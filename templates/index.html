@@ -3,16 +3,46 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>WIRING — тиндер для нейроотличных</title>
-  <meta name="description" content="Нишевый MVP: регистрация, фильтры по ASD / ADHD / ПРЛ и современным ярлыкам, потом свайп.">
+  <title>WIRING — знакомства для нейроотличных</title>
+  <meta name="description" content="Знакомства для людей с аутизмом, СДВГ, ПРЛ и соседней проводкой. Фильтры по нейротипу, свайп, взаимные мэтчи и переписка.">
+  <link rel="canonical" href="{{ site_url }}/">
+  <meta name="theme-color" content="#e9ebf3">
+  <script>
+    (function () {
+      var t = "";
+      try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
+      var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
+      document.documentElement.dataset.theme = ok[t] ? t : "mist";
+      document.querySelector('meta[name="theme-color"]').setAttribute("content", ok[t] || ok.mist);
+    })();
+  </script>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="WIRING">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:site_name" content="WIRING">
+  <meta property="og:title" content="WIRING — знакомства для нейроотличных">
+  <meta property="og:description" content="Найди человека с похожей схемой. ASD, ADHD, ПРЛ и остальные особенности — как фильтр, не как диагноз от сайта.">
+  <meta property="og:url" content="{{ site_url }}/">
+  <meta property="og:image" content="{{ site_url }}/public/og.svg">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="{{ base_path }}/public/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ base_path }}/public/icon-180.png">
+  <link rel="manifest" href="{{ base_path }}/public/manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ base_path }}/public/styles.css">
+  <link rel="stylesheet" href="{{ base_path }}/public/styles.css?v=61">
+  {% if google_analytics_id or yandex_metrika_id %}
+  <script>
+    window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
+    window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
+  </script>
+  <script src="{{ base_path }}/public/analytics.js?v=2" defer></script>
+  {% endif %}
 </head>
 <body>
   <div id="app" data-base="{{ base_path }}"></div>
-  <script src="{{ base_path }}/public/app.js" defer></script>
+  <script src="{{ base_path }}/public/app.js?v=75" defer></script>
 </body>
 </html>

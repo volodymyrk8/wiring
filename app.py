@@ -1,28 +1,60 @@
 #!/usr/bin/env python3
-"""WIRING — niche swipe app for neurodivergent dating (MVP)."""
+"""WIRING — dating for neurodivergent people."""
 
 from __future__ import annotations
 
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import time
 from functools import wraps
 from typing import Any
 
-from flask import Flask, g, jsonify, redirect, render_template, request, send_from_directory, session
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from admin import collect_stats, ensure_filter_tables, track_filters
 from catalog import (
     GENDER_IDS,
+    INTENT_IDS,
     LOOKING_IDS,
     NEURO_IDS,
+    PROMPT_IDS,
+    REPORT_IDS,
+    SEED_PHOTOS,
     VIBE_IDS,
     catalog_payload,
 )
+from cities import PLACES, catalog_city, country_of_city, is_catalog_city, normalize_city
+from icebreakers import cached_openers, clear_openers, ensure_opener_table
+from glossary import glossary_html
+from legal_pages import PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
+from matchmaker import pack_profile, seed_decides_like
+from media import MediaError, make_thumb, read_upload
+from moderation import moderate_photo
+from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
+from premium import (
+    REFERRAL_DAYS,
+    add_code,
+    apply_referral,
+    ensure_default_code,
+    ensure_referral_code,
+    grant_premium,
+    is_premium,
+    last_snooze,
+    list_codes,
+    plus_until,
+    redeem_code,
+    referral_count,
+    snooze,
+    snoozed_ids,
+    unsnooze,
+)
 from seed import SEED_USERS
+from support_triage import ensure_task_tables, list_tasks, task_counts, task_threshold, triage_support_tickets
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
@@ -30,9 +62,18 @@ BASE_PATH = os.environ.get("BASE_PATH", "").rstrip("/")
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "5070"))
 DB_PATH = os.environ.get("DATING_DB", os.path.join(BASE_DIR, "data", "wiring.sqlite3"))
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "uploads"))
+THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY") or secrets.token_hex(32)
+SITE_URL = os.environ.get("SITE_URL", "https://wiring.date").rstrip("/")
+GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "G-WH72XL7E2J").strip()
+YANDEX_METRIKA_ID = os.environ.get("YANDEX_METRIKA_ID", "").strip()
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+MAX_PHOTOS = 12
+MAX_ALBUMS = 8
+MAX_PROMPTS = 3
+ONLINE_WINDOW = 10 * 60
 
 app = Flask(__name__, template_folder="templates", static_folder=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -45,7 +86,13 @@ app.config.update(
     SESSION_COOKIE_PATH=BASE_PATH or "/",
     PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 30,
     JSON_AS_ASCII=False,
+    MAX_CONTENT_LENGTH=9 * 1024 * 1024,
 )
+
+
+@app.context_processor
+def runtime_config() -> dict[str, str]:
+    return {"google_analytics_id": GOOGLE_ANALYTICS_ID, "yandex_metrika_id": YANDEX_METRIKA_ID}
 
 _rate: dict[str, list[float]] = {}
 
@@ -75,7 +122,82 @@ def _close_db(_exc: BaseException | None) -> None:
         conn.close()
 
 
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, name: str, ddl: str) -> None:
+    if name in _columns(conn, table):
+        return
+    try:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    except sqlite3.OperationalError as exc:
+        # Race: another gunicorn worker may have added the column first.
+        if "duplicate column" not in str(exc).lower():
+            raise
+
+
+def _album_id(conn: sqlite3.Connection, user_id: int, title: str = "я") -> int:
+    title = (title or "я").strip()[:32] or "я"
+    row = conn.execute(
+        "SELECT id FROM albums WHERE user_id = ? AND title = ?",
+        (user_id, title),
+    ).fetchone()
+    if row:
+        return int(row["id"])
+    count = conn.execute("SELECT COUNT(*) AS n FROM albums WHERE user_id = ?", (user_id,)).fetchone()["n"]
+    cur = conn.execute(
+        "INSERT INTO albums (user_id, title, sort_order, created_at) VALUES (?, ?, ?, ?)",
+        (user_id, title, int(count), int(time.time())),
+    )
+    return int(cur.lastrowid)
+
+
+def _sync_primary_photo(conn: sqlite3.Connection, user_id: int) -> None:
+    row = conn.execute(
+        """
+        SELECT path FROM photos
+        WHERE user_id = ?
+        ORDER BY is_primary DESC, sort_order ASC, id ASC
+        LIMIT 1
+        """,
+        (user_id,),
+    ).fetchone()
+    conn.execute("UPDATE users SET photo = ? WHERE id = ?", (row["path"] if row else "", user_id))
+
+
+def _attach_portrait(conn: sqlite3.Connection, user_id: int, photo: str) -> None:
+    if not photo or photo not in SEED_PHOTOS:
+        return
+    if conn.execute("SELECT id FROM photos WHERE user_id = ? AND path = ?", (user_id, photo)).fetchone():
+        return
+    album_id = _album_id(conn, user_id, "я")
+    has_primary = conn.execute(
+        "SELECT id FROM photos WHERE user_id = ? AND is_primary = 1",
+        (user_id,),
+    ).fetchone()
+    conn.execute(
+        """
+        INSERT INTO photos (user_id, album_id, path, is_primary, sort_order, created_at)
+        VALUES (?, ?, ?, ?, 0, ?)
+        """,
+        (user_id, album_id, photo, 0 if has_primary else 1, int(time.time())),
+    )
+    _sync_primary_photo(conn, user_id)
+
+
+def _replace_prompts(conn: sqlite3.Connection, user_id: int, prompts: list[dict[str, str]]) -> None:
+    conn.execute("DELETE FROM user_prompts WHERE user_id = ?", (user_id,))
+    for index, item in enumerate(prompts):
+        conn.execute(
+            "INSERT INTO user_prompts (user_id, prompt_id, answer, sort_order) VALUES (?, ?, ?, ?)",
+            (user_id, item["id"], item["answer"], index),
+        )
+
+
 def init_db() -> None:
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -92,6 +214,11 @@ def init_db() -> None:
             looking_for TEXT NOT NULL,
             bio TEXT NOT NULL DEFAULT '',
             photo TEXT NOT NULL DEFAULT '',
+            job TEXT NOT NULL DEFAULT '',
+            intent TEXT NOT NULL DEFAULT 'dating',
+            height INTEGER,
+            communication TEXT NOT NULL DEFAULT '',
+            last_seen INTEGER NOT NULL DEFAULT 0,
             is_seed INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL
         );
@@ -101,6 +228,33 @@ def init_db() -> None:
             tag TEXT NOT NULL,
             PRIMARY KEY (user_id, kind, tag),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS user_prompts (
+            user_id INTEGER NOT NULL,
+            prompt_id TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, prompt_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS albums (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            album_id INTEGER,
+            path TEXT NOT NULL,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE SET NULL
         );
         CREATE TABLE IF NOT EXISTS swipes (
             from_id INTEGER NOT NULL,
@@ -112,8 +266,159 @@ def init_db() -> None:
             FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_swipes_to ON swipes(to_id, direction);
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_id INTEGER NOT NULL,
+            to_id INTEGER NOT NULL,
+            body TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id, id);
+        CREATE TABLE IF NOT EXISTS blocks (
+            from_id INTEGER NOT NULL,
+            to_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (from_id, to_id),
+            FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_id INTEGER NOT NULL,
+            to_id INTEGER NOT NULL,
+            reason TEXT NOT NULL,
+            details TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS reads (
+            user_id INTEGER NOT NULL,
+            other_id INTEGER NOT NULL,
+            last_read_id INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, other_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            from_id INTEGER NOT NULL DEFAULT 0,
+            body TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_notices_user ON notifications(user_id, read);
+        CREATE TABLE IF NOT EXISTS notes (
+            user_id INTEGER NOT NULL,
+            other_id INTEGER NOT NULL,
+            body TEXT NOT NULL DEFAULT '',
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (user_id, other_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS snoozes (
+            user_id INTEGER NOT NULL,
+            other_id INTEGER NOT NULL,
+            until_at INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (user_id, other_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS promo_codes (
+            code TEXT PRIMARY KEY,
+            days INTEGER NOT NULL,
+            max_uses INTEGER NOT NULL DEFAULT 0,
+            uses INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS promo_redemptions (
+            code TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (code, user_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS referrals (
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (referred_id),
+            FOREIGN KEY (referrer_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (referred_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_referrals_from ON referrals(referrer_id);
+        CREATE TABLE IF NOT EXISTS support_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            name TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            body TEXT NOT NULL,
+            ip TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        );
+        CREATE TABLE IF NOT EXISTS password_resets (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            used_at INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS filter_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            value TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
+    ensure_filter_tables(conn)
+    ensure_task_tables(conn)
+    ensure_opener_table(conn)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_filter_events_kind ON filter_events(kind, value, created_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_filter_events_user ON filter_events(user_id, fingerprint, created_at)"
+    )
+    for name, ddl in {
+        "job": "TEXT NOT NULL DEFAULT ''",
+        "intent": "TEXT NOT NULL DEFAULT 'dating'",
+        "height": "INTEGER",
+        "communication": "TEXT NOT NULL DEFAULT ''",
+        "last_seen": "INTEGER NOT NULL DEFAULT 0",
+        "onboard_done": "INTEGER NOT NULL DEFAULT 0",
+        "premium_until": "INTEGER NOT NULL DEFAULT 0",
+        "incognito": "INTEGER NOT NULL DEFAULT 0",
+        "paused": "INTEGER NOT NULL DEFAULT 0",
+        "referral_code": "TEXT",
+        "privacy_accepted_at": "INTEGER",
+        "special_data_consent_at": "INTEGER",
+        "photo_rights_consent_at": "INTEGER",
+        "marketing_consent_at": "INTEGER",
+        "seek_min_age": "INTEGER NOT NULL DEFAULT 18",
+        "seek_max_age": "INTEGER NOT NULL DEFAULT 99",
+        "seek_place": "TEXT NOT NULL DEFAULT ''",
+        "hide_tags": "TEXT NOT NULL DEFAULT ''",
+    }.items():
+        _ensure_column(conn, "users", name, ddl)
+    _ensure_column(conn, "messages", "reply_to_id", "INTEGER")
+    _ensure_column(conn, "messages", "photo", "TEXT NOT NULL DEFAULT ''")
+    # Map free-text cities onto the catalog when an alias/exact match exists.
+    for row in conn.execute("SELECT id, city FROM users"):
+        resolved = catalog_city(str(row["city"] or ""))
+        if resolved and resolved != row["city"]:
+            conn.execute("UPDATE users SET city = ? WHERE id = ?", (resolved, row["id"]))
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
+    ensure_default_code(conn)
+
     existing = {row["email"] for row in conn.execute("SELECT email FROM users")}
     now = int(time.time())
     for person in SEED_USERS:
@@ -122,8 +427,11 @@ def init_db() -> None:
         password = person.get("password") or secrets.token_urlsafe(18)
         cur = conn.execute(
             """
-            INSERT INTO users (email, password_hash, name, age, city, gender, looking_for, bio, photo, is_seed, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (
+                email, password_hash, name, age, city, gender, looking_for, bio, photo,
+                job, intent, communication, is_seed, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 person["email"],
@@ -135,20 +443,65 @@ def init_db() -> None:
                 person["looking_for"],
                 person["bio"],
                 person.get("photo") or "",
+                person.get("job") or "",
+                person.get("intent") or "dating",
+                person.get("communication") or "",
                 0 if person.get("is_demo") else 1,
                 now,
             ),
         )
-        uid = cur.lastrowid
+        uid = int(cur.lastrowid)
         for tag in person.get("neuro") or []:
             conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'neuro', ?)", (uid, tag))
         for tag in person.get("vibe") or []:
             conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'vibe', ?)", (uid, tag))
+        _replace_prompts(conn, uid, person.get("prompts") or [])
+        _attach_portrait(conn, uid, person.get("photo") or "")
+
+    by_email = {p["email"]: p for p in SEED_USERS}
+    for row in conn.execute("SELECT id, email, photo, job, intent, communication FROM users WHERE is_seed = 1"):
+        person = by_email.get(row["email"])
+        if not person:
+            continue
+        conn.execute(
+            "UPDATE users SET job = ?, intent = ?, communication = ? WHERE id = ? AND job = '' AND communication = ''",
+            (person.get("job") or "", person.get("intent") or "dating", person.get("communication") or "", row["id"]),
+        )
+        if not conn.execute("SELECT 1 FROM user_prompts WHERE user_id = ?", (row["id"],)).fetchone():
+            _replace_prompts(conn, row["id"], person.get("prompts") or [])
+        if row["photo"]:
+            _attach_portrait(conn, row["id"], row["photo"])
+    for row in conn.execute("SELECT id, photo FROM users WHERE photo != ''"):
+        if not conn.execute("SELECT 1 FROM photos WHERE user_id = ?", (row["id"],)).fetchone():
+            _attach_portrait(conn, row["id"], row["photo"])
+
+    keep = {person["email"] for person in SEED_USERS}
+    stale = [
+        int(row["id"])
+        for row in conn.execute("SELECT id, email FROM users WHERE is_seed = 1")
+        if row["email"] not in keep
+    ]
+    for uid in stale:
+        conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
+        conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
+        conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
+        conn.execute("DELETE FROM user_prompts WHERE user_id = ?", (uid,))
+        conn.execute("DELETE FROM photos WHERE user_id = ?", (uid,))
+        conn.execute("DELETE FROM albums WHERE user_id = ?", (uid,))
+        conn.execute("DELETE FROM blocks WHERE from_id = ? OR to_id = ?", (uid, uid))
+        conn.execute("DELETE FROM reports WHERE from_id = ? OR to_id = ?", (uid, uid))
+        conn.execute("DELETE FROM reads WHERE user_id = ? OR other_id = ?", (uid, uid))
+        conn.execute("DELETE FROM notifications WHERE user_id = ? OR from_id = ?", (uid, uid))
+        conn.execute("DELETE FROM notes WHERE user_id = ? OR other_id = ?", (uid, uid))
+        conn.execute("DELETE FROM snoozes WHERE user_id = ? OR other_id = ?", (uid, uid))
+        conn.execute("DELETE FROM promo_redemptions WHERE user_id = ?", (uid,))
+        conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+
     conn.commit()
     conn.close()
 
 
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
 init_db()
 
 
@@ -163,22 +516,61 @@ def too_many(key: str, limit: int, window: float) -> bool:
     return False
 
 
-def current_user() -> dict[str, Any] | None:
-    uid = session.get("uid")
-    if not uid:
-        return None
-    row = db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    return user_public(row, include_email=True) if row else None
+def is_guest_email(email: str) -> bool:
+    return email.endswith("@wiring.guest") or email == "demo@wiring.app"
 
 
-def login_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get("uid"):
-            return jsonify({"ok": False, "error": "нужна сессия"}), 401
-        return fn(*args, **kwargs)
+def is_demo_email(email: str) -> bool:
+    value = (email or "").strip().lower()
+    return (
+        is_guest_email(value)
+        or value.endswith("@example.com")
+        or value.endswith("@wiring.demo")
+        or value.endswith("@wiring.app")
+    )
 
-    return wrapper
+
+def is_live_profile(row: sqlite3.Row) -> bool:
+    if int(row["is_seed"] or 0):
+        return False
+    return not is_demo_email(str(row["email"] or ""))
+
+
+def _consent_yes(value: Any) -> bool:
+    return value is True or value in (1, "1", "true", "True", "yes", "on")
+
+
+def profile_complete(row: sqlite3.Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
+    """Ready to appear in the feed: city, age, neuro, photo, consents."""
+    if int(row["is_seed"] or 0) or is_guest_email(str(row["email"] or "")):
+        return True
+    tags = tags if tags is not None else tags_for(row["id"])
+    if photos is None:
+        photos = photos_for(row["id"])
+    if int(row["age"] or 0) < 18:
+        return False
+    if not str(row["city"] or "").strip():
+        return False
+    if str(row["gender"] or "") not in GENDER_IDS:
+        return False
+    if not tags.get("neuro"):
+        return False
+    if not photos and not str(row["photo"] or "").strip():
+        return False
+    keys = set(row.keys())
+    if "special_data_consent_at" in keys and not row["special_data_consent_at"]:
+        return False
+    if "photo_rights_consent_at" in keys and not row["photo_rights_consent_at"]:
+        return False
+    return True
+
+
+def media_url(path: str) -> str:
+    if not path:
+        return ""
+    if path.startswith("portraits/") or path.startswith("people/"):
+        return prefix(f"/public/{path}")
+    return prefix(f"/media/{path}")
 
 
 def tags_for(user_id: int) -> dict[str, list[str]]:
@@ -192,8 +584,66 @@ def tags_for(user_id: int) -> dict[str, list[str]]:
     return {"neuro": neuro, "vibe": vibe}
 
 
-def user_public(row: sqlite3.Row, include_email: bool = False) -> dict[str, Any]:
+def prompts_for(user_id: int) -> list[dict[str, str]]:
+    return [
+        {"id": row["prompt_id"], "answer": row["answer"]}
+        for row in db().execute(
+            "SELECT prompt_id, answer FROM user_prompts WHERE user_id = ? ORDER BY sort_order, prompt_id",
+            (user_id,),
+        )
+    ]
+
+
+def photos_for(user_id: int) -> list[dict[str, Any]]:
+    rows = db().execute(
+        """
+        SELECT p.id, p.path, p.is_primary, p.sort_order, p.album_id, a.title AS album
+        FROM photos p
+        LEFT JOIN albums a ON a.id = p.album_id
+        WHERE p.user_id = ?
+        ORDER BY p.is_primary DESC, p.sort_order ASC, p.id ASC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "url": media_url(row["path"]),
+            "album_id": row["album_id"],
+            "album": row["album"] or "я",
+            "is_primary": bool(row["is_primary"]),
+        }
+        for row in rows
+    ]
+
+
+def albums_for(user_id: int) -> list[dict[str, Any]]:
+    photos = photos_for(user_id)
+    albums = [
+        {"id": row["id"], "title": row["title"], "photos": []}
+        for row in db().execute(
+            "SELECT id, title FROM albums WHERE user_id = ? ORDER BY sort_order, id",
+            (user_id,),
+        )
+    ]
+    by_id = {item["id"]: item for item in albums}
+    for photo in photos:
+        bucket = by_id.get(photo["album_id"])
+        if bucket is None:
+            bucket = {"id": photo["album_id"] or 0, "title": photo["album"], "photos": []}
+            albums.append(bucket)
+            by_id[bucket["id"]] = bucket
+        bucket["photos"].append(photo)
+    return albums
+
+
+def user_public(row: sqlite3.Row, include_email: bool = False, detail: bool = False) -> dict[str, Any]:
     tags = tags_for(row["id"])
+    photos = photos_for(row["id"])
+    urls = [item["url"] for item in photos]
+    primary = next((item["url"] for item in photos if item["is_primary"]), urls[0] if urls else media_url(row["photo"]))
+    keys = set(row.keys())
+    last_seen = int(row["last_seen"] or 0) if "last_seen" in keys else 0
     payload = {
         "id": row["id"],
         "name": row["name"],
@@ -202,13 +652,134 @@ def user_public(row: sqlite3.Row, include_email: bool = False) -> dict[str, Any]
         "gender": row["gender"],
         "looking_for": row["looking_for"],
         "bio": row["bio"],
-        "photo": row["photo"] or "",
+        "job": row["job"] if "job" in keys else "",
+        "intent": (intents_of(row) or ["dating"])[0],
+        "intents": intents_of(row),
+        "height": row["height"] if "height" in keys else None,
+        "communication": row["communication"] if "communication" in keys else "",
+        "photo": primary or "",
+        "photos": photos if detail else urls,
         "neuro": tags["neuro"],
         "vibe": tags["vibe"],
+        "prompts": prompts_for(row["id"]),
+        "online": bool(last_seen and time.time() - last_seen < ONLINE_WINDOW),
+        "city_ok": is_catalog_city(str(row["city"] or "")),
+        "has_photo": bool(photos) or bool(str(row["photo"] or "").strip()),
+        "seek_min_age": int(row["seek_min_age"] or 18) if "seek_min_age" in keys else 18,
+        "seek_max_age": int(row["seek_max_age"] or 99) if "seek_max_age" in keys else 99,
+        "seek_place": str(row["seek_place"] or "") if "seek_place" in keys else "",
+        "hide_tags": hide_tags_of(row),
     }
+    if detail:
+        payload["albums"] = albums_for(row["id"])
     if include_email:
         payload["email"] = row["email"]
+        payload["guest"] = is_guest_email(str(row["email"]))
+        complete = profile_complete(row, tags, photos)
+        payload["needs_profile"] = not complete and not payload["guest"]
+        payload["needs_onboard"] = payload["needs_profile"]
+        payload["needs_city"] = not bool(str(row["city"] or "").strip())
+        payload["needs_special_consent"] = not bool(row["special_data_consent_at"] if "special_data_consent_at" in keys else True)
+        payload["needs_photo_consent"] = not bool(row["photo_rights_consent_at"] if "photo_rights_consent_at" in keys else True)
+        payload["plus"] = is_premium(row)
+        payload["plus_until"] = plus_until(row)
+        payload["incognito"] = bool(int(row["incognito"] or 0)) if "incognito" in keys else False
+        payload["paused"] = bool(int(row["paused"] or 0)) if "paused" in keys else False
+        code = str(row["referral_code"] or "") if "referral_code" in keys else ""
+        if code and not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
+            payload["ref"] = code
+            payload["ref_url"] = f"{SITE_URL}/r/{code}"
+            payload["ref_count"] = referral_count(db(), row["id"])
+            payload["ref_days"] = REFERRAL_DAYS
     return payload
+
+
+def inbox_stats(uid: int) -> dict[str, int]:
+    conn = db()
+    blocked = blocked_ids(conn, uid)
+    likes = 0
+    for row in conn.execute(
+        """
+        SELECT s.from_id, u.email FROM swipes s
+        JOIN users u ON u.id = s.from_id
+        WHERE s.to_id = ? AND s.direction = 'like'
+          AND s.from_id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
+          AND (
+            EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
+            OR (u.photo IS NOT NULL AND u.photo != '')
+          )
+        """,
+        (uid, uid),
+    ):
+        if row["from_id"] in blocked or is_guest_email(str(row["email"] or "")):
+            continue
+        likes += 1
+    unread = 0
+    for row in conn.execute(
+        """
+        SELECT u.id FROM users u
+        JOIN swipes a ON a.to_id = u.id AND a.from_id = ? AND a.direction = 'like'
+        JOIN swipes b ON b.from_id = u.id AND b.to_id = ? AND b.direction = 'like'
+        """,
+        (uid, uid),
+    ):
+        if row["id"] in blocked:
+            continue
+        unread += unread_count(conn, uid, row["id"])
+    return {"likes_in": likes, "unread": unread}
+
+
+def current_user() -> dict[str, Any] | None:
+    uid = session.get("uid")
+    if not uid:
+        return None
+    conn = db()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row:
+        return None
+    if not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
+        ensure_referral_code(conn, uid)
+        conn.commit()
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    payload = user_public(row, include_email=True, detail=True)
+    payload.update(inbox_stats(uid))
+    liked = db().execute(
+        "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
+        (uid,),
+    ).fetchone()["n"]
+    payload["guest_nudge"] = bool(payload.get("guest") and liked >= 3)
+    payload["notices"] = unread_notices(db(), uid)
+    return payload
+
+
+def touch_seen(uid: int) -> None:
+    db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (int(time.time()), uid))
+    db().commit()
+
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("uid"):
+            return jsonify({"ok": False, "error": "нужна сессия"}), 401
+        touch_seen(session["uid"])
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def real_account_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        uid = session.get("uid")
+        if not uid:
+            return jsonify({"ok": False, "error": "нужна сессия"}), 401
+        row = db().execute("SELECT email FROM users WHERE id = ?", (uid,)).fetchone()
+        if not row or is_guest_email(str(row["email"])):
+            return jsonify({"ok": False, "error": "сначала собери свой профиль"}), 403
+        return fn(*args, **kwargs)
+
+    return wrapper
 
 
 def parse_tags(raw: Any, allowed: set[str], *, required: bool) -> tuple[list[str] | None, str | None]:
@@ -224,39 +795,150 @@ def parse_tags(raw: Any, allowed: set[str], *, required: bool) -> tuple[list[str
             cleaned.append(item)
     if required and not cleaned:
         return None, "выбери хотя бы один нейротип"
-    if len(cleaned) > 8:
-        return None, "слишком много тегов — оставь до 8"
     return cleaned, None
 
 
-def parse_profile(data: dict[str, Any], *, require_password: bool) -> tuple[dict[str, Any] | None, str | None]:
+def parse_prompts(raw: Any) -> tuple[list[dict[str, str]] | None, str | None]:
+    if raw is None:
+        return [], None
+    if not isinstance(raw, list):
+        return None, "промпты должны быть списком"
+    if len(raw) > MAX_PROMPTS:
+        return None, "можно три промпта"
+    cleaned: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            return None, "промпт — объект с id и ответом"
+        pid = str(item.get("id") or "")
+        answer = str(item.get("answer") or "").strip()
+        if pid not in PROMPT_IDS:
+            return None, "неизвестный промпт"
+        if pid in seen:
+            continue
+        if not (4 <= len(answer) <= 280):
+            return None, "ответ промпта: 4–280 символов"
+        seen.add(pid)
+        cleaned.append({"id": pid, "answer": answer})
+    return cleaned, None
+
+
+def parse_intents(raw: Any) -> list[str]:
+    if isinstance(raw, list):
+        items = raw
+    else:
+        text = str(raw or "").strip()
+        if not text:
+            items = []
+        elif text.startswith("["):
+            try:
+                import json
+
+                parsed = json.loads(text)
+                items = parsed if isinstance(parsed, list) else [text]
+            except (TypeError, ValueError):
+                items = re.split(r"[,;|]+", text)
+        else:
+            items = re.split(r"[,;|]+", text)
+    out: list[str] = []
+    for item in items:
+        value = str(item or "").strip()
+        if value in INTENT_IDS and value not in out:
+            out.append(value)
+    return out
+
+
+def intents_store(items: list[str]) -> str:
+    return ",".join(items) if items else "dating"
+
+
+def intents_of(row_or_value: Any) -> list[str]:
+    if isinstance(row_or_value, sqlite3.Row):
+        keys = set(row_or_value.keys())
+        raw = row_or_value["intent"] if "intent" in keys else "dating"
+    else:
+        raw = row_or_value
+    found = parse_intents(raw)
+    return found or ["dating"]
+
+
+def parse_profile(
+    data: dict[str, Any], *, require_password: bool, require_neuro: bool = True
+) -> tuple[dict[str, Any] | None, str | None]:
     name = str(data.get("name") or "").strip()
-    city = str(data.get("city") or "").strip()
+    city_raw = str(data.get("city") or "").strip()
+    city = normalize_city(city_raw)
     bio = str(data.get("bio") or "").strip()
     gender = str(data.get("gender") or "").strip()
     looking_for = str(data.get("looking_for") or "").strip()
+    job = str(data.get("job") or "").strip()
+    communication = str(data.get("communication") or "").strip()
+    intents = parse_intents(data.get("intents") if data.get("intents") is not None else data.get("intent"))
+    if not intents:
+        intents = ["dating"]
     try:
         age = int(data.get("age"))
     except (TypeError, ValueError):
         return None, "возраст — число"
+    height_raw = data.get("height")
+    height = None
+    if height_raw not in (None, "", 0, "0"):
+        try:
+            height = int(height_raw)
+        except (TypeError, ValueError):
+            return None, "рост — число в см"
+        if not (140 <= height <= 220):
+            return None, "рост: 140–220 см"
     if not (2 <= len(name) <= 32):
         return None, "имя: 2–32 символа"
     if not (18 <= age <= 99):
         return None, "только 18+"
-    if not (2 <= len(city) <= 40):
-        return None, "город: 2–40 символов"
-    if len(bio) > 280:
-        return None, "био до 280 символов"
+    if not city or len(city) < 2 or len(city) > 48:
+        return None, "город: 2–48 символов"
+    if len(bio) > 1200:
+        return None, "био до 1200 символов"
+    if len(job) > 60:
+        return None, "занятие до 60 символов"
+    if len(communication) > 280:
+        return None, "как тебе писать: до 280 символов"
     if gender not in GENDER_IDS:
         return None, "выбери гендер"
     if looking_for not in LOOKING_IDS:
         return None, "кого ищешь?"
-    neuro, err = parse_tags(data.get("neuro"), NEURO_IDS, required=True)
+    neuro, err = parse_tags(data.get("neuro"), NEURO_IDS, required=require_neuro)
     if err:
         return None, err
     vibe, err = parse_tags(data.get("vibe"), VIBE_IDS, required=False)
     if err:
         return None, err
+    prompts, err = parse_prompts(data.get("prompts"))
+    if err:
+        return None, err
+    seek_min: int | None = None
+    seek_max: int | None = None
+    if "seek_min_age" in data or "seek_max_age" in data:
+        try:
+            seek_min = int(data.get("seek_min_age") if data.get("seek_min_age") not in (None, "") else 18)
+            seek_max = int(data.get("seek_max_age") if data.get("seek_max_age") not in (None, "") else 99)
+        except (TypeError, ValueError):
+            return None, "возраст видимости — числа"
+        seek_min = max(18, min(99, seek_min))
+        seek_max = max(18, min(99, seek_max))
+        if seek_min > seek_max:
+            seek_min, seek_max = seek_max, seek_min
+    seek_place: str | None = None
+    if "seek_place" in data:
+        seek_place = str(data.get("seek_place") or "").strip()
+        if seek_place:
+            as_city = catalog_city(seek_place) or normalize_city(seek_place)
+            countries = {str(b.get("country") or "") for b in PLACES}
+            if as_city and is_catalog_city(as_city):
+                seek_place = as_city
+            elif seek_place not in countries:
+                return None, "страна или город из списка"
+    hide: list[str] | None = None
+    if "hide_tags" in data:
+        hide = parse_hide_tags(data.get("hide_tags"))
     payload: dict[str, Any] = {
         "name": name,
         "age": age,
@@ -264,9 +946,23 @@ def parse_profile(data: dict[str, Any], *, require_password: bool) -> tuple[dict
         "gender": gender,
         "looking_for": looking_for,
         "bio": bio,
+        "job": job,
+        "intent": intents_store(intents),
+        "intents": intents,
+        "height": height,
+        "communication": communication,
         "neuro": neuro,
         "vibe": vibe or [],
+        "prompts": prompts or [],
+        "seek_min_age": seek_min,
+        "seek_max_age": seek_max,
+        "seek_place": seek_place,
+        "hide_tags": hide,
     }
+    photo = str(data.get("photo") or "").strip()
+    if photo and photo not in SEED_PHOTOS:
+        return None, "выбери фото из набора или загрузи своё"
+    payload["photo"] = photo
     if require_password:
         email = str(data.get("email") or "").strip().lower()
         password = str(data.get("password") or "")
@@ -297,11 +993,252 @@ def looking_matches(viewer_looking: str, candidate_gender: str) -> bool:
     return True
 
 
+def mutual_looking_ok(a_looking: str, a_gender: str, b_looking: str, b_gender: str) -> bool:
+    return looking_matches(a_looking, b_gender) and looking_matches(b_looking, a_gender)
+
+
+def parse_hide_tags(raw: Any) -> list[str]:
+    if isinstance(raw, list):
+        items = [str(x).strip() for x in raw]
+    else:
+        items = [p.strip() for p in str(raw or "").split(",")]
+    allowed = NEURO_IDS | VIBE_IDS
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if item in allowed and item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
+def hide_tags_of(row: sqlite3.Row | dict[str, Any] | None) -> list[str]:
+    if not row:
+        return []
+    keys = set(row.keys()) if hasattr(row, "keys") else set()
+    if "hide_tags" not in keys and not isinstance(row, dict):
+        return []
+    raw = row["hide_tags"] if not isinstance(row, dict) else row.get("hide_tags")
+    return parse_hide_tags(raw)
+
+
+def discovery_allows(owner: sqlite3.Row, viewer: sqlite3.Row) -> bool:
+    """Whether `viewer` is allowed to see `owner` in the feed."""
+    keys = set(owner.keys())
+    viewer_age = int(viewer["age"] or 0)
+    vmin = int(owner["seek_min_age"] or 18) if "seek_min_age" in keys else 18
+    vmax = int(owner["seek_max_age"] or 99) if "seek_max_age" in keys else 99
+    vmin = max(18, min(99, vmin))
+    vmax = max(18, min(99, vmax))
+    if vmin > vmax:
+        vmin, vmax = vmax, vmin
+    if viewer_age < vmin or viewer_age > vmax:
+        return False
+    place = str(owner["seek_place"] or "").strip() if "seek_place" in keys else ""
+    if place:
+        viewer_city = str(viewer["city"] or "").strip()
+        viewer_country = country_of_city(viewer_city)
+        if place != viewer_city and place != viewer_country:
+            return False
+    blocked = hide_tags_of(owner)
+    if blocked:
+        tags = tags_for(int(viewer["id"]))
+        mine = set(tags.get("neuro") or []) | set(tags.get("vibe") or [])
+        if mine & set(blocked):
+            return False
+    return True
+
+
+def _notifiable(row: sqlite3.Row) -> bool:
+    return is_live_profile(row)
+
+
+def maybe_finish_onboard(conn: sqlite3.Connection, uid: int) -> None:
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row or is_guest_email(str(row["email"])):
+        return
+    if profile_complete(row):
+        conn.execute("UPDATE users SET onboard_done = 1 WHERE id = ?", (uid,))
+    else:
+        conn.execute("UPDATE users SET onboard_done = 0 WHERE id = ?", (uid,))
+
+
+def _token_ok(got: str, expected: str) -> bool:
+    if not got or not expected:
+        return False
+    left = got.encode("utf-8")
+    right = expected.encode("utf-8")
+    if len(left) != len(right):
+        return False
+    return secrets.compare_digest(left, right)
+
+
+def blocked_ids(conn: sqlite3.Connection, uid: int) -> set[int]:
+    rows = conn.execute(
+        """
+        SELECT to_id AS id FROM blocks WHERE from_id = ?
+        UNION
+        SELECT from_id AS id FROM blocks WHERE to_id = ?
+        """,
+        (uid, uid),
+    )
+    return {int(row["id"]) for row in rows}
+
+
+def unread_count(conn: sqlite3.Connection, me: int, other: int) -> int:
+    row = conn.execute(
+        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ?",
+        (me, other),
+    ).fetchone()
+    last_id = int(row["last_read_id"]) if row else 0
+    return int(
+        conn.execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND id > ?",
+            (other, me, last_id),
+        ).fetchone()["n"]
+    )
+
+
+def mark_read(conn: sqlite3.Connection, me: int, other: int) -> None:
+    last = conn.execute(
+        """
+        SELECT id FROM messages
+        WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+        ORDER BY id DESC LIMIT 1
+        """,
+        (me, other, other, me),
+    ).fetchone()
+    last_id = int(last["id"]) if last else 0
+    conn.execute(
+        """
+        INSERT INTO reads (user_id, other_id, last_read_id) VALUES (?, ?, ?)
+        ON CONFLICT(user_id, other_id) DO UPDATE SET last_read_id = excluded.last_read_id
+        """,
+        (me, other, last_id),
+    )
+
+
+def wipe_user(conn: sqlite3.Connection, uid: int) -> None:
+    conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
+    conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
+    conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM user_prompts WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM photos WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM albums WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM blocks WHERE from_id = ? OR to_id = ?", (uid, uid))
+    conn.execute("DELETE FROM reports WHERE from_id = ? OR to_id = ?", (uid, uid))
+    conn.execute("DELETE FROM reads WHERE user_id = ? OR other_id = ?", (uid, uid))
+    conn.execute("DELETE FROM notifications WHERE user_id = ? OR from_id = ?", (uid, uid))
+    conn.execute("DELETE FROM notes WHERE user_id = ? OR other_id = ?", (uid, uid))
+    conn.execute("DELETE FROM snoozes WHERE user_id = ? OR other_id = ?", (uid, uid))
+    conn.execute("DELETE FROM promo_redemptions WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
+    conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+    folder = os.path.join(UPLOAD_DIR, str(uid))
+    if os.path.isdir(folder):
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+def _purge_old_guests(conn: sqlite3.Connection) -> None:
+    cutoff = int(time.time()) - 60 * 60 * 24 * 3
+    ids = [
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM users WHERE email LIKE 'guest-%@wiring.guest' AND created_at < ?",
+            (cutoff,),
+        )
+    ]
+    for uid in ids:
+        wipe_user(conn, uid)
+
+
+def _clear_pair(conn: sqlite3.Connection, uid: int, target_id: int) -> None:
+    conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (uid, target_id))
+    target = conn.execute("SELECT is_seed FROM users WHERE id = ?", (target_id,)).fetchone()
+    if target and target["is_seed"]:
+        conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (target_id, uid))
+
+
+def _is_match(conn: sqlite3.Connection, a: int, b: int) -> bool:
+    left = conn.execute(
+        "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
+        (a, b),
+    ).fetchone()
+    right = conn.execute(
+        "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
+        (b, a),
+    ).fetchone()
+    return bool(left and right and left["direction"] == "like" and right["direction"] == "like")
+
+
+def _unmatch_pair(conn: sqlite3.Connection, uid: int, other_id: int) -> None:
+    """Remove chat: your side becomes a pass (diz), their like is dropped.
+
+    They leave Чаты and Лайки and stay out of the лента until you restore passes.
+    """
+    now = int(time.time())
+    for row in conn.execute(
+        """
+        SELECT photo FROM messages
+        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+          AND photo IS NOT NULL AND photo != ''
+        """,
+        (uid, other_id, other_id, uid),
+    ):
+        rel = str(row["photo"] or "")
+        if not rel or ".." in rel or rel.startswith("/"):
+            continue
+        full = os.path.join(UPLOAD_DIR, rel)
+        if os.path.isfile(full):
+            try:
+                os.remove(full)
+            except OSError:
+                pass
+    conn.execute(
+        "DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)",
+        (uid, other_id, other_id, uid),
+    )
+    conn.execute(
+        "DELETE FROM reads WHERE (user_id = ? AND other_id = ?) OR (user_id = ? AND other_id = ?)",
+        (uid, other_id, other_id, uid),
+    )
+    conn.execute(
+        """
+        INSERT INTO swipes (from_id, to_id, direction, created_at)
+        VALUES (?, ?, 'pass', ?)
+        ON CONFLICT(from_id, to_id) DO UPDATE SET direction = 'pass', created_at = excluded.created_at
+        """,
+        (uid, other_id, now),
+    )
+    conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (other_id, uid))
+    clear_openers(conn, uid, other_id)
+
+
+def _spa() -> str:
+    return render_template("index.html", base_path=BASE_PATH, site_url=SITE_URL)
+
+
 @app.get("/")
 def index():
     if BASE_PATH and request.path.rstrip("/") == "":
         return redirect(prefix("/"))
-    return render_template("index.html", base_path=BASE_PATH)
+    return _spa()
+
+
+@app.get("/login")
+@app.get("/register")
+@app.get("/forgot")
+@app.get("/reset")
+@app.get("/feed")
+@app.get("/likes")
+@app.get("/chats")
+@app.get("/chats/<int:chat_id>")
+@app.get("/me")
+@app.get("/onboard")
+@app.get("/p/<int:person_id>")
+@app.get("/r/<code>")
+def spa_app(**_kwargs):
+    return _spa()
 
 
 @app.get("/health")
@@ -327,37 +1264,60 @@ def api_register():
     if too_many(f"reg:{ip}", 8, 3600):
         return jsonify({"ok": False, "error": "слишком много регистраций, подожди"}), 429
     data = request.get_json(silent=True) or {}
-    parsed, err = parse_profile(data, require_password=True)
-    if err or parsed is None:
-        return jsonify({"ok": False, "error": err}), 400
+    if not data.get("age_confirm"):
+        return jsonify({"ok": False, "error": "нужно подтвердить, что тебе есть 18"}), 400
+    if data.get("privacy_confirm") is not True:
+        return jsonify({"ok": False, "error": "нужно согласие на обработку персональных данных и политику конфиденциальности"}), 400
+    name = str(data.get("name") or "").strip()
+    email = str(data.get("email") or "").strip().lower()
+    password = str(data.get("password") or "")
+    if not (2 <= len(name) <= 32):
+        return jsonify({"ok": False, "error": "имя: 2–32 символа"}), 400
+    if not EMAIL_RE.match(email) or "@wiring.guest" in email or email.endswith("@wiring.demo"):
+        return jsonify({"ok": False, "error": "нужна нормальная почта"}), 400
+    if len(password) < 6:
+        return jsonify({"ok": False, "error": "пароль минимум 6 символов"}), 400
     conn = db()
-    if conn.execute("SELECT id FROM users WHERE email = ?", (parsed["email"],)).fetchone():
+    if conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
         return jsonify({"ok": False, "error": "такая почта уже есть"}), 409
+    consented_at = int(time.time())
+    marketing_at = consented_at if data.get("marketing_consent") is True else None
     cur = conn.execute(
         """
-        INSERT INTO users (email, password_hash, name, age, city, gender, looking_for, bio, photo, is_seed, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 0, ?)
+        INSERT INTO users (
+            email, password_hash, name, age, city, gender, looking_for, bio, photo,
+            job, intent, height, communication, privacy_accepted_at,
+            special_data_consent_at, photo_rights_consent_at, marketing_consent_at,
+            onboard_done, is_seed, created_at, last_seen
+        )
+        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, 0, 0, ?, ?)
         """,
         (
-            parsed["email"],
-            generate_password_hash(parsed["password"], method="pbkdf2:sha256"),
-            parsed["name"],
-            parsed["age"],
-            parsed["city"],
-            parsed["gender"],
-            parsed["looking_for"],
-            parsed["bio"],
-            int(time.time()),
+            email,
+            generate_password_hash(password, method="pbkdf2:sha256"),
+            name,
+            consented_at,
+            marketing_at,
+            consented_at,
+            consented_at,
         ),
     )
     uid = int(cur.lastrowid)
-    replace_tags(conn, uid, parsed["neuro"], parsed["vibe"])
+    ensure_referral_code(conn, uid)
+    referrer_id = apply_referral(conn, uid, str(data.get("ref") or data.get("referral") or ""))
+    if referrer_id:
+        add_notice(
+            conn,
+            referrer_id,
+            "referral",
+            0,
+            f"по твоей ссылке зарегистрировались — WIRING+ на {REFERRAL_DAYS} дней",
+        )
     conn.commit()
     session.clear()
     session.permanent = True
     session["uid"] = uid
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    return jsonify({"ok": True, "user": user_public(user, include_email=True)})
+    return jsonify({"ok": True, "user": current_user()})
 
 
 @app.post("/api/login")
@@ -374,18 +1334,101 @@ def api_login():
     session.clear()
     session.permanent = True
     session["uid"] = row["id"]
-    return jsonify({"ok": True, "user": user_public(row, include_email=True)})
+    db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (int(time.time()), row["id"]))
+    db().commit()
+    return jsonify({"ok": True, "user": current_user()})
+
+
+@app.post("/api/password/forgot")
+def api_password_forgot():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"pwforgot:{ip}", 8, 600):
+        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+    if EMAIL_RE.match(email) and "@wiring.guest" not in email and not email.endswith("@wiring.demo"):
+        conn = db()
+        row = conn.execute(
+            "SELECT id FROM users WHERE email = ? AND COALESCE(is_seed, 0) = 0",
+            (email,),
+        ).fetchone()
+        if row:
+            token = secrets.token_urlsafe(32)
+            conn.execute("DELETE FROM password_resets WHERE user_id = ?", (row["id"],))
+            conn.execute(
+                "INSERT INTO password_resets (token, user_id, created_at) VALUES (?, ?, ?)",
+                (token, row["id"], int(time.time())),
+            )
+            conn.commit()
+            link = f"{SITE_URL}/?reset={token}"
+            send_mail(
+                email,
+                "WIRING — сброс пароля",
+                f"Ссылка действует 2 часа:\n\n{link}\n\nЕсли это не ты — просто проигнорируй письмо.",
+            )
+    return jsonify({"ok": True})
+
+
+@app.post("/api/password/reset")
+def api_password_reset():
+    data = request.get_json(silent=True) or {}
+    token = str(data.get("token") or "").strip()
+    password = str(data.get("password") or "")
+    if len(password) < 6:
+        return jsonify({"ok": False, "error": "пароль минимум 6 символов"}), 400
+    if not token:
+        return jsonify({"ok": False, "error": "нет токена"}), 400
+    conn = db()
+    row = conn.execute(
+        "SELECT token, user_id, created_at, used_at FROM password_resets WHERE token = ?",
+        (token,),
+    ).fetchone()
+    if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 7200:
+        return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
+    conn.execute(
+        "UPDATE users SET password_hash = ? WHERE id = ?",
+        (generate_password_hash(password, method="pbkdf2:sha256"), row["user_id"]),
+    )
+    conn.execute("UPDATE password_resets SET used_at = ? WHERE token = ?", (int(time.time()), token))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/me/city")
+@login_required
+def api_me_city():
+    data = request.get_json(silent=True) or {}
+    city = normalize_city(str(data.get("city") or "").strip())
+    if not city or len(city) < 2 or len(city) > 48:
+        return jsonify({"ok": False, "error": "город: 2–48 символов"}), 400
+    conn = db()
+    conn.execute("UPDATE users SET city = ? WHERE id = ?", (city, session["uid"]))
+    conn.commit()
+    return jsonify({"ok": True, "user": current_user()})
 
 
 @app.post("/api/demo")
 def api_demo():
-    row = db().execute("SELECT * FROM users WHERE email = ?", ("demo@wiring.app",)).fetchone()
-    if not row:
-        return jsonify({"ok": False, "error": "демо-профиль не создан"}), 500
+    conn = db()
+    _purge_old_guests(conn)
+    email = f"guest-{secrets.token_hex(8)}@wiring.guest"
+    cur = conn.execute(
+        """
+        INSERT INTO users (email, password_hash, name, age, city, gender, looking_for, bio, photo, is_seed, created_at, last_seen)
+        VALUES (?, ?, 'Гость', 28, 'онлайн / не важно', 'other', 'everyone',
+                'Смотрю анкеты. Свой профиль соберу чуть позже.',
+                '', 0, ?, ?)
+        """,
+        (email, generate_password_hash(secrets.token_urlsafe(18), method="pbkdf2:sha256"), int(time.time()), int(time.time())),
+    )
+    uid = int(cur.lastrowid)
+    replace_tags(conn, uid, ["audhd"], ["selfdx", "terminally-online"])
+    conn.commit()
     session.clear()
     session.permanent = True
-    session["uid"] = row["id"]
-    return jsonify({"ok": True, "user": user_public(row, include_email=True)})
+    session["uid"] = uid
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True)})
 
 
 @app.post("/api/logout")
@@ -394,26 +1437,150 @@ def api_logout():
     return jsonify({"ok": True})
 
 
+@app.delete("/api/me")
+@login_required
+def api_delete_me():
+    uid = session["uid"]
+    conn = db()
+    wipe_user(conn, uid)
+    conn.commit()
+    session.clear()
+    return jsonify({"ok": True})
+
+
 @app.patch("/api/me")
 @login_required
 def api_patch_me():
     data = request.get_json(silent=True) or {}
-    parsed, err = parse_profile({**data, "email": "x@y.zz", "password": "ignore1"}, require_password=False)
+    parsed, err = parse_profile(
+        {**data, "email": "x@y.zz", "password": "ignore1"}, require_password=False, require_neuro=True
+    )
     if err or parsed is None:
         return jsonify({"ok": False, "error": err}), 400
     uid = session["uid"]
     conn = db()
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not me:
+        return jsonify({"ok": False, "error": "нет профиля"}), 401
+    now = int(time.time())
+    special_at = me["special_data_consent_at"] if "special_data_consent_at" in me.keys() else None
+    photo_at = me["photo_rights_consent_at"] if "photo_rights_consent_at" in me.keys() else None
+    if _consent_yes(data.get("special_data_consent")):
+        special_at = special_at or now
+    if _consent_yes(data.get("photo_rights_consent")):
+        photo_at = photo_at or now
+    if parsed["neuro"] and not special_at:
+        return jsonify({"ok": False, "error": "нужно согласие на обработку и показ выбранных особенностей"}), 400
+    me_keys = set(me.keys())
+    seek_min = parsed.get("seek_min_age")
+    seek_max = parsed.get("seek_max_age")
+    seek_place = parsed.get("seek_place")
+    hide = parsed.get("hide_tags")
+    if seek_min is None:
+        seek_min = int(me["seek_min_age"] or 18) if "seek_min_age" in me_keys else 18
+    if seek_max is None:
+        seek_max = int(me["seek_max_age"] or 99) if "seek_max_age" in me_keys else 99
+    if seek_place is None:
+        seek_place = str(me["seek_place"] or "") if "seek_place" in me_keys else ""
+    if hide is None:
+        hide = hide_tags_of(me)
     conn.execute(
         """
-        UPDATE users SET name = ?, age = ?, city = ?, gender = ?, looking_for = ?, bio = ?
+        UPDATE users SET name = ?, age = ?, city = ?, gender = ?, looking_for = ?, bio = ?,
+            job = ?, intent = ?, height = ?, communication = ?,
+            special_data_consent_at = ?, photo_rights_consent_at = ?,
+            seek_min_age = ?, seek_max_age = ?, seek_place = ?, hide_tags = ?
         WHERE id = ?
         """,
-        (parsed["name"], parsed["age"], parsed["city"], parsed["gender"], parsed["looking_for"], parsed["bio"], uid),
+        (
+            parsed["name"],
+            parsed["age"],
+            parsed["city"],
+            parsed["gender"],
+            parsed["looking_for"],
+            parsed["bio"],
+            parsed["job"],
+            parsed["intent"],
+            parsed["height"],
+            parsed["communication"],
+            special_at,
+            photo_at,
+            seek_min,
+            seek_max,
+            seek_place,
+            ",".join(hide or []),
+            uid,
+        ),
     )
     replace_tags(conn, uid, parsed["neuro"], parsed["vibe"])
+    _replace_prompts(conn, uid, parsed["prompts"])
+    if parsed.get("photo"):
+        if not photo_at:
+            return jsonify({"ok": False, "error": "подтверди, что загружаешь только свои фото"}), 400
+        _attach_portrait(conn, uid, parsed["photo"])
+        conn.execute("UPDATE photos SET is_primary = CASE WHEN path = ? THEN 1 ELSE 0 END WHERE user_id = ?", (parsed["photo"], uid))
+        _sync_primary_photo(conn, uid)
+    primary_id = data.get("primary_photo_id")
+    if primary_id not in (None, ""):
+        try:
+            pid = int(primary_id)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "не то фото"}), 400
+        photo = conn.execute("SELECT id FROM photos WHERE id = ? AND user_id = ?", (pid, uid)).fetchone()
+        if not photo:
+            return jsonify({"ok": False, "error": "фото не найдено"}), 404
+        conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (pid, uid))
+        _sync_primary_photo(conn, uid)
+    maybe_finish_onboard(conn, uid)
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    return jsonify({"ok": True, "user": user_public(row, include_email=True)})
+    return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True)})
+
+
+def _eligible_card(
+    me: sqlite3.Row,
+    row: sqlite3.Row,
+    neuro_filter: list[str],
+    vibe_filter: list[str],
+    blocked: set[int],
+    *,
+    skip_seeds: bool = False,
+    snoozed: set[int] | None = None,
+    liked_me: set[int] | None = None,
+) -> dict[str, Any] | None:
+    if row["id"] in blocked:
+        return None
+    if snoozed and row["id"] in snoozed:
+        return None
+    if is_guest_email(str(row["email"])):
+        return None
+    keys = set(row.keys())
+    if "paused" in keys and int(row["paused"] or 0):
+        return None
+    if skip_seeds and not is_live_profile(row):
+        return None
+    if "incognito" in keys and int(row["incognito"] or 0):
+        if not liked_me or row["id"] not in liked_me:
+            return None
+    if not mutual_looking_ok(
+        str(me["looking_for"] or "everyone"),
+        str(me["gender"] or ""),
+        str(row["looking_for"] or "everyone"),
+        str(row["gender"] or ""),
+    ):
+        return None
+    if not discovery_allows(row, me):
+        return None
+    if not int(row["is_seed"] or 0) and not profile_complete(row):
+        return None
+    if not photos_for(row["id"]) and not str(row["photo"] or "").strip():
+        return None
+    card = user_public(row)
+    if neuro_filter and not set(neuro_filter) & set(card["neuro"]):
+        return None
+    if vibe_filter and not set(vibe_filter) & set(card["vibe"]):
+        return None
+    return card
 
 
 @app.get("/api/feed")
@@ -424,30 +1591,78 @@ def api_feed():
         return jsonify({"ok": False, "error": "нет профиля"}), 401
     neuro_filter = [t for t in request.args.get("neuro", "").split(",") if t in NEURO_IDS]
     vibe_filter = [t for t in request.args.get("vibe", "").split(",") if t in VIBE_IDS]
-    rows = db().execute(
+    intent_filter = [t for t in request.args.get("intent", "").split(",") if t in INTENT_IDS]
+    min_age = request.args.get("min_age", type=int) or 18
+    max_age = request.args.get("max_age", type=int) or 99
+    city_q = normalize_city(str(request.args.get("city") or "").strip())
+    real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
+    min_age = max(18, min(99, min_age))
+    max_age = max(18, min(99, max_age))
+    if min_age > max_age:
+        min_age, max_age = max_age, min_age
+    if not is_guest_email(str(me["email"])) and not int(me["is_seed"] or 0):
+        track_filters(
+            db(),
+            user_id=int(me["id"]),
+            source="feed",
+            neuro=neuro_filter,
+            vibe=vibe_filter,
+            intents=intent_filter,
+            city=city_q,
+            min_age=min_age,
+            max_age=max_age,
+            real_only=real_only,
+        )
+    blocked = blocked_ids(db(), me["id"])
+    skip_seeds = bool(real_only and is_premium(me))
+    hidden = snoozed_ids(db(), me["id"]) if is_premium(me) else set()
+    liked_me = {
+        int(r["from_id"])
+        for r in db().execute(
+            "SELECT from_id FROM swipes WHERE to_id = ? AND direction = 'like'",
+            (me["id"],),
+        )
+    }
+    unseen_rows = db().execute(
         """
         SELECT * FROM users
         WHERE id != ?
+          AND age BETWEEN ? AND ?
+          AND (? = '' OR city = ?)
           AND id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
+          AND (
+            EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id)
+            OR (photo IS NOT NULL AND photo != '')
+          )
         ORDER BY is_seed DESC, id ASC
         """,
-        (me["id"], me["id"]),
+        (me["id"], min_age, max_age, city_q, city_q, me["id"]),
     ).fetchall()
-    cards = []
-    for row in rows:
-        if row["email"] == "demo@wiring.app":
-            continue
-        if not looking_matches(me["looking_for"], row["gender"]):
-            continue
-        card = user_public(row)
-        if neuro_filter and not set(neuro_filter) & set(card["neuro"]):
-            continue
-        if vibe_filter and not set(vibe_filter) & set(card["vibe"]):
-            continue
-        cards.append(card)
-        if len(cards) >= 30:
-            break
-    return jsonify({"ok": True, "cards": cards})
+    liked = db().execute(
+        "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
+        (me["id"],),
+    ).fetchone()["n"]
+    unseen = [
+        c
+        for row in unseen_rows
+        if (c := _eligible_card(me, row, neuro_filter, vibe_filter, blocked, skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me))
+        and (not intent_filter or any(i in intent_filter for i in intents_of(row)))
+    ]
+    passed_n = db().execute(
+        "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'pass'",
+        (me["id"],),
+    ).fetchone()["n"]
+    return jsonify(
+        {
+            "ok": True,
+            "cards": unseen[:30],
+            "recycled": False,
+            "unseen": len(unseen),
+            "passed": int(passed_n),
+            "liked": int(liked),
+            **inbox_stats(me["id"]),
+        }
+    )
 
 
 @app.post("/api/swipe")
@@ -459,15 +1674,38 @@ def api_swipe():
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "нет цели"}), 400
     direction = str(data.get("direction") or "")
-    if direction not in {"like", "pass"}:
-        return jsonify({"ok": False, "error": "like или pass"}), 400
+    if direction not in {"like", "pass", "snooze"}:
+        return jsonify({"ok": False, "error": "like, pass или snooze"}), 400
     uid = session["uid"]
     if target_id == uid:
         return jsonify({"ok": False, "error": "это ты"}), 400
     conn = db()
+    if target_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
     target = conn.execute("SELECT * FROM users WHERE id = ?", (target_id,)).fetchone()
     if not target:
         return jsonify({"ok": False, "error": "человек не найден"}), 404
+    me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if direction == "snooze":
+        if not is_premium(me_row):
+            return jsonify({"ok": False, "error": "отложить — это WIRING+", "need_plus": True}), 403
+        until = snooze(conn, uid, target_id)
+        conn.commit()
+        return jsonify({"ok": True, "matched": False, "match": None, "snoozed_until": until})
+    # Accidental pass/rewind on a mutual like used to wipe the match and lock the chat.
+    if direction == "pass" and _is_match(conn, uid, target_id):
+        return jsonify(
+            {
+                "ok": False,
+                "error": "это уже взаимный лайк — убрать можно только из чата",
+                "matched": True,
+                "match": user_public(target),
+            }
+        ), 409
+    prev = conn.execute(
+        "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
+        (uid, target_id),
+    ).fetchone()
     conn.execute(
         """
         INSERT INTO swipes (from_id, to_id, direction, created_at)
@@ -485,52 +1723,1140 @@ def api_swipe():
         ).fetchone()
         if back and back["direction"] == "like":
             matched = True
-        elif target["is_seed"]:
-            # Seed profiles like back so the demo loop closes.
+        elif int(target["is_seed"]) and not back:
+            seed = pack_profile(target, tags_for(target_id), prompts_for(target_id))
+            cand = pack_profile(me_row, tags_for(uid), prompts_for(uid))
+            seed_dir = "like" if seed_decides_like(seed, cand) else "pass"
             conn.execute(
                 """
                 INSERT INTO swipes (from_id, to_id, direction, created_at)
-                VALUES (?, ?, 'like', ?)
-                ON CONFLICT(from_id, to_id) DO UPDATE SET direction = 'like'
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(from_id, to_id) DO UPDATE SET direction = excluded.direction, created_at = excluded.created_at
                 """,
-                (target_id, uid, int(time.time())),
+                (target_id, uid, seed_dir, int(time.time())),
             )
-            conn.commit()
-            matched = True
+            matched = seed_dir == "like"
+        # Fresh mutual like (not a re-tap on an existing match) → notify.
+        was_match = bool(prev and prev["direction"] == "like" and back and back["direction"] == "like")
+        if matched:
+            if not was_match:
+                if _notifiable(me_row):
+                    notify_event(
+                        conn,
+                        user_id=uid,
+                        email=str(me_row["email"]),
+                        is_guest=False,
+                        kind="match",
+                        from_id=target_id,
+                        from_name=str(target["name"]),
+                        last_seen=int(me_row["last_seen"] or 0) if "last_seen" in me_row.keys() else 0,
+                    )
+                if _notifiable(target):
+                    notify_event(
+                        conn,
+                        user_id=target_id,
+                        email=str(target["email"]),
+                        is_guest=False,
+                        kind="match",
+                        from_id=uid,
+                        from_name=str(me_row["name"]),
+                        last_seen=int(target["last_seen"] or 0) if "last_seen" in target.keys() else 0,
+                    )
+        elif not int(target["is_seed"]) and _notifiable(target):
+            notify_event(
+                conn,
+                user_id=target_id,
+                email=str(target["email"]),
+                is_guest=False,
+                kind="like",
+                from_id=uid,
+                from_name=str(me_row["name"]),
+                last_seen=int(target["last_seen"] or 0) if "last_seen" in target.keys() else 0,
+            )
+        conn.commit()
+    liked = conn.execute(
+        "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
+        (uid,),
+    ).fetchone()["n"]
     return jsonify(
         {
             "ok": True,
             "matched": matched,
             "match": user_public(target) if matched else None,
+            "guest_nudge": bool(is_guest_email(str(me_row["email"])) and liked >= 3),
         }
     )
+
+
+@app.post("/api/rewind")
+@login_required
+def api_rewind():
+    uid = session["uid"]
+    conn = db()
+    last = conn.execute(
+        "SELECT to_id, direction, created_at FROM swipes WHERE from_id = ? ORDER BY created_at DESC, to_id DESC LIMIT 1",
+        (uid,),
+    ).fetchone()
+    parked = last_snooze(conn, uid)
+    if parked and (not last or int(parked["created_at"]) >= int(last["created_at"])):
+        target = conn.execute("SELECT * FROM users WHERE id = ?", (parked["other_id"],)).fetchone()
+        unsnooze(conn, uid, int(parked["other_id"]))
+        conn.commit()
+        return jsonify({"ok": True, "card": user_public(target) if target else None, "undid": "snooze"})
+    if not last:
+        return jsonify({"ok": False, "error": "нечего возвращать"}), 404
+    if last["direction"] == "like" and _is_match(conn, uid, int(last["to_id"])):
+        return jsonify(
+            {"ok": False, "error": "это уже взаимный лайк — убрать можно только из чата"}
+        ), 409
+    target = conn.execute("SELECT * FROM users WHERE id = ?", (last["to_id"],)).fetchone()
+    _clear_pair(conn, uid, last["to_id"])
+    conn.commit()
+    return jsonify({"ok": True, "card": user_public(target) if target else None, "undid": last["direction"]})
+
+
+@app.post("/api/deck/restart")
+@login_required
+def api_deck_restart():
+    """Manually restore passed profiles into the deck. Likes stay untouched."""
+    uid = session["uid"]
+    conn = db()
+    targets = [
+        int(r["to_id"])
+        for r in conn.execute(
+            "SELECT to_id FROM swipes WHERE from_id = ? AND direction = 'pass'",
+            (uid,),
+        )
+    ]
+    for target_id in targets:
+        _clear_pair(conn, uid, target_id)
+    conn.commit()
+    return jsonify({"ok": True, "cleared": len(targets)})
+
+
+@app.get("/api/people/<int:other_id>")
+@login_required
+def api_person(other_id: int):
+    uid = session["uid"]
+    conn = db()
+    if other_id != uid and other_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 404
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not row or (other_id != uid and is_guest_email(str(row["email"]))):
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    payload = user_public(row, include_email=(other_id == uid), detail=True)
+    payload["matched"] = other_id != uid and _is_match(conn, uid, other_id)
+    liked_you = bool(
+        conn.execute(
+            "SELECT 1 FROM swipes WHERE from_id = ? AND to_id = ? AND direction = 'like'",
+            (other_id, uid),
+        ).fetchone()
+    )
+    you_liked = bool(
+        conn.execute(
+            "SELECT 1 FROM swipes WHERE from_id = ? AND to_id = ? AND direction = 'like'",
+            (uid, other_id),
+        ).fetchone()
+    )
+    payload["liked_you"] = liked_you and other_id != uid
+    payload["you_liked"] = you_liked and other_id != uid
+    return jsonify({"ok": True, "person": payload})
+
+
+@app.get("/api/likes")
+@login_required
+def api_likes():
+    uid = session["uid"]
+    conn = db()
+    blocked = blocked_ids(conn, uid)
+    neuro_filter = [t for t in request.args.get("neuro", "").split(",") if t in NEURO_IDS]
+    vibe_filter = [t for t in request.args.get("vibe", "").split(",") if t in VIBE_IDS]
+    intent_filter = [t for t in request.args.get("intent", "").split(",") if t in INTENT_IDS]
+    min_age = request.args.get("min_age", type=int) or 18
+    max_age = request.args.get("max_age", type=int) or 99
+    city_q = normalize_city(str(request.args.get("city") or "").strip())
+    min_age = max(18, min(99, min_age))
+    max_age = max(18, min(99, max_age))
+    if min_age > max_age:
+        min_age, max_age = max_age, min_age
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if me and not is_guest_email(str(me["email"])) and not int(me["is_seed"] or 0):
+        track_filters(
+            conn,
+            user_id=uid,
+            source="likes",
+            neuro=neuro_filter,
+            vibe=vibe_filter,
+            intents=intent_filter,
+            city=city_q,
+            min_age=min_age,
+            max_age=max_age,
+        )
+    # Only unanswered inbound likes. Mutual → Чаты; pass → gone from likes.
+    rows = conn.execute(
+        """
+        SELECT u.* FROM users u
+        JOIN swipes s ON s.from_id = u.id AND s.to_id = ? AND s.direction = 'like'
+        WHERE u.age BETWEEN ? AND ?
+          AND (? = '' OR u.city = ?)
+          AND u.id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
+          AND (
+            EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
+            OR (u.photo IS NOT NULL AND u.photo != '')
+          )
+        ORDER BY s.created_at DESC
+        """,
+        (uid, min_age, max_age, city_q, city_q, uid),
+    ).fetchall()
+    plus = is_premium(me)
+    people = []
+    for row in rows:
+        if row["id"] in blocked or is_guest_email(str(row["email"])):
+            continue
+        if neuro_filter or vibe_filter:
+            tags = tags_for(row["id"])
+            if neuro_filter and not set(neuro_filter) & set(tags["neuro"]):
+                continue
+            if vibe_filter and not set(vibe_filter) & set(tags["vibe"]):
+                continue
+        if intent_filter and not any(i in intent_filter for i in intents_of(row)):
+            continue
+        if plus:
+            item = user_public(row, detail=True)
+            item["matched"] = False
+            people.append(item)
+        else:
+            people.append({"hidden": True, "matched": False})
+    return jsonify({"ok": True, "likes": people, "plus": plus})
 
 
 @app.get("/api/matches")
 @login_required
 def api_matches():
     uid = session["uid"]
-    rows = db().execute(
+    conn = db()
+    blocked = blocked_ids(conn, uid)
+    rows = conn.execute(
         """
-        SELECT u.* FROM users u
+        SELECT u.*,
+               CASE WHEN a.created_at > b.created_at THEN a.created_at ELSE b.created_at END AS matched_at
+        FROM users u
         JOIN swipes a ON a.to_id = u.id AND a.from_id = ? AND a.direction = 'like'
         JOIN swipes b ON b.from_id = u.id AND b.to_id = ? AND b.direction = 'like'
-        ORDER BY a.created_at DESC
         """,
         (uid, uid),
     ).fetchall()
-    return jsonify({"ok": True, "matches": [user_public(row) for row in rows]})
+    matches = []
+    for row in rows:
+        if row["id"] in blocked:
+            continue
+        item = user_public(row)
+        matched_at = int(row["matched_at"] or 0)
+        last = conn.execute(
+            """
+            SELECT body, photo, from_id, created_at, id FROM messages
+            WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+            ORDER BY id DESC LIMIT 1
+            """,
+            (uid, row["id"], row["id"], uid),
+        ).fetchone()
+        body = str(last["body"] or "").strip() if last else ""
+        has_photo = bool(last and str(last["photo"] or "").strip()) if last else False
+        if last and not body and has_photo:
+            preview = "фото"
+        elif last and body and has_photo:
+            preview = body
+        else:
+            preview = body
+        item["last_message"] = preview
+        item["last_at"] = last["created_at"] if last else 0
+        item["last_from_id"] = last["from_id"] if last else 0
+        item["matched_at"] = matched_at
+        item["unread"] = unread_count(conn, uid, row["id"])
+        matches.append(item)
+    # Newest activity on top: last message, or match time if чат ещё пустой.
+    matches.sort(
+        key=lambda item: (
+            max(int(item.get("last_at") or 0), int(item.get("matched_at") or 0)),
+            int(item.get("matched_at") or 0),
+            int(item.get("id") or 0),
+        ),
+        reverse=True,
+    )
+    return jsonify({"ok": True, "matches": matches})
+
+
+
+def _message_preview(body: str, photo: str = "") -> str:
+    text_body = str(body or "").strip()
+    if text_body:
+        return text_body[:160]
+    if str(photo or "").strip():
+        return "фото"
+    return ""
+
+
+def _message_payload(
+    row: sqlite3.Row,
+    uid: int,
+    peer_read_id: int = 0,
+    by_id: dict[int, sqlite3.Row] | None = None,
+) -> dict[str, Any]:
+    keys = set(row.keys())
+    photo = str(row["photo"] or "") if "photo" in keys else ""
+    body = str(row["body"] or "")
+    reply_to = None
+    reply_id = row["reply_to_id"] if "reply_to_id" in keys else None
+    if reply_id and by_id and int(reply_id) in by_id:
+        src = by_id[int(reply_id)]
+        src_keys = set(src.keys())
+        src_photo = str(src["photo"] or "") if "photo" in src_keys else ""
+        reply_to = {
+            "id": int(src["id"]),
+            "body": _message_preview(str(src["body"] or ""), src_photo),
+            "mine": src["from_id"] == uid,
+            "has_photo": bool(src_photo),
+        }
+    return {
+        "id": row["id"],
+        "from_id": row["from_id"],
+        "mine": row["from_id"] == uid,
+        "body": body,
+        "photo": photo,
+        "photo_url": prefix(f"/api/messages/media/{row['id']}") if photo else "",
+        "created_at": row["created_at"],
+        "read": row["from_id"] == uid and int(row["id"]) <= peer_read_id,
+        "reply_to": reply_to,
+    }
+
+
+def _insert_message(
+    conn: sqlite3.Connection,
+    *,
+    uid: int,
+    other_id: int,
+    body: str,
+    photo: str = "",
+    reply_to_id: int | None = None,
+) -> int:
+    cur = conn.execute(
+        """
+        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (uid, other_id, body, int(time.time()), reply_to_id, photo or ""),
+    )
+    return int(cur.lastrowid)
+
+
+@app.get("/api/messages/<int:other_id>")
+@login_required
+def api_messages(other_id: int):
+    uid = session["uid"]
+    conn = db()
+    if other_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+    if not _is_match(conn, uid, other_id):
+        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+    other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not other:
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    rows = conn.execute(
+        """
+        SELECT id, from_id, to_id, body, created_at, reply_to_id, photo FROM messages
+        WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+        ORDER BY id ASC
+        """,
+        (uid, other_id, other_id, uid),
+    ).fetchall()
+    mark_read(conn, uid, other_id)
+    conn.execute(
+        "UPDATE notifications SET read = 1 WHERE user_id = ? AND from_id = ? AND kind = 'message' AND read = 0",
+        (uid, other_id),
+    )
+    conn.commit()
+    peer_read = conn.execute(
+        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ?",
+        (other_id, uid),
+    ).fetchone()
+    peer_read_id = int(peer_read["last_read_id"]) if peer_read else 0
+    by_id = {int(r["id"]): r for r in rows}
+    messages = [_message_payload(r, uid, peer_read_id, by_id) for r in rows]
+    peer = user_public(other, detail=True)
+    me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    me = user_public(me_row, detail=True) if me_row else None
+    openers = cached_openers(conn, uid, other_id, peer, me) if not messages else []
+    return jsonify(
+        {
+            "ok": True,
+            "peer": peer,
+            "messages": messages,
+            "openers": openers,
+        }
+    )
+
+
+@app.post("/api/messages")
+@login_required
+def api_send_message():
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    try:
+        other_id = int(data.get("to_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет адресата"}), 400
+    body = str(data.get("body") or "").strip()
+    if not (1 <= len(body) <= 1000):
+        return jsonify({"ok": False, "error": "сообщение: 1–1000 символов"}), 400
+    conn = db()
+    if other_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+    if not _is_match(conn, uid, other_id):
+        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+    sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    reply_to_id = None
+    raw_reply = data.get("reply_to_id")
+    if raw_reply not in (None, "", 0, "0"):
+        try:
+            reply_to_id = int(raw_reply)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "некорректный ответ"}), 400
+        src = conn.execute(
+            """
+            SELECT id FROM messages
+            WHERE id = ? AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+            """,
+            (reply_to_id, uid, other_id, other_id, uid),
+        ).fetchone()
+        if not src:
+            return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
+    _insert_message(conn, uid=uid, other_id=other_id, body=body, reply_to_id=reply_to_id)
+    mark_read(conn, uid, other_id)
+    if sender and other and _notifiable(other):
+        notify_event(
+            conn,
+            user_id=other_id,
+            email=str(other["email"]),
+            is_guest=False,
+            kind="message",
+            from_id=uid,
+            from_name=str(sender["name"]),
+            preview=body,
+            last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
+        )
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/messages/photo")
+@login_required
+@real_account_required
+def api_send_photo_message():
+    uid = session["uid"]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"chatphoto:{ip}", 40, 3600):
+        return jsonify({"ok": False, "error": "слишком много фото, подожди"}), 429
+    try:
+        other_id = int(request.form.get("to_id") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет адресата"}), 400
+    if not other_id:
+        return jsonify({"ok": False, "error": "нет адресата"}), 400
+    caption = str(request.form.get("body") or "").strip()[:500]
+    conn = db()
+    if other_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+    if not _is_match(conn, uid, other_id):
+        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+    sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not other:
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    reply_to_id = None
+    raw_reply = request.form.get("reply_to_id")
+    if raw_reply not in (None, "", 0, "0"):
+        try:
+            reply_to_id = int(raw_reply)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "некорректный ответ"}), 400
+        src = conn.execute(
+            """
+            SELECT id FROM messages
+            WHERE id = ? AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+            """,
+            (reply_to_id, uid, other_id, other_id, uid),
+        ).fetchone()
+        if not src:
+            return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
+    try:
+        jpeg = read_upload(request.files.get("file"))
+        moderate_photo(jpeg)
+    except MediaError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    folder = os.path.join(UPLOAD_DIR, "chat", str(uid))
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{secrets.token_hex(16)}.jpg"
+    rel = f"chat/{uid}/{filename}"
+    with open(os.path.join(folder, filename), "wb") as handle:
+        handle.write(jpeg)
+    msg_id = _insert_message(
+        conn,
+        uid=uid,
+        other_id=other_id,
+        body=caption,
+        photo=rel,
+        reply_to_id=reply_to_id,
+    )
+    mark_read(conn, uid, other_id)
+    if sender and other and _notifiable(other):
+        notify_event(
+            conn,
+            user_id=other_id,
+            email=str(other["email"]),
+            is_guest=False,
+            kind="message",
+            from_id=uid,
+            from_name=str(sender["name"]),
+            preview=_message_preview(caption, rel),
+            last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
+        )
+    conn.commit()
+    return jsonify({"ok": True, "id": msg_id})
+
+
+@app.get("/api/messages/media/<int:message_id>")
+@login_required
+def api_message_media(message_id: int):
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+    if not row:
+        abort(404)
+    from_id = int(row["from_id"])
+    to_id = int(row["to_id"])
+    if uid not in {from_id, to_id}:
+        abort(403)
+    other = to_id if uid == from_id else from_id
+    if other in blocked_ids(conn, uid):
+        abort(403)
+    photo = str(row["photo"] or "") if "photo" in row.keys() else ""
+    if not photo:
+        abort(404)
+    if request.args.get("s") == "sm":
+        return _send_thumb(UPLOAD_DIR, photo, "chat")
+    _safe_media_path(UPLOAD_DIR, photo)
+    response = send_from_directory(UPLOAD_DIR, photo)
+    response.headers["Cache-Control"] = "private, max-age=86400"
+    return response
+
+
+@app.post("/api/unmatch")
+@login_required
+def api_unmatch():
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    try:
+        other_id = int(data.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет человека"}), 400
+    conn = db()
+    _unmatch_pair(conn, uid, other_id)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/block")
+@login_required
+def api_block():
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    try:
+        other_id = int(data.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет человека"}), 400
+    if other_id == uid:
+        return jsonify({"ok": False, "error": "это ты"}), 400
+    conn = db()
+    if not conn.execute("SELECT id FROM users WHERE id = ?", (other_id,)).fetchone():
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    conn.execute(
+        "INSERT INTO blocks (from_id, to_id, created_at) VALUES (?, ?, ?) ON CONFLICT(from_id, to_id) DO NOTHING",
+        (uid, other_id, int(time.time())),
+    )
+    _unmatch_pair(conn, uid, other_id)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/report")
+@login_required
+def api_report():
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    try:
+        other_id = int(data.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет человека"}), 400
+    reason = str(data.get("reason") or "").strip()
+    details = str(data.get("details") or "").strip()[:500]
+    if reason not in REPORT_IDS:
+        return jsonify({"ok": False, "error": "выбери причину"}), 400
+    if other_id == uid:
+        return jsonify({"ok": False, "error": "это ты"}), 400
+    conn = db()
+    if not conn.execute("SELECT id FROM users WHERE id = ?", (other_id,)).fetchone():
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    conn.execute(
+        "INSERT INTO reports (from_id, to_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)",
+        (uid, other_id, reason, details, int(time.time())),
+    )
+    conn.execute(
+        "INSERT INTO blocks (from_id, to_id, created_at) VALUES (?, ?, ?) ON CONFLICT(from_id, to_id) DO NOTHING",
+        (uid, other_id, int(time.time())),
+    )
+    _unmatch_pair(conn, uid, other_id)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/albums")
+@login_required
+def api_albums():
+    return jsonify({"ok": True, "albums": albums_for(session["uid"])})
+
+
+@app.post("/api/albums")
+@login_required
+@real_account_required
+def api_create_album():
+    return jsonify({"ok": False, "error": "один набор фото, без альбомов"}), 400
+
+
+@app.patch("/api/albums/<int:album_id>")
+@login_required
+@real_account_required
+def api_rename_album(album_id: int):
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title") or "").strip()[:32]
+    if len(title) < 1:
+        return jsonify({"ok": False, "error": "нужно название"}), 400
+    conn = db()
+    row = conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "альбом не найден"}), 404
+    conn.execute("UPDATE albums SET title = ? WHERE id = ?", (title, album_id))
+    conn.commit()
+    return jsonify({"ok": True, "albums": albums_for(uid)})
+
+
+@app.delete("/api/albums/<int:album_id>")
+@login_required
+@real_account_required
+def api_delete_album(album_id: int):
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "альбом не найден"}), 404
+    fallback = _album_id(conn, uid, "я")
+    if fallback == album_id:
+        other = conn.execute(
+            "SELECT id FROM albums WHERE user_id = ? AND id != ? ORDER BY id LIMIT 1",
+            (uid, album_id),
+        ).fetchone()
+        fallback = int(other["id"]) if other else None
+    if fallback:
+        conn.execute("UPDATE photos SET album_id = ? WHERE user_id = ? AND album_id = ?", (fallback, uid, album_id))
+    else:
+        conn.execute("UPDATE photos SET album_id = NULL WHERE user_id = ? AND album_id = ?", (uid, album_id))
+    conn.execute("DELETE FROM albums WHERE id = ?", (album_id,))
+    conn.commit()
+    return jsonify({"ok": True, "albums": albums_for(uid)})
+
+
+@app.post("/api/photos")
+@login_required
+@real_account_required
+def api_upload_photo():
+    uid = session["uid"]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"photo:{ip}", 40, 3600):
+        return jsonify({"ok": False, "error": "слишком много загрузок, подожди"}), 429
+    conn = db()
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    photo_at = me["photo_rights_consent_at"] if me and "photo_rights_consent_at" in me.keys() else None
+    if not photo_at:
+        flag = str(request.form.get("photo_rights_consent") or "").lower()
+        if flag in {"1", "true", "yes", "on"}:
+            photo_at = int(time.time())
+            conn.execute("UPDATE users SET photo_rights_consent_at = ? WHERE id = ?", (photo_at, uid))
+        else:
+            return jsonify({"ok": False, "error": "сначала отметь в профиле, что загружаешь свои фото"}), 400
+    count = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
+    if count >= MAX_PHOTOS:
+        return jsonify({"ok": False, "error": f"не больше {MAX_PHOTOS} фото"}), 400
+    try:
+        jpeg = read_upload(request.files.get("file"))
+        moderate_photo(jpeg)
+    except MediaError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    album_id_raw = request.form.get("album_id") or (request.get_json(silent=True) or {}).get("album_id")
+    album_title = (request.form.get("album") or "").strip()[:32]
+    album_id = None
+    if album_id_raw:
+        try:
+            album_id = int(album_id_raw)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "не тот альбом"}), 400
+        if not conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone():
+            return jsonify({"ok": False, "error": "альбом не найден"}), 404
+    if album_id is None:
+        album_id = _album_id(conn, uid, album_title or "я")
+    folder = os.path.join(UPLOAD_DIR, str(uid))
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{secrets.token_hex(16)}.jpg"
+    rel = f"{uid}/{filename}"
+    with open(os.path.join(folder, filename), "wb") as handle:
+        handle.write(jpeg)
+    is_primary = 1 if count == 0 else 0
+    cur = conn.execute(
+        """
+        INSERT INTO photos (user_id, album_id, path, is_primary, sort_order, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (uid, album_id, rel, is_primary, int(count), int(time.time())),
+    )
+    _sync_primary_photo(conn, uid)
+    maybe_finish_onboard(conn, uid)
+    conn.commit()
+    photo_id = int(cur.lastrowid)
+    photos = photos_for(uid)
+    item = next((p for p in photos if p["id"] == photo_id), None)
+    return jsonify({"ok": True, "photo": item, "photos": photos, "albums": albums_for(uid)})
+
+
+@app.patch("/api/photos/<int:photo_id>")
+@login_required
+@real_account_required
+def api_patch_photo(photo_id: int):
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    conn = db()
+    row = conn.execute("SELECT * FROM photos WHERE id = ? AND user_id = ?", (photo_id, uid)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "фото не найдено"}), 404
+    if "album_id" in data and data["album_id"] is not None:
+        try:
+            album_id = int(data["album_id"])
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "не тот альбом"}), 400
+        if not conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone():
+            return jsonify({"ok": False, "error": "альбом не найден"}), 404
+        conn.execute("UPDATE photos SET album_id = ? WHERE id = ?", (album_id, photo_id))
+    if data.get("is_primary"):
+        conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (photo_id, uid))
+        _sync_primary_photo(conn, uid)
+    conn.commit()
+    return jsonify({"ok": True, "photos": photos_for(uid), "albums": albums_for(uid)})
+
+
+@app.delete("/api/photos/<int:photo_id>")
+@login_required
+@real_account_required
+def api_delete_photo(photo_id: int):
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT * FROM photos WHERE id = ? AND user_id = ?", (photo_id, uid)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "фото не найдено"}), 404
+    remaining_n = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
+    if remaining_n <= 1:
+        return jsonify({"ok": False, "error": "нужно хотя бы одно фото"}), 400
+    path = row["path"]
+    conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
+    if not str(path).startswith("portraits/"):
+        full = os.path.join(UPLOAD_DIR, path)
+        if os.path.isfile(full):
+            os.remove(full)
+    remaining = conn.execute("SELECT id FROM photos WHERE user_id = ? ORDER BY sort_order, id LIMIT 1", (uid,)).fetchone()
+    if remaining:
+        conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (remaining["id"], uid))
+    _sync_primary_photo(conn, uid)
+    conn.commit()
+    return jsonify({"ok": True, "photos": photos_for(uid), "albums": albums_for(uid)})
+
+
+def _safe_media_path(root: str, filename: str) -> str:
+    if ".." in filename or filename.startswith("/"):
+        abort(404)
+    full = os.path.abspath(os.path.join(root, filename))
+    root_abs = os.path.abspath(root)
+    if full != root_abs and not full.startswith(root_abs + os.sep):
+        abort(404)
+    if not os.path.isfile(full):
+        abort(404)
+    return full
+
+
+def _send_thumb(root: str, filename: str, kind: str):
+    source = _safe_media_path(root, filename)
+    cache = os.path.join(THUMB_DIR, kind, filename)
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    if not os.path.isfile(cache) or os.path.getmtime(cache) < os.path.getmtime(source):
+        with open(source, "rb") as fh:
+            raw = fh.read()
+        try:
+            data = make_thumb(raw)
+        except MediaError:
+            return send_from_directory(root, filename)
+        with open(cache, "wb") as fh:
+            fh.write(data)
+    response = send_file(cache, mimetype="image/jpeg", max_age=31536000)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
+
+@app.get("/media/<path:filename>")
+def media_files(filename: str):
+    if request.args.get("s") == "sm":
+        return _send_thumb(UPLOAD_DIR, filename, "media")
+    _safe_media_path(UPLOAD_DIR, filename)
+    response = send_from_directory(UPLOAD_DIR, filename)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 
 @app.get("/public/<path:filename>")
 def public_files(filename: str):
+    if request.args.get("s") == "sm":
+        return _send_thumb(PUBLIC_DIR, filename, "public")
     return send_from_directory(PUBLIC_DIR, filename)
+
+
+@app.patch("/api/plus")
+@login_required
+@real_account_required
+def api_plus():
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not is_premium(row):
+        return jsonify({"ok": False, "error": "это WIRING+", "need_plus": True}), 403
+    data = request.get_json(silent=True) or {}
+    incognito = row["incognito"]
+    paused = row["paused"]
+    if "incognito" in data:
+        incognito = 1 if data.get("incognito") else 0
+    if "paused" in data:
+        paused = 1 if data.get("paused") else 0
+    conn.execute("UPDATE users SET incognito = ?, paused = ? WHERE id = ?", (incognito, paused, uid))
+    conn.commit()
+    return jsonify({"ok": True, "user": current_user()})
+
+
+@app.post("/api/premium/redeem")
+@login_required
+@real_account_required
+def api_redeem():
+    uid = session["uid"]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"promo:{ip}", 12, 3600):
+        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+    data = request.get_json(silent=True) or {}
+    conn = db()
+    until, err = redeem_code(conn, uid, str(data.get("code") or ""))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    conn.commit()
+    return jsonify({"ok": True, "user": current_user(), "plus_until": until})
+
+
+@app.post("/api/onboard/skip")
+@login_required
+def api_onboard_skip():
+    # Soft skip — profile can stay incomplete; feed still hides hollow cards.
+    return jsonify({"ok": True, "user": current_user()})
+
+
+@app.get("/api/inbox")
+@login_required
+def api_inbox():
+    uid = session["uid"]
+    return jsonify({"ok": True, **inbox_stats(uid), "notices": unread_notices(db(), uid)})
+
+
+@app.post("/api/notices/read")
+@login_required
+def api_notices_read():
+    data = request.get_json(silent=True) or {}
+    raw_ids = data.get("ids")
+    ids = None
+    if isinstance(raw_ids, list):
+        ids = []
+        for item in raw_ids:
+            try:
+                ids.append(int(item))
+            except (TypeError, ValueError):
+                continue
+    conn = db()
+    mark_notices_read(conn, session["uid"], ids)
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+def _admin_token() -> str:
+    return (os.environ.get("ADMIN_TOKEN") or "").strip()
+
+
+def _admin_ready() -> bool:
+    return bool(_admin_token() and session.get("admin"))
+
+
+def _admin_tickets(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        """
+        SELECT id, user_id, name, email, body, created_at
+        FROM support_tickets
+        ORDER BY id DESC
+        LIMIT 40
+        """
+    ).fetchall()
+
+
+def _admin_tasks(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return list_tasks(conn, limit=120)
+
+
+def _admin_view(error: str | None = None, status: int = 200):
+    conn = db()
+    return (
+        render_template(
+            "admin.html",
+            authed=True,
+            s=collect_stats(conn),
+            codes=list_codes(conn),
+            tickets=_admin_tickets(conn),
+            tasks=_admin_tasks(conn),
+            task_counts=task_counts(conn),
+            task_threshold=task_threshold(),
+            error=error,
+        ),
+        status,
+    )
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_page():
+    token = _admin_token()
+    if not token:
+        abort(404)
+    if request.args.get("out"):
+        session.pop("admin", None)
+        return redirect("/admin")
+    if _token_ok(str(request.args.get("token") or ""), token):
+        session["admin"] = True
+    error = None
+    status = 200
+    if request.method == "POST":
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+        if too_many(f"admin:{ip}", 12, 3600):
+            return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error="подожди немного"), 429
+        if _token_ok(str(request.form.get("token") or ""), token):
+            session["admin"] = True
+        else:
+            error = "не тот токен"
+            status = 403
+    if not session.get("admin"):
+        return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error=error), status
+    return _admin_view()
+
+
+@app.post("/admin/premium")
+def admin_premium():
+    if not _admin_ready():
+        abort(403)
+    who = str(request.form.get("who") or "").strip()
+    try:
+        days = int(request.form.get("days") or "30")
+    except (TypeError, ValueError):
+        return _admin_view("дни — число", 400)
+    if not who:
+        return _admin_view("укажи почту или id", 400)
+    conn = db()
+    row = None
+    if who.isdigit():
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (int(who),)).fetchone()
+    if row is None:
+        row = conn.execute("SELECT * FROM users WHERE lower(email) = ?", (who.lower(),)).fetchone()
+    if row is None:
+        row = conn.execute("SELECT * FROM users WHERE name = ? AND is_seed = 0", (who,)).fetchone()
+    if not row:
+        return _admin_view("человека нет", 404)
+    if is_guest_email(str(row["email"])) or int(row["is_seed"] or 0):
+        return _admin_view("премиум только живым аккаунтам", 400)
+    grant_premium(conn, int(row["id"]), days)
+    conn.commit()
+    return redirect("/admin")
+
+
+@app.post("/admin/promo")
+def admin_promo():
+    if not _admin_ready():
+        abort(403)
+    try:
+        days = int(request.form.get("days") or "90")
+        max_uses = int(request.form.get("max_uses") or "0")
+    except (TypeError, ValueError):
+        return _admin_view("дни и лимит — числа", 400)
+    err = add_code(db(), str(request.form.get("code") or ""), days, max_uses)
+    if err:
+        return _admin_view(err, 400)
+    db().commit()
+    return redirect("/admin")
+
+
+@app.post("/admin/tasks/import-support")
+def admin_tasks_import_support():
+    """Backfill the triage board from messages already sent via /support."""
+    if not _admin_ready():
+        abort(403)
+    conn = db()
+    triage_support_tickets(conn)
+    conn.commit()
+    return redirect("/admin#tasks")
+
+
+@app.post("/admin/tasks/<int:task_id>/decision")
+def admin_task_decision(task_id: int):
+    if not _admin_ready():
+        abort(403)
+    decision = str(request.form.get("decision") or "").strip().lower()
+    if decision not in {"approved", "rejected", "done", "candidate"}:
+        return _admin_view("неизвестное решение", 400)
+    conn = db()
+    row = conn.execute("SELECT id FROM feature_tasks WHERE id = ?", (task_id,)).fetchone()
+    if not row:
+        return _admin_view("задача не найдена", 404)
+    now = int(time.time())
+    if decision == "approved":
+        conn.execute(
+            "UPDATE feature_tasks SET status = 'approved', approved_at = ?, approved_by = 'admin', updated_at = ? WHERE id = ?",
+            (now, now, task_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE feature_tasks SET status = ?, updated_at = ? WHERE id = ?",
+            (decision, now, task_id),
+        )
+    conn.commit()
+    return redirect("/admin#tasks")
+
+
+@app.get("/privacy")
+def privacy():
+    return render_template(
+        "legal.html",
+        title="Конфиденциальность",
+        description="Какие данные хранит WIRING и как их удалить.",
+        path="/privacy",
+        site_url=SITE_URL,
+        body=PRIVACY_HTML,
+    )
+
+
+@app.get("/rules")
+def rules():
+    return render_template(
+        "legal.html",
+        title="Правила",
+        description="Правила сообщества WIRING. 18+.",
+        path="/rules",
+        site_url=SITE_URL,
+        body=RULES_HTML,
+    )
+
+
+@app.get("/glossary")
+def glossary():
+    return render_template(
+        "legal.html",
+        title="Особенности и аббревиатуры",
+        description="Что значат ASD, ADHD, AuDHD, ПРЛ, RSD, PDA и остальные особенности на WIRING.",
+        path="/glossary",
+        site_url=SITE_URL,
+        body=glossary_html(),
+    )
+
+
+@app.route("/support", methods=["GET", "POST"])
+def support():
+    me = current_user()
+    notice = ""
+    error = ""
+    if request.method == "POST":
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+        if too_many(f"support:{ip}", 5, 3600):
+            error = "слишком часто — подожди немного"
+        else:
+            body = str(request.form.get("body") or "").strip()
+            name = str(request.form.get("name") or "").strip()
+            email = str(request.form.get("email") or "").strip()
+            if me:
+                name = name or str(me.get("name") or "")
+            if len(body) < 8:
+                error = "напиши чуть подробнее"
+            elif len(body) > 2000:
+                error = "слишком длинно"
+            elif email and not EMAIL_RE.match(email):
+                error = "почта странная"
+            else:
+                uid = session.get("uid")
+                conn = db()
+                conn.execute(
+                    """
+                    INSERT INTO support_tickets (user_id, name, email, body, ip, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (uid, name[:80], email[:120], body[:2000], ip[:80], int(time.time())),
+                )
+                conn.commit()
+                who = name or (f"#{uid}" if uid else "гость")
+                contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
+                notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
+                notice = "отправили. ответим на почту, если её указал, или найдём тебя по аккаунту"
+    return render_template(
+        "legal.html",
+        title="Поддержка",
+        description="Написать в поддержку WIRING. Почту указывать не обязательно.",
+        path="/support",
+        site_url=SITE_URL,
+        body=SUPPORT_HTML,
+        support_form=True,
+        me=me,
+        notice=notice,
+        error=error,
+    )
+
+
+@app.get("/robots.txt")
+def robots():
+    body = f"User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: {SITE_URL}/sitemap.xml\n"
+    return app.response_class(body, mimetype="text/plain")
+
+
+@app.get("/sitemap.xml")
+def sitemap():
+    urls = ["/", "/rules", "/privacy", "/support"]
+    items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
+    xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
+    return app.response_class(xml, mimetype="application/xml")
 
 
 def _register_prefixed_routes() -> None:
     if not BASE_PATH:
         return
-    # Expose the same handlers under /dating/... when mounted behind nginx.
     mapping = []
     for rule in list(app.url_map.iter_rules()):
         if rule.endpoint == "static":
