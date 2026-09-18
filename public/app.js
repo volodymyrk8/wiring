@@ -52,6 +52,7 @@
     reportReason: "",
     reportDetails: "",
     resetToken: "",
+    verifyEmail: "",
     recycled: false,
     unseen: 0,
     passed: 0,
@@ -71,34 +72,23 @@
   };
   let chatTimer = 0;
   let inboxTimer = 0;
-  let lastUrl = "";
+  const urlSyncState = { lastUrl: "" };
   let profileScrollY = 0;
   const seenNotices = new Set();
   const PAGE_TITLE = document.title;
 
-  const pathOf = () => {
-    let p = location.pathname || "/";
-    if (BASE && p.startsWith(BASE)) p = p.slice(BASE.length) || "/";
-    if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
-    return p || "/";
+  let routing = null;
+  const ensureRouting = () => {
+    if (routing) return Promise.resolve(routing);
+    return import(`${BASE}/public/dist/router.js`).then((mod) => {
+      routing = mod;
+      return mod;
+    });
   };
 
-  const hrefFor = (view, extra = {}) => {
-    let path = "/";
-    if (view === "home") path = "/";
-    else if (view === "login") path = "/login";
-    else if (view === "register") path = "/register";
-    else if (view === "forgot") path = "/forgot";
-    else if (view === "reset") path = "/reset";
-    else if (view === "deck") path = "/feed";
-    else if (view === "likes") path = "/likes";
-    else if (view === "matches") path = "/chats";
-    else if (view === "chat") path = extra.id ? `/chats/${extra.id}` : "/chats";
-    else if (view === "profile") path = "/me";
-    else if (view === "onboard") path = "/onboard";
-    else if (view === "person") path = extra.id ? `/p/${extra.id}` : "/feed";
-    return `${BASE}${path}`;
-  };
+  const pathOf = () => routing.normalizePath(location.pathname || "/", BASE);
+
+  const hrefFor = (view, extra = {}) => routing.hrefFor(BASE, view, extra);
 
   const rememberRef = (code) => {
     const clean = String(code || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
@@ -114,49 +104,20 @@
     return state.pendingRef || sessionStorage.getItem("wiring-ref") || "";
   };
 
-  const parseRoute = () => {
-    const p = pathOf();
-    peekRef();
-    const invite = p.match(/^\/r\/([A-Za-z0-9]{4,16})$/i);
-    if (invite) {
-      rememberRef(invite[1]);
-      return { view: "register" };
-    }
-    const chat = p.match(/^\/chats\/(\d+)$/);
-    if (chat) return { view: "chat", id: Number(chat[1]) };
-    const person = p.match(/^\/p\/(\d+)$/);
-    if (person) return { view: "person", id: Number(person[1]) };
-    if (p === "/login") return { view: "login" };
-    if (p === "/register") return { view: "register" };
-    if (p === "/forgot") return { view: "forgot" };
-    if (p === "/reset") return { view: "reset" };
-    if (p === "/feed") return { view: "deck" };
-    if (p === "/likes") return { view: "likes" };
-    if (p === "/chats") return { view: "matches" };
-    if (p === "/me") return { view: "profile" };
-    if (p === "/onboard") return { view: "onboard" };
-    return { view: "home" };
-  };
-
   const currentHref = () =>
     hrefFor(state.view, {
       id: state.view === "chat" ? state.thread?.peer?.id : state.view === "person" ? state.person?.id : undefined,
     });
 
   const syncUrl = () => {
-    const url = currentHref();
-    if (!url) return;
-    const pathNow = location.pathname;
-    if (url === lastUrl && pathNow === url) return;
-    const replace = !lastUrl || pathNow === url;
-    lastUrl = url;
-    if (pathNow !== url) {
-      if (replace) history.replaceState({ view: state.view }, "", url);
-      else {
-        history.pushState({ view: state.view }, "", url);
-        try { window.WIRING_ANALYTICS?.page?.(url); } catch (_) {}
-      }
-    }
+    routing.syncViewToUrl(urlSyncState, BASE, state.view, {
+      id:
+        state.view === "chat"
+          ? state.thread?.peer?.id
+          : state.view === "person"
+            ? state.person?.id
+            : undefined,
+    });
   };
 
   const escapeHtml = (s) =>
@@ -360,6 +321,20 @@
     const item = itemOf(kind, id);
     const tip = escapeAttr(tipText(kind, id));
     return `<span class="chip has-tip ${kind === "vibe" ? "vibe" : ""} ${extra}" data-tip="${tip}" tabindex="0">${escapeHtml(item.label || id)}<i class="tip-bubble">${escapeHtml(tipText(kind, id))}</i></span>`;
+  };
+
+  const FEED_CHIP_LIMIT = 4;
+  const feedChipsHtml = (card) => {
+    const items = [
+      ...(card.neuro || []).map((id) => ({ kind: "neuro", id })),
+      ...(card.vibe || []).map((id) => ({ kind: "vibe", id })),
+    ];
+    const shown = items.slice(0, FEED_CHIP_LIMIT);
+    const rest = items.length - shown.length;
+    return (
+      shown.map((item) => chipMark(item.kind, item.id, "on")).join("") +
+      (rest > 0 ? `<span class="chip on more">+${rest}</span>` : "")
+    );
   };
 
   const TEST_HREF = "https://neuro-raznoobrazie.web.app/";
@@ -739,7 +714,7 @@
     </footer>`;
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
-  const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "onboard", "invite", "chat"]);
+  const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat"]);
   const showsTabbar = () => !QUIET_VIEWS.has(state.view);
   const HOME_FACE_SRC = Array.from({ length: 12 }, (_, i) => `people/${String(i + 1).padStart(2, "0")}.jpg`);
   const pickHomeFaces = () => {
@@ -805,6 +780,22 @@
       ? `<nav class="tabbar" aria-label="разделы">${navLinks("tab")}</nav>`
       : "";
 
+  const authLegalFoot = () => `
+    <footer class="site-foot auth-legal-foot">
+      <span>18+</span>
+      <a href="/rules">правила</a>
+      <a href="/privacy">конфиденциальность</a>
+      <a href="/support">поддержка</a>
+    </footer>`;
+
+  const authLayout = (body) => `
+      ${appHead()}
+      <div class="auth-shell">
+        <section class="panel auth-panel">${body}</section>
+      </div>
+      ${authLegalFoot()}
+      ${tabbar()}`;
+
   const ownTraitMarks = () => {
     const neuro = state.user?.neuro || [];
     const vibe = state.user?.vibe || [];
@@ -815,80 +806,12 @@
     ].join("")}</div>`;
   };
 
-  const forgotView = () => ({
-    html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Сброс пароля</h2>
-        <p class="lede">Пришлём ссылку на почту, если такой аккаунт есть.</p>
-        <form class="form" id="forgot">
-          <label>почта<input name="email" type="email" required autocomplete="username"></label>
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">отправить ссылку</button>
-            <a class="ghost" href="${hrefFor("login")}" data-nav="login">ко входу</a>
-          </div>
-        </form>
-      </section>
-      ${tabbar()}`,
-    bind() {
-      root.querySelector("#forgot").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = new FormData(e.target).get("email");
-        try {
-          await api("/api/password/forgot", { method: "POST", body: JSON.stringify({ email }) });
-          toast("если аккаунт есть — письмо уже в пути");
-          state.view = "login";
-          render();
-        } catch (err) {
-          root.querySelector("#err").textContent = err.message;
-        }
-      });
-    },
-  });
-
-  const resetView = () => ({
-    html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Новый пароль</h2>
-        <form class="form" id="reset">
-          ${passwordField("password", { autocomplete: "new-password" })}
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">сохранить пароль</button>
-            <a class="ghost" href="${hrefFor("login")}" data-nav="login">ко входу</a>
-          </div>
-        </form>
-      </section>
-      ${tabbar()}`,
-    bind() {
-      bindPasswordToggles();
-      root.querySelector("#reset").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const password = new FormData(e.target).get("password");
-        try {
-          await api("/api/password/reset", {
-            method: "POST",
-            body: JSON.stringify({ token: state.resetToken, password }),
-          });
-          toast("пароль обновлён — можно войти");
-          state.resetToken = "";
-          state.view = "login";
-          render();
-        } catch (err) {
-          root.querySelector("#err").textContent = err.message;
-        }
-      });
-    },
-  });
-
   const cityGateView = () => ({
     html: `
       ${appHead()}
       <section class="panel">
         <h2>Уточни город</h2>
-        <p class="lede">Сначала страна, потом город из списка — или впиши свой.</p>
+        <p class="lede">Сначала страна, потом город из списка.</p>
         <form class="form" id="city-gate">
           ${placeFields(state.user?.city || "", { id: "gate-city" })}
           <div class="err" id="err"></div>
@@ -972,6 +895,8 @@
     const ids = Array.isArray(card.intents) && card.intents.length ? card.intents : card.intent ? [card.intent] : [];
     return ids.map((id) => labelOf("intents", id)).filter(Boolean).join(", ");
   };
+
+  const formatMultiline = (text) => escapeHtml(String(text || "")).replace(/\n/g, "<br>");
 
   const lookingLabel = (card) => {
     const raw = labelOf("looking_for", card.looking_for);
@@ -1057,7 +982,7 @@
         <span class="city-combo">
           <input name="${name}" id="${id}" list="${listId}" value="${escapeAttr(selectedCity || "")}" ${
             required ? "required" : ""
-          } maxlength="48" autocomplete="address-level2" placeholder="выбери или впиши">
+          } maxlength="48" autocomplete="address-level2" placeholder="выбери из списка" list="${listId}">
           <datalist id="${listId}">${cityOpts}</datalist>
         </span>
       </label>`;
@@ -1085,8 +1010,10 @@
     if (state.view !== "profile") return;
     const form = root.querySelector("form#me");
     if (!form || !state.user || state.user.guest) return;
+    // Before bind() profileEdit is empty — do not clobber tags with [].
+    const edit = state.profileEdit;
+    if (!edit) return;
     const fd = new FormData(form);
-    const edit = state.profileEdit || {};
     state.profileDraft = {
       name: String(fd.get("name") || ""),
       age: String(fd.get("age") || ""),
@@ -1112,7 +1039,7 @@
   };
 
   const passwordField = (name, { autocomplete = "current-password", required = true, value = "" } = {}) =>
-    `<label class="password-field">пароль
+    `<label class="password-field">Пароль
       <span class="password-wrap">
         <input name="${name}" type="password" ${required ? "required" : ""} minlength="6" autocomplete="${autocomplete}" value="${escapeAttr(value)}">
         <button type="button" class="password-toggle" aria-label="показать пароль" title="показать пароль">${ICONS.eye}</button>
@@ -1234,101 +1161,12 @@
     </div>`;
   };
 
-  const authForm = (mode) => {
-    return {
-      html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>${mode === "login" ? "Вход" : "Регистрация"}</h2>
-        ${
-          mode === "register"
-            ? `<p class="lede">${
-                peekRef()
-                  ? "Ты по приглашению. После регистрации WIRING+ на 30 дней будет у вас обоих. Анкету можно дозаполнить позже."
-                  : "Сначала имя, почта и пароль. Анкету — фото, город, особенности — дозаполнишь, когда будет удобно."
-              }</p>`
-            : ""
-        }
-        <form class="form" id="auth">
-          ${mode === "register" ? `<label>имя<input name="name" required minlength="2" maxlength="32" autocomplete="nickname"></label>` : ""}
-          <label>почта<input name="email" type="email" required autocomplete="username"></label>
-          ${passwordField("password", { autocomplete: mode === "login" ? "current-password" : "new-password" })}
-          ${
-            mode === "register"
-              ? `
-            <label class="check"><input name="age_confirm" type="checkbox" required autocomplete="off"> мне есть 18, принимаю <a href="/rules" target="_blank" rel="noopener">правила</a></label>
-            <label class="check"><input name="privacy_confirm" type="checkbox" required autocomplete="off"> согласен(на) на обработку персональных данных и принимаю <a href="/privacy" target="_blank" rel="noopener">политику конфиденциальности</a></label>
-            <label class="check"><input name="marketing_consent" type="checkbox" autocomplete="off"> согласен(на) на маркетинговые письма на почту</label>
-          `
-              : ""
-          }
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">${mode === "login" ? "войти" : "создать аккаунт"}</button>
-            <a class="ghost" href="${hrefFor(mode === "login" ? "register" : "login")}" data-nav="${mode === "login" ? "register" : "login"}">${mode === "login" ? "нет профиля" : "уже есть вход"}</a>
-          </div>
-          ${mode === "login" ? `<p class="hint"><a href="${hrefFor("forgot")}" data-nav="forgot">забыл(а) пароль</a></p>` : ""}
-        </form>
-        ${footer()}
-      </section>
-      ${tabbar()}`,
-      bind() {
-        bindPasswordToggles();
-        root.querySelector("#auth").addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.target);
-          const payload = Object.fromEntries(form.entries());
-          if (mode === "register") {
-            payload.age_confirm = form.has("age_confirm");
-            payload.privacy_confirm = form.has("privacy_confirm");
-            payload.marketing_consent = form.has("marketing_consent");
-            const ref = peekRef();
-            if (ref) payload.ref = ref;
-          }
-          try {
-            const data = await api(mode === "login" ? "/api/login" : "/api/register", {
-              method: "POST",
-              body: JSON.stringify(payload),
-            });
-            state.user = data.user;
-            if (mode === "register") {
-              sessionStorage.removeItem("wiring-ref");
-              state.pendingRef = "";
-              if (data.user?.plus) toast("WIRING+ за приглашение");
-            }
-            if (mode === "register") await refreshMe();
-            startInbox();
-            if (mode === "register") {
-              state.view = state.user?.needs_profile ? "profile" : "deck";
-              if (state.view === "deck") await loadFeed();
-              render();
-              return;
-            }
-            if (state.pendingPath) {
-              const pending = state.pendingPath;
-              state.pendingPath = "";
-              history.replaceState({ view: "pending" }, "", `${BASE}${pending}`);
-              lastUrl = `${BASE}${pending}`;
-              await hydrateFromUrl();
-              return;
-            }
-            state.view = state.user?.needs_profile ? "profile" : "deck";
-            if (state.view === "deck") await loadFeed();
-            render();
-          } catch (err) {
-            root.querySelector("#err").textContent = err.message;
-          }
-        });
-      },
-    };
-  };
-
   const goAfterInvite = async () => {
     if (state.pendingPath) {
       const pending = state.pendingPath;
       state.pendingPath = "";
       history.replaceState({ view: "pending" }, "", `${BASE}${pending}`);
-      lastUrl = `${BASE}${pending}`;
+      urlSyncState.lastUrl = `${BASE}${pending}`;
       await hydrateFromUrl();
       return;
     }
@@ -1412,10 +1250,9 @@
           ${stacked ? "" : `<a class="card-more" href="${hrefFor("person", { id: card.id })}" id="open-person">анкета</a>`}
         </div>
         <div class="meta">${profileMeta(card)}</div>
-        ${card.bio ? `<p class="bio">${escapeHtml(card.bio)}</p>` : ""}
+        ${card.bio ? `<p class="bio">${formatMultiline(card.bio)}</p>` : ""}
         <div class="chips static">
-          ${card.neuro.map((id) => chipMark("neuro", id, "on")).join("")}
-          ${card.vibe.slice(0, 3).map((id) => chipMark("vibe", id, "on")).join("")}
+          ${feedChipsHtml(card)}
         </div>
       </div>
     </article>`;
@@ -1426,8 +1263,7 @@
       state.filters.neuro.length + state.filters.vibe.length + (state.filters.intents || []).length > 0 ||
       state.filters.city ||
       state.filters.min_age > 18 ||
-      state.filters.max_age < 99 ||
-      state.filters.real_only;
+      state.filters.max_age < 99;
     const hasPassed = Number(state.passed || 0) > 0;
     return emptyBox(
       filtered ? "По фильтрам никого нет" : "Анкеты на сегодня закончились",
@@ -1473,11 +1309,6 @@
                   <label>до<input id="max-age" type="number" min="18" max="99" value="${state.filters.max_age}"></label>
                   <label>город${citySelect("f-city", state.filters.city, { required: false, allowEmpty: true, emptyLabel: "неважно", id: "f-city" })}</label>
                 </div>
-                ${
-                  state.user?.plus
-                    ? `<label class="check" style="margin-top:10px"><input id="f-real" type="checkbox" ${state.filters.real_only ? "checked" : ""}> только живые анкеты</label>`
-                    : ""
-                }
                 <div class="filter-foot"><button type="button" class="ghost slim js-filters">скрыть фильтры</button></div>
               </div>`
             : ""
@@ -1537,7 +1368,7 @@
               .join("")}</div>`
           : ""
       }
-      ${p.bio ? `<p class="lede">${escapeHtml(p.bio)}</p>` : ""}
+      ${p.bio ? `<p class="lede bio-text">${formatMultiline(p.bio)}</p>` : ""}
       ${p.communication ? `<div class="prompt-card"><div class="q">как тебе писать</div><p>${escapeHtml(p.communication)}</p></div>` : ""}
       <div class="chips static" style="margin:12px 0">
         ${(p.neuro || []).map((id) => chipMark("neuro", id, "on")).join("")}
@@ -1965,10 +1796,10 @@
   const profileView = () => {
     const u = state.user;
     const d = state.profileDraft || {};
-    const neuro = [...(d.neuro || u.neuro || [])];
-    const vibe = [...(d.vibe || u.vibe || [])];
-    const prompts = (d.prompts || u.prompts || []).map((p) => ({ ...p }));
-    const intentSeed = d.intents || u.intents || (u.intent ? [u.intent] : ["dating"]);
+    const neuro = [...(Array.isArray(d.neuro) ? d.neuro : u.neuro || [])];
+    const vibe = [...(Array.isArray(d.vibe) ? d.vibe : u.vibe || [])];
+    const prompts = (Array.isArray(d.prompts) ? d.prompts : u.prompts || []).map((p) => ({ ...p }));
+    const intentSeed = Array.isArray(d.intents) ? d.intents : u.intents || (u.intent ? [u.intent] : ["dating"]);
     const intentsHold = intentPicker(intentSeed, { id: "me-intents" });
     const nameVal = d.name != null ? d.name : u.name;
     const ageVal = d.age != null && d.age !== "" ? d.age : u.age;
@@ -1985,7 +1816,7 @@
     const seekMin = d.seek_min_age != null ? d.seek_min_age : u.seek_min_age || 18;
     const seekMax = d.seek_max_age != null ? d.seek_max_age : u.seek_max_age || 99;
     const seekPlace = d.seek_place != null ? d.seek_place : u.seek_place || "";
-    const hideTags = [...(d.hide_tags || u.hide_tags || [])];
+    const hideTags = [...(Array.isArray(d.hide_tags) ? d.hide_tags : u.hide_tags || [])];
     const hideNeuro = hideTags.filter((id) => (state.catalog?.neuro || []).some((x) => x.id === id));
     const hideVibe = hideTags.filter((id) => (state.catalog?.vibe || []).some((x) => x.id === id));
     const seekPlaceOpts = [
@@ -2197,20 +2028,21 @@
           const payload = Object.fromEntries(form.entries());
           payload.age = Number(payload.age);
           payload.height = payload.height ? Number(payload.height) : null;
-          payload.neuro = [...neuro];
-          payload.vibe = [...vibe];
-          payload.intents = [...intentsHold.selected];
+          const edit = state.profileEdit || {};
+          payload.neuro = [...(edit.neuro || neuro)];
+          payload.vibe = [...(edit.vibe || vibe)];
+          payload.intents = [...(edit.intents || intentsHold.selected)];
           delete payload.intent;
-          payload.prompts = prompts.filter((p) => p.answer.trim().length >= 4);
+          payload.prompts = (edit.prompts || prompts).filter((p) => String(p.answer || "").trim().length >= 4);
           payload.seek_min_age = Number(payload.seek_min_age || 18);
           payload.seek_max_age = Number(payload.seek_max_age || 99);
           payload.seek_place = String(payload.seek_place || "").trim();
-          payload.hide_tags = [...hideNeuro, ...hideVibe];
+          payload.hide_tags = [...(edit.hideNeuro || hideNeuro), ...(edit.hideVibe || hideVibe)];
           payload.special_data_consent = form.has("special_data_consent") || form.get("special_data_consent") === "1" || form.get("special_data_consent") === "on";
           payload.photo_rights_consent = form.has("photo_rights_consent") || form.get("photo_rights_consent") === "1" || form.get("photo_rights_consent") === "on";
           if (root.querySelector("#special-data-consent")?.checked) payload.special_data_consent = true;
           if (root.querySelector("#photo-rights-consent")?.checked) payload.photo_rights_consent = true;
-          if (!neuro.length) {
+          if (!payload.neuro.length) {
             root.querySelector("#err").textContent = "отметь хотя бы одну особенность";
             return;
           }
@@ -2554,15 +2386,6 @@
     const later = root.querySelector("#later");
     if (later) later.addEventListener("click", () => swipe("snooze"));
     if (undo) undo.addEventListener("click", () => rewind());
-    const realOnly = root.querySelector("#f-real");
-    if (realOnly) {
-      realOnly.addEventListener("change", async () => {
-        state.filters.real_only = realOnly.checked;
-        persistFilters();
-        await loadFeed();
-        render();
-      });
-    }
     const unpause = root.querySelector("#unpause");
     if (unpause) {
       unpause.addEventListener("click", async () => {
@@ -2756,7 +2579,6 @@
     if (state.filters.min_age && state.filters.min_age !== 18) q.set("min_age", String(state.filters.min_age));
     if (state.filters.max_age && state.filters.max_age !== 99) q.set("max_age", String(state.filters.max_age));
     if (state.filters.city) q.set("city", state.filters.city);
-    if (state.filters.real_only) q.set("real", "1");
     const data = await api(`/api/feed?${q.toString()}`);
     state.cards = data.cards || [];
     state.index = 0;
@@ -2773,6 +2595,138 @@
     }
   };
 
+  const AUTH_FEATURE_VIEWS = new Set(["login", "register", "forgot", "verify", "reset"]);
+  let authFeatureUnmount = null;
+  let authFeatureModulePromise = null;
+
+  const loadAuthFeatureModule = () => {
+    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js`);
+    return authFeatureModulePromise;
+  };
+
+  const buildAuthHostBridge = (mode) => ({
+    mode,
+    basePath: BASE,
+    verifyEmail: state.verifyEmail || "",
+    resetToken: state.resetToken || "",
+    inviteLede: Boolean(peekRef()),
+    getReferralCode: peekRef,
+    hrefFor,
+    api,
+    toast,
+    navigate: (view) => {
+      void goToView(view);
+    },
+    onRegisterVerify: (email) => {
+      sessionStorage.removeItem("wiring-ref");
+      state.pendingRef = "";
+      state.verifyEmail = email;
+      state.user = null;
+      state.view = "verify";
+      toast("проверь почту — нужна ссылка подтверждения");
+      render();
+    },
+    onAuthSuccess: async (mode, data) => {
+      state.user = data.user;
+      if (mode === "register") {
+        sessionStorage.removeItem("wiring-ref");
+        state.pendingRef = "";
+        if (data.user?.plus) toast("WIRING+ за приглашение");
+        await refreshMe();
+      }
+      startInbox();
+      if (mode === "register") {
+        state.view = state.user?.needs_profile ? "profile" : "deck";
+        if (state.view === "deck") await loadFeed();
+        render();
+        return;
+      }
+      if (state.pendingPath) {
+        const pending = state.pendingPath;
+        state.pendingPath = "";
+        history.replaceState({ view: "pending" }, "", `${BASE}${pending}`);
+        urlSyncState.lastUrl = `${BASE}${pending}`;
+        await hydrateFromUrl();
+        return;
+      }
+      state.view = state.user?.needs_profile ? "profile" : "deck";
+      if (state.view === "deck") await loadFeed();
+      render();
+    },
+    onForgotDone: () => {
+      state.view = "login";
+      render();
+    },
+    onResetDone: () => {
+      state.resetToken = "";
+      state.view = "login";
+      render();
+    },
+  });
+
+  const goToView = async (next, meta = {}) => {
+    if (meta.neuro && next === "register") sessionStorage.setItem(PICK_NEURO, meta.neuro);
+    if (meta.neuro && next === "deck") {
+      state.filters.neuro = [meta.neuro];
+      persistFilters();
+    }
+    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat"].includes(next)) {
+      let pending = hrefFor(next);
+      if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
+      state.pendingPath = pending;
+      state.view = "login";
+      render();
+      return;
+    }
+    if (state.view === "person" && next === "deck") {
+      state.view = "deck";
+      render();
+      return;
+    }
+    state.view = next;
+    state.photoIndex = 0;
+    if (next !== "profile") clearProfileDraft();
+    if (state.view === "deck" && state.user) await loadFeed();
+    if (state.view === "matches" && state.user) {
+      const data = await api("/api/matches");
+      state.matches = data.matches;
+      state.thread = null;
+      await refreshMe();
+    }
+    if (state.view === "likes" && state.user) {
+      await loadLikes();
+      await refreshMe();
+    }
+    if (state.view === "profile" && state.user && !state.profileDraft) await refreshMe();
+    render();
+  };
+
+  const bindDataNavLinks = () => {
+    root.querySelectorAll("[data-nav]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        if (btn.tagName === "A") e.preventDefault();
+        const next = btn.dataset.nav;
+        await goToView(next, { neuro: btn.dataset.neuro });
+      });
+    });
+  };
+
+  const renderAuthFeature = async (mode) => {
+    authFeatureUnmount?.();
+    authFeatureUnmount = null;
+    root.innerHTML = authLayout('<div id="auth-feature-root"></div>');
+    const mountEl = root.querySelector("#auth-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await loadAuthFeatureModule();
+      authFeatureUnmount = mod.mountAuth(mountEl, buildAuthHostBridge(mode));
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      mountEl.innerHTML = `<p class="err">не загрузился модуль auth (${err.message}). выполни npm run build</p>`;
+    }
+  };
+
   const render = () => {
     if (state.view === "profile") {
       captureProfileDraft();
@@ -2782,14 +2736,34 @@
     document.documentElement.toggleAttribute("data-tabs", showsTabbar());
     if (state.view !== "chat") clearInterval(chatTimer);
     let bound = null;
+    if (!AUTH_FEATURE_VIEWS.has(state.view)) {
+      authFeatureUnmount?.();
+      authFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
     }
-    if (state.view === "register" && (!state.user || state.user.guest)) bound = authForm("register");
-    else if (!state.user && state.view === "login") bound = authForm("login");
-    else if (!state.user && state.view === "forgot") bound = forgotView();
-    else if (!state.user && state.view === "reset") bound = resetView();
+    if (state.view === "register" && (!state.user || state.user.guest)) {
+      void renderAuthFeature("register");
+      return;
+    }
+    if (!state.user && state.view === "login") {
+      void renderAuthFeature("login");
+      return;
+    }
+    if (!state.user && state.view === "forgot") {
+      void renderAuthFeature("forgot");
+      return;
+    }
+    if (!state.user && state.view === "reset") {
+      void renderAuthFeature("reset");
+      return;
+    }
+    if (!state.user && state.view === "verify") {
+      void renderAuthFeature("verify");
+      return;
+    }
     else if (state.view === "home" || !state.user) root.innerHTML = homeView();
     else if (state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile") bound = cityGateView();
     else if (state.view === "chat") root.innerHTML = chatView();
@@ -2809,46 +2783,7 @@
       requestAnimationFrame(() => window.scrollTo(0, profileScrollY));
     }
     if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
-    root.querySelectorAll("[data-nav]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        if (btn.tagName === "A") e.preventDefault();
-        const next = btn.dataset.nav;
-        if (btn.dataset.neuro && next === "register") sessionStorage.setItem(PICK_NEURO, btn.dataset.neuro);
-        if (btn.dataset.neuro && next === "deck") {
-          state.filters.neuro = [btn.dataset.neuro];
-          persistFilters();
-        }
-        if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat"].includes(next)) {
-          let pending = hrefFor(next);
-          if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
-          state.pendingPath = pending;
-          state.view = "login";
-          render();
-          return;
-        }
-        if (state.view === "person" && next === "deck") {
-          state.view = "deck";
-          render();
-          return;
-        }
-        state.view = next;
-        state.photoIndex = 0;
-        if (next !== "profile") clearProfileDraft();
-        if (state.view === "deck" && state.user) await loadFeed();
-        if (state.view === "matches" && state.user) {
-          const data = await api("/api/matches");
-          state.matches = data.matches;
-          state.thread = null;
-          await refreshMe();
-        }
-        if (state.view === "likes" && state.user) {
-          await loadLikes();
-          await refreshMe();
-        }
-        if (state.view === "profile" && state.user && !state.profileDraft) await refreshMe();
-        render();
-      });
-    });
+    bindDataNavLinks();
     root.querySelectorAll("[data-unmatch]").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
@@ -3040,7 +2975,8 @@ bindTips();
   };
 
   const hydrateFromUrl = async () => {
-    const resetQ = new URLSearchParams(location.search).get("reset");
+    const params = new URLSearchParams(location.search);
+    const resetQ = params.get("reset");
     if (resetQ) {
       state.resetToken = resetQ;
       state.view = "reset";
@@ -3048,32 +2984,51 @@ bindTips();
       render();
       return;
     }
-    const route = parseRoute();
-    if (!state.user) {
-      if (["login", "register", "home", "forgot", "reset"].includes(route.view)) {
-        state.view = route.view;
+    const verifyQ = params.get("verify");
+    if (verifyQ) {
+      history.replaceState({ view: "verify" }, "", hrefFor("verify"));
+      try {
+        const data = await api("/api/email/verify", {
+          method: "POST",
+          body: JSON.stringify({ token: verifyQ }),
+        });
+        state.user = data.user;
+        state.verifyEmail = "";
+        toast("почта подтверждена");
+        startInbox();
+        state.view = state.user?.needs_profile ? "profile" : "deck";
+        if (state.view === "deck") await loadFeed();
         render();
-        return;
+      } catch (err) {
+        state.verifyEmail = "";
+        state.view = "verify";
+        render();
+        toast(err.message || "ссылка не сработала");
       }
-      state.pendingPath = pathOf();
+      return;
+    }
+    const matched = routing.matchRoute(location.pathname || "/", BASE);
+    if (matched.inviteRef) rememberRef(matched.inviteRef);
+    const session = state.user
+      ? { loggedIn: true, isGuest: !!state.user.guest }
+      : { loggedIn: false };
+    const plan = routing.planRoute(matched, session, pathOf());
+
+    if (plan.kind === "login") {
+      state.pendingPath = plan.pendingPath;
       state.view = "login";
       render();
       return;
     }
-    if (route.view === "onboard" || ((route.view === "login" || route.view === "register") && !state.user.guest)) {
+    if (plan.kind === "feed") {
       state.view = "deck";
       await loadFeed();
       render();
       return;
     }
-    if (route.view === "home") {
-      state.view = "home";
-      render();
-      return;
-    }
-    if (route.view === "person") {
+    if (plan.kind === "person") {
       try {
-        await openPerson(route.id, "deck");
+        await openPerson(plan.id, "deck");
       } catch (err) {
         toast(err.message);
         state.view = "deck";
@@ -3082,9 +3037,9 @@ bindTips();
       }
       return;
     }
-    if (route.view === "chat") {
+    if (plan.kind === "chat") {
       try {
-        await openChat(route.id);
+        await openChat(plan.id);
       } catch (err) {
         toast(err.message);
         state.view = "matches";
@@ -3094,7 +3049,7 @@ bindTips();
       }
       return;
     }
-    state.view = route.view;
+    state.view = plan.view;
     state.photoIndex = 0;
     if (state.view === "deck") await loadFeed();
     if (state.view === "matches") {
@@ -3108,6 +3063,7 @@ bindTips();
   };
 
   const boot = async () => {
+    await ensureRouting();
     state.catalog = await api("/api/catalog");
     const me = await api("/api/me");
     state.user = me.user;
@@ -3125,7 +3081,7 @@ bindTips();
   };
 
   window.addEventListener("popstate", () => {
-    lastUrl = location.pathname;
+    urlSyncState.lastUrl = location.pathname;
     hydrateFromUrl().catch((err) => {
       root.innerHTML = `<p class="err">${escapeHtml(err.message)}</p>`;
     });

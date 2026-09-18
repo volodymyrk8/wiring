@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>WIRING admin</title>
+  <meta name="theme-color" content="#e9ebf3">
+  <script>
+    (function () {
+      var allowed = { mist: 1, pastel: 1, night: 1, slate: 1, dusk: 1 };
+      var t = "";
+      try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
+      document.documentElement.dataset.theme = allowed[t] ? t : "mist";
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/public/styles.css?v=58">
+</head>
+<body>
+  <main class="legal admin">
+    <div class="legal-head">
+      <a class="brand" href="/"><span class="brand-name">WIR<span>ING</span></span><span class="beta-label">beta</span></a>
+      <div class="theme-swatches" role="group" aria-label="цвет">
+        <button type="button" class="swatch" data-theme-set="pastel" aria-label="пастель" title="пастель"></button>
+        <button type="button" class="swatch" data-theme-set="mist" aria-label="дымка" title="дымка"></button>
+        <button type="button" class="swatch" data-theme-set="night" aria-label="ночь" title="ночь"></button>
+        <button type="button" class="swatch" data-theme-set="slate" aria-label="сланец" title="сланец"></button>
+        <button type="button" class="swatch" data-theme-set="dusk" aria-label="сумерки" title="сумерки"></button>
+      </div>
+    </div>
+    <h1>статистика</h1>
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}
+    {% if not authed %}
+      <form class="form" method="post" action="/admin">
+        <label>токен<input name="token" type="password" required autocomplete="current-password"></label>
+        <button class="solid" type="submit">войти</button>
+      </form>
+    {% else %}
+      <div class="admin-grid">
+        <div class="prompt-card"><div class="q">живые</div><p>{{ s.users_real }}</p></div>
+        <div class="prompt-card"><div class="q">гости</div><p>{{ s.users_guest }}</p></div>
+        <div class="prompt-card"><div class="q">сиды</div><p>{{ s.users_seed }}</p></div>
+        <div class="prompt-card"><div class="q">свайпы сегодня</div><p>{{ s.swipes_today }} <span class="hint">вчера {{ s.swipes_yesterday }}</span></p></div>
+        <div class="prompt-card"><div class="q">лайки / пропуски</div><p>{{ s.likes }} / {{ s.passes }}</p></div>
+        <div class="prompt-card"><div class="q">мэтчи живые / сиды</div><p>{{ s.matches_real }} / {{ s.matches_seed }}</p></div>
+        <div class="prompt-card"><div class="q">сообщения</div><p>{{ s.messages }}</p></div>
+        <div class="prompt-card"><div class="q">жалобы / блоки</div><p>{{ s.reports }} / {{ s.blocks }}</p></div>
+        <div class="prompt-card"><div class="q">WIRING+</div><p>{{ s.users_plus }}</p></div>
+        <div class="prompt-card"><div class="q">фильтры 7д</div><p>{{ s.filter_sessions_7d }} <span class="hint">сессий</span></p></div>
+        <div class="prompt-card"><div class="q">фильтры 30д</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }} чел.</span></p></div>
+      </div>
+
+      <h2>популярные фильтры</h2>
+      <p class="hint">Считаем применения в ленте и «кто лайкнул». Одинаковый набор от одного человека — не чаще раза в полчаса.</p>
+      <div class="admin-grid">
+        <div>
+          <h3>диагнозы</h3>
+          <table class="admin-table">
+            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_neuro %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>вайб</h3>
+          <table class="admin-table">
+            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_vibe %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>формат</h3>
+          <table class="admin-table">
+            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_intent %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>города</h3>
+          <table class="admin-table">
+            <tr><th>город</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_city %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>возраст</h3>
+          <table class="admin-table">
+            <tr><th>диапазон</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_age %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>за 7 дней · диагнозы</h3>
+          <table class="admin-table">
+            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            {% for row in s.filters_neuro_7d %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+
+      <h2>выдать WIRING+</h2>
+      <p class="hint">Почта, id или точное имя. Дни прибавляются к текущему сроку. 0 — снять.</p>
+      <form class="form" method="post" action="/admin/premium">
+        <label>кто<input name="who" required placeholder="id, почта или имя"></label>
+        <label>дней
+          <select name="days">
+            <option value="30">30</option>
+            <option value="90" selected>90</option>
+            <option value="365">365</option>
+            <option value="36500">навсегда</option>
+            <option value="0">снять</option>
+          </select>
+        </label>
+        <button class="solid" type="submit">выдать</button>
+      </form>
+
+      <h2>промокоды</h2>
+      <form class="form" method="post" action="/admin/promo">
+        <label>код<input name="code" required placeholder="WIRINGPLUS" maxlength="24"></label>
+        <label>дней<input name="days" type="number" min="1" max="36500" value="90"></label>
+        <label>лимит использований<input name="max_uses" type="number" min="0" value="0" placeholder="0 = безлимит"></label>
+        <button class="ghost" type="submit">создать код</button>
+      </form>
+      <table class="admin-table">
+        <tr><th>код</th><th>дни</th><th>использовали</th></tr>
+        {% for c in codes %}
+        <tr><td>{{ c.code }}</td><td>{{ c.days }}</td><td>{{ c.uses }}{% if c.max_uses %} / {{ c.max_uses }}{% else %} / ∞{% endif %}</td></tr>
+        {% else %}
+        <tr><td colspan="3">нет кодов</td></tr>
+        {% endfor %}
+      </table>
+
+      <h2>регистрации</h2>
+      <table class="admin-table">
+        <tr><th>день</th><th>живые</th><th>гости</th></tr>
+        {% for row in s.days %}
+        <tr><td>{{ row.day }}</td><td>{{ row.real }}</td><td>{{ row.guest }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">пока пусто</td></tr>
+        {% endfor %}
+      </table>
+
+      <h2>молчат после регистрации</h2>
+      {% if s.silent %}
+        <ul>
+          {% for u in s.silent %}
+          <li>{{ u.name }}, {{ u.age }} · {{ u.city }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="hint">все живые хотя бы раз свайпнули</p>
+      {% endif %}
+
+      <h2>поддержка</h2>
+      <table class="admin-table">
+        <tr><th>кто</th><th>контакт</th><th>текст</th></tr>
+        {% for t in tickets %}
+        <tr>
+          <td>{{ t.name or "—" }}{% if t.user_id %} <span class="hint">#{{ t.user_id }}</span>{% endif %}</td>
+          <td>{{ t.email or "—" }}</td>
+          <td>{{ t.body }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">пока пусто</td></tr>
+        {% endfor %}
+      </table>
+
+      <section id="tasks" class="task-board-wrap">
+        <div class="task-board-head">
+          <div>
+            <h2>черновики задач</h2>
+            <p class="hint">Сообщения из поддержки и Telegram превращаются в предложения. В работу попадают только после твоего одобрения.</p>
+          </div>
+          <form method="post" action="/admin/tasks/import-support">
+            <button class="ghost" type="submit">собрать из поддержки</button>
+          </form>
+        </div>
+        <p class="task-threshold">Порог: <strong>{{ "%.1f"|format(task_threshold) }}/10</strong> · кандидатов {{ task_counts.get('candidate', 0) }} · одобрено {{ task_counts.get('approved', 0) }} · отфильтровано {{ task_counts.get('filtered', 0) }} · дубликатов {{ task_counts.get('duplicate', 0) }}</p>
+        <div class="task-board">
+          {% for t in tasks %}
+          <article class="task-card task-{{ t.status }}">
+            <div class="task-card-top">
+              <span class="task-score">{{ "%.1f"|format(t.score) }}/10</span>
+              <span class="task-status">{% if t.status == 'candidate' %}кандидат{% elif t.status == 'approved' %}одобрено{% elif t.status == 'filtered' %}ниже порога{% elif t.status == 'duplicate' %}дубликат{% elif t.status == 'done' %}готово{% else %}отклонено{% endif %}</span>
+            </div>
+            <h3>{{ t.title }}</h3>
+            <p>{{ t.raw_text }}</p>
+            <div class="task-meta">{{ t.category }} · {{ t.source_chat or t.source_type }}{% if t.source_author %} · {{ t.source_author }}{% endif %}</div>
+            {% if t.duplicate_of %}<div class="hint">повтор задачи №{{ t.duplicate_of }}</div>{% endif %}
+            {% if t.status in ['candidate', 'filtered'] %}
+            <div class="task-actions">
+              <form method="post" action="/admin/tasks/{{ t.id }}/decision">
+                <input type="hidden" name="decision" value="approved">
+                <button class="solid slim" type="submit">одобрить</button>
+              </form>
+              <form method="post" action="/admin/tasks/{{ t.id }}/decision">
+                <input type="hidden" name="decision" value="rejected">
+                <button class="ghost slim" type="submit">отклонить</button>
+              </form>
+            </div>
+            {% elif t.status == 'approved' %}
+            <form method="post" action="/admin/tasks/{{ t.id }}/decision" class="task-actions">
+              <input type="hidden" name="decision" value="done">
+              <button class="ghost slim" type="submit">отметить готовой</button>
+            </form>
+            {% endif %}
+          </article>
+          {% else %}
+          <p class="hint">Пока нет сообщений для разбора. Нажми «собрать из поддержки» или подключи Telegram-воркер.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <h2>новые анкеты</h2>
+      <table class="admin-table">
+        <tr><th>кто</th><th>город</th><th>свайпы</th><th>+</th></tr>
+        {% for u in s.recent %}
+        <tr>
+          <td>{{ u.name }}, {{ u.age }} <span class="hint">#{{ u.id }}</span></td>
+          <td>{{ u.city }}</td>
+          <td>{{ u.swipes }}</td>
+          <td>
+            {% if u.plus %}до {{ u.plus_until }}{% else %}—{% endif %}
+            <form method="post" action="/admin/premium" class="inline-grant">
+              <input type="hidden" name="who" value="{{ u.id }}">
+              <input type="hidden" name="days" value="90">
+              <button class="ghost slim" type="submit">+90</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      <p class="legal-nav"><a href="/admin?out=1">выйти</a></p>
+    {% endif %}
+  </main>
+  <script>
+    (function () {
+      document.querySelectorAll("[data-theme-set]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var next = btn.getAttribute("data-theme-set");
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("wiring-theme", next); } catch (e) {}
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -7,7 +7,6 @@ import os
 import re
 import secrets
 import shutil
-import sqlite3
 import time
 from functools import wraps
 from typing import Any
@@ -17,6 +16,16 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from admin import collect_stats, ensure_filter_tables, track_filters
+from database import (
+    Connection,
+    Row,
+    USE_PG,
+    columns as _db_columns,
+    connect as db_connect,
+    ensure_column as _db_ensure_column,
+    open_request_connection,
+    table_names as _db_table_names,
+)
 from catalog import (
     GENDER_IDS,
     INTENT_IDS,
@@ -53,14 +62,16 @@ from premium import (
     snoozed_ids,
     unsnooze,
 )
-from seed import SEED_USERS
+from profanity import has_profanity
 from support_triage import ensure_task_tables, list_tasks, task_counts, task_threshold, triage_support_tickets
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 BASE_PATH = os.environ.get("BASE_PATH", "").rstrip("/")
 HOST = os.environ.get("HOST", "127.0.0.1")
-PORT = int(os.environ.get("PORT", "5070"))
+# Fixed local dev port (documented in README; override only for prod/systemd).
+DEV_PORT = 5070
+PORT = int(os.environ.get("PORT", str(DEV_PORT)))
 DB_PATH = os.environ.get("DATING_DB", os.path.join(BASE_DIR, "data", "wiring.sqlite3"))
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "uploads"))
 THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
@@ -103,14 +114,10 @@ def prefix(path: str) -> str:
     return f"{BASE_PATH}{path}" if BASE_PATH else path
 
 
-def db() -> sqlite3.Connection:
+def db() -> Connection:
     conn = getattr(g, "_db", None)
     if conn is None:
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
+        conn = open_request_connection(DB_PATH)
         g._db = conn
     return conn
 
@@ -122,22 +129,15 @@ def _close_db(_exc: BaseException | None) -> None:
         conn.close()
 
 
-def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
-    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+def _columns(conn: Connection, table: str) -> set[str]:
+    return _db_columns(conn, table)
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, name: str, ddl: str) -> None:
-    if name in _columns(conn, table):
-        return
-    try:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
-    except sqlite3.OperationalError as exc:
-        # Race: another gunicorn worker may have added the column first.
-        if "duplicate column" not in str(exc).lower():
-            raise
+def _ensure_column(conn: Connection, table: str, name: str, ddl: str) -> None:
+    _db_ensure_column(conn, table, name, ddl)
 
 
-def _album_id(conn: sqlite3.Connection, user_id: int, title: str = "я") -> int:
+def _album_id(conn: Connection, user_id: int, title: str = "я") -> int:
     title = (title or "я").strip()[:32] or "я"
     row = conn.execute(
         "SELECT id FROM albums WHERE user_id = ? AND title = ?",
@@ -153,7 +153,7 @@ def _album_id(conn: sqlite3.Connection, user_id: int, title: str = "я") -> int:
     return int(cur.lastrowid)
 
 
-def _sync_primary_photo(conn: sqlite3.Connection, user_id: int) -> None:
+def _sync_primary_photo(conn: Connection, user_id: int) -> None:
     row = conn.execute(
         """
         SELECT path FROM photos
@@ -166,7 +166,7 @@ def _sync_primary_photo(conn: sqlite3.Connection, user_id: int) -> None:
     conn.execute("UPDATE users SET photo = ? WHERE id = ?", (row["path"] if row else "", user_id))
 
 
-def _attach_portrait(conn: sqlite3.Connection, user_id: int, photo: str) -> None:
+def _attach_portrait(conn: Connection, user_id: int, photo: str) -> None:
     if not photo or photo not in SEED_PHOTOS:
         return
     if conn.execute("SELECT id FROM photos WHERE user_id = ? AND path = ?", (user_id, photo)).fetchone():
@@ -186,7 +186,7 @@ def _attach_portrait(conn: sqlite3.Connection, user_id: int, photo: str) -> None
     _sync_primary_photo(conn, user_id)
 
 
-def _replace_prompts(conn: sqlite3.Connection, user_id: int, prompts: list[dict[str, str]]) -> None:
+def _replace_prompts(conn: Connection, user_id: int, prompts: list[dict[str, str]]) -> None:
     conn.execute("DELETE FROM user_prompts WHERE user_id = ?", (user_id,))
     for index, item in enumerate(prompts):
         conn.execute(
@@ -196,11 +196,10 @@ def _replace_prompts(conn: sqlite3.Connection, user_id: int, prompts: list[dict[
 
 
 def init_db() -> None:
-    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    if not USE_PG:
+        os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    conn = db_connect(DB_PATH)
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -367,6 +366,13 @@ def init_db() -> None:
             used_at INTEGER,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS email_verifications (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            used_at INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS filter_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -409,6 +415,19 @@ def init_db() -> None:
         "hide_tags": "TEXT NOT NULL DEFAULT ''",
     }.items():
         _ensure_column(conn, "users", name, ddl)
+    had_email_verified = "email_verified_at" in _columns(conn, "users")
+    _ensure_column(conn, "users", "email_verified_at", "INTEGER")
+    if not had_email_verified:
+        # Grandfather existing accounts so deploy doesn't lock anyone out.
+        now = int(time.time())
+        conn.execute(
+            """
+            UPDATE users
+            SET email_verified_at = COALESCE(NULLIF(created_at, 0), ?)
+            WHERE email_verified_at IS NULL
+            """,
+            (now,),
+        )
     _ensure_column(conn, "messages", "reply_to_id", "INTEGER")
     _ensure_column(conn, "messages", "photo", "TEXT NOT NULL DEFAULT ''")
     # Map free-text cities onto the catalog when an alias/exact match exists.
@@ -419,69 +438,19 @@ def init_db() -> None:
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
     ensure_default_code(conn)
 
-    existing = {row["email"] for row in conn.execute("SELECT email FROM users")}
-    now = int(time.time())
-    for person in SEED_USERS:
-        if person["email"] in existing:
-            continue
-        password = person.get("password") or secrets.token_urlsafe(18)
-        cur = conn.execute(
-            """
-            INSERT INTO users (
-                email, password_hash, name, age, city, gender, looking_for, bio, photo,
-                job, intent, communication, is_seed, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                person["email"],
-                generate_password_hash(password, method="pbkdf2:sha256"),
-                person["name"],
-                person["age"],
-                person["city"],
-                person["gender"],
-                person["looking_for"],
-                person["bio"],
-                person.get("photo") or "",
-                person.get("job") or "",
-                person.get("intent") or "dating",
-                person.get("communication") or "",
-                0 if person.get("is_demo") else 1,
-                now,
-            ),
-        )
-        uid = int(cur.lastrowid)
-        for tag in person.get("neuro") or []:
-            conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'neuro', ?)", (uid, tag))
-        for tag in person.get("vibe") or []:
-            conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'vibe', ?)", (uid, tag))
-        _replace_prompts(conn, uid, person.get("prompts") or [])
-        _attach_portrait(conn, uid, person.get("photo") or "")
-
-    by_email = {p["email"]: p for p in SEED_USERS}
-    for row in conn.execute("SELECT id, email, photo, job, intent, communication FROM users WHERE is_seed = 1"):
-        person = by_email.get(row["email"])
-        if not person:
-            continue
-        conn.execute(
-            "UPDATE users SET job = ?, intent = ?, communication = ? WHERE id = ? AND job = '' AND communication = ''",
-            (person.get("job") or "", person.get("intent") or "dating", person.get("communication") or "", row["id"]),
-        )
-        if not conn.execute("SELECT 1 FROM user_prompts WHERE user_id = ?", (row["id"],)).fetchone():
-            _replace_prompts(conn, row["id"], person.get("prompts") or [])
-        if row["photo"]:
-            _attach_portrait(conn, row["id"], row["photo"])
-    for row in conn.execute("SELECT id, photo FROM users WHERE photo != ''"):
-        if not conn.execute("SELECT 1 FROM photos WHERE user_id = ?", (row["id"],)).fetchone():
-            _attach_portrait(conn, row["id"], row["photo"])
-
-    keep = {person["email"] for person in SEED_USERS}
-    stale = [
+    # Fake deck fillers are retired: wipe any leftover seed rows on boot.
+    seed_ids = [
         int(row["id"])
-        for row in conn.execute("SELECT id, email FROM users WHERE is_seed = 1")
-        if row["email"] not in keep
+        for row in conn.execute(
+            """
+            SELECT id FROM users
+            WHERE COALESCE(is_seed, 0) = 1
+               OR email LIKE '%@wiring.demo'
+            """
+        )
     ]
-    for uid in stale:
+    has_referrals = "referrals" in _db_table_names(conn)
+    for uid in seed_ids:
         conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
         conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
         conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
@@ -495,14 +464,54 @@ def init_db() -> None:
         conn.execute("DELETE FROM notes WHERE user_id = ? OR other_id = ?", (uid, uid))
         conn.execute("DELETE FROM snoozes WHERE user_id = ? OR other_id = ?", (uid, uid))
         conn.execute("DELETE FROM promo_redemptions WHERE user_id = ?", (uid,))
+        if has_referrals:
+            conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
         conn.execute("DELETE FROM users WHERE id = ?", (uid,))
+
+    for row in conn.execute("SELECT id, photo FROM users WHERE photo != ''"):
+        if not conn.execute("SELECT 1 FROM photos WHERE user_id = ?", (row["id"],)).fetchone():
+            _attach_portrait(conn, row["id"], row["photo"])
 
     conn.commit()
     conn.close()
 
 
-os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+if not USE_PG:
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
 init_db()
+
+
+def email_verify_enforced() -> bool:
+    """Skip email confirmation in the test suite so existing flows stay intact."""
+    return not bool(app.config.get("TESTING"))
+
+
+def email_is_verified(row: Row | None) -> bool:
+    if not row:
+        return False
+    keys = set(row.keys())
+    email = str(row["email"] or "") if "email" in keys else ""
+    if is_guest_email(email) or email.endswith("@wiring.demo"):
+        return True
+    if "email_verified_at" not in keys:
+        return True
+    return bool(row["email_verified_at"])
+
+
+def issue_email_verification(conn: Connection, user_id: int, email: str) -> str:
+    token = secrets.token_urlsafe(32)
+    conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (user_id,))
+    conn.execute(
+        "INSERT INTO email_verifications (token, user_id, created_at) VALUES (?, ?, ?)",
+        (token, user_id, int(time.time())),
+    )
+    link = f"{SITE_URL}/?verify={token}"
+    send_mail(
+        email,
+        "WIRING — подтверди почту",
+        f"Чтобы войти в WIRING, подтверди почту по ссылке (действует 48 часов):\n\n{link}\n\nЕсли это не ты — просто проигнорируй письмо.",
+    )
+    return token
 
 
 def too_many(key: str, limit: int, window: float) -> bool:
@@ -530,7 +539,7 @@ def is_demo_email(email: str) -> bool:
     )
 
 
-def is_live_profile(row: sqlite3.Row) -> bool:
+def is_live_profile(row: Row) -> bool:
     if int(row["is_seed"] or 0):
         return False
     return not is_demo_email(str(row["email"] or ""))
@@ -540,7 +549,7 @@ def _consent_yes(value: Any) -> bool:
     return value is True or value in (1, "1", "true", "True", "yes", "on")
 
 
-def profile_complete(row: sqlite3.Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
+def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
     """Ready to appear in the feed: city, age, neuro, photo, consents."""
     if int(row["is_seed"] or 0) or is_guest_email(str(row["email"] or "")):
         return True
@@ -637,7 +646,7 @@ def albums_for(user_id: int) -> list[dict[str, Any]]:
     return albums
 
 
-def user_public(row: sqlite3.Row, include_email: bool = False, detail: bool = False) -> dict[str, Any]:
+def user_public(row: Row, include_email: bool = False, detail: bool = False) -> dict[str, Any]:
     tags = tags_for(row["id"])
     photos = photos_for(row["id"])
     urls = [item["url"] for item in photos]
@@ -703,6 +712,7 @@ def inbox_stats(uid: int) -> dict[str, int]:
         SELECT s.from_id, u.email FROM swipes s
         JOIN users u ON u.id = s.from_id
         WHERE s.to_id = ? AND s.direction = 'like'
+          AND COALESCE(u.is_seed, 0) = 0
           AND s.from_id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
           AND (
             EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
@@ -853,7 +863,7 @@ def intents_store(items: list[str]) -> str:
 
 
 def intents_of(row_or_value: Any) -> list[str]:
-    if isinstance(row_or_value, sqlite3.Row):
+    if hasattr(row_or_value, "keys") and not isinstance(row_or_value, (str, bytes, dict)):
         keys = set(row_or_value.keys())
         raw = row_or_value["intent"] if "intent" in keys else "dating"
     else:
@@ -895,12 +905,22 @@ def parse_profile(
         return None, "только 18+"
     if not city or len(city) < 2 or len(city) > 48:
         return None, "город: 2–48 символов"
+    if not is_catalog_city(city):
+        return None, "выбери город из списка"
     if len(bio) > 1200:
         return None, "био до 1200 символов"
     if len(job) > 60:
         return None, "занятие до 60 символов"
     if len(communication) > 280:
         return None, "как тебе писать: до 280 символов"
+    for label, value in (
+        ("имя", name),
+        ("о себе", bio),
+        ("занятость", job),
+        ("как тебе писать", communication),
+    ):
+        if has_profanity(value):
+            return None, f"в поле «{label}» есть мат — переформулируй"
     if gender not in GENDER_IDS:
         return None, "выбери гендер"
     if looking_for not in LOOKING_IDS:
@@ -914,6 +934,9 @@ def parse_profile(
     prompts, err = parse_prompts(data.get("prompts"))
     if err:
         return None, err
+    for prompt in prompts or []:
+        if has_profanity(str(prompt.get("answer") or "")):
+            return None, "в промпте есть мат — переформулируй"
     seek_min: int | None = None
     seek_max: int | None = None
     if "seek_min_age" in data or "seek_max_age" in data:
@@ -975,7 +998,7 @@ def parse_profile(
     return payload, None
 
 
-def replace_tags(conn: sqlite3.Connection, user_id: int, neuro: list[str], vibe: list[str]) -> None:
+def replace_tags(conn: Connection, user_id: int, neuro: list[str], vibe: list[str]) -> None:
     conn.execute("DELETE FROM user_tags WHERE user_id = ?", (user_id,))
     for tag in neuro:
         conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'neuro', ?)", (user_id, tag))
@@ -1012,7 +1035,7 @@ def parse_hide_tags(raw: Any) -> list[str]:
     return out
 
 
-def hide_tags_of(row: sqlite3.Row | dict[str, Any] | None) -> list[str]:
+def hide_tags_of(row: Row | dict[str, Any] | None) -> list[str]:
     if not row:
         return []
     keys = set(row.keys()) if hasattr(row, "keys") else set()
@@ -1022,7 +1045,7 @@ def hide_tags_of(row: sqlite3.Row | dict[str, Any] | None) -> list[str]:
     return parse_hide_tags(raw)
 
 
-def discovery_allows(owner: sqlite3.Row, viewer: sqlite3.Row) -> bool:
+def discovery_allows(owner: Row, viewer: Row) -> bool:
     """Whether `viewer` is allowed to see `owner` in the feed."""
     keys = set(owner.keys())
     viewer_age = int(viewer["age"] or 0)
@@ -1049,11 +1072,11 @@ def discovery_allows(owner: sqlite3.Row, viewer: sqlite3.Row) -> bool:
     return True
 
 
-def _notifiable(row: sqlite3.Row) -> bool:
+def _notifiable(row: Row) -> bool:
     return is_live_profile(row)
 
 
-def maybe_finish_onboard(conn: sqlite3.Connection, uid: int) -> None:
+def maybe_finish_onboard(conn: Connection, uid: int) -> None:
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not row or is_guest_email(str(row["email"])):
         return
@@ -1073,7 +1096,7 @@ def _token_ok(got: str, expected: str) -> bool:
     return secrets.compare_digest(left, right)
 
 
-def blocked_ids(conn: sqlite3.Connection, uid: int) -> set[int]:
+def blocked_ids(conn: Connection, uid: int) -> set[int]:
     rows = conn.execute(
         """
         SELECT to_id AS id FROM blocks WHERE from_id = ?
@@ -1085,7 +1108,7 @@ def blocked_ids(conn: sqlite3.Connection, uid: int) -> set[int]:
     return {int(row["id"]) for row in rows}
 
 
-def unread_count(conn: sqlite3.Connection, me: int, other: int) -> int:
+def unread_count(conn: Connection, me: int, other: int) -> int:
     row = conn.execute(
         "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ?",
         (me, other),
@@ -1099,7 +1122,7 @@ def unread_count(conn: sqlite3.Connection, me: int, other: int) -> int:
     )
 
 
-def mark_read(conn: sqlite3.Connection, me: int, other: int) -> None:
+def mark_read(conn: Connection, me: int, other: int) -> None:
     last = conn.execute(
         """
         SELECT id FROM messages
@@ -1118,7 +1141,7 @@ def mark_read(conn: sqlite3.Connection, me: int, other: int) -> None:
     )
 
 
-def wipe_user(conn: sqlite3.Connection, uid: int) -> None:
+def wipe_user(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
@@ -1133,13 +1156,15 @@ def wipe_user(conn: sqlite3.Connection, uid: int) -> None:
     conn.execute("DELETE FROM snoozes WHERE user_id = ? OR other_id = ?", (uid, uid))
     conn.execute("DELETE FROM promo_redemptions WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
+    conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM users WHERE id = ?", (uid,))
     folder = os.path.join(UPLOAD_DIR, str(uid))
     if os.path.isdir(folder):
         shutil.rmtree(folder, ignore_errors=True)
 
 
-def _purge_old_guests(conn: sqlite3.Connection) -> None:
+def _purge_old_guests(conn: Connection) -> None:
     cutoff = int(time.time()) - 60 * 60 * 24 * 3
     ids = [
         r["id"]
@@ -1152,14 +1177,14 @@ def _purge_old_guests(conn: sqlite3.Connection) -> None:
         wipe_user(conn, uid)
 
 
-def _clear_pair(conn: sqlite3.Connection, uid: int, target_id: int) -> None:
+def _clear_pair(conn: Connection, uid: int, target_id: int) -> None:
     conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (uid, target_id))
     target = conn.execute("SELECT is_seed FROM users WHERE id = ?", (target_id,)).fetchone()
     if target and target["is_seed"]:
         conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (target_id, uid))
 
 
-def _is_match(conn: sqlite3.Connection, a: int, b: int) -> bool:
+def _is_match(conn: Connection, a: int, b: int) -> bool:
     left = conn.execute(
         "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
         (a, b),
@@ -1171,7 +1196,7 @@ def _is_match(conn: sqlite3.Connection, a: int, b: int) -> bool:
     return bool(left and right and left["direction"] == "like" and right["direction"] == "like")
 
 
-def _unmatch_pair(conn: sqlite3.Connection, uid: int, other_id: int) -> None:
+def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
     """Remove chat: your side becomes a pass (diz), their like is dropped.
 
     They leave Чаты and Лайки and stay out of the лента until you restore passes.
@@ -1229,6 +1254,7 @@ def index():
 @app.get("/register")
 @app.get("/forgot")
 @app.get("/reset")
+@app.get("/verify")
 @app.get("/feed")
 @app.get("/likes")
 @app.get("/chats")
@@ -1282,15 +1308,17 @@ def api_register():
         return jsonify({"ok": False, "error": "такая почта уже есть"}), 409
     consented_at = int(time.time())
     marketing_at = consented_at if data.get("marketing_consent") is True else None
+    need_verify = email_verify_enforced()
+    verified_at = None if need_verify else consented_at
     cur = conn.execute(
         """
         INSERT INTO users (
             email, password_hash, name, age, city, gender, looking_for, bio, photo,
             job, intent, height, communication, privacy_accepted_at,
             special_data_consent_at, photo_rights_consent_at, marketing_consent_at,
-            onboard_done, is_seed, created_at, last_seen
+            email_verified_at, onboard_done, is_seed, created_at, last_seen
         )
-        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, 0, 0, ?, ?)
+        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, ?, 0, 0, ?, ?)
         """,
         (
             email,
@@ -1298,6 +1326,7 @@ def api_register():
             name,
             consented_at,
             marketing_at,
+            verified_at,
             consented_at,
             consented_at,
         ),
@@ -1313,6 +1342,11 @@ def api_register():
             0,
             f"по твоей ссылке зарегистрировались — WIRING+ на {REFERRAL_DAYS} дней",
         )
+    if need_verify:
+        issue_email_verification(conn, uid, email)
+        conn.commit()
+        session.clear()
+        return jsonify({"ok": True, "needs_email_verify": True, "email": email})
     conn.commit()
     session.clear()
     session.permanent = True
@@ -1331,12 +1365,69 @@ def api_login():
     row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return jsonify({"ok": False, "error": "неверная почта или пароль"}), 401
+    if email_verify_enforced() and not email_is_verified(row):
+        return jsonify(
+            {
+                "ok": False,
+                "error": "подтверди почту — мы отправили ссылку",
+                "needs_email_verify": True,
+                "email": email,
+            }
+        ), 403
     session.clear()
     session.permanent = True
     session["uid"] = row["id"]
     db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (int(time.time()), row["id"]))
     db().commit()
     return jsonify({"ok": True, "user": current_user()})
+
+
+@app.post("/api/email/verify")
+def api_email_verify():
+    data = request.get_json(silent=True) or {}
+    token = str(data.get("token") or "").strip()
+    if not token:
+        return jsonify({"ok": False, "error": "нет токена"}), 400
+    conn = db()
+    row = conn.execute(
+        "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ?",
+        (token,),
+    ).fetchone()
+    if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 172800:
+        return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (row["user_id"],)).fetchone()
+    if not user:
+        return jsonify({"ok": False, "error": "аккаунт не найден"}), 400
+    now = int(time.time())
+    conn.execute(
+        "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), last_seen = ? WHERE id = ?",
+        (now, now, row["user_id"]),
+    )
+    conn.execute("UPDATE email_verifications SET used_at = ? WHERE token = ?", (now, token))
+    conn.commit()
+    session.clear()
+    session.permanent = True
+    session["uid"] = row["user_id"]
+    return jsonify({"ok": True, "user": current_user()})
+
+
+@app.post("/api/email/resend")
+def api_email_resend():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"emailverify:{ip}", 8, 600):
+        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+    if EMAIL_RE.match(email) and "@wiring.guest" not in email and not email.endswith("@wiring.demo"):
+        conn = db()
+        row = conn.execute(
+            "SELECT * FROM users WHERE email = ? AND COALESCE(is_seed, 0) = 0",
+            (email,),
+        ).fetchone()
+        if row and not email_is_verified(row):
+            issue_email_verification(conn, int(row["id"]), email)
+            conn.commit()
+    return jsonify({"ok": True})
 
 
 @app.post("/api/password/forgot")
@@ -1401,6 +1492,8 @@ def api_me_city():
     city = normalize_city(str(data.get("city") or "").strip())
     if not city or len(city) < 2 or len(city) > 48:
         return jsonify({"ok": False, "error": "город: 2–48 символов"}), 400
+    if not is_catalog_city(city):
+        return jsonify({"ok": False, "error": "выбери город из списка"}), 400
     conn = db()
     conn.execute("UPDATE users SET city = ? WHERE id = ?", (city, session["uid"]))
     conn.commit()
@@ -1414,12 +1507,13 @@ def api_demo():
     email = f"guest-{secrets.token_hex(8)}@wiring.guest"
     cur = conn.execute(
         """
-        INSERT INTO users (email, password_hash, name, age, city, gender, looking_for, bio, photo, is_seed, created_at, last_seen)
+        INSERT INTO users (email, password_hash, name, age, city, gender, looking_for, bio, photo,
+                           email_verified_at, is_seed, created_at, last_seen)
         VALUES (?, ?, 'Гость', 28, 'онлайн / не важно', 'other', 'everyone',
                 'Смотрю анкеты. Свой профиль соберу чуть позже.',
-                '', 0, ?, ?)
+                '', ?, 0, ?, ?)
         """,
-        (email, generate_password_hash(secrets.token_urlsafe(18), method="pbkdf2:sha256"), int(time.time()), int(time.time())),
+        (email, generate_password_hash(secrets.token_urlsafe(18), method="pbkdf2:sha256"), int(time.time()), int(time.time()), int(time.time())),
     )
     uid = int(cur.lastrowid)
     replace_tags(conn, uid, ["audhd"], ["selfdx", "terminally-online"])
@@ -1538,8 +1632,8 @@ def api_patch_me():
 
 
 def _eligible_card(
-    me: sqlite3.Row,
-    row: sqlite3.Row,
+    me: Row,
+    row: Row,
     neuro_filter: list[str],
     vibe_filter: list[str],
     blocked: set[int],
@@ -1557,7 +1651,10 @@ def _eligible_card(
     keys = set(row.keys())
     if "paused" in keys and int(row["paused"] or 0):
         return None
+    if int(row["is_seed"] or 0) if "is_seed" in keys else 0:
+        return None
     if skip_seeds and not is_live_profile(row):
+        # legacy real-only flag: still hide @example.com / demo when asked
         return None
     if "incognito" in keys and int(row["incognito"] or 0):
         if not liked_me or row["id"] not in liked_me:
@@ -1614,6 +1711,7 @@ def api_feed():
             real_only=real_only,
         )
     blocked = blocked_ids(db(), me["id"])
+    # Seeds are wiped; real_only remains for hiding @example.com test/demo rows if asked.
     skip_seeds = bool(real_only and is_premium(me))
     hidden = snoozed_ids(db(), me["id"]) if is_premium(me) else set()
     liked_me = {
@@ -1634,7 +1732,7 @@ def api_feed():
             EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id)
             OR (photo IS NOT NULL AND photo != '')
           )
-        ORDER BY is_seed DESC, id ASC
+        ORDER BY id ASC
         """,
         (me["id"], min_age, max_age, city_q, city_q, me["id"]),
     ).fetchall()
@@ -1899,6 +1997,7 @@ def api_likes():
         JOIN swipes s ON s.from_id = u.id AND s.to_id = ? AND s.direction = 'like'
         WHERE u.age BETWEEN ? AND ?
           AND (? = '' OR u.city = ?)
+          AND COALESCE(u.is_seed, 0) = 0
           AND u.id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
           AND (
             EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
@@ -1997,10 +2096,10 @@ def _message_preview(body: str, photo: str = "") -> str:
 
 
 def _message_payload(
-    row: sqlite3.Row,
+    row: Row,
     uid: int,
     peer_read_id: int = 0,
-    by_id: dict[int, sqlite3.Row] | None = None,
+    by_id: dict[int, Row] | None = None,
 ) -> dict[str, Any]:
     keys = set(row.keys())
     photo = str(row["photo"] or "") if "photo" in keys else ""
@@ -2031,7 +2130,7 @@ def _message_payload(
 
 
 def _insert_message(
-    conn: sqlite3.Connection,
+    conn: Connection,
     *,
     uid: int,
     other_id: int,
@@ -2614,7 +2713,7 @@ def _admin_ready() -> bool:
     return bool(_admin_token() and session.get("admin"))
 
 
-def _admin_tickets(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def _admin_tickets(conn: Connection) -> list[Row]:
     return conn.execute(
         """
         SELECT id, user_id, name, email, body, created_at
@@ -2625,7 +2724,7 @@ def _admin_tickets(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
-def _admin_tasks(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+def _admin_tasks(conn: Connection) -> list[Row]:
     return list_tasks(conn, limit=120)
 
 

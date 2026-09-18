@@ -16,6 +16,7 @@ from PIL import Image
 
 from app import app, init_db, DB_PATH, _rate  # noqa: E402
 from media import MediaError  # noqa: E402
+from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
 
 
 class WiringTest(unittest.TestCase):
@@ -34,7 +35,7 @@ class WiringTest(unittest.TestCase):
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
         self.assertTrue(health["ok"])
-        self.assertGreaterEqual(health["users"], 8)
+        self.assertGreaterEqual(health["users"], 0)
         catalog = self.client.get("/api/catalog").get_json()
         self.assertTrue(any(item["id"] == "adhd" for item in catalog["neuro"]))
         self.assertTrue(any(item["id"] == "neurospicy" for item in catalog["vibe"]))
@@ -46,6 +47,19 @@ class WiringTest(unittest.TestCase):
         me = self._register()
         self.assertEqual(me["name"], "Ада")
         self.assertFalse(me["needs_profile"])
+        self._peers(1)
+        self._login("ada@example.com")
+        # one peer with adhd
+        self._logout()
+        peer = self._register(
+            email="adhd-peer@example.com",
+            name="Адик",
+            gender="man",
+            neuro=["adhd"],
+            photo="portraits/p03.jpg",
+        )
+        self._logout()
+        self._login("ada@example.com")
 
         feed = self.client.get("/api/feed?neuro=adhd").get_json()
         self.assertTrue(feed["cards"])
@@ -65,8 +79,10 @@ class WiringTest(unittest.TestCase):
         else:
             lonely = self.client.post("/api/messages", json={"to_id": target["id"], "body": "привет"})
             self.assertEqual(lonely.status_code, 403)
+        self.assertEqual(peer["name"], "Адик")
 
     def test_demo_login(self):
+        self._peers(6)
         first = self.client.post("/api/demo")
         self.assertEqual(first.status_code, 200)
         first_email = first.get_json()["user"]["email"]
@@ -77,6 +93,7 @@ class WiringTest(unittest.TestCase):
         self.assertNotEqual(second.get_json()["user"]["email"], first_email)
 
     def test_pass_recycles_and_rewind(self):
+        self._peers(3)
         self.client.post("/api/demo")
         feed = self.client.get("/api/feed").get_json()
         target = feed["cards"][0]
@@ -89,6 +106,7 @@ class WiringTest(unittest.TestCase):
         self.assertIn(target["id"], ids)
 
     def test_restart_after_all_swipes(self):
+        self._peers(3)
         self.client.post("/api/demo")
         feed = self.client.get("/api/feed").get_json()
         first = feed["cards"][0]
@@ -145,6 +163,61 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("персональных данных", res.get_json()["error"])
 
+    def test_email_verify_required_before_login(self):
+        with patch("app.email_verify_enforced", return_value=True), patch("app.send_mail", return_value=True) as mail:
+            res = self.client.post(
+                "/api/register",
+                json={
+                    "email": "verify-me@example.com",
+                    "password": "secret1",
+                    "name": "Вера",
+                    "age_confirm": True,
+                    "privacy_confirm": True,
+                },
+            )
+            self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+            data = res.get_json()
+            self.assertTrue(data["needs_email_verify"])
+            self.assertEqual(data["email"], "verify-me@example.com")
+            self.assertIsNone(self.client.get("/api/me").get_json()["user"])
+            self.assertTrue(mail.called)
+            self.assertIn("?verify=", mail.call_args[0][2])
+
+        with patch("app.email_verify_enforced", return_value=True):
+            blocked = self.client.post(
+                "/api/login",
+                json={"email": "verify-me@example.com", "password": "secret1"},
+            )
+            self.assertEqual(blocked.status_code, 403)
+            self.assertTrue(blocked.get_json()["needs_email_verify"])
+
+        import sqlite3
+
+        conn = sqlite3.connect(DB_PATH)
+        token = conn.execute(
+            "SELECT token FROM email_verifications ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()[0]
+        conn.close()
+
+        verified = self.client.post("/api/email/verify", json={"token": token})
+        self.assertEqual(verified.status_code, 200, verified.get_data(as_text=True))
+        self.assertEqual(verified.get_json()["user"]["email"], "verify-me@example.com")
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertEqual(me["email"], "verify-me@example.com")
+
+        with patch("app.email_verify_enforced", return_value=True), patch("app.send_mail", return_value=True) as mail2:
+            again = self.client.post("/api/email/resend", json={"email": "verify-me@example.com"})
+            self.assertEqual(again.status_code, 200)
+            self.assertFalse(mail2.called)
+
+        self._logout()
+        with patch("app.email_verify_enforced", return_value=True):
+            login = self.client.post(
+                "/api/login",
+                json={"email": "verify-me@example.com", "password": "secret1"},
+            )
+            self.assertEqual(login.status_code, 200)
+
     def test_legal_and_sitemap(self):
         self.assertEqual(self.client.get("/privacy").status_code, 200)
         self.assertEqual(self.client.get("/rules").status_code, 200)
@@ -175,7 +248,7 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(sitemap.status_code, 200)
         self.assertIn(b"/support", sitemap.data)
         self.assertNotIn(b"/glossary", sitemap.data)
-        for path in ("/feed", "/likes", "/chats", "/me", "/login", "/register", "/p/1", "/chats/1", "/r/abcd1234"):
+        for path in ("/feed", "/likes", "/chats", "/me", "/login", "/register", "/verify", "/p/1", "/chats/1", "/r/abcd1234"):
             page = self.client.get(path)
             self.assertEqual(page.status_code, 200, path)
             self.assertIn(b"WIRING", page.data)
@@ -218,6 +291,34 @@ class WiringTest(unittest.TestCase):
         user = patched.get_json()["user"]
         self.assertFalse(user["needs_profile"])
         return user
+
+    def _logout(self):
+        self.client.post("/api/logout")
+
+    def _login(self, email, password="secret1"):
+        res = self.client.post("/api/login", json={"email": email, "password": password})
+        self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+        return res.get_json()["user"]
+
+    def _peers(self, n=6, **extra):
+        """Create n complete profiles and leave the client logged out."""
+        photos = [f"portraits/p0{i}.jpg" for i in range(1, 10)]
+        peers = []
+        for i in range(n):
+            self._logout()
+            peers.append(
+                self._register(
+                    email=f"peer{i}-{n}@example.com",
+                    name=f"Пир{i}",
+                    gender="man" if i % 2 else "woman",
+                    age=20 + (i % 20),
+                    neuro=["adhd"] if i % 2 else ["asd"],
+                    photo=photos[i % len(photos)],
+                    **extra,
+                )
+            )
+        self._logout()
+        return peers
 
     def test_light_register_then_profile(self):
         created = self.client.post(
@@ -287,6 +388,8 @@ class WiringTest(unittest.TestCase):
 
     def test_block_hides_from_feed(self):
         self._register()
+        self._peers(2)
+        self._login("ada@example.com")
         feed = self.client.get("/api/feed").get_json()
         target = feed["cards"][0]
         blocked = self.client.post("/api/block", json={"user_id": target["id"]})
@@ -364,9 +467,17 @@ class WiringTest(unittest.TestCase):
 
     def test_age_filter(self):
         self._register()
+        self._logout()
+        self._register(email="young@example.com", name="Юля", age=20, gender="man", photo="portraits/p02.jpg")
+        self._logout()
+        self._register(email="old@example.com", name="Серж", age=35, gender="man", photo="portraits/p03.jpg")
+        self._logout()
+        self._login("ada@example.com")
         young = self.client.get("/api/feed?min_age=18&max_age=22").get_json()
+        self.assertTrue(young["cards"])
         self.assertTrue(all(c["age"] <= 22 for c in young["cards"]))
         old = self.client.get("/api/feed?min_age=30&max_age=99").get_json()
+        self.assertTrue(old["cards"])
         self.assertTrue(all(c["age"] >= 30 for c in old["cards"]))
 
     def test_prompts_saved(self):
@@ -379,19 +490,18 @@ class WiringTest(unittest.TestCase):
         person = self.client.get(f"/api/people/{user['id']}").get_json()["person"]
         self.assertEqual(person["communication"], "сразу по делу, без как дела")
 
-    def test_seed_does_not_always_like(self):
+    def test_no_seed_profiles(self):
         self._register()
         with app.app_context():
             from app import db
 
             seed_ids = [int(row["id"]) for row in db().execute("SELECT id FROM users WHERE is_seed = 1")]
-        self.assertGreaterEqual(len(seed_ids), 8)
-        matched = 0
-        for sid in seed_ids:
-            res = self.client.post("/api/swipe", json={"target_id": sid, "direction": "like"})
-            self.assertEqual(res.status_code, 200)
-            matched += int(res.get_json()["matched"])
-        self.assertLess(matched, len(seed_ids))
+            demo = [
+                int(row["id"])
+                for row in db().execute("SELECT id FROM users WHERE email LIKE '%@wiring.demo'")
+            ]
+        self.assertEqual(seed_ids, [])
+        self.assertEqual(demo, [])
 
     def test_city_normalize(self):
         user = self._register(city="Pscov")
@@ -405,9 +515,80 @@ class WiringTest(unittest.TestCase):
             "bio": "аутистка",
             "neuro": ["asd"],
             "vibe": [],
+            "special_data_consent": True,
+            "photo_rights_consent": True,
+            "photo": "portraits/p01.jpg",
         })
         me = self.client.get("/api/me").get_json()["user"]
         self.assertEqual(me["city"], "Гомель")
+        bad = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "Буеракираки",
+                "gender": "woman",
+                "looking_for": "everyone",
+                "bio": "аутистка",
+                "neuro": ["asd"],
+                "vibe": ["neurospicy"],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+            },
+        )
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("списка", bad.get_json()["error"])
+
+    def test_tags_survive_bio_edit(self):
+        user = self._register(neuro=["asd", "anxiety"], vibe=["neurospicy", "nonsmalltalk"])
+        self.assertIn("asd", user["neuro"])
+        self.assertIn("neurospicy", user["vibe"])
+        patched = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "Нови-Сад",
+                "gender": "woman",
+                "looking_for": "everyone",
+                "bio": "первая строка\n\nвторая строка",
+                "neuro": ["asd", "anxiety"],
+                "vibe": ["neurospicy", "nonsmalltalk"],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+                "intent": "dating",
+                "job": "таблицы",
+            },
+        )
+        self.assertEqual(patched.status_code, 200, patched.get_data(as_text=True))
+        again = patched.get_json()["user"]
+        self.assertEqual(set(again["neuro"]), {"asd", "anxiety"})
+        self.assertEqual(set(again["vibe"]), {"neurospicy", "nonsmalltalk"})
+        self.assertIn("\n", again["bio"])
+
+    def test_profanity_blocked_in_profile(self):
+        self._register()
+        dirty = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "Нови-Сад",
+                "gender": "woman",
+                "looking_for": "everyone",
+                "bio": "ГОВНО",
+                "neuro": ["asd"],
+                "vibe": [],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+                "job": "хуй",
+            },
+        )
+        self.assertEqual(dirty.status_code, 400)
+        self.assertIn("мат", dirty.get_json()["error"])
 
     def test_onboard_and_skip(self):
         created = self.client.post(
@@ -428,6 +609,7 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(me["needs_profile"])
 
     def test_guest_nudge_after_three_likes(self):
+        self._peers(3)
         self.client.post("/api/demo")
         feed = self.client.get("/api/feed").get_json()
         last = None
@@ -514,14 +696,23 @@ class WiringTest(unittest.TestCase):
     def test_plus_redeem_and_real_feed(self):
         user = self._register()
         self.assertFalse(user.get("plus"))
-        denied = self.client.post("/api/swipe", json={"target_id": 1, "direction": "snooze"})
+        self._logout()
+        self._register(email="live@mail.test", name="Живой", gender="man", photo="portraits/p02.jpg")
+        self._logout()
+        self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
+        self._logout()
+        self._login("ada@example.com")
+        cards = self.client.get("/api/feed").get_json()["cards"]
+        self.assertTrue(cards)
+        denied = self.client.post("/api/swipe", json={"target_id": cards[0]["id"], "direction": "snooze"})
         self.assertEqual(denied.status_code, 403)
         plus = self._plus()
         self.assertTrue(plus["plus"])
         all_cards = self.client.get("/api/feed").get_json()["cards"]
         live = self.client.get("/api/feed?real=1").get_json()["cards"]
-        self.assertGreater(len(all_cards), 0)
-        self.assertLess(len(live), len(all_cards))
+        self.assertTrue(any(c["name"] == "Лео" for c in all_cards))
+        self.assertTrue(any(c["name"] == "Живой" for c in live))
+        self.assertFalse(any(c["name"] == "Лео" for c in live))
 
     def test_plus_incognito_and_pause(self):
         ada = self._register()
@@ -541,6 +732,8 @@ class WiringTest(unittest.TestCase):
 
     def test_plus_snooze(self):
         self._register()
+        self._peers(2)
+        self._login("ada@example.com")
         self._plus()
         feed = self.client.get("/api/feed").get_json()
         target = feed["cards"][0]
@@ -563,27 +756,33 @@ class WiringTest(unittest.TestCase):
         me = self.client.get("/api/me").get_json()["user"]
         self.assertTrue(me["plus"])
 
+    def test_spa_shell_routes_return_html(self):
+        for path in SPA_SHELL_PATHS:
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 200, path)
+            self.assertIn(b'id="app"', res.data)
+
     def test_like_notice_for_real_user(self):
-        first = self._register()
+        first = self._register(email="like-a@wiring.test")
         self.client.post("/api/logout")
-        self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
+        self._register(email="like-b@wiring.test", name="Лео", gender="man", photo="portraits/p03.jpg")
         self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
         self.client.post("/api/logout")
-        self.client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
+        self.client.post("/api/login", json={"email": "like-a@wiring.test", "password": "secret1"})
         me = self.client.get("/api/me").get_json()["user"]
         self.assertTrue(any(n["kind"] == "like" for n in me["notices"]))
 
     def test_message_notice_and_inbox(self):
-        first = self._register()
+        first = self._register(email="msg-a@wiring.test")
         self.client.post("/api/logout")
-        second = self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
+        second = self._register(email="msg-b@wiring.test", name="Лео", gender="man", photo="portraits/p03.jpg")
         self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
         self.client.post("/api/logout")
-        self.client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
+        self.client.post("/api/login", json={"email": "msg-a@wiring.test", "password": "secret1"})
         self.client.post("/api/swipe", json={"target_id": second["id"], "direction": "like"})
         self.client.post("/api/messages", json={"to_id": second["id"], "body": "привет без small talk"})
         self.client.post("/api/logout")
-        self.client.post("/api/login", json={"email": "leo@example.com", "password": "secret1"})
+        self.client.post("/api/login", json={"email": "msg-b@wiring.test", "password": "secret1"})
         inbox = self.client.get("/api/inbox").get_json()
         self.assertGreaterEqual(inbox["unread"], 1)
         self.assertTrue(any(n["kind"] == "message" and "привет" in n["body"] for n in inbox["notices"]))

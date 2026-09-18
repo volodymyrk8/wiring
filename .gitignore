@@ -1,8 +1,17 @@
+node_modules/
+public/dist/
 .venv/
+data/telegram/
+*.session
+*.session-journal
 venv/
 __pycache__/
 *.pyc
 .DS_Store
+# Local environment files (keep a safe, shareable template if added later)
+.env
+.env.*
+!.env.example
 data/
 *.sqlite3
 *.sqlite3-*

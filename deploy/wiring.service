@@ -1,5 +1,5 @@
 [Unit]
-Description=WIRING neurodivergent dating MVP
+Description=WIRING dating
 After=network.target
 
 [Service]
@@ -8,8 +8,12 @@ User=root
 WorkingDirectory=/root/repos/dating
 Environment=HOST=127.0.0.1
 Environment=PORT=5070
-Environment=BASE_PATH=/dating
+Environment=BASE_PATH=
+Environment=SITE_URL=https://wiring.date
+# SQLite fallback when DATABASE_URL is unset (legacy). Prefer Postgres in /etc/wiring.env:
+# DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring
 Environment=DATING_DB=/var/lib/wiring/wiring.sqlite3
+Environment=UPLOAD_DIR=/var/lib/wiring/uploads
 Environment=SESSION_COOKIE_SECURE=1
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/etc/wiring.env

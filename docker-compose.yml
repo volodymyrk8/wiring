@@ -1,0 +1,22 @@
+# Local dev Postgres (same major version as prod). Not for production.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wiring-postgres-dev
+    environment:
+      POSTGRES_USER: wiring_dev
+      POSTGRES_PASSWORD: wiring_dev
+      POSTGRES_DB: wiring_dev
+    ports:
+      # Host 5433 avoids clashing with a system Postgres on 5432.
+      - "5433:5432"
+    volumes:
+      - wiring_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wiring_dev -d wiring_dev"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  wiring_pg_data:

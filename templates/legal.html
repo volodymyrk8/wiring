@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ title }} — WIRING</title>
+  <meta name="description" content="{{ description }}">
+  <link rel="canonical" href="{{ site_url }}{{ path }}">
+  <meta name="theme-color" content="#e9ebf3">
+  <script>
+    (function () {
+      var t = "";
+      try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
+      document.documentElement.dataset.theme = (t === "night" || t === "pastel") ? t : "mist";
+    })();
+  </script>
+  <link rel="icon" href="/public/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/public/icon-180.png">
+  <link rel="stylesheet" href="/public/styles.css?v=58">
+  {% if google_analytics_id or yandex_metrika_id %}
+  <script>
+    window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
+    window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
+  </script>
+  <script src="/public/analytics.js?v=2" defer></script>
+  {% endif %}
+</head>
+<body>
+  <main class="legal">
+    <div class="legal-head">
+      <a class="brand" href="/"><span class="brand-name">WIR<span>ING</span></span><span class="beta-label">beta</span></a>
+      <div class="theme-swatches" role="group" aria-label="цвет">
+        <button type="button" class="swatch" data-theme-set="pastel" aria-label="пастель" title="пастель"></button>
+        <button type="button" class="swatch" data-theme-set="mist" aria-label="дымка" title="дымка"></button>
+        <button type="button" class="swatch" data-theme-set="night" aria-label="ночь" title="ночь"></button>
+      </div>
+    </div>
+    <h1>{{ title }}</h1>
+    {{ body | safe }}
+    {% if support_form %}
+      {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+      {% if error %}<p class="err">{{ error }}</p>{% endif %}
+      {% if not notice %}
+      <form class="form" method="post" action="/support">
+        <label>имя
+          <input name="name" maxlength="80" autocomplete="name" value="{{ me.name if me else '' }}">
+        </label>
+        <label>почта, если хочешь ответ письмом
+          <input name="email" type="email" maxlength="120" autocomplete="email" placeholder="можно не указывать">
+        </label>
+        <label>сообщение
+          <textarea name="body" required minlength="8" maxlength="2000" placeholder="что случилось"></textarea>
+        </label>
+        <button class="solid" type="submit">отправить</button>
+      </form>
+      {% endif %}
+    {% endif %}
+    <p class="legal-nav"><a href="/">на главную</a> · <a href="/rules">правила</a> · <a href="/privacy">конфиденциальность</a> · <a href="/support">поддержка</a></p>
+  </main>
+  <script>
+    (function () {
+      document.querySelectorAll("[data-theme-set]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var next = btn.getAttribute("data-theme-set");
+          document.documentElement.dataset.theme = next;
+          try { localStorage.setItem("wiring-theme", next); } catch (e) {}
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
