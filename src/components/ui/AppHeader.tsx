@@ -5,21 +5,21 @@ import { Select, type SelectOption } from "./Select";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
-  { id: "mist", label: "Лаванда" },
-  { id: "pastel", label: "Лён" },
-  { id: "night", label: "Неон" },
-  { id: "slate", label: "Графит" },
-  { id: "dusk", label: "Индиго" },
+  { id: "mist", label: "дымка" },
+  { id: "pastel", label: "пастель" },
+  { id: "night", label: "ночь" },
+  { id: "dusk", label: "сумерки" },
+  { id: "slate", label: "грифель" },
 ] as const;
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
 
 export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
-  { value: "mist", label: "Лаванда", hint: "светлая • прохладная", swatchTheme: "mist" },
-  { value: "pastel", label: "Лён", hint: "светлая • тёплая", swatchTheme: "pastel" },
-  { value: "night", label: "Неон", hint: "тёмная • контрастная", swatchTheme: "night" },
-  { value: "slate", label: "Графит", hint: "тёмная • глубокая", swatchTheme: "slate" },
-  { value: "dusk", label: "Индиго", hint: "тёмная • вечерняя", swatchTheme: "dusk" },
+  { value: "mist", label: "дымка", swatchTheme: "mist" },
+  { value: "pastel", label: "пастель", swatchTheme: "pastel" },
+  { value: "night", label: "ночь", swatchTheme: "night" },
+  { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
+  { value: "slate", label: "грифель", swatchTheme: "slate" },
 ];
 
 export type AppHeaderProps = {

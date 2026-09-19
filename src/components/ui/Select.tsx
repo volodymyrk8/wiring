@@ -17,7 +17,6 @@ const ChevronIcon = () => (
 export type SelectOption<T extends string = string> = {
   value: T;
   label: string;
-  hint?: string;
   icon?: ComponentChildren;
   swatchTheme?: string;
   disabled?: boolean;
@@ -118,9 +117,7 @@ export function Select<T extends string = string>({
         onClick={toggleOpen}
       >
         {selectedOption?.swatchTheme ? (
-          <span class={styles.swatch} data-theme-set={selectedOption.swatchTheme} data-theme={selectedOption.swatchTheme} aria-hidden="true">
-            <span class={styles.swatchDot} />
-          </span>
+          <span class={styles.swatch} data-theme-set={selectedOption.swatchTheme} data-theme={selectedOption.swatchTheme} aria-hidden="true" />
         ) : icon ? (
           icon
         ) : null}
@@ -152,21 +149,15 @@ export function Select<T extends string = string>({
                 role="option"
                 aria-selected={isSelected}
                 disabled={option.disabled}
-                data-theme-item={option.swatchTheme}
                 class={`${styles.option}${isSelected ? ` ${styles.selectedOption}` : ""}`}
                 onClick={handleSelect(option)}
               >
                 {option.swatchTheme ? (
-                  <span class={styles.swatch} data-theme-set={option.swatchTheme} data-theme={option.swatchTheme} aria-hidden="true">
-                    <span class={styles.swatchDot} />
-                  </span>
+                  <span class={styles.swatch} data-theme-set={option.swatchTheme} data-theme={option.swatchTheme} aria-hidden="true" />
                 ) : option.icon ? (
                   option.icon
                 ) : null}
-                <span class={styles.labelGroup}>
-                  <span class={styles.optionLabel}>{option.label}</span>
-                  {option.hint && <span class={styles.optionHint}>{option.hint}</span>}
-                </span>
+                <span class={styles.optionLabel}>{option.label}</span>
                 {isSelected && (
                   <span class={styles.check} aria-hidden="true">
                     <CheckIcon />

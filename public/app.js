@@ -139,17 +139,23 @@
       { fill: true }
     ),
     snooze: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
-    home: svgIcon(`<path d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/>`, { size: 20 }),
-    feed: svgIcon(`<rect x="4" y="5" width="16" height="4" rx="1.2"/><rect x="4" y="11" width="16" height="4" rx="1.2"/><rect x="4" y="17" width="11" height="3" rx="1"/>`, { size: 20 }),
+    home: svgIcon(`<path d="M3 10.5L12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H15a1 1 0 0 1-1-1v-4.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1V20a1 1 0 0 1-1 1H4.5A1.5 1.5 0 0 1 3 20z"/>`, { size: 20 }),
+    feed: svgIcon(
+      `<path d="M8.5 2.5h7a2 2 0 0 1 2 2v1.5" opacity="0.5"/><rect x="6.5" y="4.5" width="11" height="16" rx="2.5"/><circle cx="12" cy="9.5" r="1.7"/><path d="M9.6 15.5c0-1.3 1.1-2.1 2.4-2.1s2.4.8 2.4 2.1"/><path d="M4.5 12.5H1.5M3 10.5l-2 2 2 2"/><path d="M19.5 12.5h3M21 10.5l2 2-2 2"/>`,
+      { size: 20 }
+    ),
     heart: svgIcon(
-      `<path d="M12 19.4s-6.2-3.8-8.3-7.5C2.1 9.3 2.6 6.2 5 5c1.9-1 4.1-.4 5.5 1.4L12 8l1.5-1.6C15 4.6 17.2 4 19.1 5c2.4 1.2 2.9 4.3 1.3 6.9-2.1 3.7-8.4 7.5-8.4 7.5z"/>`,
+      `<path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572"/>`,
       { size: 20 }
     ),
     thumb: svgIcon(
-      `<path d="M8 10.5v8.2H5.8A1.8 1.8 0 0 1 4 16.9v-4.6a1.8 1.8 0 0 1 1.8-1.8H8zm2.2-.2l1.4-3.3A2.2 2.2 0 0 1 13.6 5.5h.2a1.6 1.6 0 0 1 1.5 2.1l-.7 2.9h3.2a2 2 0 0 1 1.9 2.5l-1.1 4.2a2.6 2.6 0 0 1-2.5 1.9H10.2v-8.8z"/>`,
-      { size: 20, fill: true }
+      `<path d="M7 10v11H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3zm2 11h8.3a2 2 0 0 0 2-1.6l1.4-7a2 2 0 0 0-2-2.4H14V5a3 3 0 0 0-3-3l-4 8v11z"/>`,
+      { size: 20 }
     ),
-    chat: svgIcon(`<path d="M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H11l-4.2 3v-3H5A1.5 1.5 0 0 1 3.5 15V8A1.5 1.5 0 0 1 5 6.5z"/>`, { size: 20 }),
+    chat: svgIcon(
+      `<path d="M20.5 11.5c0 4.4-3.8 8-8.5 8-1.5 0-2.9-.4-4.1-1L3.5 20l1.4-3.6C4.2 15.1 3.5 13.4 3.5 11.5c0-4.4 3.8-8 8.5-8s8.5 3.6 8.5 8z"/><circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="1" fill="currentColor" stroke="none"/>`,
+      { size: 20 }
+    ),
     user: svgIcon(`<circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8"/>`, { size: 20 }),
     tag: svgIcon(`<path d="M4.5 12.8V5.5H12l7.2 7.2-6.5 6.5z"/><circle cx="8.2" cy="9.2" r="1" fill="currentColor" stroke="none"/>`, { size: 20 }),
     eye: svgIcon(`<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>`, { size: 18 }),
@@ -166,11 +172,11 @@
 
   const THEME_KEY = "wiring-theme";
   const THEMES = {
-    mist: { label: "Лаванда", chrome: "#e9ebf3" },
-    pastel: { label: "Лён", chrome: "#f3eee6" },
-    night: { label: "Неон", chrome: "#110e0c" },
-    slate: { label: "Графит", chrome: "#0b0f14" },
-    dusk: { label: "Индиго", chrome: "#1a1c24" },
+    mist: { label: "дымка", chrome: "#e9ebf3" },
+    pastel: { label: "пастель", chrome: "#f3eee6" },
+    night: { label: "ночь", chrome: "#110e0c" },
+    slate: { label: "сланец", chrome: "#0b0f14" },
+    dusk: { label: "сумерки", chrome: "#1a1c24" },
   };
   const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
   const applyTheme = (theme) => {
@@ -1904,7 +1910,7 @@
           </div>
           <div class="plus-box">
             <div class="q">тема</div>
-            <p class="hint">пять гамм: Лаванда, Лён, Неон, Графит и Индиго. Кнопка оформления в шапке тоже переключает.</p>
+            <p class="hint">пять гамм: пастель, дымка, мягкие сумерки, контрастная ночь и серо-голубой сланец. кнопка оформления в шапке тоже переключает.</p>
             ${themeSwatches()}
           </div>
           <div class="plus-box">
@@ -2621,7 +2627,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=3`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=4`);
     return homeFeatureModulePromise;
   };
 
