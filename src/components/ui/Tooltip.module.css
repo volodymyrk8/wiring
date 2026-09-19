@@ -17,22 +17,22 @@
   width: max-content;
   max-width: min(240px, calc(100vw - 32px));
   box-sizing: border-box;
-  background: var(--card, #fff);
-  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  background: #ffffff;
+  border: 1px solid #d2d5e0;
   border-radius: 10px;
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
   z-index: 9999;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-2px);
-  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
   font-family: var(--sans, "IBM Plex Sans", -apple-system, sans-serif);
   font-size: 12.5px;
   font-weight: 400;
   letter-spacing: normal;
   line-height: 1.48;
-  color: var(--ink, #333);
+  color: #1a1c24;
   text-align: left;
   user-select: text;
 }
@@ -64,9 +64,9 @@
   left: 32px;
   width: 8px;
   height: 8px;
-  background: var(--card, #fff);
-  border-left: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-  border-top: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  background: #ffffff;
+  border-left: 1px solid #d2d5e0;
+  border-top: 1px solid #d2d5e0;
   transform: translateX(-50%) rotate(45deg);
   pointer-events: none;
 }
@@ -76,8 +76,24 @@
   bottom: -5px;
   border-left: none;
   border-top: none;
-  border-right: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-  border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  border-right: 1px solid #d2d5e0;
+  border-bottom: 1px solid #d2d5e0;
+}
+
+:global(html[data-theme="night"]) .popover,
+:global(html[data-theme="dusk"]) .popover,
+:global(html[data-theme="slate"]) .popover {
+  background: #1e202a;
+  border-color: #3e4256;
+  color: #f0f1f6;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+:global(html[data-theme="night"]) .arrow,
+:global(html[data-theme="dusk"]) .arrow,
+:global(html[data-theme="slate"]) .arrow {
+  background: #1e202a;
+  border-color: #3e4256;
 }
 
 @media (max-width: 420px) {

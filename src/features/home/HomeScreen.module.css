@@ -36,17 +36,20 @@
   border: 0;
   border-radius: 999px;
   background: linear-gradient(120deg, var(--lime, #98c379), var(--coral, #e06c75));
-  color: var(--on-accent, #fff);
+  color: #ffffff !important;
   font-weight: 600;
   font-size: 17px;
   cursor: pointer;
   box-shadow: 0 4px 18px var(--accent-shadow, rgba(0, 0, 0, 0.12));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   font-family: inherit;
 }
 
 .cta:hover {
   transform: translateY(-1px);
+  box-shadow: 0 6px 22px var(--accent-shadow, rgba(0, 0, 0, 0.18));
+  color: #ffffff !important;
 }
 
 .cta:focus-visible {

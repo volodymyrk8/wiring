@@ -356,23 +356,23 @@ html[data-view="verify"] .auth-shell {
   width: max-content;
   max-width: min(240px, calc(100vw - 32px));
   box-sizing: border-box;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: #ffffff;
+  border: 1px solid #d2d5e0;
   border-radius: 10px;
   padding: 10px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
   z-index: 9999;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-2px);
-  transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
   pointer-events: none;
   font-family: var(--sans);
   font-size: 12.5px;
   font-weight: 400;
   letter-spacing: normal;
   line-height: 1.48;
-  color: var(--ink);
+  color: #1a1c24;
   text-align: left;
   user-select: text;
 }
@@ -383,9 +383,9 @@ html[data-view="verify"] .auth-shell {
   left: 32px;
   width: 8px;
   height: 8px;
-  background: var(--card);
-  border-left: 1px solid var(--line);
-  border-top: 1px solid var(--line);
+  background: #ffffff;
+  border-left: 1px solid #d2d5e0;
+  border-top: 1px solid #d2d5e0;
   transform: translateX(-50%) rotate(45deg);
 }
 .beta-popover::after {
@@ -403,6 +403,22 @@ html[data-view="verify"] .auth-shell {
   visibility: visible;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+html[data-theme="night"] .beta-popover,
+html[data-theme="dusk"] .beta-popover,
+html[data-theme="slate"] .beta-popover {
+  background: #1e202a;
+  border-color: #3e4256;
+  color: #f0f1f6;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="night"] .beta-popover::before,
+html[data-theme="dusk"] .beta-popover::before,
+html[data-theme="slate"] .beta-popover::before {
+  background: #1e202a;
+  border-color: #3e4256;
 }
 
 html[data-theme="mist"] .brand .beta-label {
