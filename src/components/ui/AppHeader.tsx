@@ -2,6 +2,7 @@ import { useState, useEffect } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { Tooltip } from "./Tooltip";
 import { Select, type SelectOption } from "./Select";
+import { Button } from "./Button";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
@@ -32,6 +33,11 @@ export type AppHeaderProps = {
   showThemeSwatches?: boolean;
   currentTheme?: ThemeName;
   onThemeSelect?: (theme: ThemeName) => void;
+  showBack?: boolean;
+  backHref?: string;
+  backLabel?: ComponentChildren;
+  onBackClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
+  leftSlot?: ComponentChildren;
   rightSlot?: ComponentChildren;
   children?: ComponentChildren;
   className?: string;
@@ -47,6 +53,11 @@ export function AppHeader({
   showThemeSwatches,
   currentTheme,
   onThemeSelect,
+  showBack,
+  backHref,
+  backLabel,
+  onBackClick,
+  leftSlot,
   rightSlot,
   children,
   className,
@@ -73,6 +84,38 @@ export function AppHeader({
       aria-label="шапка сайта"
       data-logo-position={logoPosition}
     >
+      {(showBack || backHref || onBackClick) ? (
+        <div class={styles.headerStart}>
+          <Button
+            variant="ghost"
+            slim
+            href={backHref || "/"}
+            nav="back"
+            onClick={onBackClick}
+            className={styles.backBtn}
+            ariaLabel="Вернуться назад"
+          >
+            <svg
+              class={styles.backArrow}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span>{backLabel ?? "Назад"}</span>
+          </Button>
+        </div>
+      ) : leftSlot ? (
+        <div class={styles.headerStart}>{leftSlot}</div>
+      ) : null}
+
       <a
         class={styles.brand}
         href={homeHref}

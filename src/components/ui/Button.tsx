@@ -10,7 +10,9 @@ type ButtonProps = {
   nav?: string;
   disabled?: boolean;
   loading?: boolean;
-  onClick?: (e: MouseEvent) => void;
+  onClick?: (e: any) => void;
+  className?: string;
+  ariaLabel?: string;
   children: ComponentChildren;
 };
 
@@ -24,6 +26,8 @@ export function Button({
   disabled,
   loading,
   onClick,
+  className,
+  ariaLabel,
   children,
 }: ButtonProps) {
   const isSolid = variant === "solid";
@@ -32,6 +36,7 @@ export function Button({
     isSolid ? styles.solid : styles.ghost,
     slim ? styles.slim : "",
     fullWidth ? styles.fullWidth : "",
+    className,
   ]
     .filter(Boolean)
     .join(" ");
@@ -44,6 +49,7 @@ export function Button({
         data-nav={nav}
         onClick={onClick}
         aria-disabled={disabled || loading}
+        aria-label={ariaLabel}
       >
         <span>{children}</span>
       </a>
@@ -57,6 +63,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading}
       onClick={onClick}
+      aria-label={ariaLabel}
     >
       {loading && (
         <svg

@@ -140,24 +140,24 @@
     ),
     snooze: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
     home: svgIcon(
-      `<path d="M4 10.5L12 4l8 6.5V20a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 20z"/><path d="M9.5 21.5V14.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v7"/>`,
-      { size: 20 }
+      `<path d="M4 10.2L12 3.5l8 6.7V20a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 20z"/><path d="M9 21.5v-6.5a3 3 0 0 1 6 0v6.5"/>`,
+      { size: 21, strokeWidth: 1.5 }
     ),
     feed: svgIcon(
-      `<rect x="2.5" y="4" width="10.5" height="15" rx="2" transform="rotate(-15 7.75 11.5)" opacity="0.45"/><rect x="11" y="4" width="10.5" height="15" rx="2" transform="rotate(15 16.25 11.5)" opacity="0.45"/><rect x="6.5" y="3.2" width="11" height="16" rx="2.2" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="8.5" r="1.8"/><path d="M9.2 14.7c.5-1.3 1.5-1.8 2.8-1.8s2.3.5 2.8 1.8"/><path d="M1.8 11.5L.6 12.7l1.2 1.2"/><path d="M22.2 11.5l1.2 1.2-1.2 1.2"/>`,
+      `<rect x="1.5" y="3" width="11.5" height="16.5" rx="2.5" transform="rotate(-16 7.25 11.25)" opacity="0.45"/><rect x="11" y="3" width="11.5" height="16.5" rx="2.5" transform="rotate(16 16.75 11.25)" opacity="0.45"/><rect x="5.75" y="2" width="12.5" height="17.5" rx="2.5" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="7.8" r="2.1"/><path d="M8.8 14.8c.6-1.5 1.8-2.1 3.2-2.1s2.6.6 3.2 2.1"/><path d="M1.2 11.5L.2 12.5l1 1"/><path d="M22.8 11.5l1 1-1 1"/>`,
       { size: 21, strokeWidth: 1.5 }
     ),
     heart: svgIcon(
-      `<path d="M12 20.8S3.5 15.4 3.5 9.5a5.2 5.2 0 0 1 8.5-3.8 5.2 5.2 0 0 1 8.5 3.8c0 5.9-8.5 11.3-8.5 11.3z"/>`,
-      { size: 20 }
+      `<path d="M12 21.2S3 15.6 3 9.4A5.4 5.4 0 0 1 12 5.5a5.4 5.4 0 0 1 9 3.9c0 6.2-9 11.8-9 11.8z"/>`,
+      { size: 21, strokeWidth: 1.5 }
     ),
     thumb: svgIcon(
       `<path d="M7 10v11H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3zm2 11h8.3a2 2 0 0 0 2-1.6l1.4-7a2 2 0 0 0-2-2.4H14V5a3 3 0 0 0-3-3l-4 8v11z"/>`,
-      { size: 20 }
+      { size: 21, strokeWidth: 1.5 }
     ),
     chat: svgIcon(
-      `<path d="M20.5 11.5c0 4.2-3.8 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3.5 19.5l1.4-3.4C4.1 14.8 3.5 13.2 3.5 11.5c0-4.2 3.8-7.5 8.5-7.5s8.5 3.3 8.5 7.5z"/><circle cx="8" cy="11.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>`,
-      { size: 20 }
+      `<path d="M21 11.5c0 4.6-4.1 8.2-9 8.2-1.5 0-3-.4-4.3-1L3 20l1.5-3.8C3.7 15 3 13.3 3 11.5 3 6.9 7.1 3.3 12 3.3s9 3.6 9 8.2z"/><circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="1" fill="currentColor" stroke="none"/>`,
+      { size: 21, strokeWidth: 1.5 }
     ),
     user: svgIcon(`<circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8"/>`, { size: 20 }),
     tag: svgIcon(`<path d="M4.5 12.8V5.5H12l7.2 7.2-6.5 6.5z"/><circle cx="8.2" cy="9.2" r="1" fill="currentColor" stroke="none"/>`, { size: 20 }),
@@ -789,9 +789,19 @@
     const isAuth = QUIET_VIEWS.has(state.view) && state.view !== "chat";
     const logoPos = opts.logoPosition !== undefined ? opts.logoPosition : (isAuth ? "center" : "left");
     const showActions = opts.showActions !== undefined ? opts.showActions : !isAuth;
+    const showBack = opts.showBack !== undefined ? opts.showBack : isAuth;
+    const backHref = opts.backHref || hrefFor("home");
+    const backLabel = opts.backLabel || "Назад";
     const centerClass = logoPos === "center" ? " center" : "";
     return `
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
+      ${showBack ? `
+      <div class="app-head-start">
+        <a class="app-head-back" href="${escapeAttr(backHref)}" data-nav="back" aria-label="Вернуться назад">
+          <svg class="app-head-back-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          <span>${escapeHtml(backLabel)}</span>
+        </a>
+      </div>` : ""}
       <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
       ${showActions ? `
       <div class="app-head-end">
@@ -818,7 +828,7 @@
   const authLegalFoot = () => legalFooterBar(false);
 
   const authLayout = (body) => `
-      ${appHead({ logoPosition: "center", showActions: false })}
+      ${appHead({ logoPosition: "center", showActions: true, showBack: true })}
       <div class="auth-shell">
         <section class="panel auth-panel">${body}</section>
       </div>
@@ -2622,7 +2632,7 @@
   let authFeatureModulePromise = null;
 
   const loadAuthFeatureModule = () => {
-    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js`);
+    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=2`);
     return authFeatureModulePromise;
   };
 
@@ -2630,7 +2640,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=8`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=9`);
     return homeFeatureModulePromise;
   };
 
@@ -2762,6 +2772,18 @@
       btn.addEventListener("click", async (e) => {
         if (btn.tagName === "A") e.preventDefault();
         const next = btn.dataset.nav;
+        if (next === "back") {
+          if (
+            window.history.length > 1 &&
+            (window.history.state?.view ||
+              (document.referrer && new URL(document.referrer, location.origin).origin === location.origin))
+          ) {
+            window.history.back();
+          } else {
+            await goToView("home");
+          }
+          return;
+        }
         await goToView(next, { neuro: btn.dataset.neuro });
       });
     });
