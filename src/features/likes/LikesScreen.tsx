@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, ProfileMenu, TagPicker } from "@/components/ui";
+import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import type { ProfileUser } from "@/features/profile/types";
 import type { LikeCard, LikesFilters, LikesHostBridge } from "./types";
@@ -147,7 +147,8 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
     }
   };
 
-  const isGuest = !host.user || Boolean(host.user.guest);
+  const signedOut = !host.user;
+  const isGuest = Boolean(host.user?.guest);
   const emptyText = host.matchesCount ? "Новых лайков нет — взаимные уже в чатах." : "Когда кто-то лайкнет тебя первым, анкета появится здесь.";
   const emptyFiltered = !likes.length && hasFilters;
 
@@ -159,7 +160,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
         sectionTitle="лайки"
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
-        rightSlot={!isGuest ? (
+        rightSlot={host.user && !isGuest ? (
           <ProfileMenu
             avatarUrl={avatarUrl(host.basePath, host.user.photo, String(host.user.name || "Профиль"))}
             userName={String(host.user.name || "")}
@@ -174,10 +175,10 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
           />
         ) : <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label="войти">♡</a>}
       />
-      <main class={styles.content}>
-        {host.user.needs_profile && !host.user.guest ? <aside class={styles.nudge}><div><strong>Анкета ещё пустая</strong><p>Добавь фото, город и особенности, чтобы тебя находили.</p></div><Button slim href={host.hrefFor("profile")} nav="profile" onClick={navigate("profile")}>дозаполнить</Button></aside> : null}
-        {likes.length || hasFilters || filtersOpen ? <div class={styles.toolbar}><Button variant="ghost" slim className={`${styles.filterButton}${hasFilters ? ` ${styles.filterButtonActive}` : ""}`} onClick={() => setFiltersOpen((open) => !open)}>{iconFilter}<span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span>{hasFilters ? <span class={styles.filterDot} /> : null}</Button></div> : null}
-        {!host.user.plus && likes.length ? (
+      <main class={`${styles.content}${signedOut ? ` ${styles.contentCentered}` : ""}`}>
+        {host.user?.needs_profile && !host.user.guest ? <aside class={styles.nudge}><div><strong>Анкета ещё пустая</strong><p>Добавь фото, город и особенности, чтобы тебя находили.</p></div><Button slim href={host.hrefFor("profile")} nav="profile" onClick={navigate("profile")}>дозаполнить</Button></aside> : null}
+        {!signedOut && (likes.length || hasFilters || filtersOpen) ? <div class={styles.toolbar}><Button variant="ghost" slim className={`${styles.filterButton}${hasFilters ? ` ${styles.filterButtonActive}` : ""}`} onClick={() => setFiltersOpen((open) => !open)}>{iconFilter}<span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span>{hasFilters ? <span class={styles.filterDot} /> : null}</Button></div> : null}
+        {host.user && !host.user.plus && likes.length ? (
           <section class={styles.gate}>
             <div class={styles.gateTop}><span class={styles.gateBadge}>{isGuest ? "гость" : "WIRING+"}</span><div class={styles.gateInfo}><strong>{isGuest ? "Создай свой профиль" : "Узнай, кто тебя лайкнул"}</strong><p>{isGuest ? "Чтобы видеть, кто проявил интерес, и начинать диалоги." : "С WIRING+ входящие симпатии открыты сразу."}</p></div></div>
             <div class={styles.gateActions}>{isGuest ? <Button slim href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать анкету</Button> : <><Button slim href={host.hrefFor("plus")} nav="plus" onClick={navigate("plus")}>Узнать о WIRING+</Button><Button variant="ghost" slim onClick={() => setPromoOpen((open) => !open)}>{promoOpen ? "Скрыть промокод" : "Ввести промокод"}</Button></>}</div>
@@ -186,7 +187,37 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
         ) : null}
         {filtersOpen ? <FilterPanel host={host} filters={filters} onApply={(next) => void apply(next)} onClear={clear} /> : null}
         {likes.length ? <div class={styles.cards}>{likes.map((item, index) => <LikeCardView key={`${item.id || "hidden"}-${index}`} host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />)}</div> : (
-          <section class={styles.empty}><span class={styles.emptyIcon}>{emptyFiltered ? iconFilter : isGuest ? "✨" : iconLike}</span><h2>{emptyFiltered ? "Ничего не найдено" : isGuest ? "Создай свой профиль" : "Пока нет новых лайков"}</h2><p>{emptyFiltered ? "По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска." : isGuest ? "Чтобы видеть людей, которым ты нравишься, и начинать диалоги." : emptyText}</p><Button variant={emptyFiltered ? "ghost" : "solid"} slim onClick={emptyFiltered ? clear : navigate(isGuest ? "register" : "deck")}>{emptyFiltered ? "Сбросить фильтры" : isGuest ? "Создать анкету" : "Смотреть ленту"}</Button></section>
+          <section class={styles.empty}>
+            <span class={styles.emptyIcon}>{emptyFiltered ? iconFilter : iconLike}</span>
+            <h2>
+              {emptyFiltered ? "Ничего не найдено" : signedOut ? "Кто тебя лайкнул" : isGuest ? "Создай свой профиль" : "Пока нет новых лайков"}
+            </h2>
+            {!signedOut ? (
+              <p>
+                {emptyFiltered
+                  ? "По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска."
+                  : isGuest
+                    ? "Чтобы видеть людей, которым ты нравишься, и начинать диалоги."
+                    : emptyText}
+              </p>
+            ) : null}
+            {emptyFiltered ? (
+              <Button variant="ghost" slim onClick={clear}>Сбросить фильтры</Button>
+            ) : signedOut ? (
+              <>
+                <GuestFlowSteps variant="likes" />
+                <div class={styles.guestCta}>
+                <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+                <div class={styles.switchRow}>
+                  <span class={styles.switchPrompt}>Уже есть профиль?</span>
+                  <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
+                </div>
+              </div>
+              </>
+            ) : (
+              <Button variant="solid" slim onClick={navigate(isGuest ? "register" : "deck")}>{isGuest ? "Создать анкету" : "Смотреть ленту"}</Button>
+            )}
+          </section>
         )}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </main>

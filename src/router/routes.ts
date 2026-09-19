@@ -38,4 +38,4 @@ export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
 };
 
 /** Views that need no session (hydrate allows direct URL). */
-export const PUBLIC_VIEWS: ViewId[] = ["login", "register", "home", "forgot", "reset", "verify"];
+export const PUBLIC_VIEWS: ViewId[] = ["login", "register", "home", "forgot", "reset", "verify", "likes", "matches"];

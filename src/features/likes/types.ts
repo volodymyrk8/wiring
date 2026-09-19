@@ -32,7 +32,7 @@ export type LikesCatalog = {
 };
 
 export type LikesHostBridge = {
-  user: ProfileUser;
+  user: ProfileUser | null;
   catalog: LikesCatalog;
   likes: LikeCard[];
   matchesCount: number;

@@ -4,6 +4,7 @@ export * from "./Switch";
 export * from "./Input";
 export * from "./Textarea";
 export * from "./LegalFooter";
+export * from "./GuestFlowSteps";
 export * from "./AppHeader";
 export * from "./Tooltip";
 export * from "./AccordionRow";

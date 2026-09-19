@@ -70,7 +70,7 @@ import { createInboxController } from "./inbox";
   let routing = null;
   const ensureRouting = () => {
     if (routing) return Promise.resolve(routing);
-    return import(`${BASE}/public/dist/router.js?v=2`).then((mod) => {
+    return import(`${BASE}/public/dist/router.js?v=4`).then((mod) => {
       routing = mod;
       return mod;
     });
@@ -463,7 +463,7 @@ import { createInboxController } from "./inbox";
   };
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
-  const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
+  const QUIET_VIEWS = new Set(["register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
   const showsTabbar = () => !QUIET_VIEWS.has(state.view);
   const HOME_FACE_SRC = Array.from({ length: 12 }, (_, i) => `people/${String(i + 1).padStart(2, "0")}.jpg`).filter(
     (src) => src !== "people/11.jpg",
@@ -498,7 +498,11 @@ import { createInboxController } from "./inbox";
       ],
     ];
     if (isTab) {
-      const isMe = state.view === "profile" || state.view === "plus" || (state.view === "person" && from === "profile");
+      const isMe =
+        state.view === "profile"
+        || state.view === "plus"
+        || state.view === "login"
+        || (state.view === "person" && from === "profile");
       const dest = state.user ? "profile" : "login";
       const label = state.user ? "Профиль" : "Войти";
       const hasPhoto = Boolean(state.user && state.user.photo);
@@ -1091,7 +1095,7 @@ import { createInboxController } from "./inbox";
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "likes", "matches", "profile", "consents", "person", "chat", "delete-account", "plus"].includes(next)) {
+    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -1146,8 +1150,10 @@ import { createInboxController } from "./inbox";
   const renderAuthFeature = async (mode) => {
     authFeatureUnmount?.();
     authFeatureUnmount = null;
-    root.innerHTML = authLayout('<div id="auth-feature-root"></div>');
+    const withTabbar = mode === "login" && showsTabbar();
+    root.innerHTML = authLayout('<div id="auth-feature-root"></div>') + (withTabbar ? tabbar() : "");
     bindDataNavLinks();
+    if (withTabbar) bindProfileMenu();
     bindThemeControls();
     const mountEl = root.querySelector("#auth-feature-root");
     if (!mountEl) return;
@@ -1379,7 +1385,19 @@ import { createInboxController } from "./inbox";
       void renderAuthFeature("verify");
       return;
     }
-    else if (state.view === "home" || !state.user) {
+    else if (state.view === "home") {
+      void renderHomeFeature();
+      return;
+    }
+    else if (!state.user) {
+      if (state.view === "likes") {
+        void renderLikesFeature();
+        return;
+      }
+      if (state.view === "matches") {
+        void renderChatFeature();
+        return;
+      }
       void renderHomeFeature();
       return;
     }
@@ -1508,11 +1526,11 @@ import { createInboxController } from "./inbox";
     state.chatId = null;
     state.photoIndex = 0;
     if (state.view === "deck") await loadFeed();
-    if (state.view === "matches") {
+    if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
       state.matches = data.matches;
     }
-    if (state.view === "likes") await loadLikes();
+    if (state.view === "likes" && state.user) await loadLikes();
     if (state.view === "profile" || state.view === "consents" || state.view === "plus") await refreshMe();
     render();
   };

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
+import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
 
@@ -114,6 +114,8 @@ function ChatHeader({ host }: { host: ChatHostBridge }) {
     host.navigate(view, params);
   };
 
+  const signedOut = !host.user;
+
   return (
     <AppHeader
       homeHref={host.hrefFor("home")}
@@ -122,18 +124,24 @@ function ChatHeader({ host }: { host: ChatHostBridge }) {
       showThemeSwatches
       onThemeSelect={host.onThemeSelect}
       rightSlot={
-        <ProfileMenu
-          avatarUrl={avatarUrl(host.basePath, host.user.photo, String(host.user.name || "Профиль"))}
-          userName={String(host.user.name || "")}
-          isPlus={Boolean(host.user.plus)}
-          profileHref={host.hrefFor("profile")}
-          consentsHref={host.hrefFor("consents")}
-          plusHref={host.hrefFor("plus")}
-          onProfileClick={navigate("profile")}
-          onConsentsClick={navigate("consents")}
-          onPlusClick={navigate("plus")}
-          onLogout={host.onLogout}
-        />
+        signedOut ? (
+          <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label="войти">
+            <UserIcon />
+          </a>
+        ) : (
+          <ProfileMenu
+            avatarUrl={avatarUrl(host.basePath, host.user!.photo, String(host.user!.name || "Профиль"))}
+            userName={String(host.user!.name || "")}
+            isPlus={Boolean(host.user!.plus)}
+            profileHref={host.hrefFor("profile")}
+            consentsHref={host.hrefFor("consents")}
+            plusHref={host.hrefFor("plus")}
+            onProfileClick={navigate("profile")}
+            onConsentsClick={navigate("consents")}
+            onPlusClick={navigate("plus")}
+            onLogout={host.onLogout}
+          />
+        )
       }
     />
   );
@@ -157,7 +165,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
             <h3>{match.name}, {match.age}</h3>
             {match.last_at ? <time class="match-time">{timeLabel(match.last_at)}</time> : null}
           </div>
-          <p>{match.last_message ? `${match.last_from_id === host.user.id ? "ты: " : ""}${match.last_message}` : "взаимно · напиши первым"}</p>
+          <p>{match.last_message ? `${match.last_from_id === host.user?.id ? "ты: " : ""}${match.last_message}` : "взаимно · напиши первым"}</p>
         </div>
         {hasUnread ? <span class="unread">{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
       </a>
@@ -169,6 +177,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
 }
 
 function MatchesScreen({ host }: { host: ChatHostBridge }) {
+  const signedOut = !host.user;
   const [matches, setMatches] = useState<ChatMatch[]>(host.matches || []);
   const [query, setQuery] = useState("");
   const [pendingUnmatch, setPendingUnmatch] = useState<number | null>(null);
@@ -177,6 +186,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (signedOut) return undefined;
     let alive = true;
     host.api("/api/matches").then((data) => {
       if (alive) setMatches(data.matches || []);
@@ -184,9 +194,10 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
       if (alive) setError(errorMessage(caught, "не удалось загрузить чаты"));
     });
     return () => { alive = false; };
-  }, [host]);
+  }, [host, signedOut]);
 
   useEffect(() => {
+    if (signedOut) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
@@ -199,7 +210,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [signedOut]);
 
   const filtered = matches.filter((match) => {
     const needle = query.trim().toLowerCase();
@@ -222,40 +233,69 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
     }
   };
 
+  const navigate = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+    event.preventDefault();
+    host.navigate(view, params);
+  };
+
   return (
     <div class={styles.root}>
       <ChatHeader host={host} />
-      <main class="chat-list-page">
-        <div class="chat-list-intro">
-          <p class="chat-list-lede">Здесь можно продолжить разговор без спешки — в своём ритме.</p>
-        </div>
-        <section class="chat-list-card" aria-label="Список чатов">
-          <label class="chat-search">
-            <SearchIcon />
-            <input ref={searchRef} type="search" value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="найти диалог" autocomplete="off" />
-            <kbd>⌘ K</kbd>
-          </label>
-          {error ? <p class={styles.error}>{error}</p> : null}
-          {matches.length ? (
-            filtered.length ? (
-              <div class="match-list">
-                {filtered.map((match) => (
-                  <MatchRow
-                    key={match.id}
-                    match={match}
-                    host={host}
-                    onOpen={() => host.navigate("chat", { id: match.id })}
-                    onRemove={() => setPendingUnmatch(match.id)}
-                  />
-                ))}
+      <main class={signedOut ? styles.guestMain : "chat-list-page"}>
+        {!signedOut ? (
+          <div class="chat-list-intro">
+            <p class="chat-list-lede">Здесь можно продолжить разговор без спешки — в своём ритме.</p>
+          </div>
+        ) : null}
+        {signedOut ? (
+          <section class={styles.empty} aria-label="Чаты">
+            <span class={styles.emptyIcon} aria-hidden="true"><ChatIcon /></span>
+            <h2>Чаты после мэтча</h2>
+            <GuestFlowSteps variant="chats" />
+            <div class={styles.guestCta}>
+              <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+              <div class={styles.switchRow}>
+                <span class={styles.switchPrompt}>Уже есть профиль?</span>
+                <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
               </div>
+            </div>
+          </section>
+        ) : (
+          <section class="chat-list-card" aria-label="Список чатов">
+            <label class="chat-search">
+              <SearchIcon />
+              <input ref={searchRef} type="search" value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="найти диалог" autocomplete="off" />
+              <kbd>⌘ K</kbd>
+            </label>
+            {error ? <p class={styles.error}>{error}</p> : null}
+            {matches.length ? (
+              filtered.length ? (
+                <div class="match-list">
+                  {filtered.map((match) => (
+                    <MatchRow
+                      key={match.id}
+                      match={match}
+                      host={host}
+                      onOpen={() => host.navigate("chat", { id: match.id })}
+                      onRemove={() => setPendingUnmatch(match.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div class="chat-no-results"><span><SearchIcon /></span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>
+              )
             ) : (
-              <div class="chat-no-results"><span><SearchIcon /></span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>
-            )
-          ) : (
-            <div class="chat-empty"><div class="chat-empty-icon"><ChatIcon /></div><h2>Первый мэтч — уже начало</h2><p>Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.</p><a class="solid" href={host.hrefFor("deck")} onClick={(event) => { event.preventDefault(); host.navigate("deck"); }}>перейти в ленту <ArrowIcon /></a></div>
-          )}
-        </section>
+              <div class="chat-empty">
+                <div class="chat-empty-icon"><ChatIcon /></div>
+                <h2>Первый мэтч — уже начало</h2>
+                <p>Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.</p>
+                <Button variant="solid" slim href={host.hrefFor("deck")} nav="deck" onClick={navigate("deck")}>
+                  перейти в ленту <ArrowIcon />
+                </Button>
+              </div>
+            )}
+          </section>
+        )}
       </main>
       <Modal
         isOpen={pendingUnmatch !== null}

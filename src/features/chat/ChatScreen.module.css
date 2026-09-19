@@ -1,6 +1,10 @@
 .root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   width: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .loading,
@@ -31,4 +35,213 @@
   margin: 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.guestMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 0;
+  padding-top: clamp(12px, 4vh, 40px);
+  padding-bottom: clamp(52px, 12vh, 88px);
+  box-sizing: border-box;
+}
+
+.guestMain .empty {
+  width: 100%;
+  max-width: min(400px, 100%);
+  padding-bottom: 6px;
+}
+
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--guest-block-gap, 14px);
+  padding: 6px 0 10px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: calc(var(--guest-icon-size, 56px) + 30px);
+  height: calc(var(--guest-icon-size, 56px) + 30px);
+  margin-bottom: var(--guest-icon-after, 6px);
+  border-radius: 30%;
+  background: radial-gradient(
+    130% 130% at 50% 28%,
+    color-mix(in srgb, var(--accent-soft) 88%, transparent),
+    color-mix(in srgb, var(--accent-soft) 38%, transparent)
+  );
+  color: var(--lime);
+  line-height: 0;
+}
+
+.emptyIcon svg {
+  width: var(--guest-icon-size, 56px);
+  height: var(--guest-icon-size, 56px);
+}
+
+:global(html[data-theme="pastel"]) .emptyIcon,
+:global(html[data-theme="mist"]) .emptyIcon {
+  background: radial-gradient(
+    130% 130% at 50% 28%,
+    color-mix(in srgb, var(--accent-soft) 92%, var(--bg-2)),
+    color-mix(in srgb, var(--accent-soft) 55%, transparent)
+  );
+}
+
+.empty h2 {
+  margin: 0 0 var(--guest-title-after, 20px);
+  color: var(--ink);
+  font-family: var(--serif, "Fraunces", Georgia, serif);
+  font-size: var(--guest-title-size, 23px);
+  font-weight: 500;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.empty p {
+  max-width: 370px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.guestCta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--guest-cta-gap, 10px);
+  width: 100%;
+  max-width: min(340px, 100%);
+  margin-top: 0;
+  padding-bottom: 4px;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.switchPrompt {
+  color: var(--muted);
+}
+
+.switchLink {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+
+.switchLink:hover {
+  background: var(--line);
+}
+
+.switchLink:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .guestMain {
+    padding-top: 10px;
+    padding-bottom: clamp(48px, 11vh, 72px);
+  }
+
+  .empty {
+    --guest-block-gap: 10px;
+    --guest-icon-size: 52px;
+    --guest-icon-after: 4px;
+    --guest-title-size: 21px;
+    --guest-title-after: 16px;
+    gap: var(--guest-block-gap);
+  }
+
+  .guestCta {
+    --guest-cta-gap: 8px;
+    max-width: 100%;
+  }
+
+  .switchRow {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 768px) {
+  .guestMain {
+    padding-top: clamp(20px, 5vh, 48px);
+    padding-bottom: clamp(64px, 11vh, 100px);
+  }
+
+  .guestMain .empty {
+    max-width: 440px;
+  }
+
+  .empty {
+    --guest-block-gap: 12px;
+    --guest-icon-size: 64px;
+    --guest-icon-after: 8px;
+    --guest-title-size: 26px;
+    --guest-title-after: 24px;
+    gap: var(--guest-block-gap);
+    padding: 8px 0 12px;
+  }
+
+  .guestCta {
+    max-width: 380px;
+    --guest-cta-gap: 12px;
+  }
+
+  .switchRow {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1080px) {
+  .guestMain {
+    padding-bottom: clamp(72px, 10vh, 108px);
+  }
+
+  .guestMain .empty {
+    max-width: 460px;
+  }
+
+  .empty {
+    --guest-title-size: 28px;
+    --guest-icon-size: 72px;
+    --guest-title-after: 28px;
+  }
+
+  .guestCta {
+    max-width: 400px;
+  }
+}
+
+@media (max-height: 640px) {
+  .guestMain {
+    padding-top: 8px;
+    padding-bottom: clamp(44px, 10vh, 64px);
+  }
+
+  .empty {
+    --guest-block-gap: 8px;
+    --guest-title-size: 20px;
+    --guest-icon-size: 48px;
+    --guest-title-after: 14px;
+  }
 }

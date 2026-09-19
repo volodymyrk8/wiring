@@ -2,10 +2,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 10px;
-  row-gap: 0;
   width: 100%;
-  margin: 0 0 20px;
-  height: clamp(92px, 28vw, 125px);
+  margin: 0;
+  height: clamp(72px, 22vw, 108px);
 }
 
 .face {
@@ -29,7 +28,6 @@
 @media (max-width: 420px) {
   .strip {
     column-gap: 8px;
-    margin-bottom: 14px;
     height: clamp(88px, 28vw, 100px);
   }
 
@@ -43,16 +41,11 @@
     column-gap: 12px;
     height: 125px;
   }
-
-  .face {
-    border-radius: 16px;
-  }
 }
 
 @media (max-height: 580px) {
   .strip {
     height: 84px;
-    margin-bottom: 12px;
     column-gap: 8px;
   }
 

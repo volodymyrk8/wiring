@@ -49,7 +49,7 @@ assert.equal(planRoute({ view: "deck" }, guest, "/feed").kind, "login");
 const guestChat = planRoute({ view: "chat", id: 1 }, guest, "/chats/1");
 assert.equal(guestChat.kind, "login");
 assert.equal(guestChat.pendingPath, "/chats/1");
-assert.equal(planRoute({ view: "likes" }, guest, "/likes").kind, "login");
+assert.equal(planRoute({ view: "likes" }, guest, "/likes").kind, "show");
 assert.equal(planRoute({ view: "delete-account" }, guest, "/delete-account").kind, "login");
 
 assert.equal(planRoute({ view: "login" }, member, "/sign-in").kind, "feed");
@@ -64,5 +64,6 @@ assert.equal(planRoute({ view: "login" }, guestSession, "/login").kind, "show");
 assert.equal(planRoute({ view: "chat", id: 5 }, member, "/chats/5").kind, "chat");
 assert.equal(planRoute({ view: "person", id: 2 }, member, "/p/2").kind, "person");
 assert.equal(planRoute({ view: "matches" }, member, "/chats").kind, "show");
+assert.equal(planRoute({ view: "matches" }, guest, "/chats").kind, "show");
 
 console.log("router.test.mjs ok");

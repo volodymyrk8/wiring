@@ -44,7 +44,7 @@ export type ChatMode = "matches" | "chat";
 export type ChatHostBridge = {
   mode: ChatMode;
   chatId?: number;
-  user: ChatUser;
+  user: ChatUser | null;
   matches?: ChatMatch[];
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;

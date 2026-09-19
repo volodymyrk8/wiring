@@ -164,8 +164,19 @@ html[data-view="home"] #app {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  overflow: hidden;
 }
-html[data-tabs] #app { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+html[data-view="home"] #home-feature-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+html[data-tabs] #app {
+  --tabbar-clearance: 88px;
+  padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom));
+}
 html[data-view="chat"],
 html[data-view="chat"] body {
   height: 100%;
@@ -219,7 +230,15 @@ html[data-view="verify"] #app {
   display: flex;
   flex-direction: column;
   padding-top: max(12px, env(safe-area-inset-top));
+}
+html[data-view="register"] #app,
+html[data-view="forgot"] #app,
+html[data-view="reset"] #app,
+html[data-view="verify"] #app {
   padding-bottom: 0 !important;
+}
+html[data-view="login"][data-tabs] #app {
+  padding-bottom: calc(var(--tabbar-clearance, 78px) + env(safe-area-inset-bottom)) !important;
 }
 html[data-view="login"] .app-head,
 html[data-view="register"] .app-head,
@@ -247,6 +266,9 @@ html[data-view="verify"] .auth-shell {
   display: flex;
   flex-direction: column;
   padding: 8px 0 0;
+}
+html[data-view="login"][data-tabs] .auth-shell {
+  padding-bottom: 4px;
 }
 .auth-panel {
   width: 100%;
@@ -1442,12 +1464,7 @@ html[data-theme="slate"] .profile-menu-status {
 }
 
 @media (max-width: 360px) {
-  .tabbar {
-    min-height: calc(50px + env(safe-area-inset-bottom));
-    padding: 0 4px env(safe-area-inset-bottom) 4px;
-  }
   .tabbar a {
-    min-height: calc(50px + env(safe-area-inset-bottom));
     font-size: 9px;
     gap: 1.5px;
   }
@@ -2822,6 +2839,14 @@ html[data-view="likes"] #app {
   display: flex;
   flex-direction: column;
 }
+html[data-view="likes"] #likes-feature-root,
+html[data-view="matches"] #chat-feature-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
 
 
 .modal-back {
@@ -2925,44 +2950,69 @@ html[data-view="deck"] #deck-feature-root {
   }
 }
 
-/* Mobile tabbar: leave breathing room around the selected item instead of
-   letting its pill touch the bar edges. */
+/* Mobile: floating pill + strong backdrop blur (flat — no drop shadow). */
 @media (max-width: 767px) {
-  .tabbar {
-    min-height: calc(66px + env(safe-area-inset-bottom));
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  html[data-tabs] #app {
+    --tabbar-clearance: 78px;
   }
-  .tabbar a {
+
+  .tabbar {
+    left: 50%;
+    right: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: min(420px, calc(100% - 20px));
+    transform: translateX(-50%);
     min-height: 54px;
-    padding: 4px 0;
+    padding: 4px 5px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+    border-radius: 22px;
+    box-shadow: none;
+    background: color-mix(in srgb, var(--bg-2) 52%, transparent);
+    backdrop-filter: blur(44px) saturate(190%);
+    -webkit-backdrop-filter: blur(44px) saturate(190%);
+  }
+
+  .tabbar a {
+    min-height: 46px;
+    padding: 2px 0;
     gap: 3px;
   }
+
   .tabbar a::before {
-    inset: 4px 3px;
+    inset: 3px 2px;
     border-radius: 16px;
   }
+
   .tabbar a:hover::before {
     background: transparent;
   }
+
   .tabbar a.on::before {
     background: var(--accent-soft);
   }
 }
 
 @media (max-width: 360px) {
-  .tabbar {
-    min-height: calc(62px + env(safe-area-inset-bottom));
-    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+  html[data-tabs] #app {
+    --tabbar-clearance: 74px;
   }
+
+  .tabbar {
+    width: calc(100% - 16px);
+    min-height: 50px;
+    padding: 3px 4px;
+    border-radius: 20px;
+  }
+
   .tabbar a {
-    min-height: 52px;
-    padding: 4px 0;
+    min-height: 44px;
     gap: 2px;
   }
+
   .tabbar a::before {
-    inset: 4px 2px;
+    inset: 3px 1px;
     border-radius: 14px;
   }
 }
@@ -2971,6 +3021,8 @@ html[data-view="deck"] #deck-feature-root {
    and clear hierarchy people expect from a modern messenger. */
 html[data-view="matches"] #app {
   --app-w: 960px;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-list-page {
