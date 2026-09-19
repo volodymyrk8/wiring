@@ -153,6 +153,8 @@ export function Select<T extends string = string>({
                 role="option"
                 aria-selected={isSelected}
                 disabled={option.disabled}
+                data-value={option.value}
+                data-theme={option.swatchTheme || option.value}
                 class={`${styles.option}${isSelected ? ` ${styles.selectedOption}` : ""}`}
                 onClick={handleSelect(option)}
               >

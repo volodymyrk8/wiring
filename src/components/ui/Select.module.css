@@ -1,6 +1,7 @@
 .selectWrap {
   position: relative;
   display: inline-flex;
+  flex-shrink: 0;
 }
 
 .trigger {
@@ -21,6 +22,7 @@
   outline: none;
   transition: border-color 0.14s ease, background-color 0.14s ease;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .trigger:hover {
@@ -35,9 +37,21 @@
 .iconTrigger {
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 44px;
+  max-height: 44px;
   padding: 0;
   justify-content: center;
   border-radius: 50%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: transparent !important;
+}
+
+.iconTrigger:hover {
+  background: transparent !important;
+  border-color: var(--accent-line, rgba(143, 168, 110, 0.38));
 }
 
 .pillTrigger {
@@ -71,14 +85,14 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 160px;
+  min-width: 164px;
   box-sizing: border-box;
-  background: #ffffff;
-  border: 1px solid #d2d5e0;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--line, #d2d5e0);
   border-radius: 14px;
-  padding: 4px;
+  padding: 5px;
   display: grid;
-  gap: 2px;
+  gap: 4px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
   z-index: 9999;
   outline: none;
@@ -110,7 +124,7 @@
   color: inherit;
   font-family: inherit;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   outline: none;
@@ -156,49 +170,137 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  color: var(--muted, #888);
-  transition: color 0.14s ease;
-}
-
-.option:hover .optionIcon,
-.selectedOption .optionIcon {
-  color: var(--ink, #111);
-}
-
-/* Swatch: chunky rounded square on the left */
-.swatch {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 7px;
   flex-shrink: 0;
   box-sizing: border-box;
-  border: 1px solid rgba(0, 0, 0, 0.14);
 }
 
-.swatch[data-theme="mist"] {
+.optionIcon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+/* Minimalist premium flat badges */
+.option[data-theme="mist"] .optionIcon,
+.option[data-value="mist"] .optionIcon {
   background: #e9ebf3;
-  border-color: #c4c7d6;
+  color: #32344a;
+  border: 1px solid rgba(50, 52, 74, 0.16);
 }
 
-.swatch[data-theme="pastel"] {
+.option[data-theme="pastel"] .optionIcon,
+.option[data-value="pastel"] .optionIcon {
   background: #f3eee6;
-  border-color: #d5cbbe;
+  color: #3f372f;
+  border: 1px solid rgba(63, 55, 47, 0.16);
 }
 
-.swatch[data-theme="night"] {
+.option[data-theme="dusk"] .optionIcon,
+.option[data-value="dusk"] .optionIcon {
+  background: #1a1c24;
+  color: #e4e6ef;
+  border: 1px solid rgba(154, 165, 209, 0.22);
+}
+
+.option[data-theme="night"] .optionIcon,
+.option[data-value="night"] .optionIcon {
+  background: #110e0c;
+  color: #f4ead8;
+  border: 1px solid rgba(244, 234, 216, 0.2);
+}
+
+.option[data-theme="slate"] .optionIcon,
+.option[data-value="slate"] .optionIcon {
+  background: #0b0f14;
+  color: #d7e0ea;
+  border: 1px solid rgba(167, 184, 204, 0.24);
+}
+
+/* Swatch: elegant rounded square showing the theme color */
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.iconTrigger .swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  transition: transform 0.14s ease;
+}
+
+.iconTrigger:hover .swatch {
+  transform: scale(1.08);
+}
+
+.swatch[data-theme="mist"],
+.swatch[data-theme-set="mist"] {
+  background: #e9ebf3;
+  border-color: rgba(50, 52, 74, 0.22);
+}
+
+.swatch[data-theme="pastel"],
+.swatch[data-theme-set="pastel"] {
+  background: #f3eee6;
+  border-color: rgba(63, 55, 47, 0.22);
+}
+
+.swatch[data-theme="night"],
+.swatch[data-theme-set="night"] {
   background: #110e0c;
   border-color: rgba(244, 234, 216, 0.28);
 }
 
-.swatch[data-theme="slate"] {
+.swatch[data-theme="slate"],
+.swatch[data-theme-set="slate"] {
   background: #0b0f14;
   border-color: rgba(167, 184, 204, 0.35);
 }
 
-.swatch[data-theme="dusk"] {
+.swatch[data-theme="dusk"],
+.swatch[data-theme-set="dusk"] {
   background: #1a1c24;
   border-color: rgba(154, 165, 209, 0.35);
+}
+
+/* Tablet (768px - 1024px) */
+@media (min-width: 768px) {
+  .iconTrigger {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+  }
+  .iconTrigger .swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+  }
+}
+
+/* Desktop (1025px+) */
+@media (min-width: 1025px) {
+  .iconTrigger {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    min-height: 50px;
+    max-width: 50px;
+    max-height: 50px;
+  }
+  .iconTrigger .swatch {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+  }
 }

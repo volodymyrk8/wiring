@@ -141,7 +141,7 @@
     snooze: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
     gem: svgIcon(
       `<path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>`,
-      { size: 10, strokeWidth: 2.2 }
+      { size: 11, strokeWidth: 2.2 }
     ),
     home: svgIcon(
       `<path d="M4.5 11.5L12 5l7.5 6.5V19.5a1.5 1.5 0 0 1-1.5 1.5H14.5a1 1 0 0 1-1-1V15.5a1.5 1.5 0 0 0-3 0V20a1 1 0 0 1-1 1H6a1.5 1.5 0 0 1-1.5-1.5z"/>`,
@@ -2813,7 +2813,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=11`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=22`);
     return homeFeatureModulePromise;
   };
 

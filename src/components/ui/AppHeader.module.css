@@ -254,6 +254,41 @@
   min-width: 0;
 }
 
+.headerEnd :global(.avatar-slot),
+.headerEnd :global(.avatar-link),
+.headerEnd :global(.profile-slot),
+.headerEnd :global(.icon-btn) {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.headerEnd :global(.avatar-slot) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerEnd :global(.avatar-link) {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.headerEnd :global(.icon-btn) {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
 .swatches {
   display: flex;
   gap: 8px;
@@ -299,8 +334,76 @@
   border-color: rgba(154, 165, 209, 0.35);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 420px) {
   .brand {
     font-size: 22px;
+  }
+}
+
+/* Tablet (768px - 1024px) */
+@media (min-width: 768px) {
+  .header {
+    min-height: 60px;
+    margin-bottom: 20px;
+    gap: 14px;
+  }
+  .brand {
+    font-size: 26px;
+  }
+  .brandSection {
+    font-size: 14px;
+  }
+  .backBtn {
+    width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+  .headerEnd {
+    gap: 10px;
+  }
+  .headerEnd :global(.avatar-slot),
+  .headerEnd :global(.avatar-link),
+  .headerEnd :global(.profile-slot),
+  .headerEnd :global(.icon-btn) {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
+  }
+}
+
+/* Desktop (1025px+) */
+@media (min-width: 1025px) {
+  .header {
+    min-height: 64px;
+    margin-bottom: 24px;
+    gap: 16px;
+  }
+  .brand {
+    font-size: 28px;
+  }
+  .brandSection {
+    font-size: 15px;
+  }
+  .backBtn {
+    width: 50px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+  }
+  .headerEnd {
+    gap: 12px;
+  }
+  .headerEnd :global(.avatar-slot),
+  .headerEnd :global(.avatar-link),
+  .headerEnd :global(.profile-slot),
+  .headerEnd :global(.icon-btn) {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    min-height: 50px;
+    max-width: 50px;
+    max-height: 50px;
   }
 }
