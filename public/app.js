@@ -166,11 +166,11 @@
 
   const THEME_KEY = "wiring-theme";
   const THEMES = {
-    pastel: { label: "пастель", chrome: "#f3eee6" },
-    mist: { label: "дымка", chrome: "#e9ebf3" },
-    dusk: { label: "сумерки", chrome: "#1a1c24" },
-    night: { label: "ночь", chrome: "#110e0c" },
-    slate: { label: "сланец", chrome: "#0b0f14" },
+    mist: { label: "Лаванда", chrome: "#e9ebf3" },
+    pastel: { label: "Лён", chrome: "#f3eee6" },
+    night: { label: "Неон", chrome: "#110e0c" },
+    slate: { label: "Графит", chrome: "#0b0f14" },
+    dusk: { label: "Индиго", chrome: "#1a1c24" },
   };
   const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
   const applyTheme = (theme) => {
@@ -1904,7 +1904,7 @@
           </div>
           <div class="plus-box">
             <div class="q">тема</div>
-            <p class="hint">пять гамм: пастель, дымка, мягкие сумерки, контрастная ночь и серо-голубой сланец. кнопка оформления в шапке тоже переключает.</p>
+            <p class="hint">пять гамм: Лаванда, Лён, Неон, Графит и Индиго. Кнопка оформления в шапке тоже переключает.</p>
             ${themeSwatches()}
           </div>
           <div class="plus-box">
@@ -2621,7 +2621,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=2`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=3`);
     return homeFeatureModulePromise;
   };
 
