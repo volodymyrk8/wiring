@@ -1403,7 +1403,7 @@ html[data-theme="slate"] .profile-menu-status {
   background: var(--accent-soft);
 }
 .tabbar a:active::before {
-  transform: scale(0.96);
+  transform: scale(1.06);
 }
 .tabbar .nav-ico,
 .tabbar .nav-lbl {
@@ -2262,7 +2262,9 @@ body.legal-page .legal {
   opacity: 0.8;
 }
 
-/* Polished Support Form */
+/* ==========================================================================
+   Support Form
+   ========================================================================== */
 .support-form {
   display: flex;
   flex-direction: column;
@@ -2271,6 +2273,84 @@ body.legal-page .legal {
   margin-top: 24px;
 }
 
+.support-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Floating Input */
+.field-floating {
+  position: relative;
+  display: flex;
+  width: 100%;
+}
+
+.field-floating input {
+  width: 100%;
+  min-height: 56px;
+  padding: 22px 16px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.25;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.field-floating input:hover:not(:focus) {
+  border-color: var(--accent-line);
+}
+
+.field-floating input:focus {
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-2);
+}
+
+.field-floating input:-webkit-autofill,
+.field-floating input:autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-2) inset !important;
+  box-shadow: 0 0 0 1000px var(--bg-2) inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  caret-color: var(--ink);
+}
+
+.field-floating .field-floating__label {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              top 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              font-size 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.18s ease;
+  transform-origin: left top;
+}
+
+.field-floating input:focus ~ .field-floating__label,
+.field-floating input:not(:placeholder-shown) ~ .field-floating__label,
+.field-floating input:-webkit-autofill ~ .field-floating__label,
+.field-floating input:autofill ~ .field-floating__label {
+  top: 8px;
+  transform: none;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.field-floating input:focus ~ .field-floating__label {
+  color: var(--lime);
+}
+
+/* Textarea Field */
 .textarea-field {
   display: flex;
   flex-direction: column;
@@ -2312,6 +2392,7 @@ body.legal-page .legal {
   padding: 0 4px;
 }
 
+/* Support Actions */
 .support-actions {
   display: flex;
   align-items: center;
@@ -3280,6 +3361,48 @@ html[data-view="deck"] .controls {
 @media (min-width: 768px) {
   html[data-view="deck"] #app {
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Mobile tabbar: leave breathing room around the selected item instead of
+   letting its pill touch the bar edges. */
+@media (max-width: 767px) {
+  .tabbar {
+    min-height: calc(66px + env(safe-area-inset-bottom));
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  }
+  .tabbar a {
+    min-height: 54px;
+    padding: 4px 0;
+    gap: 3px;
+  }
+  .tabbar a::before {
+    inset: 4px 3px;
+    border-radius: 16px;
+  }
+  .tabbar a:hover::before {
+    background: transparent;
+  }
+  .tabbar a.on::before {
+    background: var(--accent-soft);
+  }
+}
+
+@media (max-width: 360px) {
+  .tabbar {
+    min-height: calc(62px + env(safe-area-inset-bottom));
+    padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
+  }
+  .tabbar a {
+    min-height: 52px;
+    padding: 4px 0;
+    gap: 2px;
+  }
+  .tabbar a::before {
+    inset: 4px 2px;
+    border-radius: 14px;
   }
 }
 

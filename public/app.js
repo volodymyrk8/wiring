@@ -2165,11 +2165,6 @@
             ${promptFields(prompts)}
           </div>
           <div class="plus-box">
-            <div class="q">тема</div>
-            <p class="hint">пять гамм: день, пастель, сумерки, ночь и полночь. кнопка оформления в шапке тоже переключает.</p>
-            ${themeSwatches()}
-          </div>
-          <div class="plus-box">
             <div class="q">уведомления</div>
             ${
               notifyAllowed()

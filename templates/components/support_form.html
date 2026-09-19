@@ -1,0 +1,124 @@
+<div id="support-status-wrap">
+  {% if notice %}
+    <div class="card-status ok">
+      <span class="status-icon">✓</span>
+      <div>
+        <h3>Сообщение отправлено</h3>
+        <p>{{ notice }}</p>
+      </div>
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="card-status err" role="alert">
+      <span class="status-icon">⚠️</span>
+      <div>
+        <p>{{ error }}</p>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+{% if not notice %}
+<form class="support-form" id="support-form" method="post" action="/support">
+  <div class="support-fields">
+    <label class="field-floating">
+      <input
+        name="name"
+        maxlength="80"
+        autocomplete="name"
+        placeholder=" "
+        value="{{ me.name if me else '' }}"
+      >
+      <span class="field-floating__label">Имя (по желанию)</span>
+    </label>
+
+    <label class="field-floating">
+      <input
+        name="email"
+        type="email"
+        maxlength="120"
+        autocomplete="email"
+        inputmode="email"
+        autocapitalize="none"
+        placeholder=" "
+        value="{{ me.email if me and me.email else '' }}"
+      >
+      <span class="field-floating__label">Почта для ответа (по желанию)</span>
+    </label>
+
+    <div class="textarea-field">
+      <textarea
+        name="body"
+        id="support-body"
+        required
+        minlength="8"
+        maxlength="2000"
+        placeholder="Что случилось? Опиши подробно..."
+      ></textarea>
+      <div class="textarea-meta">
+        <span>Минимум 8 символов</span>
+        <span id="char-count">0 / 2000</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="support-actions">
+    <button class="solid" type="submit" id="support-submit">
+      <span>Отправить сообщение</span>
+    </button>
+  </div>
+</form>
+
+<script>
+  (function () {
+    var form = document.getElementById("support-form");
+    var bodyField = document.getElementById("support-body");
+    var charCount = document.getElementById("char-count");
+    var statusWrap = document.getElementById("support-status-wrap");
+    var submitBtn = document.getElementById("support-submit");
+
+    if (bodyField && charCount) {
+      bodyField.addEventListener("input", function () {
+        charCount.textContent = bodyField.value.length + " / 2000";
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", async function (e) {
+        if (!window.fetch) return;
+        e.preventDefault();
+        var bodyVal = (bodyField ? bodyField.value : "").trim();
+        if (bodyVal.length < 8) {
+          statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>напиши чуть подробнее (минимум 8 символов)</p></div></div>';
+          return;
+        }
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span>Отправляем…</span>';
+        }
+        try {
+          var formData = new FormData(form);
+          var res = await fetch("/support", {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
+            body: formData,
+          });
+          var data = await res.json();
+          if (res.ok && data.ok) {
+            form.remove();
+            statusWrap.innerHTML = '<div class="card-status ok"><span class="status-icon">✓</span><div><h3>Сообщение отправлено</h3><p>' + (data.notice || 'отправили. ответим на почту, если её указал') + '</p></div></div>';
+          } else {
+            statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>' + (data.error || 'произошла ошибка, попробуй позже') + '</p></div></div>';
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = '<span>Отправить сообщение</span>';
+            }
+          }
+        } catch (err) {
+          form.submit();
+        }
+      });
+    }
+  })();
+</script>
+{% endif %}

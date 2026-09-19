@@ -11,7 +11,10 @@
     </a>
   </div>
   {% endif %}
-  <a class="brand" href="/" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
+  <div class="brand-group">
+    <a class="brand" href="/" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
+    {% if section_title %}<span class="brand-section" aria-current="page">{{ section_title }}</span>{% endif %}
+  </div>
   {% if _show_actions %}
   <div class="app-head-end">
     <div class="theme-swatches" role="group" aria-label="цвет">

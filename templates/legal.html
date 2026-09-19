@@ -13,6 +13,7 @@
       try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
       var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
       document.documentElement.dataset.theme = ok[t] ? t : "mist";
+      document.querySelector('meta[name="theme-color"]').setAttribute("content", ok[t] || ok.mist);
     })();
   </script>
   <link rel="icon" href="/public/favicon.svg" type="image/svg+xml">
@@ -20,7 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/public/styles.css?v=92">
+  <link rel="stylesheet" href="/public/styles.css?v=123">
   {% if google_analytics_id or yandex_metrika_id %}
   <script>
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
@@ -31,74 +32,14 @@
 </head>
 <body class="legal-page">
   <main class="legal">
+    {% set show_back = true %}
+    {% set back_href = '/' %}
+    {% set section_title = 'поддержка' if support_form else '' %}
     {% include "components/header.html" %}
     <h1>{{ title }}</h1>
     {{ body | safe }}
     {% if support_form %}
-      <div id="support-status-wrap">
-        {% if notice %}
-          <div class="card-status ok">
-            <span class="status-icon">✓</span>
-            <div>
-              <h3>Сообщение отправлено</h3>
-              <p>{{ notice }}</p>
-            </div>
-          </div>
-        {% endif %}
-        {% if error %}
-          <div class="card-status err" role="alert">
-            <span class="status-icon">⚠️</span>
-            <div>
-              <p>{{ error }}</p>
-            </div>
-          </div>
-        {% endif %}
-      </div>
-      {% if not notice %}
-      <form class="support-form" id="support-form" method="post" action="/support">
-        <label class="field-floating">
-          <input
-            name="name"
-            maxlength="80"
-            autocomplete="name"
-            placeholder=" "
-            value="{{ me.name if me else '' }}"
-          >
-          <span class="field-floating__label">Имя (по желанию)</span>
-        </label>
-        <label class="field-floating">
-          <input
-            name="email"
-            type="email"
-            maxlength="120"
-            autocomplete="email"
-            inputmode="email"
-            autocapitalize="none"
-            placeholder=" "
-          >
-          <span class="field-floating__label">Почта для ответа (по желанию)</span>
-        </label>
-        <div class="textarea-field">
-          <textarea
-            name="body"
-            id="support-body"
-            required
-            minlength="8"
-            maxlength="2000"
-            placeholder="Что случилось? Опиши подробно..."
-          ></textarea>
-          <div class="textarea-meta">
-            <span>Минимум 8 символов</span>
-            <span id="char-count">0 / 2000</span>
-          </div>
-        </div>
-        <div class="support-actions">
-          <button class="solid" type="submit" id="support-submit">
-            <span>Отправить сообщение</span>
-          </button>
-        </div>
-      </form>
-      {% endif %}
+      {% include "components/support_form.html" %}
     {% endif %}
   </main>
   {% include "components/footer.html" %}
@@ -109,59 +50,14 @@
         btn.addEventListener("click", function () {
           var next = btn.getAttribute("data-theme-set");
           document.documentElement.dataset.theme = next;
-          try { localStorage.setItem("wiring-theme", next); } catch (e) {}
+          try {
+            localStorage.setItem("wiring-theme", next);
+            var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta && ok[next]) meta.setAttribute("content", ok[next]);
+          } catch (e) {}
         });
       });
-
-      // Interactive Support Form
-      var form = document.getElementById("support-form");
-      var bodyField = document.getElementById("support-body");
-      var charCount = document.getElementById("char-count");
-      var statusWrap = document.getElementById("support-status-wrap");
-      var submitBtn = document.getElementById("support-submit");
-
-      if (bodyField && charCount) {
-        bodyField.addEventListener("input", function () {
-          charCount.textContent = bodyField.value.length + " / 2000";
-        });
-      }
-
-      if (form) {
-        form.addEventListener("submit", async function (e) {
-          if (!window.fetch) return; // Fallback to normal POST
-          e.preventDefault();
-          var bodyVal = (bodyField ? bodyField.value : "").trim();
-          if (bodyVal.length < 8) {
-            statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>напиши чуть подробнее (минимум 8 символов)</p></div></div>';
-            return;
-          }
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span>Отправляем…</span>';
-          }
-          try {
-            var formData = new FormData(form);
-            var res = await fetch("/support", {
-              method: "POST",
-              headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
-              body: formData,
-            });
-            var data = await res.json();
-            if (res.ok && data.ok) {
-              form.remove();
-              statusWrap.innerHTML = '<div class="card-status ok"><span class="status-icon">✓</span><div><h3>Сообщение отправлено</h3><p>' + (data.notice || 'отправили. ответим на почту, если её указал') + '</p></div></div>';
-            } else {
-              statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>' + (data.error || 'произошла ошибка, попробуй позже') + '</p></div></div>';
-              if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<span>Отправить сообщение</span>';
-              }
-            }
-          } catch (err) {
-            form.submit(); // If fetch fails, submit normally
-          }
-        });
-      }
     })();
   </script>
 </body>
