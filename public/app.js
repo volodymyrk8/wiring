@@ -2617,6 +2617,39 @@
     return authFeatureModulePromise;
   };
 
+  let homeFeatureUnmount = null;
+  let homeFeatureModulePromise = null;
+
+  const loadHomeFeatureModule = () => {
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js`);
+    return homeFeatureModulePromise;
+  };
+
+  const buildHomeHostBridge = () => {
+    const signed = Boolean(state.user && !state.user.guest);
+    const neuro = state.user?.neuro || [];
+    const vibe = state.user?.vibe || [];
+    const userTraits = [
+      ...neuro.map((id) => ({ label: labelOf("neuro", id) })),
+      ...vibe.map((id) => ({ label: labelOf("vibe", id), vibe: true })),
+    ].filter((t) => Boolean(t.label));
+
+    return {
+      signed,
+      basePath: BASE,
+      homeFaces: HOME_FACES,
+      userTraits,
+      profileAvatar: state.user?.photo ? `${BASE}/${state.user.photo}` : undefined,
+      hrefFor,
+      navigate: (view) => {
+        void goToView(view);
+      },
+      onThemeSelect: (theme) => {
+        applyTheme(theme);
+      },
+    };
+  };
+
   const buildAuthHostBridge = (mode) => ({
     mode,
     basePath: BASE,
@@ -2742,6 +2775,28 @@
     }
   };
 
+  const renderHomeFeature = async () => {
+    homeFeatureUnmount?.();
+    homeFeatureUnmount = null;
+    root.innerHTML = '<div id="home-feature-root"></div>' + tabbar();
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#home-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await loadHomeFeatureModule();
+      homeFeatureUnmount = mod.mountHome(mountEl, buildHomeHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = homeView();
+      bindFold("#traits-open", "#home-traits");
+      bindFold("#about-open", "#home-about");
+      bindDataNavLinks();
+      bindThemeControls();
+    }
+  };
+
   const render = () => {
     if (state.view === "profile") {
       captureProfileDraft();
@@ -2754,6 +2809,10 @@
     if (!AUTH_FEATURE_VIEWS.has(state.view)) {
       authFeatureUnmount?.();
       authFeatureUnmount = null;
+    }
+    if (state.view !== "home") {
+      homeFeatureUnmount?.();
+      homeFeatureUnmount = null;
     }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
@@ -2779,7 +2838,10 @@
       void renderAuthFeature("verify");
       return;
     }
-    else if (state.view === "home" || !state.user) root.innerHTML = homeView();
+    else if (state.view === "home" || !state.user) {
+      void renderHomeFeature();
+      return;
+    }
     else if (state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile") bound = cityGateView();
     else if (state.view === "chat") root.innerHTML = chatView();
     else if (state.view === "matches") root.innerHTML = matchesView();

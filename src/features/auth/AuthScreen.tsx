@@ -1,9 +1,6 @@
 import { useState, useEffect } from "preact/hooks";
 import type { JSX } from "preact";
-import { Button } from "@/components/ui/Button";
-import { FieldFloating } from "@/components/ui/FieldFloating";
-import { PasswordField } from "@/components/ui/PasswordField";
-import { LegalFooter } from "@/components/ui/LegalFooter";
+import { Button, Input, LegalFooter } from "@/components/ui";
 import type { AuthHostBridge } from "@/features/auth/types";
 import { getErrorMessage } from "@/lib/get-error-message";
 import styles from "./AuthScreen.module.css";
@@ -264,7 +261,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
           <h2 class={`${styles.title} ${styles.titleWithLede}`}>Сброс пароля</h2>
           <p class={styles.lede}>Пришлём ссылку на почту, если такой аккаунт есть.</p>
           <form class={styles.form} onSubmit={onSubmitForgot} noValidate>
-            <FieldFloating
+            <Input
               label="Почта"
               name="email"
               type="email"
@@ -304,7 +301,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
         <div class={styles.authBody}>
           <h2 class={styles.title}>Новый пароль</h2>
           <form class={styles.form} onSubmit={onSubmitReset} noValidate>
-            <PasswordField
+            <Input
+              label="Новый пароль"
+              name="password"
+              type="password"
               autoComplete="new-password"
               showStrength
               value={password}
@@ -374,7 +374,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
 
       <form class={styles.form} onSubmit={onSubmitLoginRegister} noValidate>
         {!isLogin && (
-          <FieldFloating
+          <Input
             label="Имя"
             name="name"
             required
@@ -391,7 +391,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
           />
         )}
 
-        <FieldFloating
+        <Input
           label="Почта"
           name="email"
           type="email"
@@ -408,7 +408,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
           }}
         />
 
-        <PasswordField
+        <Input
+          label="Пароль"
+          name="password"
+          type="password"
           autoComplete={isLogin ? "current-password" : "new-password"}
           showStrength={!isLogin}
           enterKeyHint={isLogin ? "done" : "next"}
