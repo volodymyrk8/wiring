@@ -74,7 +74,7 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
           <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Сохранить"}</Button>
         </form>
       </main>
-      <LegalFooter showGlossary />
+      <LegalFooter />
     </div>
   );
 }

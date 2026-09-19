@@ -1,14 +1,10 @@
 import styles from "./LegalFooter.module.css";
 
 type LegalFooterProps = {
-  showGlossary?: boolean;
   className?: string;
 };
 
-export function LegalFooter({
-  showGlossary = false,
-  className,
-}: LegalFooterProps = {}) {
+export function LegalFooter({ className }: LegalFooterProps = {}) {
   return (
     <footer
       class={`${styles.footer}${className ? ` ${className}` : ""}`}
@@ -24,11 +20,6 @@ export function LegalFooter({
       <a class={styles.link} href="/support" draggable={false}>
         поддержка
       </a>
-      {showGlossary && (
-        <a class={styles.link} href="/glossary" draggable={false}>
-          глоссарий
-        </a>
-      )}
     </footer>
   );
 }

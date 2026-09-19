@@ -376,7 +376,7 @@ export function ProfileScreen({ host }: Props) {
           </form>
         </main>
       )}
-      <LegalFooter showGlossary={signed} />
+      <LegalFooter />
     </div>
   );
 }

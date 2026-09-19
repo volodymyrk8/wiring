@@ -8,28 +8,33 @@
 
 /* Vertical rhythm: hero → faces → CTA → slogan. */
 .home {
-  --home-gap: 12px;
-  --home-gap-tight: 6px;
+  --home-gap: 20px;
+  --home-gap-tight: 10px;
   width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 0;
   min-height: 0;
+  padding-block: clamp(10px, 2.5vh, 24px);
+  box-sizing: border-box;
 }
 
 .stack {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  justify-content: center;
   gap: var(--home-gap);
   width: 100%;
+  min-height: 0;
 }
 
 .hero {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
   width: 100%;
 }
 
@@ -102,12 +107,20 @@
 }
 
 .quiet {
+  flex-shrink: 0;
   width: 100%;
-  margin: 0;
+  max-width: 22rem;
+  margin: clamp(24px, 5vh, 44px) auto 0;
+  padding: clamp(18px, 3.5vh, 28px) 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--line, rgba(0, 0, 0, 0.12)) 72%, transparent);
   text-align: center;
-  font-size: 14px;
-  line-height: 1.4;
-  color: var(--muted, #777);
+  font-family: var(--serif, "Fraunces", Georgia, serif);
+  font-size: clamp(15px, 3.6vw, 17px);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--muted, #6d7084) 82%, var(--ink, #32344a));
 }
 
 /* Full-width legal bar: no extra horizontal inset; aligns with #app edges. */
@@ -121,11 +134,18 @@
 
 @media (max-width: 420px) {
   .home {
-    gap: 8px;
+    --home-gap: 16px;
+    padding-block: 8px;
   }
 
-  .stack {
-    gap: 10px;
+  .quiet {
+    margin-top: clamp(20px, 4vh, 32px);
+    padding-top: 16px;
+    font-size: 15px;
+  }
+
+  .hero {
+    gap: 8px;
   }
 
   .title {
@@ -135,22 +155,47 @@
 
 @media (min-width: 768px) {
   .home {
-    padding-top: 4px;
+    --home-gap: 24px;
+    --home-gap-tight: 12px;
+    padding-block: clamp(16px, 3vh, 32px);
+  }
+
+  .quiet {
+    max-width: 24rem;
+    margin-top: clamp(32px, 5vh, 52px);
+    padding-top: clamp(22px, 4vh, 32px);
+  }
+
+  .hero {
+    gap: 12px;
   }
 
   .homeFooter {
     margin-inline: -28px;
     width: calc(100% + 56px);
+    padding-top: 16px;
+  }
+}
+
+@media (min-width: 1080px) {
+  .home {
+    --home-gap: 28px;
+  }
+
+  .quiet {
+    font-size: 17px;
   }
 }
 
 @media (max-height: 700px) {
   .home {
-    gap: 6px;
+    --home-gap: 14px;
+    gap: 12px;
+    padding-block: 6px;
   }
 
   .stack {
-    gap: 8px;
+    gap: var(--home-gap);
   }
 
   .title {
@@ -158,12 +203,18 @@
   }
 
   .quiet {
-    font-size: 13px;
+    margin-top: 16px;
+    padding-top: 14px;
+    font-size: 14px;
   }
 }
 
 @media (max-height: 580px) {
-  .stack {
+  .home {
+    --home-gap: 12px;
+  }
+
+  .hero {
     gap: 6px;
   }
 }

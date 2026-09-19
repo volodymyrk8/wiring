@@ -3,7 +3,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   column-gap: 10px;
   width: 100%;
-  margin: 0;
+  margin: clamp(4px, 1vh, 12px) 0;
   height: clamp(72px, 22vw, 108px);
 }
 

@@ -114,7 +114,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
         <p class={styles.quiet}>Можно быть собой.</p>
       </section>
 
-      <LegalFooter showGlossary={signed} className={styles.homeFooter} />
+      <LegalFooter className={styles.homeFooter} />
     </div>
   );
 }
