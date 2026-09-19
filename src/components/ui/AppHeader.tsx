@@ -15,12 +15,50 @@ export const THEME_LIST = [
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
 
+export function ThemeIcon({ theme, size = 20 }: { theme: ThemeName; size?: number }) {
+  if (theme === "mist") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+      </svg>
+    );
+  }
+  if (theme === "pastel") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16" />
+      </svg>
+    );
+  }
+  if (theme === "dusk") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" />
+      </svg>
+    );
+  }
+  if (theme === "night") {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z" />
+      <path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z" />
+    </svg>
+  );
+}
+
 export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
-  { value: "mist", label: "день", swatchTheme: "mist" },
-  { value: "pastel", label: "пастель", swatchTheme: "pastel" },
-  { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
-  { value: "night", label: "ночь", swatchTheme: "night" },
-  { value: "slate", label: "полночь", swatchTheme: "slate" },
+  { value: "mist", label: "день", icon: <ThemeIcon theme="mist" /> },
+  { value: "pastel", label: "пастель", icon: <ThemeIcon theme="pastel" /> },
+  { value: "dusk", label: "сумерки", icon: <ThemeIcon theme="dusk" /> },
+  { value: "night", label: "ночь", icon: <ThemeIcon theme="night" /> },
+  { value: "slate", label: "полночь", icon: <ThemeIcon theme="slate" /> },
 ];
 
 export type AppHeaderProps = {
@@ -145,9 +183,10 @@ export function AppHeader({
                 onThemeSelect(theme);
               }}
               showValue={false}
-              variant="default"
-              ariaLabel="Оформление"
-              title="Оформление"
+              showChevron={false}
+              variant="iconOnly"
+              ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+              title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
             />
           )}
           {rightSlot}

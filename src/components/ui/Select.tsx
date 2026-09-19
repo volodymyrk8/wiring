@@ -118,7 +118,9 @@ export function Select<T extends string = string>({
         title={title || selectedOption?.label}
         onClick={toggleOpen}
       >
-        {selectedOption?.swatchTheme ? (
+        {selectedOption?.icon ? (
+          <span class={styles.triggerIcon}>{selectedOption.icon}</span>
+        ) : selectedOption?.swatchTheme ? (
           <span class={styles.swatch} data-theme-set={selectedOption.swatchTheme} data-theme={selectedOption.swatchTheme} aria-hidden="true" />
         ) : icon ? (
           icon
@@ -154,10 +156,10 @@ export function Select<T extends string = string>({
                 class={`${styles.option}${isSelected ? ` ${styles.selectedOption}` : ""}`}
                 onClick={handleSelect(option)}
               >
-                {option.swatchTheme ? (
+                {option.icon ? (
+                  <span class={styles.optionIcon}>{option.icon}</span>
+                ) : option.swatchTheme ? (
                   <span class={styles.swatch} data-theme-set={option.swatchTheme} data-theme={option.swatchTheme} aria-hidden="true" />
-                ) : option.icon ? (
-                  option.icon
                 ) : null}
                 <span class={styles.optionLabel}>{option.label}</span>
                 {isSelected && (

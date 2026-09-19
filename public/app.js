@@ -144,7 +144,7 @@
       { size: 21, strokeWidth: 1.5 }
     ),
     feed: svgIcon(
-      `<rect x="1.5" y="3" width="11.5" height="16.5" rx="2.5" transform="rotate(-16 7.25 11.25)" opacity="0.45"/><rect x="11" y="3" width="11.5" height="16.5" rx="2.5" transform="rotate(16 16.75 11.25)" opacity="0.45"/><rect x="5.75" y="2" width="12.5" height="17.5" rx="2.5" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="7.8" r="2.1"/><path d="M8.8 14.8c.6-1.5 1.8-2.1 3.2-2.1s2.6.6 3.2 2.1"/><path d="M1.2 11.5L.2 12.5l1 1"/><path d="M22.8 11.5l1 1-1 1"/>`,
+      `<rect x="4.45" y="3.5" width="9.5" height="16.5" rx="2.2" transform="rotate(-10 9.2 11.75)" opacity="0.45"/><rect x="10.05" y="3.5" width="9.5" height="16.5" rx="2.2" transform="rotate(10 14.8 11.75)" opacity="0.45"/><rect x="6.75" y="2.8" width="10.5" height="17.5" rx="2.4" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="8.2" r="2"/><path d="M9 15c.6-1.4 1.7-1.9 3-1.9s2.4.5 3 1.9"/><path d="M2.8 11.75H1.2m1.2-1.2L1.2 11.75l1.2 1.2"/><path d="M21.2 11.75H22.8m-1.2-1.2l1.2 1.2-1.2 1.2"/>`,
       { size: 21, strokeWidth: 1.5 }
     ),
     heart: svgIcon(
@@ -173,6 +173,30 @@
     arrow: svgIcon(`<path d="M5 12h14M13 6l6 6-6 6"/>`, { size: 18 }),
   };
 
+  const THEME_ICONS = {
+    mist: svgIcon(
+      `<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"/>`,
+      { size: 20, strokeWidth: 1.9 }
+    ),
+    pastel: svgIcon(
+      `<path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16"/>`,
+      { size: 20, strokeWidth: 1.9 }
+    ),
+    dusk: svgIcon(
+      `<path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>`,
+      { size: 20, strokeWidth: 1.9 }
+    ),
+    night: svgIcon(
+      `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`,
+      { size: 20, strokeWidth: 1.9 }
+    ),
+    slate: svgIcon(
+      `<path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z"/><path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z"/>`,
+      { size: 20, strokeWidth: 1.9 }
+    ),
+  };
+  const themeIcon = (theme) => THEME_ICONS[theme] || THEME_ICONS.mist;
+
   const THEME_KEY = "wiring-theme";
   const THEMES = {
     mist: { label: "день", chrome: "#e9ebf3" },
@@ -192,6 +216,17 @@
     }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", THEMES[next].chrome);
+
+    const openBtn = document.getElementById("theme-open");
+    if (openBtn) {
+      openBtn.innerHTML = themeIcon(next);
+      const lbl = `Оформление: ${THEMES[next].label}`;
+      openBtn.setAttribute("aria-label", lbl);
+      openBtn.setAttribute("title", lbl);
+    }
+    document.querySelectorAll(".theme-opt").forEach((opt) => {
+      opt.classList.toggle("active", opt.dataset.themeSet === next);
+    });
   };
   const themeSwatches = () =>
     `<div class="theme-swatches" role="group" aria-label="цвет">
@@ -202,18 +237,20 @@
         )
         .join("")}
     </div>`;
-  const themePicker = () =>
-    `<div class="theme-pop">
-      <button type="button" class="icon-btn" id="theme-open" aria-expanded="false" aria-controls="theme-menu" aria-haspopup="true" aria-label="Оформление" title="Оформление">${ICONS.theme}</button>
+  const themePicker = () => {
+    const cur = themeNow();
+    return `<div class="theme-pop">
+      <button type="button" class="icon-btn" id="theme-open" aria-expanded="false" aria-controls="theme-menu" aria-haspopup="true" aria-label="Оформление: ${escapeAttr(THEMES[cur]?.label || cur)}" title="Оформление: ${escapeAttr(THEMES[cur]?.label || cur)}">${themeIcon(cur)}</button>
       <div class="theme-menu" id="theme-menu" hidden>
         ${Object.entries(THEMES)
           .map(
             ([id, t]) =>
-              `<button type="button" class="theme-opt" data-theme-set="${id}"><span class="swatch" data-theme-set="${id}"></span>${t.label}</button>`
+              `<button type="button" class="theme-opt${id === cur ? " active" : ""}" data-theme-set="${id}"><span class="theme-opt-icon">${THEME_ICONS[id]}</span><span class="theme-opt-label">${t.label}</span></button>`
           )
           .join("")}
       </div>
     </div>`;
+  };
   let themeUiBound = false;
   const bindThemePicker = () => {
     const wrap = root.querySelector(".theme-pop");
@@ -260,7 +297,15 @@
   };
   const bindThemeControls = () => {
     root.querySelectorAll("[data-theme-set]").forEach((btn) => {
-      btn.addEventListener("click", () => applyTheme(btn.dataset.themeSet));
+      btn.addEventListener("click", () => {
+        applyTheme(btn.dataset.themeSet);
+        const menu = root.querySelector("#theme-menu");
+        const trigger = root.querySelector("#theme-open");
+        if (menu && !menu.hidden) {
+          menu.hidden = true;
+          if (trigger) trigger.setAttribute("aria-expanded", "false");
+        }
+      });
     });
     bindThemePicker();
   };
@@ -2639,7 +2684,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=9`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=10`);
     return homeFeatureModulePromise;
   };
 

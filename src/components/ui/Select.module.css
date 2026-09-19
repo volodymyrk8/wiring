@@ -141,6 +141,32 @@
   flex-shrink: 0;
 }
 
+.triggerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.optionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--muted, #888);
+  transition: color 0.14s ease;
+}
+
+.option:hover .optionIcon,
+.selectedOption .optionIcon {
+  color: var(--ink, #111);
+}
+
 /* Swatch: chunky rounded square on the left */
 .swatch {
   width: 26px;
