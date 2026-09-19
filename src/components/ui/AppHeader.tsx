@@ -102,7 +102,7 @@ export function AppHeader({
                 setActiveTheme(theme);
                 onThemeSelect(theme);
               }}
-              variant="pill"
+              variant="default"
               ariaLabel="Оформление"
               title="Оформление"
             />

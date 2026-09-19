@@ -2621,7 +2621,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=2`);
     return homeFeatureModulePromise;
   };
 
