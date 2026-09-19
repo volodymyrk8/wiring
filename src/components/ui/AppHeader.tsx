@@ -1,10 +1,12 @@
+import { useState, useEffect } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { Tooltip } from "./Tooltip";
+import { Select, type SelectOption } from "./Select";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
-  { id: "pastel", label: "пастель" },
   { id: "mist", label: "дымка" },
+  { id: "pastel", label: "пастель" },
   { id: "night", label: "ночь" },
   { id: "dusk", label: "сумерки" },
   { id: "slate", label: "грифель" },
@@ -12,13 +14,23 @@ export const THEME_LIST = [
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
 
+export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
+  { value: "mist", label: "дымка", swatchTheme: "mist" },
+  { value: "pastel", label: "пастель", swatchTheme: "pastel" },
+  { value: "night", label: "ночь", swatchTheme: "night" },
+  { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
+  { value: "slate", label: "грифель", swatchTheme: "slate" },
+];
+
 export type AppHeaderProps = {
   homeHref?: string;
   onHomeClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement>) => void;
   logoPosition?: "left" | "center";
   showActions?: boolean;
   showBetaBadge?: boolean;
+  showThemeSelect?: boolean;
   showThemeSwatches?: boolean;
+  currentTheme?: ThemeName;
   onThemeSelect?: (theme: ThemeName) => void;
   rightSlot?: ComponentChildren;
   children?: ComponentChildren;
@@ -31,13 +43,29 @@ export function AppHeader({
   logoPosition = "left",
   showActions = true,
   showBetaBadge = true,
-  showThemeSwatches = false,
+  showThemeSelect,
+  showThemeSwatches,
+  currentTheme,
   onThemeSelect,
   rightSlot,
   children,
   className,
 }: AppHeaderProps) {
   const isCenter = logoPosition === "center";
+
+  const [activeTheme, setActiveTheme] = useState<ThemeName>(() => {
+    if (currentTheme) return currentTheme;
+    if (typeof document !== "undefined" && document.documentElement.dataset.theme) {
+      return (document.documentElement.dataset.theme as ThemeName) || "mist";
+    }
+    return "mist";
+  });
+
+  useEffect(() => {
+    if (currentTheme) setActiveTheme(currentTheme);
+  }, [currentTheme]);
+
+  const shouldShowThemeDropdown = (showThemeSelect ?? (showThemeSwatches !== undefined ? showThemeSwatches : Boolean(onThemeSelect))) && Boolean(onThemeSelect);
 
   return (
     <header
@@ -66,20 +94,18 @@ export function AppHeader({
 
       {showActions && (
         <div class={styles.headerEnd}>
-          {showThemeSwatches && (
-            <div class={styles.swatches} role="group" aria-label="цвет">
-              {THEME_LIST.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  class={styles.swatch}
-                  data-theme-set={t.id}
-                  aria-label={t.label}
-                  title={t.label}
-                  onClick={() => onThemeSelect?.(t.id)}
-                />
-              ))}
-            </div>
+          {shouldShowThemeDropdown && onThemeSelect && (
+            <Select<ThemeName>
+              options={THEME_OPTIONS}
+              value={activeTheme}
+              onChange={(theme) => {
+                setActiveTheme(theme);
+                onThemeSelect(theme);
+              }}
+              variant="pill"
+              ariaLabel="Оформление"
+              title="Оформление"
+            />
           )}
           {rightSlot}
           {children}
@@ -88,3 +114,4 @@ export function AppHeader({
     </header>
   );
 }
+
