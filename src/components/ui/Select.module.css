@@ -46,6 +46,11 @@
   font-size: 13.5px;
 }
 
+.compactTrigger {
+  padding: 0 8px;
+  gap: 6px;
+}
+
 .chevron {
   display: flex;
   align-items: center;

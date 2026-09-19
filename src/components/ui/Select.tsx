@@ -32,6 +32,7 @@ export type SelectProps<T extends string = string> = {
   align?: "left" | "right";
   icon?: ComponentChildren;
   showChevron?: boolean;
+  showValue?: boolean;
   className?: string;
   menuClassName?: string;
   ariaLabel?: string;
@@ -48,6 +49,7 @@ export function Select<T extends string = string>({
   align = "right",
   icon,
   showChevron = true,
+  showValue = true,
   className,
   menuClassName,
   ariaLabel,
@@ -109,7 +111,7 @@ export function Select<T extends string = string>({
     <div ref={wrapRef} class={`${styles.selectWrap}${className ? ` ${className}` : ""}`}>
       <button
         type="button"
-        class={`${styles.trigger}${isIconOnly ? ` ${styles.iconTrigger}` : ""}${isPill ? ` ${styles.pillTrigger}` : ""}`}
+        class={`${styles.trigger}${isIconOnly ? ` ${styles.iconTrigger}` : ""}${isPill ? ` ${styles.pillTrigger}` : ""}${!showValue && !isIconOnly ? ` ${styles.compactTrigger}` : ""}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel || title || selectedOption?.label || placeholder}
@@ -122,7 +124,7 @@ export function Select<T extends string = string>({
           icon
         ) : null}
 
-        {!isIconOnly && (
+        {!isIconOnly && showValue && (
           <span class={styles.label}>{selectedOption?.label || placeholder}</span>
         )}
 

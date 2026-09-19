@@ -9,7 +9,7 @@ export const THEME_LIST = [
   { id: "pastel", label: "пастель" },
   { id: "night", label: "ночь" },
   { id: "dusk", label: "сумерки" },
-  { id: "slate", label: "графит" },
+  { id: "slate", label: "сталь" },
 ] as const;
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
@@ -19,7 +19,7 @@ export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
   { value: "pastel", label: "пастель", swatchTheme: "pastel" },
   { value: "night", label: "ночь", swatchTheme: "night" },
   { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
-  { value: "slate", label: "графит", swatchTheme: "slate" },
+  { value: "slate", label: "сталь", swatchTheme: "slate" },
 ];
 
 export type AppHeaderProps = {
@@ -102,6 +102,7 @@ export function AppHeader({
                 setActiveTheme(theme);
                 onThemeSelect(theme);
               }}
+              showValue={false}
               variant="default"
               ariaLabel="Оформление"
               title="Оформление"
