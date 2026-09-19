@@ -9,7 +9,7 @@ export const THEME_LIST = [
   { id: "pastel", label: "пастель" },
   { id: "dusk", label: "сумерки" },
   { id: "night", label: "ночь" },
-  { id: "slate", label: "сталь" },
+  { id: "slate", label: "полночь" },
 ] as const;
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
@@ -19,7 +19,7 @@ export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
   { value: "pastel", label: "пастель", swatchTheme: "pastel" },
   { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
   { value: "night", label: "ночь", swatchTheme: "night" },
-  { value: "slate", label: "сталь", swatchTheme: "slate" },
+  { value: "slate", label: "полночь", swatchTheme: "slate" },
 ];
 
 export type AppHeaderProps = {

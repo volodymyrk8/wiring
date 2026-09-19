@@ -144,8 +144,8 @@
       { size: 20 }
     ),
     feed: svgIcon(
-      `<path d="M7 3.5h10a2 2 0 0 1 2 2v10" opacity=\"0.4\"/><rect x=\"5\" y=\"5\" width=\"12\" height=\"15\" rx=\"2.2\"/><circle cx=\"11\" cy=\"10\" r=\"1.8\"/><path d=\"M8.2 16c.4-1.2 1.4-1.7 2.8-1.7s2.4.5 2.8 1.7\"/><path d=\"M19.5 12.5h3m-1.2-1.2l1.2 1.2-1.2 1.2\"/><path d=\"M1.5 12.5h3M2.7 11.3L1.5 12.5l1.2 1.2\"/>`,
-      { size: 21 }
+      `<rect x="2.5" y="4" width="10.5" height="15" rx="2" transform="rotate(-15 7.75 11.5)" opacity="0.45"/><rect x="11" y="4" width="10.5" height="15" rx="2" transform="rotate(15 16.25 11.5)" opacity="0.45"/><rect x="6.5" y="3.2" width="11" height="16" rx="2.2" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="8.5" r="1.8"/><path d="M9.2 14.7c.5-1.3 1.5-1.8 2.8-1.8s2.3.5 2.8 1.8"/><path d="M1.8 11.5L.6 12.7l1.2 1.2"/><path d="M22.2 11.5l1.2 1.2-1.2 1.2"/>`,
+      { size: 21, strokeWidth: 1.5 }
     ),
     heart: svgIcon(
       `<path d="M12 20.8S3.5 15.4 3.5 9.5a5.2 5.2 0 0 1 8.5-3.8 5.2 5.2 0 0 1 8.5 3.8c0 5.9-8.5 11.3-8.5 11.3z"/>`,
@@ -179,7 +179,7 @@
     pastel: { label: "пастель", chrome: "#f3eee6" },
     dusk: { label: "сумерки", chrome: "#1a1c24" },
     night: { label: "ночь", chrome: "#110e0c" },
-    slate: { label: "сталь", chrome: "#0b0f14" },
+    slate: { label: "полночь", chrome: "#0b0f14" },
   };
   const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
   const applyTheme = (theme) => {
@@ -1913,7 +1913,7 @@
           </div>
           <div class="plus-box">
             <div class="q">тема</div>
-            <p class="hint">пять гамм: день, пастель, сумерки, ночь и сталь. кнопка оформления в шапке тоже переключает.</p>
+            <p class="hint">пять гамм: день, пастель, сумерки, ночь и полночь. кнопка оформления в шапке тоже переключает.</p>
             ${themeSwatches()}
           </div>
           <div class="plus-box">
@@ -2630,7 +2630,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=7`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=8`);
     return homeFeatureModulePromise;
   };
 
