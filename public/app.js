@@ -196,6 +196,7 @@
     ),
   };
   const themeIcon = (theme) => THEME_ICONS[theme] || THEME_ICONS.mist;
+  const CHECK_ICON = `<span class="check" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>`;
 
   const THEME_KEY = "wiring-theme";
   const THEMES = {
@@ -225,7 +226,15 @@
       openBtn.setAttribute("title", lbl);
     }
     document.querySelectorAll(".theme-opt").forEach((opt) => {
-      opt.classList.toggle("active", opt.dataset.themeSet === next);
+      const isSel = opt.dataset.themeSet === next;
+      opt.classList.toggle("active", isSel);
+      opt.classList.toggle("selectedOption", isSel);
+      const chk = opt.querySelector(".check");
+      if (isSel && !chk) {
+        opt.insertAdjacentHTML("beforeend", CHECK_ICON);
+      } else if (!isSel && chk) {
+        chk.remove();
+      }
     });
   };
   const themeSwatches = () =>
@@ -245,7 +254,7 @@
         ${Object.entries(THEMES)
           .map(
             ([id, t]) =>
-              `<button type="button" class="theme-opt${id === cur ? " active" : ""}" data-theme-set="${id}"><span class="theme-opt-icon">${THEME_ICONS[id]}</span><span class="theme-opt-label">${t.label}</span></button>`
+              `<button type="button" class="theme-opt${id === cur ? " selectedOption active" : ""}" data-theme-set="${id}"><span class="theme-opt-icon">${THEME_ICONS[id]}</span><span class="theme-opt-label">${t.label}</span>${id === cur ? CHECK_ICON : ""}</button>`
           )
           .join("")}
       </div>
