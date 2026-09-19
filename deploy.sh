@@ -17,6 +17,9 @@ ENV_FILE=/etc/wiring.env
 umask 077
 touch "$ENV_FILE"
 chmod 600 "$ENV_FILE"
+if ! grep -q '^DATABASE_URL=' "$ENV_FILE" && [ -f /root/repos/dating/.env ]; then
+  grep '^DATABASE_URL=' /root/repos/dating/.env >> "$ENV_FILE" || true
+fi
 if ! grep -q '^OPENAI_API_KEY=' "$ENV_FILE" && [ -f /root/repos/dating/.env ]; then
   grep '^OPENAI_API_KEY=' /root/repos/dating/.env >> "$ENV_FILE" || true
 fi
@@ -31,6 +34,7 @@ rsync -az --delete \
   --exclude '*.pyc' \
   --exclude '.venv/' \
   --exclude 'venv/' \
+  --exclude 'node_modules/' \
   --exclude 'data/' \
   --exclude '.env' \
   --exclude '.env.*' \
@@ -59,11 +63,26 @@ chmod 600 "\$ENV_FILE"
 if ! grep -q '^APP_SECRET_KEY=' "\$ENV_FILE"; then
   printf 'APP_SECRET_KEY=%s\n' "\$(python3 -c 'import secrets; print(secrets.token_hex(32))')" >> "\$ENV_FILE"
 fi
+if ! grep -q '^DATABASE_URL=' "\$ENV_FILE" && [ -f /root/repos/dating/.env ]; then
+  grep '^DATABASE_URL=' /root/repos/dating/.env >> "\$ENV_FILE" || true
+fi
 if ! grep -q '^OPENAI_API_KEY=' "\$ENV_FILE" && [ -f /root/repos/dating/.env ]; then
   grep '^OPENAI_API_KEY=' /root/repos/dating/.env >> "\$ENV_FILE" || true
 fi
 if ! grep -q '^ADMIN_TOKEN=' "\$ENV_FILE"; then
   printf 'ADMIN_TOKEN=%s\n' "\$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "\$ENV_FILE"
+fi
+
+if ! grep -q '^DATABASE_URL=' "\$ENV_FILE"; then
+  if id -u postgres >/dev/null 2>&1; then
+    systemctl start postgresql || true
+    PG_PASS="\$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
+    su - postgres -c "psql -tc \"SELECT 1 FROM pg_roles WHERE rolname='wiring_app'\"" | grep -q 1 || \
+      su - postgres -c "psql -c \"CREATE USER wiring_app WITH PASSWORD '\$PG_PASS';\""
+    su - postgres -c "psql -tc \"SELECT 1 FROM pg_database WHERE datname='wiring'\"" | grep -q 1 || \
+      su - postgres -c "psql -c \"CREATE DATABASE wiring OWNER wiring_app;\""
+    printf 'DATABASE_URL=postgresql://wiring_app:%s@127.0.0.1:5432/wiring\n' "\$PG_PASS" >> "\$ENV_FILE"
+  fi
 fi
 
 install -m 644 "\$REMOTE_DIR/deploy/wiring.service" /etc/systemd/system/\$SERVICE_NAME
@@ -95,12 +114,21 @@ fi
 nginx -t
 systemctl reload nginx
 
-for i in \$(seq 1 15); do
-  if curl -sf http://127.0.0.1:5070/health >/dev/null; then
+HEALTHY=0
+for i in \$(seq 1 25); do
+  if curl -sf http://127.0.0.1:5070/health >/dev/null 2>&1; then
+    HEALTHY=1
     break
   fi
   sleep 1
 done
+
+if [ "\$HEALTHY" -ne 1 ]; then
+  echo "Health check failed after 25s! Service status and recent logs:"
+  systemctl --no-pager --full status "\$SERVICE_NAME" || true
+  journalctl -u "\$SERVICE_NAME" -n 60 --no-pager || true
+  exit 1
+fi
 
 curl -sf http://127.0.0.1:5070/health
 echo
