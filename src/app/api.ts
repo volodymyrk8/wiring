@@ -2,6 +2,8 @@ export type ApiOptions = RequestInit & {
   headers?: Record<string, string>;
 };
 
+export type ApiClient = <T = any>(path: string, options?: ApiOptions) => Promise<T>;
+
 export class ApiError extends Error {
   payload: any;
   status: number;
@@ -14,7 +16,7 @@ export class ApiError extends Error {
   }
 }
 
-export function createApi(basePath = "") {
+export function createApi(basePath = ""): ApiClient {
   return async function api<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
     const headers = { ...(options.headers || {}) };
     if (!(options.body instanceof FormData) && !headers["Content-Type"]) {

@@ -4,6 +4,9 @@ import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
 
+const errorMessage = (caught: unknown, fallback: string) =>
+  caught instanceof Error && caught.message ? caught.message : fallback;
+
 const ArrowIcon = ({ back = false }: { back?: boolean }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {back ? <path d="m13 6-6 6 6 6M7 12h14" /> : <path d="M5 12h14M13 6l6 6-6 6" />}
@@ -178,7 +181,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
     host.api("/api/matches").then((data) => {
       if (alive) setMatches(data.matches || []);
     }).catch((caught) => {
-      if (alive) setError(caught.message || "не удалось загрузить чаты");
+      if (alive) setError(errorMessage(caught, "не удалось загрузить чаты"));
     });
     return () => { alive = false; };
   }, [host]);
@@ -213,7 +216,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
       setPendingUnmatch(null);
       host.toast("убрано · в пропущенных");
     } catch (caught) {
-      host.toast(caught.message || "не удалось убрать чат");
+      host.toast(errorMessage(caught, "не удалось убрать чат"));
     } finally {
       setBusy(false);
     }
@@ -315,7 +318,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       });
       setError("");
     } catch (caught) {
-      setError(caught.message || "не удалось загрузить переписку");
+      setError(errorMessage(caught, "не удалось загрузить переписку"));
     }
   };
 
@@ -327,7 +330,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     host.api(`/api/messages/${chatId}`).then((data) => {
       if (alive) setThread(data as ChatThread);
     }).catch((caught) => {
-      if (alive) setError(caught.message || "не удалось загрузить переписку");
+      if (alive) setError(errorMessage(caught, "не удалось загрузить переписку"));
     });
     const timer = window.setInterval(() => {
       if (alive) void loadThread();
@@ -360,7 +363,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
-      host.toast(caught.message || "не удалось отправить сообщение");
+      host.toast(errorMessage(caught, "не удалось отправить сообщение"));
     } finally {
       setSending(false);
     }
@@ -383,7 +386,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
-      host.toast(caught.message || "не удалось отправить фото");
+      host.toast(errorMessage(caught, "не удалось отправить фото"));
     } finally {
       setSending(false);
     }
@@ -429,7 +432,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 <PhotoIcon />
                 <input type="file" accept="image/*" hidden disabled={sending} onChange={sendPhoto} />
               </label>
-              <input name="body" maxlength="1000" value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder="написать сообщение" autocomplete="off" enterkeyhint="send" disabled={sending} />
+              <input name="body" maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder="написать сообщение" autocomplete="off" enterKeyHint="send" disabled={sending} />
               <button class="composer-send" type="submit" aria-label="Отправить сообщение" title="Отправить" disabled={sending || !draft.trim()}><SendIcon /></button>
             </form>
           </div>
@@ -452,7 +455,7 @@ export function ChatScreen({ host }: { host: ChatHostBridge }) {
       host.toast("убрано · в пропущенных");
       host.navigate("matches");
     } catch (caught) {
-      host.toast(caught.message || "не удалось убрать чат");
+      host.toast(errorMessage(caught, "не удалось убрать чат"));
     } finally {
       setBusy(false);
     }
