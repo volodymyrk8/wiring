@@ -189,7 +189,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
         <p class={styles.quiet}>Можно быть собой.</p>
       </section>
 
-      <LegalFooter signed={signed} hrefFor={hrefFor} />
+      <LegalFooter showGlossary={signed} />
     </>
   );
 }

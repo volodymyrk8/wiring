@@ -159,7 +159,10 @@
       `<path d="M21 12c0 4.7-4 8.5-9 8.5-1.6 0-3.1-.4-4.4-1.1L3.2 21.2l1.6-3.9C4 15.8 3.2 14 3.2 12c0-4.7 4-8.5 9-8.5s8.8 3.8 8.8 8.5z"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.2" fill="currentColor" stroke="none"/>`,
       { size: 21, strokeWidth: 1.5 }
     ),
-    user: svgIcon(`<circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8"/>`, { size: 20 }),
+    user: svgIcon(
+      `<circle cx="12" cy="7.8" r="3.4"/><path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5"/>`,
+      { size: 21, strokeWidth: 1.5 }
+    ),
     tag: svgIcon(`<path d="M4.5 12.8V5.5H12l7.2 7.2-6.5 6.5z"/><circle cx="8.2" cy="9.2" r="1" fill="currentColor" stroke="none"/>`, { size: 20 }),
     eye: svgIcon(`<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>`, { size: 18 }),
     eyeOff: svgIcon(`<path d="M3 4l17 16M10.5 10.7a2.6 2.6 0 0 0 3.7 3.6M9.4 5.5A11 11 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-4.2 4.6M6.2 6.7C3.8 8.3 2 12 2 12a17 17 0 0 0 5.4 5.2"/>`, { size: 18 }),
@@ -779,11 +782,7 @@
       <a href="/rules">правила</a>
       <a href="/privacy">конфиденциальность</a>
       <a href="/support">поддержка</a>
-      ${
-        state.user && !state.user.guest
-          ? `<a href="/glossary">глоссарий</a><a href="${TEST_HREF}" target="_blank" rel="noopener">тест нейроотличий</a>`
-          : ""
-      }
+      ${state.user && !state.user.guest ? `<a href="/glossary">глоссарий</a>` : ""}
     </footer>`;
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
@@ -807,6 +806,7 @@
 
   const navLinks = (kind) => {
     const from = state.personFrom;
+    const isTab = kind === "tab";
     const items = [
       ["home", "Главная", ICONS.home, state.view === "home"],
       ["deck", "Лента", ICONS.feed, state.view === "deck" || (state.view === "person" && from === "deck")],
@@ -818,6 +818,16 @@
         state.view === "matches" || state.view === "chat" || (state.view === "person" && (from === "matches" || from === "chat")),
       ],
     ];
+    if (isTab) {
+      const isMe = state.view === "profile" || (state.view === "person" && from === "profile");
+      const dest = state.user ? "profile" : "login";
+      const label = state.user ? "Профиль" : "Войти";
+      const hasPhoto = Boolean(state.user && state.user.photo);
+      const icon = hasPhoto
+        ? `<span class="nav-avatar"><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></span>`
+        : ICONS.user;
+      items.push([dest, label, icon, isMe]);
+    }
     return items
       .map(([view, label, icon, on]) => {
         const badge = view === "likes" ? countSlot("likes") : view === "matches" ? countSlot("unread") : "";
@@ -875,7 +885,7 @@
       <a href="/rules">правила</a>
       <a href="/privacy">конфиденциальность</a>
       <a href="/support">поддержка</a>
-      ${signed ? `<a href="/glossary">глоссарий</a><a href="${TEST_HREF}" target="_blank" rel="noopener">тест</a>` : ""}
+      ${signed ? `<a href="/glossary">глоссарий</a>` : ""}
     </footer>`;
 
   const authLegalFoot = () => legalFooterBar(false);
@@ -2022,7 +2032,7 @@
           </div>
         </form>`
         }
-        ${footer()}
+        ${legalFooterBar(true)}
       </section>
       ${tabbar()}`,
       bind() {
