@@ -1,0 +1,26 @@
+.root { display: flex; flex: 1; width: 100%; min-height: 100%; flex-direction: column; }
+.content { display: grid; gap: 18px; width: 100%; max-width: 580px; margin: 0 auto; }
+.panel { display: grid; gap: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 22px; background: var(--bg-2); }
+.panel h1 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: clamp(27px, 6vw, 36px); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; }
+.lede { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.refBox { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--accent-line); border-radius: 16px; background: var(--accent-soft); }
+.refLabel { margin: 0; color: var(--lime); font-size: 12px; font-weight: 600; }
+.refRow { display: flex; gap: 8px; }
+.refRow input { min-width: 0; flex: 1; height: 40px; box-sizing: border-box; padding: 0 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--ink); font: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.actions > * { flex: 1 1 auto; }
+.warning { display: grid; gap: 8px; padding: 14px; border-left: 3px solid var(--coral); border-radius: 13px; background: color-mix(in srgb, var(--coral) 12%, transparent); color: var(--muted); font-size: 13px; line-height: 1.45; }
+.warning strong { color: var(--coral); }
+.confirm { display: flex; gap: 9px; align-items: flex-start; color: var(--ink); font-size: 13px; line-height: 1.4; cursor: pointer; }
+.confirm input { margin-top: 2px; accent-color: var(--lime); }
+.error { margin: 0; color: var(--coral); font-size: 13px; }
+.danger { background: linear-gradient(135deg, var(--coral), color-mix(in srgb, var(--coral) 72%, #000)); color: var(--on-danger, #fff); }
+.danger:hover:not(:disabled) { filter: brightness(1.06); }
+
+@media (max-width: 560px) {
+  .panel { padding: 18px 14px; border-radius: 18px; }
+  .refRow { flex-direction: column; }
+  .refRow a, .refRow button { width: 100%; }
+  .actions { flex-direction: column; }
+}

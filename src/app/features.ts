@@ -1,4 +1,4 @@
-type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "chat";
+type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "account" | "chat";
 
 const FEATURE_FILES: Record<FeatureName, string> = {
   auth: "auth.js?v=4",
@@ -7,6 +7,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
   likes: "likes.js?v=1",
   person: "person.js?v=1",
   deck: "deck.js?v=1",
+  account: "account.js?v=1",
   chat: "chat.js?v=1",
 };
 
@@ -29,6 +30,7 @@ export function createFeatureLoader(basePath = "") {
     likes: () => load("likes"),
     person: () => load("person"),
     deck: () => load("deck"),
+    account: () => load("account"),
     chat: () => load("chat"),
   };
 }

@@ -2437,36 +2437,6 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
 }
 
 /* Delete Account Warning Card */
-.delete-warning-card {
-  max-width: 100%;
-  margin: 16px 0 20px;
-  line-height: 1.5;
-  border-radius: 16px;
-}
-
-.delete-warning-card h3 {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--coral);
-  margin: 0 0 6px 0;
-}
-
-.delete-warning-card p {
-  font-size: 13.5px;
-  color: var(--muted);
-  margin: 0 0 8px 0;
-  line-height: 1.45;
-}
-
-.delete-warning-card .delete-recovery-hint {
-  color: var(--ink);
-}
-
-.delete-warning-card .delete-final-hint {
-  margin: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
 
 .field-floating.password-wrap .password-toggle {
   z-index: 2;
@@ -3085,22 +3055,6 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
    ========================================================================== */
 html[data-view="delete-account"] #app {
   --app-w: 580px;
-}
-
-.delete-account-page {
-  max-width: 540px;
-  width: 100%;
-  margin: 0 auto;
-}
-
-.delete-account-page .panel {
-  padding: 24px;
-}
-
-@media (max-width: 540px) {
-  .delete-account-page .panel {
-    padding: 18px 14px;
-  }
 }
 
 /* ==========================================================================

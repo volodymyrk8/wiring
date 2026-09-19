@@ -1191,58 +1191,6 @@ import { createInboxController } from "./inbox";
     render();
   };
 
-  const inviteView = () => {
-    const u = state.user || {};
-    const days = u.ref_days || 30;
-    return {
-      html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Анкета готова</h2>
-        <p class="lede">Пригласи друга по ссылке — WIRING+ на ${days} дней будет и у тебя, и у него. Подарок за регистрацию, не за лайк.</p>
-        ${
-          u.ref_url
-            ? `<div class="plus-box on">
-          <div class="q">твоя ссылка</div>
-          <div class="ref-row">
-            <input id="ref-link" readonly value="${escapeAttr(u.ref_url)}">
-            <button class="ghost slim" type="button" id="ref-copy">копировать</button>
-          </div>
-          <p class="hint">ссылка всегда есть в профиле</p>
-        </div>`
-            : `<p class="hint">ссылка для приглашений появится в профиле</p>`
-        }
-        <div class="actions" style="margin-top:16px">
-          <button class="solid" type="button" id="invite-go">в ленту</button>
-        </div>
-      </section>
-      ${tabbar()}`,
-      bind() {
-        const copyRef = root.querySelector("#ref-copy");
-        if (copyRef) {
-          copyRef.addEventListener("click", async () => {
-            const link = (root.querySelector("#ref-link") || {}).value || "";
-            try {
-              if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(link);
-              else {
-                const input = root.querySelector("#ref-link");
-                if (input) {
-                  input.select();
-                  document.execCommand("copy");
-                }
-              }
-              toast("ссылка скопирована");
-            } catch {
-              toast("не удалось скопировать");
-            }
-          });
-        }
-        root.querySelector("#invite-go")?.addEventListener("click", () => {
-          goAfterInvite().catch((err) => toast(err.message));
-        });
-      },
-    };
-  };
 
 
 
@@ -1530,10 +1478,7 @@ import { createInboxController } from "./inbox";
         bindPlaceCountry();
         const killBtn = root.querySelector("#kill");
         if (killBtn) {
-          killBtn.addEventListener("click", () => {
-            state.deleteConfirmModal = true;
-            render();
-          });
+          killBtn.addEventListener("click", () => { void goToView("delete-account"); });
         }
         const add = root.querySelector("#add-photos");
         if (add) {
@@ -1630,161 +1575,6 @@ import { createInboxController } from "./inbox";
     };
   };
 
-  const deleteConfirmModal = () => {
-    return `<div class="modal-back" id="delete-confirm-modal">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Удалить аккаунт">
-        <h3>Удалить аккаунт?</h3>
-        <p style="margin: 10px 0 12px; font-size: 0.95rem; line-height: 1.45;">
-          Твой профиль сразу пропадет из поиска, рекомендаций и чатов.
-        </p>
-        <div style="padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--coral, #f43f5e) 15%, transparent); border-left: 3px solid var(--coral, #f43f5e); margin-bottom: 14px; font-size: 0.88rem; line-height: 1.45;">
-          <strong>Обрати внимание:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления. Полное удаление данных произойдет через 7 суток.
-        </div>
-        <p style="margin: 0 0 18px; font-size: 0.88rem; color: var(--muted);">
-          Для подтверждения удаления потребуется ввести пароль на следующей странице.
-        </p>
-        <div class="actions" style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button type="button" class="ghost" id="delete-modal-cancel">отмена</button>
-          <button type="button" class="solid" id="delete-modal-proceed" style="background: linear-gradient(135deg, var(--coral, #e11d48), color-mix(in srgb, var(--coral, #e11d48) 75%, #000)); color: #fff;">
-            перейти к удалению
-          </button>
-        </div>
-      </div>
-    </div>`;
-  };
-
-  const deleteAccountView = () => {
-    return {
-      html: `
-        ${appHead({ showBack: true, backHref: hrefFor("profile"), backNav: "profile", backLabel: "В профиль", sectionTitle: "удаление" })}
-        <main class="delete-account-page">
-          <section class="panel">
-            <h2 style="font-family: var(--serif); font-size: 24px; font-weight: 600; margin: 0 0 16px; color: var(--ink);">Удаление аккаунта</h2>
-            <div class="card-status err delete-warning-card" role="alert">
-              <span class="status-icon" aria-hidden="true">⚠️</span>
-              <div>
-                <h3>Профиль сразу пропадёт из публичного доступа</h3>
-                <p>В момент удаления ты мгновенно исчезнешь из ленты, поиска и чатов. Другие пользователи больше не увидят твои данные и анкету.</p>
-                <p class="delete-recovery-hint"><strong>Восстановление:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления.</p>
-                <p class="delete-final-hint">Через 7 суток данные удалятся полностью.</p>
-              </div>
-            </div>
-            <form class="support-fields" id="delete-account-form">
-              <div class="field-floating password-wrap">
-                <input
-                  type="password"
-                  id="delete-password"
-                  name="password"
-                  required
-                  autocomplete="current-password"
-                  placeholder=" "
-                >
-                <span class="field-floating__label">Текущий пароль для подтверждения</span>
-                <button type="button" class="password-toggle" id="delete-password-toggle" aria-label="показать пароль" title="показать пароль">
-                  ${ICONS.eye}
-                </button>
-              </div>
-              <label class="ui-checkbox">
-                <span class="box-wrap">
-                  <input type="checkbox" id="delete-confirm-check" required>
-                  <span class="custom-box" aria-hidden="true">
-                    <svg class="check-icon" viewBox="0 0 16 16" fill="none">
-                      <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  </span>
-                </span>
-                <span class="ui-checkbox__text">Подтверждаю удаление своего профиля</span>
-              </label>
-              <div class="card-status err" id="delete-error-banner" role="alert" style="display: none; margin: 6px 0 0 0;">
-                <span class="status-icon">⚠️</span>
-                <div><p id="err" style="margin: 0;"></p></div>
-              </div>
-              <div class="support-actions" style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                <button class="btn solid danger" type="submit" id="delete-submit-btn">
-                  <span>Удалить аккаунт навсегда</span>
-                </button>
-                <a class="btn ghost" href="${hrefFor("profile")}" data-nav="profile">
-                  <span>Отмена</span>
-                </a>
-              </div>
-            </form>
-            ${legalFooterBar(true)}
-          </section>
-        </main>
-      `,
-      bind() {
-        bindDataNavLinks();
-        const form = root.querySelector("#delete-account-form");
-        const errEl = root.querySelector("#err");
-        const errBanner = root.querySelector("#delete-error-banner");
-        const pwdInput = root.querySelector("#delete-password");
-        const pwdToggle = root.querySelector("#delete-password-toggle");
-        const submitBtn = root.querySelector("#delete-submit-btn");
-
-        if (pwdToggle && pwdInput) {
-          pwdToggle.addEventListener("click", () => {
-            const isPwd = pwdInput.type === "password";
-            pwdInput.type = isPwd ? "text" : "password";
-            pwdToggle.innerHTML = isPwd ? ICONS.eyeOff : ICONS.eye;
-            pwdToggle.setAttribute("aria-label", isPwd ? "скрыть пароль" : "показать пароль");
-            pwdToggle.setAttribute("title", isPwd ? "скрыть пароль" : "показать пароль");
-            pwdToggle.classList.toggle("on", isPwd);
-          });
-        }
-
-        const showError = (msg) => {
-          if (!errBanner || !errEl) return;
-          if (msg) {
-            errEl.textContent = msg;
-            errBanner.style.display = "flex";
-          } else {
-            errEl.textContent = "";
-            errBanner.style.display = "none";
-          }
-        };
-
-        form?.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          showError("");
-          const password = pwdInput ? pwdInput.value : "";
-          if (!password) {
-            showError("введи пароль для подтверждения");
-            pwdInput?.focus();
-            return;
-          }
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = "<span>Удаляем…</span>";
-          }
-          try {
-            const res = await api("/api/me/delete", {
-              method: "POST",
-              body: JSON.stringify({ password }),
-            });
-            if (res && res.ok) {
-              state.user = null;
-              clearProfileDraft();
-              stopInbox();
-              toast("Аккаунт удалён. Восстановить профиль можно в течение 7 суток.");
-              await goToView("home");
-            } else {
-              showError(res?.error || "ошибка при удалении");
-              if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = "<span>Удалить аккаунт навсегда</span>";
-              }
-            }
-          } catch (err) {
-            showError(err.message || "ошибка сети");
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.innerHTML = "<span>Удалить аккаунт навсегда</span>";
-            }
-          }
-        });
-      },
-    };
-  };
 
   const openPerson = async (id, from) => {
     const data = await api(`/api/people/${id}`);
@@ -1975,6 +1765,7 @@ import { createInboxController } from "./inbox";
   let likesFeatureUnmount = null;
   let personFeatureUnmount = null;
   let deckFeatureUnmount = null;
+  let accountFeatureUnmount = null;
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
@@ -2110,6 +1901,24 @@ import { createInboxController } from "./inbox";
     toast,
     onUserUpdated: (user) => {
       state.user = user;
+    },
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
+  });
+
+  const buildAccountHostBridge = () => ({
+    user: state.user,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => void goToView(view, params),
+    api,
+    toast,
+    continueAfterInvite: goAfterInvite,
+    onDeleted: async () => {
+      state.user = null;
+      clearProfileDraft();
+      stopInbox();
+      await goToView("home");
     },
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
@@ -2392,6 +2201,28 @@ import { createInboxController } from "./inbox";
     }
   };
 
+  const renderAccountFeature = async (view) => {
+    accountFeatureUnmount?.();
+    accountFeatureUnmount = null;
+    root.innerHTML = '<div id="account-feature-root"></div>' + (view === "invite" ? tabbar() : "");
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#account-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await featureLoader.account();
+      if (!["invite", "delete-account"].includes(state.view)) return;
+      accountFeatureUnmount = view === "invite"
+        ? mod.mountInvite(mountEl, buildAccountHostBridge())
+        : mod.mountDeleteAccount(mountEl, buildAccountHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = `<p class="err">не загрузился модуль account (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль account (${err.message}).`);
+    }
+  };
+
   const renderChatFeature = async () => {
     const token = ++chatFeatureMountToken;
     chatFeatureUnmount?.();
@@ -2450,6 +2281,10 @@ import { createInboxController } from "./inbox";
       deckFeatureUnmount?.();
       deckFeatureUnmount = null;
     }
+    if (!["invite", "delete-account"].includes(state.view)) {
+      accountFeatureUnmount?.();
+      accountFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
@@ -2495,13 +2330,15 @@ import { createInboxController } from "./inbox";
       void renderDeckFeature();
       return;
     }
+    else if (["invite", "delete-account"].includes(state.view)) {
+      void renderAccountFeature(state.view);
+      return;
+    }
     else if (["profile", "consents", "plus"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
     }
-    else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
-    else if (state.view === "invite") bound = inviteView();
     else root.innerHTML = homeView();
 
     if (bound) {
@@ -2511,23 +2348,7 @@ import { createInboxController } from "./inbox";
     if (state.view === "profile") {
       requestAnimationFrame(() => window.scrollTo(0, profileScrollY));
     }
-    if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
     bindDataNavLinks();
-    const deleteModalBack = root.querySelector("#delete-confirm-modal");
-    if (deleteModalBack) {
-      const closeDelModal = () => {
-        state.deleteConfirmModal = false;
-        render();
-      };
-      deleteModalBack.addEventListener("click", (e) => {
-        if (e.target === deleteModalBack) closeDelModal();
-      });
-      root.querySelector("#delete-modal-cancel")?.addEventListener("click", closeDelModal);
-      root.querySelector("#delete-modal-proceed")?.addEventListener("click", async () => {
-        state.deleteConfirmModal = false;
-        await goToView("delete-account");
-      });
-    }
     root.querySelectorAll("[data-person]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         if (btn.tagName === "A") e.preventDefault();
