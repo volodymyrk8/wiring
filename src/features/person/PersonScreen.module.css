@@ -1,0 +1,51 @@
+.root { display: flex; flex: 1; width: 100%; min-height: 100%; flex-direction: column; gap: 14px; }
+.back { align-self: flex-start; }
+.back svg { width: 18px; height: 18px; }
+.content { display: grid; gap: 16px; width: 100%; }
+.hero { position: relative; overflow: hidden; border-radius: 24px; background: var(--photo); color: var(--on-photo); touch-action: pan-y; user-select: none; }
+.heroImage { display: block; width: 100%; max-height: min(72dvh, 720px); object-fit: cover; }
+.heroOverlay { position: absolute; inset: auto 0 0; z-index: 1; padding: 48px 18px 18px; background: linear-gradient(to top, rgba(17, 14, 12, .9), rgba(17, 14, 12, .5) 48%, transparent); }
+.heroOverlay h1 { margin: 0; color: var(--on-photo); font-family: var(--serif); font-size: clamp(25px, 5vw, 34px); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; }
+.online { display: inline-block; width: 8px; height: 8px; margin: 0 7px 3px 0; border-radius: 50%; background: #9be34d; box-shadow: 0 0 0 3px rgba(155, 227, 77, .18); }
+.meta { margin: 8px 0 0; color: var(--on-photo-muted); font-size: 13px; line-height: 1.45; text-shadow: 0 1px 8px rgba(0, 0, 0, .7); }
+.metaSecondary { margin-top: 3px; }
+.dots { position: absolute; z-index: 2; top: 10px; left: 12px; right: 12px; display: flex; gap: 4px; }
+.dots i { height: 3px; flex: 1; border-radius: 999px; background: rgba(255,255,255,.34); }
+.dots i.active { background: var(--lime); }
+.photoStrip { display: flex; gap: 7px; overflow-x: auto; padding: 0 1px 3px; }
+.photoThumb { flex: 0 0 70px; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 12px; background: var(--photo); cursor: pointer; }
+.photoThumb.active { border-color: var(--lime); }
+.photoThumb img { display: block; width: 70px; height: 92px; object-fit: cover; }
+.body { display: grid; gap: 14px; }
+.bio { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prompt { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-2); }
+.prompt strong { color: var(--lime); font-size: 12px; font-weight: 600; }
+.prompt p { margin: 0; color: var(--ink); line-height: 1.45; }
+.tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.tag { padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 12px; }
+.tagVibe { color: var(--lime); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+.actionIcon { display: inline-grid; width: 48px; height: 48px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--bg-2); color: var(--ink); cursor: pointer; }
+.actionIcon svg { width: 21px; height: 21px; }
+.pass:hover { color: var(--coral); border-color: var(--coral); }
+.like { color: var(--lime); border-color: var(--accent-line); }
+.snooze { color: var(--muted); }
+.matchedAction { width: 100%; }
+.safety { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.error { margin: 0; color: var(--coral); font-size: 13px; text-align: center; }
+.modalHint { margin: 0; color: var(--muted); line-height: 1.5; }
+.reportForm { display: grid; gap: 12px; }
+.reportReasons { display: grid; gap: 7px; }
+.reason { display: flex; gap: 9px; align-items: flex-start; padding: 10px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-size: 13px; line-height: 1.35; cursor: pointer; }
+.reason input { margin-top: 2px; accent-color: var(--lime); }
+.reportForm label:last-child { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.reportForm textarea { width: 100%; min-height: 76px; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font: inherit; resize: vertical; }
+.reportForm textarea:focus { border-color: var(--lime); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+
+@media (max-width: 560px) {
+  .hero { border-radius: 18px; }
+  .heroImage { max-height: min(66dvh, 560px); }
+  .heroOverlay { padding: 42px 14px 14px; }
+  .photoThumb, .photoThumb img { width: 62px; }
+  .photoThumb img { height: 82px; }
+}

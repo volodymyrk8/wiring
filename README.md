@@ -30,6 +30,7 @@ src/
   features/auth/     # auth screens + mountAuth()
   features/chat/     # chats list, thread, polling and composer
   features/likes/    # incoming likes, filters and WIRING+ gate
+  features/person/   # public profile, photo gallery and safety actions
   features/profile/  # profile, consents, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js

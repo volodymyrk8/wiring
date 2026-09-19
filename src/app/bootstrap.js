@@ -51,10 +51,6 @@ import { createInboxController } from "./inbox";
     filters: { ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }), real_only: false },
     filtersOpen: false,
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
-    reportFor: null,
-    reportReason: "",
-    reportDetails: "",
-    unmatchFor: null,
     resetToken: "",
     verifyEmail: "",
     recycled: false,
@@ -1397,73 +1393,6 @@ import { createInboxController } from "./inbox";
       ${tabbar()}`;
   };
 
-  const promptList = (prompts) =>
-    (prompts || [])
-      .map(
-        (p) => `
-      <div class="prompt-card">
-        <div class="q">${escapeHtml(labelOf("prompts", p.id))}</div>
-        <p>${escapeHtml(p.answer)}</p>
-      </div>`
-      )
-      .join("");
-
-  const personBody = (p) => {
-    const photos = cardPhotos(p);
-    const idx = state.photoIndex % Math.max(photos.length, 1);
-    return `
-      <div class="person-hero">
-        <img class="card-photo" src="${photoUrl(photos[idx] || p.photo, p.name)}" alt="">
-        ${
-          photos.length > 1
-            ? `<div class="dots">${photos.map((_, i) => `<i class="${i === idx ? "on" : ""}"></i>`).join("")}</div>`
-            : ""
-        }
-        <div class="card-body">
-          <h3>${p.online ? '<span class="online-dot"></span>' : ""}${escapeHtml(p.name)}, ${p.age}</h3>
-          <div class="meta">${profileMeta(p, { height: true })}</div>
-        </div>
-      </div>
-      ${
-        photos.length > 1
-          ? `<div class="photo-strip">${photos
-              .map(
-                (url, i) =>
-                  `<button type="button" class="${i === idx ? "on" : ""}" data-photo="${i}"><img src="${avatarUrl(url, p.name)}" alt=""></button>`
-              )
-              .join("")}</div>`
-          : ""
-      }
-      ${p.bio ? `<p class="lede bio-text">${formatMultiline(p.bio)}</p>` : ""}
-      ${p.communication ? `<div class="prompt-card"><div class="q">как тебе писать</div><p>${escapeHtml(p.communication)}</p></div>` : ""}
-      <div class="chips static" style="margin:12px 0">
-        ${(p.neuro || []).map((id) => chipMark("neuro", id, "on")).join("")}
-        ${(p.vibe || []).map((id) => chipMark("vibe", id, "on")).join("")}
-      </div>
-      <div class="form" style="gap:10px">${promptList(p.prompts)}</div>`;
-  };
-
-  const personView = () => {
-    const p = state.person;
-    if (!p) return deckView();
-    const fromDeck = state.personFrom === "deck" || state.personFrom === "likes";
-    return `
-      ${appHead()}
-      <section class="panel">
-        <a class="ghost slim person-back" href="${hrefFor(state.personFrom === "likes" ? "likes" : state.personFrom === "matches" || state.personFrom === "chat" ? "matches" : "deck")}" data-nav="${state.personFrom === "likes" ? "likes" : state.personFrom === "matches" || state.personFrom === "chat" ? "matches" : "deck"}">← назад</a>
-        ${personBody(p)}
-        <div class="actions" style="margin-top:16px">
-          ${fromDeck ? `<button class="pass" id="no" aria-label="пропустить" title="пропустить">${ICONS.pass}</button>${state.user?.plus ? `<button class="ghost" id="later" title="отложить на неделю">отложить</button>` : ""}<button class="like" id="yes" aria-label="${friendlyLike().label}" title="${friendlyLike().title}">${friendlyLike().icon}</button>` : ""}
-          ${p.matched ? `<button class="solid" id="open-chat">написать</button>` : ""}
-        </div>
-        <div class="safety">
-          ${p.matched ? `<button class="ghost slim" id="unmatch">размэтчить</button>` : ""}
-          ${p.matched ? `<button class="ghost slim" id="block">в блок</button>` : ""}
-          <button class="ghost slim" id="report">пожаловаться</button>
-        </div>
-      </section>
-      ${tabbar()}`;
-  };
 
   const photoManager = (u) => {
     const albums = u.albums || [];
@@ -2014,54 +1943,7 @@ import { createInboxController } from "./inbox";
     render();
   };
 
-  const reportPerson = async (id) => {
-    const reasons = state.catalog.report_reasons || [];
-    if (!reasons.length) return;
-    state.reportFor = id;
-    state.reportReason = reasons[0].id;
-    state.reportDetails = "";
-    render();
-  };
 
-  const reportModal = () => {
-    if (!state.reportFor) return "";
-    const reasons = state.catalog.report_reasons || [];
-    return `<div class="modal-back" id="report-modal">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-label="жалоба">
-        <h3>Пожаловаться</h3>
-        <p class="hint">Выбери причину. Человек скроется из ленты и чатов.</p>
-        <div class="report-reasons">
-          ${reasons
-            .map(
-              (r) =>
-                `<label class="check"><input type="radio" name="report-reason" value="${escapeAttr(r.id)}" ${
-                  r.id === state.reportReason ? "checked" : ""
-                }> ${escapeHtml(r.label)}</label>`
-            )
-            .join("")}
-        </div>
-        <label>коротко, если нужно<textarea id="report-details" maxlength="280" rows="3">${escapeHtml(state.reportDetails || "")}</textarea></label>
-        <div class="actions">
-          <button type="button" class="danger" id="report-send">отправить</button>
-          <button type="button" class="ghost" id="report-cancel">отмена</button>
-        </div>
-      </div>
-    </div>`;
-  };
-
-  const chatUnmatchModal = () => {
-    if (!state.unmatchFor) return "";
-    return `<div class="modal-back chat-unmatch-modal" id="chat-unmatch-modal">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="chat-unmatch-title">
-        <h3 id="chat-unmatch-title">Убрать чат?</h3>
-        <p class="hint">Переписка сохранится, но чат исчезнет из списка.</p>
-        <div class="actions">
-          <button type="button" class="ghost" id="chat-unmatch-cancel">отмена</button>
-          <button type="button" class="danger" id="chat-unmatch-confirm">убрать чат</button>
-        </div>
-      </div>
-    </div>`;
-  };
 
   const swipe = async (direction) => {
     const card = state.view === "person" && state.person ? state.person : state.cards[state.index];
@@ -2115,6 +1997,9 @@ import { createInboxController } from "./inbox";
         return;
       }
       toast(err.message);
+      state.busy = false;
+      render();
+      return;
     }
     if (state.view === "person") {
       state.person = null;
@@ -2203,15 +2088,14 @@ import { createInboxController } from "./inbox";
   };
 
   const cyclePhoto = (dir) => {
-    const card = state.view === "person" ? state.person : state.cards[state.index];
+    const card = state.cards[state.index];
     const photos = card ? cardPhotos(card) : [];
     if (photos.length < 2) return false;
     state.photoIndex = (state.photoIndex + dir + photos.length) % photos.length;
     const idx = state.photoIndex % photos.length;
     const src = photoUrl(photos[idx] || card.photo, card.name);
-    const img = root.querySelector(state.view === "person" ? ".person-hero .card-photo" : ".card:not(.stacked) .card-photo");
-    const dots = root.querySelectorAll(state.view === "person" ? ".person-hero .dots i" : ".card:not(.stacked) .dots i");
-    const strip = root.querySelectorAll(".photo-strip button");
+    const img = root.querySelector(".card:not(.stacked) .card-photo");
+    const dots = root.querySelectorAll(".card:not(.stacked) .dots i");
     if (img) {
       img.style.opacity = "0.35";
       const next = new Image();
@@ -2231,7 +2115,6 @@ import { createInboxController } from "./inbox";
       return true;
     }
     dots.forEach((dot, i) => dot.classList.toggle("on", i === idx));
-    strip.forEach((btn, i) => btn.classList.toggle("on", i === idx));
     return true;
   };
 
@@ -2381,95 +2264,6 @@ import { createInboxController } from "./inbox";
     card.addEventListener("pointercancel", end);
   };
 
-  const wirePerson = () => {
-    const hero = root.querySelector(".person-hero");
-    if (hero) {
-      let x0 = 0;
-      let y0 = 0;
-      let dx = 0;
-      let dy = 0;
-      let axis = "";
-      let tracking = false;
-      let swiped = false;
-      hero.addEventListener("pointerdown", (e) => {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        if (e.target.closest("[data-photo]")) return;
-        tracking = true;
-        swiped = false;
-        axis = "";
-        x0 = e.clientX;
-        y0 = e.clientY;
-        dx = 0;
-        dy = 0;
-        hero.setPointerCapture(e.pointerId);
-      });
-      hero.addEventListener("pointermove", (e) => {
-        if (!tracking) return;
-        dx = e.clientX - x0;
-        dy = e.clientY - y0;
-        if (!axis && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) {
-          axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-        }
-      });
-      const finish = () => {
-        if (!tracking) return;
-        tracking = false;
-        if (axis === "x" && Math.abs(dx) > 36) {
-          swiped = cyclePhoto(dx < 0 ? 1 : -1);
-        }
-      };
-      hero.addEventListener("pointerup", finish);
-      hero.addEventListener("pointercancel", finish);
-      hero.addEventListener("click", (e) => {
-        if (e.target.closest("[data-photo]")) return;
-        if (swiped) {
-          e.preventDefault();
-          e.stopPropagation();
-          swiped = false;
-          return;
-        }
-        const rect = hero.getBoundingClientRect();
-        if (e.clientX < rect.left + rect.width * 0.4) cyclePhoto(-1);
-        else cyclePhoto(1);
-      });
-    }
-    root.querySelectorAll("[data-photo]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        state.photoIndex = Number(btn.dataset.photo) || 0;
-        render();
-      });
-    });
-    const yes = root.querySelector("#yes");
-    const no = root.querySelector("#no");
-    if (yes) yes.addEventListener("click", () => swipe("like"));
-    if (no) no.addEventListener("click", () => swipe("pass"));
-    const later = root.querySelector("#later");
-    if (later) later.addEventListener("click", () => swipe("snooze"));
-    const chat = root.querySelector("#open-chat");
-    if (chat) chat.addEventListener("click", () => openChat(state.person.id));
-    const block = root.querySelector("#block");
-    if (block) {
-      block.addEventListener("click", async () => {
-        if (!confirm("Скрыть этого человека из ленты и чатов?")) return;
-        await api("/api/block", { method: "POST", body: JSON.stringify({ user_id: state.person.id }) });
-        toast("в блоке");
-        state.person = null;
-        state.view = "deck";
-        await loadFeed();
-        render();
-      });
-    }
-    const unmatch = root.querySelector("#unmatch");
-    if (unmatch) {
-      unmatch.addEventListener("click", () => {
-        state.unmatchFor = state.person?.id || null;
-        render();
-      });
-    }
-    const report = root.querySelector("#report");
-    if (report) report.addEventListener("click", () => reportPerson(state.person.id));
-  };
 
   const loadFeed = async () => {
     const q = new URLSearchParams();
@@ -2500,6 +2294,7 @@ import { createInboxController } from "./inbox";
   let homeFeatureUnmount = null;
   let profileFeatureUnmount = null;
   let likesFeatureUnmount = null;
+  let personFeatureUnmount = null;
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
@@ -2580,6 +2375,27 @@ import { createInboxController } from "./inbox";
       state.likesIn = user.likes_in || 0;
       state.unread = user.unread || 0;
     },
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
+  });
+
+  const buildPersonHostBridge = () => ({
+    user: state.user,
+    catalog: state.catalog,
+    person: state.person,
+    personFrom: state.personFrom,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => {
+      if (view === "chat" && params.id) {
+        void openChat(Number(params.id));
+        return;
+      }
+      void goToView(view);
+    },
+    swipe,
+    api,
+    toast,
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
   });
@@ -2815,6 +2631,32 @@ import { createInboxController } from "./inbox";
     }
   };
 
+  const renderPersonFeature = async () => {
+    personFeatureUnmount?.();
+    personFeatureUnmount = null;
+    if (!state.person) {
+      state.view = "deck";
+      await loadFeed();
+      render();
+      return;
+    }
+    root.innerHTML = '<div id="person-feature-root"></div>' + tabbar();
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#person-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await featureLoader.person();
+      if (state.view !== "person" || !state.person) return;
+      personFeatureUnmount = mod.mountPerson(mountEl, buildPersonHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = `<p class="err">не загрузился модуль person (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль person (${err.message}).`);
+    }
+  };
+
   const renderChatFeature = async () => {
     const token = ++chatFeatureMountToken;
     chatFeatureUnmount?.();
@@ -2865,6 +2707,10 @@ import { createInboxController } from "./inbox";
       likesFeatureUnmount?.();
       likesFeatureUnmount = null;
     }
+    if (state.view !== "person") {
+      personFeatureUnmount?.();
+      personFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
@@ -2902,7 +2748,10 @@ import { createInboxController } from "./inbox";
       void renderLikesFeature();
       return;
     }
-    else if (state.view === "person") root.innerHTML = personView();
+    else if (state.view === "person") {
+      void renderPersonFeature();
+      return;
+    }
     else if (["profile", "consents", "plus"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
@@ -2919,83 +2768,8 @@ import { createInboxController } from "./inbox";
     if (state.view === "profile") {
       requestAnimationFrame(() => window.scrollTo(0, profileScrollY));
     }
-    if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
     if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
-    if (state.unmatchFor) root.insertAdjacentHTML("beforeend", chatUnmatchModal());
     bindDataNavLinks();
-    const chatUnmatchBack = root.querySelector("#chat-unmatch-modal");
-    const closeChatUnmatch = () => {
-      state.unmatchFor = null;
-      render();
-    };
-    if (chatUnmatchBack) {
-      chatUnmatchBack.addEventListener("click", (e) => {
-        if (e.target === chatUnmatchBack) closeChatUnmatch();
-      });
-      root.querySelector("#chat-unmatch-cancel")?.addEventListener("click", closeChatUnmatch);
-      root.querySelector("#chat-unmatch-confirm")?.addEventListener("click", async (e) => {
-        const button = e.currentTarget;
-        const id = Number(state.unmatchFor);
-        if (!id || button.disabled) return;
-        button.disabled = true;
-        try {
-          await api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: id }) });
-          state.matches = (state.matches || []).filter((m) => m.id !== id);
-          if (state.view === "person") {
-            const data = await api("/api/matches");
-            state.matches = data.matches;
-          }
-          if (state.person?.id === id) {
-            state.person = null;
-            state.view = "matches";
-          }
-          state.unmatchFor = null;
-          toast("убрано · в пропущенных");
-          render();
-        } catch (err) {
-          button.disabled = false;
-          toast(err.message);
-        }
-      });
-    }
-    const reportCancel = root.querySelector("#report-cancel");
-    if (reportCancel) {
-      reportCancel.addEventListener("click", () => {
-        state.reportFor = null;
-        render();
-      });
-    }
-    const reportSend = root.querySelector("#report-send");
-    if (reportSend) {
-      reportSend.addEventListener("click", async () => {
-        const picked = root.querySelector('input[name="report-reason"]:checked')?.value;
-        const details = root.querySelector("#report-details")?.value || "";
-        if (!picked || !state.reportFor) return;
-        try {
-          await api("/api/report", {
-            method: "POST",
-            body: JSON.stringify({ user_id: state.reportFor, reason: picked, details }),
-          });
-          toast("жалоба отправлена, человек скрыт");
-          state.reportFor = null;
-          state.person = null;
-          state.view = "deck";
-          await loadFeed();
-          render();
-        } catch (err) {
-          toast(err.message);
-        }
-      });
-    }
-    const reportBack = root.querySelector("#report-modal");
-    if (reportBack) {
-      reportBack.addEventListener("click", (e) => {
-        if (e.target === reportBack) {
-          state.reportFor = null;
-          render();
-        }
-      });
-    }
     const deleteModalBack = root.querySelector("#delete-confirm-modal");
     if (deleteModalBack) {
       const closeDelModal = () => {
@@ -3073,9 +2847,8 @@ import { createInboxController } from "./inbox";
     bindFold("#traits-open", "#home-traits");
     bindFold("#about-open", "#home-about");
 
-bindTips();
+    bindTips();
     if (state.user && state.view === "deck") wireDeck();
-    if (state.user && state.view === "person") wirePerson();
     syncUrl();
   };
 

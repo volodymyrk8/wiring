@@ -2884,69 +2884,6 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
 .prompt-edit { display: grid; gap: 8px; }
 .prompt-edit textarea { min-height: 72px; }
 
-.person-hero {
-  border-radius: 24px;
-  overflow: hidden;
-  background: var(--photo);
-  position: relative;
-  margin-bottom: 14px;
-  color: var(--on-photo);
-  touch-action: pan-y;
-}
-.person-back {
-  display: inline-flex;
-  align-items: center;
-  margin: 0 0 14px;
-}
-.person-hero .card-photo {
-  position: relative;
-  inset: auto;
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(72dvh, 720px);
-}
-.person-hero .card-body {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  padding: 28px 16px 16px;
-  background: linear-gradient(
-    to top,
-    rgba(17, 14, 12, 0.88) 0%,
-    rgba(17, 14, 12, 0.55) 48%,
-    transparent 100%
-  );
-}
-.person-hero .card-body h3 { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.72); }
-.person-hero .meta {
-  color: var(--on-photo-muted);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
-  line-height: 1.35;
-}
-.person-hero .meta-seek { color: var(--on-photo-muted); }
-.photo-strip {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  margin: 0 0 14px;
-  padding-bottom: 2px;
-}
-.photo-strip button {
-  flex: 0 0 72px;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--photo);
-}
-.photo-strip button.on { border-color: var(--lime); }
-.photo-strip img { width: 72px; height: 96px; object-fit: contain; background: var(--photo); }
 .album-block { margin: 16px 0; }
 .album-block h3 { margin: 0 0 8px; font-size: 15px; }
 .album-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -2966,8 +2903,6 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
 .match.has-unread { grid-template-columns: 64px 1fr auto; }
 .receipt { font-style: normal; letter-spacing: -0.08em; opacity: 0.7; }
 .receipt.on { opacity: 1; }
-.safety { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-
 .filter-row { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; margin-top: 10px; }
 .filter-row label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
 .filter-row input,
