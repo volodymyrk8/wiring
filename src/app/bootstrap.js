@@ -63,7 +63,6 @@ import { createInboxController } from "./inbox";
     pendingFiles: [],
     guestNudge: false,
     guestNudgeHidden: false,
-    onboardFiles: [],
     notifySkip: localStorage.getItem("wiring-notify-skip") === "1",
     pendingPath: "",
     pendingRef: sessionStorage.getItem("wiring-ref") || "",
@@ -1150,22 +1149,6 @@ import { createInboxController } from "./inbox";
   const filePicker = (id) =>
     `<label class="photo-add">+<input id="${id}" type="file" accept="image/*" multiple></label>`;
 
-  const pendingThumbs = (files) =>
-    (files || [])
-      .map((f) => `<div class="photo-cell" style="background-image:url('${URL.createObjectURL(f)}')"></div>`)
-      .join("");
-
-  const wirePendingPicker = (inputId, gridId, bucket, prefixHtml = "") => {
-    const input = root.querySelector(`#${inputId}`);
-    const grid = root.querySelector(`#${gridId}`);
-    if (!input || !grid) return;
-    input.addEventListener("change", () => {
-      state[bucket].push(...input.files);
-      grid.innerHTML = prefixHtml + pendingThumbs(state[bucket]) + filePicker(inputId);
-      wirePendingPicker(inputId, gridId, bucket, prefixHtml);
-    });
-  };
-
   const profileNudge = () => {
     if (!state.user || state.user.guest || !state.user.needs_profile) return "";
     return `<div class="profile-nudge">
@@ -1222,92 +1205,6 @@ import { createInboxController } from "./inbox";
       </div>`;
   };
 
-  const onboardView = () => {
-    const u = state.user;
-    const prompts = (u.prompts || []).map((p) => ({ ...p }));
-    if (!prompts.length) prompts.push({ id: "special", answer: "" });
-    const photos = Array.isArray(u.photos) && u.photos.length && typeof u.photos[0] === "object" ? u.photos : [];
-    return {
-      html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Ещё чуть-чуть</h2>
-        <p class="lede">Два фото и один промпт сильно лучше пустой анкеты. Можно пропустить, но тогда тебя труднее узнать.</p>
-        <form class="form" id="onboard">
-          <div>
-            <div class="hint">фото — хотя бы ещё одно</div>
-            <div class="photo-grid" id="onboard-photos">
-              ${photos.map((ph) => `<div class="photo-cell" style="background-image:url('${photoUrl(ph.url, u.name)}')"></div>`).join("")}
-              ${pendingThumbs(state.onboardFiles)}
-              ${filePicker("onboard-files")}
-            </div>
-          </div>
-          <label class="city-field">город${citySelect("city", u.city)}</label>
-          <label>как тебе писать<textarea name="communication" maxlength="280" placeholder="сразу по делу, голосовые ок / нет">${escapeHtml(u.communication || "")}</textarea></label>
-          <div>
-            <div class="hint">один промпт</div>
-            ${promptFields(prompts.slice(0, 1))}
-          </div>
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">дальше в ленту</button>
-            <button class="ghost" type="button" id="skip-onboard">пропустить</button>
-          </div>
-        </form>
-      </section>
-      ${tabbar()}`,
-      bind() {
-        bindPrompts(prompts);
-        const onboardSaved = photos
-          .map((ph) => `<div class="photo-cell" style="background-image:url('${photoUrl(ph.url, u.name)}')"></div>`)
-          .join("");
-        wirePendingPicker("onboard-files", "onboard-photos", "onboardFiles", onboardSaved);
-        root.querySelector("#skip-onboard").addEventListener("click", async () => {
-          await api("/api/onboard/skip", { method: "POST" });
-          await refreshMe();
-          state.view = "deck";
-          await loadFeed();
-          render();
-        });
-        root.querySelector("#onboard").addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.target);
-          const payload = {
-            name: u.name,
-            age: u.age,
-            city: form.get("city"),
-            gender: u.gender,
-            looking_for: u.looking_for,
-            bio: u.bio,
-            job: u.job || "",
-            intent: u.intent || "dating",
-            height: u.height || "",
-            communication: form.get("communication") || "",
-            neuro: u.neuro || [],
-            vibe: u.vibe || [],
-            prompts: prompts.filter((p) => String(p.answer || "").trim().length >= 4),
-          };
-          try {
-            for (const file of state.onboardFiles) {
-              await uploadPhoto(file);
-            }
-            state.onboardFiles = [];
-            const data = await api("/api/me", { method: "PATCH", body: JSON.stringify(payload) });
-            state.user = data.user;
-            if (state.user.needs_onboard) {
-              await api("/api/onboard/skip", { method: "POST" });
-              await refreshMe();
-            }
-            state.view = "deck";
-            await loadFeed();
-            render();
-          } catch (err) {
-            root.querySelector("#err").textContent = err.message;
-          }
-        });
-      },
-    };
-  };
 
   const profileView = () => {
     const u = state.user;
@@ -1908,6 +1805,7 @@ import { createInboxController } from "./inbox";
 
   const buildAccountHostBridge = () => ({
     user: state.user,
+    catalog: state.catalog,
     basePath: BASE,
     hrefFor,
     navigate: (view, params = {}) => void goToView(view, params),
@@ -1920,6 +1818,12 @@ import { createInboxController } from "./inbox";
       stopInbox();
       await goToView("home");
     },
+    uploadPhoto,
+    refreshUser: async () => {
+      await refreshMe();
+      return state.user;
+    },
+    onUserUpdated: (user) => { state.user = user; },
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
   });
@@ -2204,17 +2108,20 @@ import { createInboxController } from "./inbox";
   const renderAccountFeature = async (view) => {
     accountFeatureUnmount?.();
     accountFeatureUnmount = null;
-    root.innerHTML = '<div id="account-feature-root"></div>' + (view === "invite" ? tabbar() : "");
+    root.innerHTML = '<div id="account-feature-root"></div>' + (["invite", "onboard"].includes(view) ? tabbar() : "");
     bindDataNavLinks();
     bindThemeControls();
     const mountEl = root.querySelector("#account-feature-root");
     if (!mountEl) return;
     try {
       const mod = await featureLoader.account();
-      if (!["invite", "delete-account"].includes(state.view)) return;
+      if (!["invite", "delete-account", "onboard"].includes(state.view)) return;
+      const accountHost = buildAccountHostBridge();
       accountFeatureUnmount = view === "invite"
-        ? mod.mountInvite(mountEl, buildAccountHostBridge())
-        : mod.mountDeleteAccount(mountEl, buildAccountHostBridge());
+        ? mod.mountInvite(mountEl, accountHost)
+        : view === "onboard"
+          ? mod.mountOnboard(mountEl, accountHost)
+          : mod.mountDeleteAccount(mountEl, accountHost);
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
@@ -2281,7 +2188,7 @@ import { createInboxController } from "./inbox";
       deckFeatureUnmount?.();
       deckFeatureUnmount = null;
     }
-    if (!["invite", "delete-account"].includes(state.view)) {
+    if (!["invite", "delete-account", "onboard"].includes(state.view)) {
       accountFeatureUnmount?.();
       accountFeatureUnmount = null;
     }
@@ -2330,7 +2237,7 @@ import { createInboxController } from "./inbox";
       void renderDeckFeature();
       return;
     }
-    else if (["invite", "delete-account"].includes(state.view)) {
+    else if (["invite", "delete-account", "onboard"].includes(state.view)) {
       void renderAccountFeature(state.view);
       return;
     }
@@ -2338,7 +2245,6 @@ import { createInboxController } from "./inbox";
       void renderProfileFeature(state.view);
       return;
     }
-    else if (state.view === "onboard") bound = onboardView();
     else root.innerHTML = homeView();
 
     if (bound) {

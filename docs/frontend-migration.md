@@ -15,8 +15,7 @@ The application is intentionally in an incremental migration state. The shell re
 | Likes | `src/features/likes/` | Preact feature |
 | Person profile | `src/features/person/` | Preact feature |
 | Deck / swipe | `src/features/deck/` | Preact feature; gesture behavior kept in feature boundary |
-| Invite / delete account | `src/features/account/` | Preact feature |
-| Onboarding | `src/app/bootstrap.js` | Legacy; migrate only with API and recovery-flow tests |
+| Invite / onboarding / delete account | `src/features/account/` | Preact feature |
 
 ## Shell responsibilities
 

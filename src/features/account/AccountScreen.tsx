@@ -110,3 +110,79 @@ export function DeleteAccountScreen({ host }: { host: AccountHostBridge }) {
     </section><LegalFooter /></main>
   </div>;
 }
+
+const photosOf = (user: AccountHostBridge["user"]) => Array.isArray(user.photos) ? user.photos : (user.albums || []).flatMap((album) => album.photos || []);
+const photoSrc = (host: AccountHostBridge, photo: unknown, name: string) => {
+  const value = photo && typeof photo === "object" ? (photo as { url?: string }).url : photo;
+  if (typeof value === "string" && value) return value.startsWith("/") ? `${host.basePath}${value}` : value.startsWith("http") || value.startsWith("data:") ? value : `${host.basePath}/public/${value}`;
+  return avatarUrl(host.basePath, value, name);
+};
+
+export function OnboardScreen({ host }: { host: AccountHostBridge }) {
+  const [user, setUser] = useState(host.user);
+  const [city, setCity] = useState(String(host.user.city || ""));
+  const [communication, setCommunication] = useState(String(host.user.communication || ""));
+  const initialPrompt = host.user.prompts?.[0] || { id: host.catalog.prompts?.[0]?.id || "special", answer: "" };
+  const [promptId] = useState(initialPrompt.id);
+  const [promptAnswer, setPromptAnswer] = useState(String(initialPrompt.answer || ""));
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const cities = (host.catalog.places || []).flatMap((place) => place.cities).filter((value, index, list) => list.indexOf(value) === index);
+  const existingPhotos = photosOf(user);
+  const addFiles = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
+    const next = Array.from(event.currentTarget.files || []);
+    if (!next.length) return;
+    setFiles((current) => [...current, ...next]);
+    setPreviews((current) => [...current, ...next.map((file) => URL.createObjectURL(file))]);
+    event.currentTarget.value = "";
+  };
+  const skip = async () => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { await host.api("/api/onboard/skip", { method: "POST" }); const next = await host.refreshUser(); setUser(next); host.onUserUpdated(next); host.navigate("deck"); } catch (caught) { setError(getErrorMessage(caught)); setBusy(false); }
+  };
+  const submit = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
+    event.preventDefault();
+    if (!city) { setError("выбери город"); return; }
+    if (busy) return;
+    setBusy(true); setError("");
+    try {
+      for (const file of files) await host.uploadPhoto(file);
+      const response = await host.api("/api/me", { method: "PATCH", body: JSON.stringify({
+        name: user.name,
+        age: user.age,
+        city,
+        gender: user.gender,
+        looking_for: user.looking_for,
+        bio: user.bio,
+        job: user.job || "",
+        intent: user.intent || "dating",
+        height: user.height || "",
+        communication,
+        neuro: user.neuro || [],
+        vibe: user.vibe || [],
+        prompts: promptAnswer.trim().length >= 4 ? [{ id: promptId, answer: promptAnswer }] : [],
+      }) });
+      let next = response.user;
+      if (next.needs_onboard) { await host.api("/api/onboard/skip", { method: "POST" }); next = await host.refreshUser(); }
+      setUser(next); host.onUserUpdated(next); host.navigate("deck");
+    } catch (caught) { setError(getErrorMessage(caught)); setBusy(false); }
+  };
+  return <div class={styles.root}>
+    <AccountHeader host={host} title="настройка" back={false} />
+    <main class={styles.content}><section class={styles.panel}>
+      <h1>Ещё чуть-чуть</h1>
+      <p class={styles.lede}>Два фото и один промпт сильно лучше пустой анкеты. Можно пропустить, но тогда тебя труднее узнать.</p>
+      <form class={styles.onboard} onSubmit={submit}>
+        <div><p class={styles.subtle}>фото — хотя бы ещё одно</p><div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy} onChange={addFiles} /></label></div></div>
+        <label>город<select value={city} required onChange={(event) => setCity(event.currentTarget.value)}><option value="">выбери город</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label>как тебе писать<textarea maxlength={280} placeholder="сразу по делу, голосовые ок / нет" value={communication} onInput={(event) => setCommunication(event.currentTarget.value)} /></label>
+        <label>{host.catalog.prompts?.find((item) => item.id === promptId)?.label || "один промпт"}<textarea maxlength={280} placeholder="расскажи что-то важное о себе" value={promptAnswer} onInput={(event) => setPromptAnswer(event.currentTarget.value)} /></label>
+        {error ? <p class={styles.error} role="alert">{error}</p> : null}
+        <div class={styles.actions}><Button variant="solid" slim type="submit" disabled={busy} loading={busy}>дальше в ленту</Button><Button variant="ghost" slim type="button" disabled={busy} onClick={() => void skip()}>пропустить</Button></div>
+      </form>
+    </section><LegalFooter /></main>
+  </div>;
+}

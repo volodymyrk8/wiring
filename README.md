@@ -32,7 +32,7 @@ src/
   features/likes/    # incoming likes, filters and WIRING+ gate
   features/person/   # public profile, photo gallery and safety actions
   features/deck/     # swipe feed, filters and undo/restart actions
-  features/account/  # invite and delete-account flows
+  features/account/  # invite, onboarding and delete-account flows
   features/profile/  # profile, consents, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js

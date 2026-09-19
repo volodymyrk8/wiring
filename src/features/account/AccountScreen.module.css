@@ -17,10 +17,22 @@
 .error { margin: 0; color: var(--coral); font-size: 13px; }
 .danger { background: linear-gradient(135deg, var(--coral), color-mix(in srgb, var(--coral) 72%, #000)); color: var(--on-danger, #fff); }
 .danger:hover:not(:disabled) { filter: brightness(1.06); }
+.onboard { display: grid; gap: 16px; }
+.onboard label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.onboard input, .onboard select, .onboard textarea { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--bg); color: var(--ink); font: inherit; outline: none; }
+.onboard textarea { min-height: 84px; resize: vertical; }
+.onboard input:focus, .onboard select:focus, .onboard textarea:focus { border-color: var(--lime); box-shadow: 0 0 0 3px var(--accent-soft); }
+.photoGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.photoCell, .fileAdd { position: relative; min-width: 0; aspect-ratio: 3 / 4; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--photo); }
+.photoCell img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.fileAdd { display: grid; place-items: center; border-style: dashed; color: var(--muted); font-size: 28px; cursor: pointer; }
+.fileAdd input { display: none; }
+.subtle { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 
 @media (max-width: 560px) {
   .panel { padding: 18px 14px; border-radius: 18px; }
   .refRow { flex-direction: column; }
   .refRow a, .refRow button { width: 100%; }
   .actions { flex-direction: column; }
+  .photoGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

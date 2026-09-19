@@ -1,3 +1,3 @@
-export { DeleteAccountScreen, InviteScreen } from "./AccountScreen";
-export { mountDeleteAccount, mountInvite } from "./mount";
+export { DeleteAccountScreen, InviteScreen, OnboardScreen } from "./AccountScreen";
+export { mountDeleteAccount, mountInvite, mountOnboard } from "./mount";
 export type { AccountHostBridge } from "./types";
