@@ -144,7 +144,7 @@
       { size: 21, strokeWidth: 1.5 }
     ),
     feed: svgIcon(
-      `<rect x="4.45" y="3.5" width="9.5" height="16.5" rx="2.2" transform="rotate(-10 9.2 11.75)" opacity="0.45"/><rect x="10.05" y="3.5" width="9.5" height="16.5" rx="2.2" transform="rotate(10 14.8 11.75)" opacity="0.45"/><rect x="6.75" y="2.8" width="10.5" height="17.5" rx="2.4" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="8.2" r="2"/><path d="M9 15c.6-1.4 1.7-1.9 3-1.9s2.4.5 3 1.9"/><path d="M2.8 11.75H1.2m1.2-1.2L1.2 11.75l1.2 1.2"/><path d="M21.2 11.75H22.8m-1.2-1.2l1.2 1.2-1.2 1.2"/>`,
+      `<rect x="4.45" y="4.2" width="9.5" height="16.5" rx="2.2" transform="rotate(-10 9.2 12.45)" opacity="0.45"/><rect x="10.05" y="4.2" width="9.5" height="16.5" rx="2.2" transform="rotate(10 14.8 12.45)" opacity="0.45"/><rect x="6.75" y="3.5" width="10.5" height="17.5" rx="2.4" fill="var(--bg-2, #18181b)"/><circle cx="12" cy="8.9" r="2"/><path d="M9 15.7c.6-1.4 1.7-1.9 3-1.9s2.4.5 3 1.9"/><path d="M2.8 12.25H1.2m1.2-1.2L1.2 12.25l1.2 1.2"/><path d="M21.2 12.25H22.8m-1.2-1.2l1.2 1.2-1.2 1.2"/>`,
       { size: 21, strokeWidth: 1.5 }
     ),
     heart: svgIcon(
@@ -156,7 +156,7 @@
       { size: 21, strokeWidth: 1.5 }
     ),
     chat: svgIcon(
-      `<path d="M21 11.5c0 4.6-4.1 8.2-9 8.2-1.5 0-3-.4-4.3-1L3 20l1.5-3.8C3.7 15 3 13.3 3 11.5 3 6.9 7.1 3.3 12 3.3s9 3.6 9 8.2z"/><circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="1" fill="currentColor" stroke="none"/>`,
+      `<path d="M21 12c0 4.7-4 8.5-9 8.5-1.6 0-3.1-.4-4.4-1.1L3.2 21.2l1.6-3.9C4 15.8 3.2 14 3.2 12c0-4.7 4-8.5 9-8.5s8.8 3.8 8.8 8.5z"/><circle cx="8" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.2" fill="currentColor" stroke="none"/>`,
       { size: 21, strokeWidth: 1.5 }
     ),
     user: svgIcon(`<circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8"/>`, { size: 20 }),
@@ -2685,7 +2685,7 @@
   let authFeatureModulePromise = null;
 
   const loadAuthFeatureModule = () => {
-    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=2`);
+    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=3`);
     return authFeatureModulePromise;
   };
 
@@ -2693,7 +2693,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=10`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=11`);
     return homeFeatureModulePromise;
   };
 

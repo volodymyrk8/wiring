@@ -24,51 +24,49 @@
   line-height: 1.4;
 }
 
-.cta {
-  width: 100%;
-  min-height: 52px;
-  display: inline-flex;
+.ctaBtn {
+  margin: 0 0 14px;
+}
+
+.guestCtaGroup {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.switchRow {
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  text-decoration: none;
-  margin: 0 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: linear-gradient(120deg, var(--lime, #98c379), var(--coral, #e06c75));
-  color: #ffffff !important;
-  font-weight: 600;
-  font-size: 17px;
-  cursor: pointer;
-  box-shadow: 0 4px 18px var(--accent-shadow, rgba(0, 0, 0, 0.12));
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-  font-family: inherit;
-}
-
-.cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 22px var(--accent-shadow, rgba(0, 0, 0, 0.18));
-  color: #ffffff !important;
-}
-
-.cta:focus-visible {
-  outline: 2px solid var(--accent-line, rgba(143, 168, 110, 0.38));
-  outline-offset: 2px;
-}
-
-.more {
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  margin: -4px 0 16px;
+  gap: 6px;
+  margin: -2px 0 16px;
   font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
 }
 
-.more a {
-  color: var(--ink, #111);
-  text-decoration: underline;
+.switchPrompt {
+  color: var(--muted);
+}
+
+.switchLink {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
+}
+
+.switchLink:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.switchLink:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
 }
 
 .chips {

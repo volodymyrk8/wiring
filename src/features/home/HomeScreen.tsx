@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { AppHeader, LegalFooter, AccordionRow } from "@/components/ui";
+import { AppHeader, LegalFooter, AccordionRow, Button } from "@/components/ui";
 import { HomeFaces } from "./components/HomeFaces";
 import type { HomeHostBridge } from "./types";
 import styles from "./HomeScreen.module.css";
@@ -95,34 +95,40 @@ export function HomeScreen({ host }: HomeScreenProps) {
         <HomeFaces faces={homeFaces} basePath={basePath} />
 
         {signed ? (
-          <a
-            class={styles.cta}
+          <Button
+            variant="solid"
+            fullWidth
             href={hrefFor("deck")}
+            nav="deck"
             onClick={handleNav("deck")}
-            data-nav="deck"
+            className={styles.ctaBtn}
           >
             Перейти в ленту <ArrowIcon />
-          </a>
+          </Button>
         ) : (
-          <>
-            <a
-              class={styles.cta}
+          <div class={styles.guestCtaGroup}>
+            <Button
+              variant="solid"
+              fullWidth
               href={hrefFor("register")}
+              nav="register"
               onClick={handleNav("register")}
-              data-nav="register"
+              className={styles.ctaBtn}
             >
               Создать профиль
-            </a>
-            <p class={styles.more}>
+            </Button>
+            <div class={styles.switchRow}>
+              <span class={styles.switchPrompt}>Уже есть профиль?</span>
               <a
+                class={styles.switchLink}
                 href={hrefFor("login")}
-                onClick={handleNav("login")}
                 data-nav="login"
+                onClick={handleNav("login")}
               >
                 Войти
               </a>
-            </p>
-          </>
+            </div>
+          </div>
         )}
 
         <AccordionRow
