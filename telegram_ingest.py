@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - exercised only on an uninstalled worke
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = os.environ.get("DATING_DB", str(BASE_DIR / "data" / "wiring.sqlite3"))
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 SESSION_PATH = os.environ.get("TELEGRAM_SESSION_PATH", str(BASE_DIR / "data" / "telegram" / "wiring"))
 
 
@@ -65,7 +65,7 @@ def _lock_session_files() -> None:
 
 
 def _db():
-    conn = db_connect(DB_PATH)
+    conn = db_connect()
     ensure_task_tables(conn)
     return conn
 

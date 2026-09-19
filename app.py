@@ -72,7 +72,8 @@ HOST = os.environ.get("HOST", "127.0.0.1")
 # Fixed local dev port (documented in README; override only for prod/systemd).
 DEV_PORT = 5070
 PORT = int(os.environ.get("PORT", str(DEV_PORT)))
-DB_PATH = os.environ.get("DATING_DB", os.path.join(BASE_DIR, "data", "wiring.sqlite3"))
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+DB_PATH = DATABASE_URL
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "uploads"))
 THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY") or secrets.token_hex(32)
@@ -117,7 +118,7 @@ def prefix(path: str) -> str:
 def db() -> Connection:
     conn = getattr(g, "_db", None)
     if conn is None:
-        conn = open_request_connection(DB_PATH)
+        conn = open_request_connection()
         g._db = conn
     return conn
 
@@ -196,10 +197,8 @@ def _replace_prompts(conn: Connection, user_id: int, prompts: list[dict[str, str
 
 
 def init_db() -> None:
-    if not USE_PG:
-        os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    conn = db_connect(DB_PATH)
+    conn = db_connect()
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -475,12 +474,29 @@ def init_db() -> None:
         if not conn.execute("SELECT 1 FROM photos WHERE user_id = ?", (row["id"],)).fetchone():
             _attach_portrait(conn, row["id"], row["photo"])
 
+    # If running in local dev and dev user is absent, seed test data into PostgreSQL
+    if not os.environ.get("TESTING") and not app.config.get("TESTING"):
+        has_dev = conn.execute("SELECT 1 FROM users WHERE email = 'dev@wiring.test'").fetchone()
+        if not has_dev:
+            try:
+                import importlib.util
+                script_path = os.path.join(BASE_DIR, "scripts", "ensure_dev_user.py")
+                if os.path.isfile(script_path):
+                    spec = importlib.util.spec_from_file_location("ensure_dev_user", script_path)
+                    if spec and spec.loader:
+                        mod = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(mod)
+                        dev_id = mod._ensure_dev(conn)
+                        mod._ensure_peer(conn, dev_id)
+                        from scripts.seed_test_social import seed_test_social
+                        seed_test_social(conn, dev_id)
+            except Exception:
+                pass
+
     conn.commit()
     conn.close()
 
 
-if not USE_PG:
-    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
 init_db()
 
 

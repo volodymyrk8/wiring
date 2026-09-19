@@ -23,6 +23,7 @@ docker compose up -d postgres
 echo -n "Waiting for Postgres (wiring-postgres-dev)"
 for _ in $(seq 1 60); do
   if docker compose exec -T postgres pg_isready -U wiring_dev -d wiring_dev >/dev/null 2>&1; then
+    docker compose exec -T postgres psql -U wiring_dev -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'wiring_test'" | grep -q 1 || docker compose exec -T postgres psql -U wiring_dev -d postgres -c "CREATE DATABASE wiring_test" >/dev/null 2>&1 || true
     echo " ok"
     exit 0
   fi

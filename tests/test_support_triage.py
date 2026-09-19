@@ -1,14 +1,16 @@
-import sqlite3
+import os
 import unittest
 
+from database import open_request_connection
 from support_triage import create_task, ensure_task_tables, task_counts
 
 
 class SupportTriageTest(unittest.TestCase):
     def setUp(self):
-        self.conn = sqlite3.connect(":memory:")
-        self.conn.row_factory = sqlite3.Row
+        self.conn = open_request_connection()
         ensure_task_tables(self.conn)
+        self.conn.execute("TRUNCATE TABLE feature_tasks RESTART IDENTITY CASCADE")
+        self.conn.commit()
 
     def tearDown(self):
         self.conn.close()
@@ -43,4 +45,3 @@ class SupportTriageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

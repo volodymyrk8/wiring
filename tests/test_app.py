@@ -4,9 +4,11 @@ import unittest
 from io import BytesIO
 from unittest.mock import patch
 
-os.environ.setdefault("DATING_DB", os.path.join(tempfile.gettempdir(), "wiring-test.sqlite3"))
+os.environ["DATABASE_URL"] = os.environ.get(
+    "TEST_DATABASE_URL",
+    os.environ.get("DATABASE_URL", "postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test"),
+)
 os.environ.setdefault("APP_SECRET_KEY", "test-secret")
-os.environ["DATING_DB"] = os.path.join(tempfile.gettempdir(), f"wiring-test-{os.getpid()}.sqlite3")
 os.environ["UPLOAD_DIR"] = os.path.join(tempfile.gettempdir(), f"wiring-uploads-{os.getpid()}")
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["WIRING_SEED_AI"] = "0"
@@ -14,40 +16,34 @@ os.environ["ADMIN_TOKEN"] = "test-admin-token"
 
 from PIL import Image
 
-from app import app, init_db, DB_PATH, _rate  # noqa: E402
-from database import use_postgres, open_request_connection, table_names  # noqa: E402
+from app import app, init_db, _rate  # noqa: E402
+from database import open_request_connection, table_names  # noqa: E402
 from media import MediaError  # noqa: E402
 from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
 
 
 class WiringTest(unittest.TestCase):
     def setUp(self):
-        if use_postgres():
-            conn = open_request_connection(DB_PATH)
-            tables = table_names(conn)
-            if tables:
-                for t in tables:
-                    try:
-                        conn.execute(f'TRUNCATE TABLE "{t}" RESTART IDENTITY CASCADE')
-                    except Exception:
-                        pass
-                from premium import ensure_default_code
-                ensure_default_code(conn)
-                conn.commit()
-            else:
-                init_db()
-            conn.close()
+        conn = open_request_connection()
+        tables = table_names(conn)
+        if tables:
+            for t in tables:
+                try:
+                    conn.execute(f'TRUNCATE TABLE "{t}" RESTART IDENTITY CASCADE')
+                except Exception:
+                    pass
+            from premium import ensure_default_code
+            ensure_default_code(conn)
+            conn.commit()
         else:
-            if os.path.exists(DB_PATH):
-                os.remove(DB_PATH)
             init_db()
+        conn.close()
         _rate.clear()
         app.config["TESTING"] = True
         self.client = app.test_client()
 
     def tearDown(self):
-        if not use_postgres() and os.path.exists(DB_PATH):
-            os.remove(DB_PATH)
+        pass
 
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
@@ -208,7 +204,7 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(blocked.status_code, 403)
             self.assertTrue(blocked.get_json()["needs_email_verify"])
 
-        conn = open_request_connection(DB_PATH)
+        conn = open_request_connection()
         row = conn.execute(
             "SELECT token FROM email_verifications ORDER BY created_at DESC LIMIT 1"
         ).fetchone()

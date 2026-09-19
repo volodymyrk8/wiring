@@ -11,10 +11,7 @@ if [[ -f .env ]]; then
 fi
 export HOST="${HOST:-127.0.0.1}"
 export PORT=5070
-export FLASK_DEBUG="${FLASK_DEBUG:-1}"
-if [[ "${DATABASE_URL:-}" == postgres* ]]; then
-  ./scripts/wait_for_postgres.sh
-fi
+./scripts/wait_for_postgres.sh
 if [[ -f package.json ]]; then
   if [[ ! -d node_modules ]]; then
     npm install

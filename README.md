@@ -35,7 +35,7 @@ src/
 
 After `npm run build`, the legacy shell loads `public/dist/router.js`. Run `npm run test:router` to smoke-test routes.
 
-**Database:** local dev uses **PostgreSQL 16** in Docker when `.env` contains `DATABASE_URL` (see `.env.example`). `./scripts/dev.sh` runs `docker compose up -d postgres` and waits until the DB is ready, then seeds test users. To use SQLite instead, remove or comment out `DATABASE_URL` in `.env`.
+**Database:** PostgreSQL 16 is the only supported database engine. Local dev uses **PostgreSQL 16** in Docker (`docker compose up -d postgres`). `./scripts/dev.sh` starts postgres, waits until ready, seeds test users, and boots the dev server.
 
 ```sh
 docker compose down          # stop DB
@@ -110,25 +110,11 @@ See [tests/README.md](tests/README.md) and [docs/router.md](docs/router.md).
 Repo: https://github.com/volodymyrk8/wiring
 
 ### PostgreSQL (production)
-
-On the server Postgres is used when `DATABASE_URL` is set (e.g. in `/etc/wiring.env`). Local dev and tests keep using SQLite unless you export `DATABASE_URL`.
-
-One-time on the server (adjust password):
+PostgreSQL is the only supported database engine. Set `DATABASE_URL` in `/etc/wiring.env`:
 
 ```sh
 sudo -u postgres psql -c "CREATE USER wiring_app WITH PASSWORD '…';"
 sudo -u postgres psql -c "CREATE DATABASE wiring OWNER wiring_app;"
 echo 'DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring' | sudo tee -a /etc/wiring.env
-```
-
-Copy data from the old SQLite file, then restart:
-
-```sh
-cd /root/repos/dating
-export DATING_DB=/var/lib/wiring/wiring.sqlite3
-export DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring
-./scripts/migrate_sqlite_to_postgres.py   # or: python3 scripts/…
 sudo systemctl restart wiring
 ```
-
-Keep a backup of `wiring.sqlite3` until you have verified prod on Postgres.

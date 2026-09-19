@@ -101,7 +101,11 @@ def _ensure_dev(conn) -> int:
         uid = int(cur.lastrowid)
     replace_tags(conn, uid, ["audhd"], ["nonsmalltalk"])
     _attach_portrait(conn, uid, "portraits/p01.jpg")
-    print(f"dev user ready: {DEV_USER_EMAIL} / {DEV_USER_PASSWORD}")
+    from premium import grant_premium, is_premium
+    user_row = conn.execute("SELECT premium_until FROM users WHERE id = ?", (uid,)).fetchone()
+    if not is_premium(user_row):
+        grant_premium(conn, uid, 365)
+    print(f"dev user ready: {DEV_USER_EMAIL} / {DEV_USER_PASSWORD} (WIRING+ active)")
     return uid
 
 
