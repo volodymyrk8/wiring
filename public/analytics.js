@@ -65,7 +65,12 @@
     }
   };
 
-  window.WIRING_ANALYTICS = { page };
+  const removeBanner = () => {
+    const el = document.querySelector(".analytics-consent");
+    if (!el) return;
+    el.classList.add("closing");
+    setTimeout(() => el.remove(), 220);
+  };
 
   const setConsent = (value) => {
     try { localStorage.setItem(consentKey, value); } catch (_) {}
@@ -73,21 +78,41 @@
     if (value === "granted") loadAnalytics();
   };
 
+  window.WIRING_ANALYTICS = { page, setConsent, removeBanner };
+
+  const isAuthPage = () => {
+    const p = location.pathname;
+    const v = document.documentElement.dataset.view;
+    return (
+      p.startsWith("/register") ||
+      p.startsWith("/login") ||
+      p.startsWith("/forgot") ||
+      p.startsWith("/reset") ||
+      v === "register" ||
+      v === "login"
+    );
+  };
+
   const showBanner = () => {
     if (document.querySelector(".analytics-consent")) return;
+    if (isAuthPage()) return; // Don't block registration/login conversion
     const banner = document.createElement("aside");
     banner.className = "analytics-consent";
     banner.setAttribute("role", "dialog");
     banner.setAttribute("aria-label", "аналитика посещений");
     banner.innerHTML = `
-      <p>Можно разрешить необязательную аналитику посещений. Она помогает понять, какие страницы WIRING полезны. <a href="/privacy">Подробнее</a></p>
+      <div class="analytics-consent-content">
+        <p>Можно разрешить необязательную аналитику посещений. Она помогает понять, какие страницы WIRING полезны. <a href="/privacy" target="_blank" rel="noopener">Подробнее</a></p>
+      </div>
       <div class="analytics-consent-actions">
         <button type="button" class="ghost slim" data-analytics-deny>Не сейчас</button>
         <button type="button" class="solid slim" data-analytics-allow>Разрешить</button>
-      </div>`;
+      </div>
+      <button type="button" class="analytics-consent-close" data-analytics-close aria-label="Закрыть">✕</button>`;
     document.body.appendChild(banner);
     banner.querySelector("[data-analytics-allow]").addEventListener("click", () => setConsent("granted"));
     banner.querySelector("[data-analytics-deny]").addEventListener("click", () => setConsent("denied"));
+    banner.querySelector("[data-analytics-close]").addEventListener("click", () => setConsent("denied"));
   };
 
   let stored = "";

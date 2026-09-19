@@ -245,6 +245,12 @@
       });
     }
   };
+  const bindThemeControls = () => {
+    root.querySelectorAll("[data-theme-set]").forEach((btn) => {
+      btn.addEventListener("click", () => applyTheme(btn.dataset.themeSet));
+    });
+    bindThemePicker();
+  };
   applyTheme(themeNow());
 
   const persistFilters = () => {
@@ -766,14 +772,21 @@
     return `<span class="avatar-slot"><a class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}" href="${hrefFor("profile")}" data-nav="profile" aria-label="${plus ? "профиль · WIRING+" : "профиль"}"${on ? ' aria-current="page"' : ""}><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></a>${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">+</span>` : ""}</span>`;
   };
 
-  const appHead = () => `
-    <header class="app-head">
+  const appHead = (opts = {}) => {
+    const isAuth = QUIET_VIEWS.has(state.view) && state.view !== "chat";
+    const logoPos = opts.logoPosition !== undefined ? opts.logoPosition : (isAuth ? "center" : "left");
+    const showActions = opts.showActions !== undefined ? opts.showActions : !isAuth;
+    const centerClass = logoPos === "center" ? " center" : "";
+    return `
+    <header class="app-head${centerClass}" data-logo-position="${logoPos}">
       <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-label">beta</span></a>
+      ${showActions ? `
       <div class="app-head-end">
         ${themePicker()}
-        ${QUIET_VIEWS.has(state.view) && state.view !== "chat" ? "" : profileSlot()}
-      </div>
+        ${isAuth ? "" : profileSlot()}
+      </div>` : ""}
     </header>`;
+  };
 
   const tabbar = () =>
     showsTabbar()
@@ -789,11 +802,10 @@
     </footer>`;
 
   const authLayout = (body) => `
-      ${appHead()}
+      ${appHead({ logoPosition: "center", showActions: false })}
       <div class="auth-shell">
         <section class="panel auth-panel">${body}</section>
       </div>
-      ${authLegalFoot()}
       ${tabbar()}`;
 
   const ownTraitMarks = () => {
@@ -2715,6 +2727,8 @@
     authFeatureUnmount?.();
     authFeatureUnmount = null;
     root.innerHTML = authLayout('<div id="auth-feature-root"></div>');
+    bindDataNavLinks();
+    bindThemeControls();
     const mountEl = root.querySelector("#auth-feature-root");
     if (!mountEl) return;
     try {
@@ -2915,10 +2929,7 @@
         render();
       });
     }
-    root.querySelectorAll("[data-theme-set]").forEach((btn) => {
-      btn.addEventListener("click", () => applyTheme(btn.dataset.themeSet));
-    });
-    bindThemePicker();
+    bindThemeControls();
     const bindFold = (btnId, panelId) => {
       const foldBtn = root.querySelector(btnId);
       const panel = root.querySelector(panelId);

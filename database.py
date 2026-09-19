@@ -141,7 +141,7 @@ class Connection:
             cur = self._raw.cursor()
             cur.execute(sql_exec, params)
             lastrowid: int | None = None
-            if " RETURNING id" in sql_exec.upper():
+            if "RETURNING" in sql_exec.upper():
                 got = cur.fetchone()
                 if got is not None:
                     lastrowid = int(got[0] if not isinstance(got, Mapping) else got["id"])

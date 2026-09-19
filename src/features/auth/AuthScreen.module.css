@@ -1,0 +1,201 @@
+.container {
+  width: 100%;
+  max-width: var(--container-form, 440px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+  padding: 4px 0 0;
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 12px 0;
+  }
+}
+
+@media (min-width: 1025px) {
+  .container {
+    padding: 16px 0;
+  }
+}
+
+.authBody {
+  margin: auto 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 6.5vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--ink);
+  margin: 0 0 clamp(28px, 6vw, 40px);
+}
+
+.titleWithLede {
+  margin-bottom: 12px;
+}
+
+.lede {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-align: center;
+  margin: 0 0 clamp(24px, 5.5vw, 36px);
+  text-wrap: balance;
+}
+
+/* Badges / Callouts */
+.badgeCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-line);
+  margin-bottom: 24px;
+  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.badgeIcon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.badgeContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.badgeTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.badgeDesc {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* Form layout */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.checksGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 6px 0;
+}
+
+/* Error Banner */
+.errorBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(201, 137, 154, 0.14);
+  border: 1px solid rgba(201, 137, 154, 0.35);
+  color: var(--coral);
+  font-size: 13.5px;
+  line-height: 1.4;
+  animation: bannerFade 0.2s ease;
+}
+
+.errorIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--coral);
+}
+
+.errorBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quickActionBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.quickActionBtn:hover {
+  opacity: 0.85;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.footerHint {
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+.footerHint a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+
+.footerHint a:hover {
+  opacity: 0.75;
+}
+
+@media (min-width: 520px) {
+  .actions {
+    flex-direction: row;
+    align-items: center;
+  }
+  .actions > * {
+    flex: 1;
+  }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bannerFade {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}

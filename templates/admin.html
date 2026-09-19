@@ -17,20 +17,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/public/styles.css?v=58">
+  <link rel="stylesheet" href="/public/styles.css?v=80">
 </head>
 <body>
   <main class="legal admin">
-    <div class="legal-head">
-      <a class="brand" href="/"><span class="brand-name">WIR<span>ING</span></span><span class="beta-label">beta</span></a>
-      <div class="theme-swatches" role="group" aria-label="цвет">
-        <button type="button" class="swatch" data-theme-set="pastel" aria-label="пастель" title="пастель"></button>
-        <button type="button" class="swatch" data-theme-set="mist" aria-label="дымка" title="дымка"></button>
-        <button type="button" class="swatch" data-theme-set="night" aria-label="ночь" title="ночь"></button>
-        <button type="button" class="swatch" data-theme-set="slate" aria-label="сланец" title="сланец"></button>
-        <button type="button" class="swatch" data-theme-set="dusk" aria-label="сумерки" title="сумерки"></button>
-      </div>
-    </div>
+    {% include "components/header.html" %}
     <h1>статистика</h1>
     {% if error %}<p class="err">{{ error }}</p>{% endif %}
     {% if not authed %}

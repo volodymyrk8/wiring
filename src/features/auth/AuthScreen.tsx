@@ -1,45 +1,147 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
+import type { JSX } from "preact";
 import { Button } from "@/components/ui/Button";
 import { FieldFloating } from "@/components/ui/FieldFloating";
 import { PasswordField } from "@/components/ui/PasswordField";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { LegalFooter } from "@/components/ui/LegalFooter";
 import type { AuthHostBridge } from "@/features/auth/types";
 import { getErrorMessage } from "@/lib/get-error-message";
+import styles from "./AuthScreen.module.css";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CYRILLIC_RE = /[а-яё]/i;
 
 type AuthScreenProps = { host: AuthHostBridge };
 
-export function AuthScreen({ host }: AuthScreenProps) {
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  const { mode, hrefFor } = host;
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  password?: string;
+  age_confirm?: string;
+  privacy_confirm?: string;
+};
 
-  const onSubmitLoginRegister = async (e: Event) => {
+export function AuthScreen({ host }: AuthScreenProps) {
+  const { mode, hrefFor } = host;
+  const isRegister = mode === "register";
+  const isLogin = mode === "login";
+
+  // Form values
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [ageConfirm, setAgeConfirm] = useState(false);
+  const [privacyConfirm, setPrivacyConfirm] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+
+  // Validation & Server state
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [serverError, setServerError] = useState("");
+  const [emailTaken, setEmailTaken] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [pickedNeuro, setPickedNeuro] = useState<string | null>(null);
+
+  // Check for preselected neuro from landing
+  useEffect(() => {
+    try {
+      const p = sessionStorage.getItem("wiring_pick_neuro");
+      if (p) setPickedNeuro(p);
+    } catch (_) {}
+  }, []);
+
+  const clearFieldError = (field: keyof FieldErrors) => {
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+    if (serverError) {
+      setServerError("");
+      setEmailTaken(false);
+    }
+  };
+
+  const validate = (): boolean => {
+    const errs: FieldErrors = {};
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (isRegister) {
+      const trimmedName = name.trim();
+      if (trimmedName.length < 2 || trimmedName.length > 32) {
+        errs.name = "Имя должно быть от 2 до 32 символов";
+      }
+    }
+
+    if (!trimmedEmail) {
+      errs.email = "Укажи адрес почты";
+    } else if (CYRILLIC_RE.test(trimmedEmail)) {
+      errs.email = "В почте должны быть только латинские буквы";
+    } else if (!EMAIL_RE.test(trimmedEmail)) {
+      errs.email = "Проверь правильность адреса почты";
+    }
+
+    if (!password) {
+      errs.password = "Введи пароль";
+    } else if (password.length < 6) {
+      errs.password = "Пароль должен содержать минимум 6 символов";
+    }
+
+    if (isRegister) {
+      if (!ageConfirm) {
+        errs.age_confirm = "Нужно подтвердить возраст 18+";
+      }
+      if (!privacyConfirm) {
+        errs.privacy_confirm = "Необходимо согласие на обработку данных";
+      }
+    }
+
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const onSubmitLoginRegister = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
-    setErr("");
+    setServerError("");
+    setEmailTaken(false);
+
+    if (!validate()) {
+      return;
+    }
+
     setBusy(true);
-    const form = e.currentTarget as HTMLFormElement;
-    const fd = new FormData(form);
-    const isRegister = mode === "register";
+    const trimmedEmail = email.trim().toLowerCase();
     try {
       let body: Record<string, unknown>;
       if (isRegister) {
         body = {
-          ...Object.fromEntries(fd.entries()),
-          age_confirm: fd.has("age_confirm"),
-          privacy_confirm: fd.has("privacy_confirm"),
-          marketing_consent: fd.has("marketing_consent"),
+          name: name.trim(),
+          email: trimmedEmail,
+          password,
+          age_confirm: ageConfirm,
+          privacy_confirm: privacyConfirm,
+          marketing_consent: marketingConsent,
         };
         const ref = host.getReferralCode();
         if (ref) body.ref = ref;
       } else {
-        body = Object.fromEntries(fd.entries()) as Record<string, unknown>;
+        body = {
+          email: trimmedEmail,
+          password,
+        };
       }
+
       const data = (await host.api(isRegister ? "/api/register" : "/api/login", {
         method: "POST",
         body: JSON.stringify(body),
       })) as Record<string, unknown>;
+
       if (isRegister && data.needs_email_verify) {
-        host.onRegisterVerify(String(data.email || body.email || ""));
+        host.onRegisterVerify(String(data.email || trimmedEmail));
         return;
+      }
+      if (isRegister) {
+        try {
+          localStorage.setItem("wiring-analytics-consent", "granted");
+        } catch (_) {}
       }
       await host.onAuthSuccess(isRegister ? "register" : "login", data);
     } catch (error) {
@@ -48,58 +150,75 @@ export function AuthScreen({ host }: AuthScreenProps) {
           ? (error as { payload?: { needs_email_verify?: boolean; email?: string } }).payload
           : null;
       if (payloadErr?.needs_email_verify) {
-        const email = String(payloadErr.email || fd.get("email") || "");
-        host.onRegisterVerify(email);
+        const emailToVerify = String(payloadErr.email || trimmedEmail);
+        host.onRegisterVerify(emailToVerify);
         return;
       }
-      setErr(getErrorMessage(error));
+
+      const msg = getErrorMessage(error);
+      if (msg.includes("такая почта уже есть") || msg.includes("уже зарегистрирован")) {
+        setEmailTaken(true);
+        setFieldError("email", "Эта почта уже зарегистрирована");
+      }
+      setServerError(msg);
     } finally {
       setBusy(false);
     }
   };
 
-  const onSubmitForgot = async (e: Event) => {
+  const setFieldError = (field: keyof FieldErrors, message: string) => {
+    setFieldErrors((prev) => ({ ...prev, [field]: message }));
+  };
+
+  const onSubmitForgot = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
-    setErr("");
+    setServerError("");
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !EMAIL_RE.test(trimmedEmail)) {
+      setFieldError("email", "Укажи корректный адрес почты");
+      return;
+    }
     setBusy(true);
-    const fd = new FormData(e.currentTarget as HTMLFormElement);
     try {
       await host.api("/api/password/forgot", {
         method: "POST",
-        body: JSON.stringify({ email: fd.get("email") }),
+        body: JSON.stringify({ email: trimmedEmail }),
       });
       host.toast("если аккаунт есть — письмо уже в пути");
       host.onForgotDone();
     } catch (error) {
-      setErr(getErrorMessage(error));
+      setServerError(getErrorMessage(error));
     } finally {
       setBusy(false);
     }
   };
 
-  const onSubmitReset = async (e: Event) => {
+  const onSubmitReset = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
-    setErr("");
+    setServerError("");
+    if (password.length < 6) {
+      setFieldError("password", "Минимум 6 символов");
+      return;
+    }
     setBusy(true);
-    const fd = new FormData(e.currentTarget as HTMLFormElement);
     try {
       await host.api("/api/password/reset", {
         method: "POST",
-        body: JSON.stringify({ token: host.resetToken, password: fd.get("password") }),
+        body: JSON.stringify({ token: host.resetToken, password }),
       });
       host.toast("пароль обновлён — можно войти");
       host.onResetDone();
     } catch (error) {
-      setErr(getErrorMessage(error));
+      setServerError(getErrorMessage(error));
     } finally {
       setBusy(false);
     }
   };
 
   const onResendVerify = async () => {
-    setErr("");
+    setServerError("");
     if (!host.verifyEmail) {
-      setErr("нет адреса — зарегистрируйся ещё раз");
+      setServerError("нет адреса — зарегистрируйся ещё раз");
       return;
     }
     try {
@@ -109,156 +228,301 @@ export function AuthScreen({ host }: AuthScreenProps) {
       });
       host.toast("если аккаунт ждёт подтверждения — письмо уже в пути");
     } catch (error) {
-      setErr(getErrorMessage(error));
+      setServerError(getErrorMessage(error));
     }
   };
 
+  // --- Screens: Verify, Forgot, Reset ---
+
   if (mode === "verify") {
-    const email = host.verifyEmail;
+    const verifyTarget = host.verifyEmail;
     return (
-      <>
-        <h2>Подтверди почту</h2>
-        <p class="lede auth-lede">
+      <div class={styles.container}>
+        <h2 class={`${styles.title} ${styles.titleWithLede}`}>Подтверди почту</h2>
+        <p class={styles.lede}>
           Мы отправили ссылку
-          {email ? (
+          {verifyTarget ? (
             <>
               {" "}
-              на <strong>{email}</strong>
+              на <strong>{verifyTarget}</strong>
             </>
           ) : (
             ""
           )}
           . Открой письмо и перейди по ссылке — после этого можно войти.
         </p>
-        <div class="err">{err}</div>
-        <div class="actions auth-actions">
-          <Button type="button" onClick={onResendVerify}>
+        {serverError && (
+          <div class={styles.errorBanner} role="alert">
+            <span class={styles.errorIcon}>⚠️</span>
+            <div class={styles.errorBody}>{serverError}</div>
+          </div>
+        )}
+        <div class={styles.actions}>
+          <Button type="button" onClick={onResendVerify} fullWidth>
             Отправить ссылку ещё раз
           </Button>
-          <Button variant="ghost" href={hrefFor("login")} nav="login">
+          <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
             Назад ко входу
           </Button>
         </div>
-        <p class="hint">Не видишь письмо? Проверь «Спам» и «Промоакции».</p>
-      </>
+        <p class={styles.footerHint}>Не видишь письмо? Проверь «Спам» и «Промоакции».</p>
+        <LegalFooter />
+      </div>
     );
   }
 
   if (mode === "forgot") {
     return (
-      <>
-        <h2>Сброс пароля</h2>
-        <p class="lede auth-lede">Пришлём ссылку на почту, если такой аккаунт есть.</p>
-        <form class="form auth-form" onSubmit={onSubmitForgot}>
-          <FieldFloating label="Почта" name="email" type="email" required autoComplete="username" />
-          <div class="err">{err}</div>
-          <div class="actions auth-actions">
-            <Button type="submit" disabled={busy}>
-              Отправить ссылку
+      <div class={styles.container}>
+        <h2 class={`${styles.title} ${styles.titleWithLede}`}>Сброс пароля</h2>
+        <p class={styles.lede}>Пришлём ссылку на почту, если такой аккаунт есть.</p>
+        <form class={styles.form} onSubmit={onSubmitForgot} noValidate>
+          <FieldFloating
+            label="Почта"
+            name="email"
+            type="email"
+            required
+            autoComplete="username"
+            value={email}
+            error={fieldErrors.email}
+            onInput={(e) => {
+              setEmail((e.currentTarget as HTMLInputElement).value);
+              clearFieldError("email");
+            }}
+          />
+          {serverError && (
+            <div class={styles.errorBanner} role="alert">
+              <span class={styles.errorIcon}>⚠️</span>
+              <div class={styles.errorBody}>{serverError}</div>
+            </div>
+          )}
+          <div class={styles.actions}>
+            <Button type="submit" disabled={busy} loading={busy} fullWidth>
+              {busy ? "Отправляем…" : "Отправить ссылку"}
             </Button>
-            <Button variant="ghost" href={hrefFor("login")} nav="login">
+            <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
               Назад ко входу
             </Button>
           </div>
         </form>
-      </>
+        <LegalFooter />
+      </div>
     );
   }
 
   if (mode === "reset") {
     return (
-      <>
-        <h2>Новый пароль</h2>
-        <form class="form auth-form" onSubmit={onSubmitReset}>
-          <PasswordField autoComplete="new-password" />
-          <div class="err">{err}</div>
-          <div class="actions auth-actions">
-            <Button type="submit" disabled={busy}>
-              Сохранить пароль
+      <div class={styles.container}>
+        <h2 class={styles.title}>Новый пароль</h2>
+        <form class={styles.form} onSubmit={onSubmitReset} noValidate>
+          <PasswordField
+            autoComplete="new-password"
+            showStrength
+            value={password}
+            error={fieldErrors.password}
+            onInput={(e) => {
+              setPassword((e.currentTarget as HTMLInputElement).value);
+              clearFieldError("password");
+            }}
+          />
+          {serverError && (
+            <div class={styles.errorBanner} role="alert">
+              <span class={styles.errorIcon}>⚠️</span>
+              <div class={styles.errorBody}>{serverError}</div>
+            </div>
+          )}
+          <div class={styles.actions}>
+            <Button type="submit" disabled={busy} loading={busy} fullWidth>
+              {busy ? "Сохраняем…" : "Сохранить пароль"}
             </Button>
-            <Button variant="ghost" href={hrefFor("login")} nav="login">
+            <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
               Назад ко входу
             </Button>
           </div>
         </form>
-      </>
+        <LegalFooter />
+      </div>
     );
   }
 
-  const isLogin = mode === "login";
+  // --- Main Auth: Register or Login ---
+
   return (
-    <>
-      <h2>{isLogin ? "Вход" : "Регистрация"}</h2>
-      {!isLogin ? (
-        <p class="lede auth-lede">
-          {host.inviteLede
-            ? "Ты по приглашению. После регистрации WIRING+ на 30 дней будет у вас обоих. Анкету можно дозаполнить позже."
-            : "Сначала имя, почта и пароль. Анкету — фото, город, особенности — дозаполнишь, когда будет удобно."}
-        </p>
-      ) : null}
-      <form class="form auth-form" onSubmit={onSubmitLoginRegister}>
-        {!isLogin ? (
+    <div class={styles.container}>
+      <div class={styles.authBody}>
+        <h2 class={styles.title}>
+          {isLogin ? "Вход" : "Регистрация"}
+        </h2>
+
+      {!isLogin && (
+        <>
+          {host.inviteLede && (
+            <div class={styles.badgeCard}>
+              <span class={styles.badgeIcon}>🎁</span>
+              <div class={styles.badgeContent}>
+                <span class={styles.badgeTitle}>Тебе доступен подарок!</span>
+                <span class={styles.badgeDesc}>
+                  Ты по приглашению. После регистрации WIRING+ на 30 дней активируется у тебя и у друга.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {pickedNeuro && (
+            <div class={styles.badgeCard}>
+              <span class={styles.badgeIcon}>✨</span>
+              <div class={styles.badgeContent}>
+                <span class={styles.badgeTitle}>Твой выбор сохранён</span>
+                <span class={styles.badgeDesc}>
+                  Мы автоматически добавим выбранную особенность в твой профиль.
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      <form class={styles.form} onSubmit={onSubmitLoginRegister} noValidate>
+        {!isLogin && (
           <FieldFloating
             label="Имя"
             name="name"
             required
             minLength={2}
             maxLength={32}
-            autoComplete="nickname"
+            autoComplete="name"
+            enterKeyHint="next"
+            value={name}
+            error={fieldErrors.name}
+            onInput={(e) => {
+              setName((e.currentTarget as HTMLInputElement).value);
+              clearFieldError("name");
+            }}
           />
-        ) : null}
+        )}
+
         <FieldFloating
           label="Почта"
           name="email"
           type="email"
           required
-          autoComplete="username"
+          autoComplete="email"
           inputMode="email"
           autoCapitalize="none"
+          enterKeyHint="next"
+          value={email}
+          error={fieldErrors.email}
+          onInput={(e) => {
+            setEmail((e.currentTarget as HTMLInputElement).value);
+            clearFieldError("email");
+          }}
         />
-        <PasswordField autoComplete={isLogin ? "current-password" : "new-password"} />
-        {!isLogin ? (
-          <>
-            <label class="check">
-              <input name="age_confirm" type="checkbox" required autocomplete="off" /> мне есть 18, принимаю{" "}
+
+        <PasswordField
+          autoComplete={isLogin ? "current-password" : "new-password"}
+          showStrength={!isLogin}
+          enterKeyHint={isLogin ? "done" : "next"}
+          value={password}
+          error={fieldErrors.password}
+          onInput={(e) => {
+            setPassword((e.currentTarget as HTMLInputElement).value);
+            clearFieldError("password");
+          }}
+        />
+
+        {!isLogin && (
+          <div class={styles.checksGroup}>
+            <Checkbox
+              name="age_confirm"
+              checked={ageConfirm}
+              required
+              error={Boolean(fieldErrors.age_confirm)}
+              onChange={(checked) => {
+                setAgeConfirm(checked);
+                clearFieldError("age_confirm");
+              }}
+            >
+              Мне есть 18, и я принимаю{" "}
               <a href="/rules" target="_blank" rel="noopener">
-                правила
+                правила сервиса
               </a>
-            </label>
-            <label class="check">
-              <input name="privacy_confirm" type="checkbox" required autocomplete="off" /> согласен(на) на обработку
-              персональных данных и принимаю{" "}
+            </Checkbox>
+
+            <Checkbox
+              name="privacy_confirm"
+              checked={privacyConfirm}
+              required
+              error={Boolean(fieldErrors.privacy_confirm)}
+              onChange={(checked) => {
+                setPrivacyConfirm(checked);
+                clearFieldError("privacy_confirm");
+              }}
+            >
+              Даю согласие на обработку данных и принимаю{" "}
               <a href="/privacy" target="_blank" rel="noopener">
                 политику конфиденциальности
               </a>
-            </label>
-            <label class="check">
-              <input name="marketing_consent" type="checkbox" autocomplete="off" /> согласен(на) на маркетинговые
-              письма на почту
-            </label>
-          </>
-        ) : null}
-        <div class="err">{err}</div>
-        <div class="actions auth-actions">
-          <Button type="submit" disabled={busy}>
-            {isLogin ? "Войти" : "Создать аккаунт"}
+            </Checkbox>
+
+            <Checkbox
+              name="marketing_consent"
+              checked={marketingConsent}
+              onChange={(checked) => setMarketingConsent(checked)}
+            >
+              Получать новости и полезные обновления на почту
+            </Checkbox>
+          </div>
+        )}
+
+        {serverError && (
+          <div class={styles.errorBanner} role="alert">
+            <span class={styles.errorIcon}>⚠️</span>
+            <div class={styles.errorBody}>
+              <span>{serverError}</span>
+              {emailTaken && (
+                <a
+                  class={styles.quickActionBtn}
+                  href={hrefFor("login")}
+                  data-nav="login"
+                  onClick={() => host.navigate("login")}
+                >
+                  Войти с этой почтой →
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div class={styles.actions}>
+          <Button type="submit" disabled={busy} loading={busy} fullWidth>
+            {busy
+              ? isLogin
+                ? "Входим…"
+                : "Создаём профиль…"
+              : isLogin
+              ? "Войти"
+              : "Создать аккаунт"}
           </Button>
           <Button
             variant="ghost"
             href={hrefFor(isLogin ? "register" : "login")}
             nav={isLogin ? "register" : "login"}
+            fullWidth
           >
-            {isLogin ? "Создать профиль" : "Войти"}
+            {isLogin ? "Создать профиль" : "У меня есть аккаунт"}
           </Button>
         </div>
-        {isLogin ? (
-          <p class="hint auth-hint">
+
+        {isLogin && (
+          <p class={styles.footerHint}>
             <a href={hrefFor("forgot")} data-nav="forgot">
-              Забыл(а) пароль?
+              Напомнить пароль?
             </a>
           </p>
-        ) : null}
+        )}
       </form>
-    </>
+      </div>
+      {isLogin && <LegalFooter />}
+    </div>
   );
 }

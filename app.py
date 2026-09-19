@@ -2896,12 +2896,15 @@ def support():
     error = ""
     if request.method == "POST":
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+        data = request.get_json(silent=True) if request.is_json else request.form
+        if not data:
+            data = request.form
         if too_many(f"support:{ip}", 5, 3600):
             error = "слишком часто — подожди немного"
         else:
-            body = str(request.form.get("body") or "").strip()
-            name = str(request.form.get("name") or "").strip()
-            email = str(request.form.get("email") or "").strip()
+            body = str(data.get("body") or "").strip()
+            name = str(data.get("name") or "").strip()
+            email = str(data.get("email") or "").strip()
             if me:
                 name = name or str(me.get("name") or "")
             if len(body) < 8:
@@ -2925,6 +2928,12 @@ def support():
                 contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
                 notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
                 notice = "отправили. ответим на почту, если её указал, или найдём тебя по аккаунту"
+
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            if error:
+                return jsonify({"ok": False, "error": error}), 400
+            return jsonify({"ok": True, "notice": notice})
+
     return render_template(
         "legal.html",
         title="Поддержка",

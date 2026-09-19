@@ -15,21 +15,38 @@ os.environ["ADMIN_TOKEN"] = "test-admin-token"
 from PIL import Image
 
 from app import app, init_db, DB_PATH, _rate  # noqa: E402
+from database import use_postgres, open_request_connection, table_names  # noqa: E402
 from media import MediaError  # noqa: E402
 from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
 
 
 class WiringTest(unittest.TestCase):
     def setUp(self):
-        if os.path.exists(DB_PATH):
-            os.remove(DB_PATH)
+        if use_postgres():
+            conn = open_request_connection(DB_PATH)
+            tables = table_names(conn)
+            if tables:
+                for t in tables:
+                    try:
+                        conn.execute(f'TRUNCATE TABLE "{t}" RESTART IDENTITY CASCADE')
+                    except Exception:
+                        pass
+                from premium import ensure_default_code
+                ensure_default_code(conn)
+                conn.commit()
+            else:
+                init_db()
+            conn.close()
+        else:
+            if os.path.exists(DB_PATH):
+                os.remove(DB_PATH)
+            init_db()
         _rate.clear()
-        init_db()
         app.config["TESTING"] = True
         self.client = app.test_client()
 
     def tearDown(self):
-        if os.path.exists(DB_PATH):
+        if not use_postgres() and os.path.exists(DB_PATH):
             os.remove(DB_PATH)
 
     def test_health_and_catalog(self):
@@ -191,12 +208,11 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(blocked.status_code, 403)
             self.assertTrue(blocked.get_json()["needs_email_verify"])
 
-        import sqlite3
-
-        conn = sqlite3.connect(DB_PATH)
-        token = conn.execute(
+        conn = open_request_connection(DB_PATH)
+        row = conn.execute(
             "SELECT token FROM email_verifications ORDER BY created_at DESC LIMIT 1"
-        ).fetchone()[0]
+        ).fetchone()
+        token = row["token"] if hasattr(row, "__getitem__") and not isinstance(row, (tuple, list)) else row[0]
         conn.close()
 
         verified = self.client.post("/api/email/verify", json={"token": token})
