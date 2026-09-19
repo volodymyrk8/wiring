@@ -309,17 +309,13 @@ html[data-view="verify"] .auth-shell {
   min-width: 0;
 }
 .app-head-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 14px 6px 10px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 600;
-  text-decoration: none;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
   background: var(--card);
   border: 1px solid var(--line);
   color: var(--ink);
@@ -340,7 +336,7 @@ html[data-view="verify"] .auth-shell {
   transform: translateY(-1px);
 }
 .app-head-back:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 .app-head-back:focus-visible {
   outline: 2px solid var(--accent-line);
@@ -410,14 +406,6 @@ html[data-theme="dusk"] .app-head-back:hover {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
-@media (max-width: 360px) {
-  .app-head-back span {
-    display: none;
-  }
-  .app-head-back {
-    padding: 6px 10px;
-  }
-}
 .brand {
   position: relative;
   font-family: var(--serif);

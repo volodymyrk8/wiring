@@ -797,9 +797,8 @@
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
       ${showBack ? `
       <div class="app-head-start">
-        <a class="app-head-back" href="${escapeAttr(backHref)}" data-nav="back" aria-label="Вернуться назад">
-          <svg class="app-head-back-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-          <span>${escapeHtml(backLabel)}</span>
+        <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="back" aria-label="Вернуться назад" title="Назад">
+          <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </a>
       </div>` : ""}
       <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
