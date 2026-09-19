@@ -852,6 +852,52 @@
     },
   });
 
+    const homeView = () => {
+    const signed = state.user && !state.user.guest;
+    const cta = signed
+      ? `<a class="home-cta" href="${hrefFor("deck")}" data-nav="deck">Перейти в ленту ${ICONS.arrow}</a>`
+      : `<a class="home-cta" href="${hrefFor("register")}" data-nav="register">Создать профиль</a>
+         <p class="home-more"><a href="${hrefFor("login")}" data-nav="login">Войти</a></p>`;
+    const traitsBody = signed
+      ? `${ownTraitMarks()}<a class="ghost slim" href="${hrefFor("profile")}" data-nav="profile">Изменить в профиле</a>`
+      : `<p class="hint">По желанию. Можно указать диагнозы позже, в анкете.</p>
+         <a class="ghost slim" href="${hrefFor("register")}" data-nav="register">Добавить при создании профиля</a>`;
+    return `
+    ${appHead()}
+    <section class="home-v2">
+      <h1 class="home-v2-title">Отличные люди рядом</h1>
+      <p class="home-v2-sub">Знакомства для нейроотличных</p>
+      <div class="home-faces" aria-hidden="true">${HOME_FACES.map(
+        (src) =>
+          `<div class="home-face"><img src="${BASE}/public/${src}" alt="" width="120" height="150" onerror="this.remove()"></div>`
+      ).join("")}</div>
+      ${cta}
+      <button type="button" class="home-row" id="traits-open" aria-expanded="false" aria-controls="home-traits">
+        <span class="nav-ico" aria-hidden="true">${ICONS.tag}</span>
+        <span class="grow"><strong>Мои особенности</strong><small>по желанию</small></span>
+        <span class="nav-ico" aria-hidden="true">${ICONS.plus}</span>
+      </button>
+      <div class="home-panel" id="home-traits" hidden>${traitsBody}</div>
+      <button type="button" class="home-row" id="about-open" aria-expanded="false" aria-controls="home-about">
+        <span class="nav-ico" aria-hidden="true">${ICONS.book}</span>
+        <span class="grow"><strong>Как устроен WIRING</strong></span>
+        <span class="nav-ico" aria-hidden="true">${ICONS.arrow}</span>
+      </button>
+      <div class="home-panel" id="home-about" hidden>
+        <p>Профиль — фото, особенности и как тебе писать. Лента — анкеты свайпом. Если симпатия взаимная, открывается чат.</p>
+      </div>
+      <p class="home-quiet">Можно быть собой.</p>
+      <footer class="home-legal">
+        <span>18+</span>
+        <a href="/rules">Правила</a>
+        <a href="/privacy">Конфиденциальность</a>
+        <a href="/support">Поддержка</a>
+        ${signed ? `<a href="/glossary">Глоссарий</a><a href="${TEST_HREF}" target="_blank" rel="noopener">Тест</a>` : ""}
+      </footer>
+    </section>
+    ${tabbar()}`;
+  };
+
   const options = (kind, selected) =>
     (state.catalog[kind] || [])
       .map((item) => `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${item.label}</option>`)
@@ -2695,44 +2741,6 @@
     }
   };
 
-  let homeFeatureUnmount = null;
-  let homeFeatureModulePromise = null;
-
-  const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js`);
-    return homeFeatureModulePromise;
-  };
-
-  const buildHomeHostBridge = () => ({
-    basePath: BASE,
-    user: state.user,
-    catalog: state.catalog,
-    faces: HOME_FACES,
-    testHref: TEST_HREF,
-    hrefFor,
-    navigate: (view, extra) => {
-      void goToView(view, extra);
-    },
-  });
-
-  const renderHomeFeature = async () => {
-    homeFeatureUnmount?.();
-    homeFeatureUnmount = null;
-    root.innerHTML = `<div id="home-feature-root"></div>${tabbar()}`;
-    bindDataNavLinks();
-    bindThemeControls();
-    const mountEl = root.querySelector("#home-feature-root");
-    if (!mountEl) return;
-    try {
-      const mod = await loadHomeFeatureModule();
-      homeFeatureUnmount = mod.mountHome(mountEl, buildHomeHostBridge());
-      bindDataNavLinks();
-      syncUrl();
-    } catch (err) {
-      mountEl.innerHTML = `<p class="err">не загрузился модуль home (${err.message}). выполни npm run build</p>`;
-    }
-  };
-
   const render = () => {
     if (state.view === "profile") {
       captureProfileDraft();
@@ -2745,10 +2753,6 @@
     if (!AUTH_FEATURE_VIEWS.has(state.view)) {
       authFeatureUnmount?.();
       authFeatureUnmount = null;
-    }
-    if (state.view !== "home") {
-      homeFeatureUnmount?.();
-      homeFeatureUnmount = null;
     }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
@@ -2774,10 +2778,7 @@
       void renderAuthFeature("verify");
       return;
     }
-    if (state.view === "home" || !state.user) {
-      void renderHomeFeature();
-      return;
-    }
+    else if (state.view === "home" || !state.user) root.innerHTML = homeView();
     else if (state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile") bound = cityGateView();
     else if (state.view === "chat") root.innerHTML = chatView();
     else if (state.view === "matches") root.innerHTML = matchesView();
