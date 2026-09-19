@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
 
@@ -80,8 +81,9 @@ const photoUrl = (basePath: string, photo: unknown, name = "?") => {
     if (value.startsWith("/")) return `${basePath}${value}`;
     return `${basePath}/public/${value}`;
   }
-  const hue = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-  const svg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 40% 28%)"/><stop offset="1" stop-color="hsl(${(hue + 40) % 360} 50% 18%)"/></linearGradient></defs><rect width="400" height="520" fill="url(#g)"/><text x="200" y="280" text-anchor="middle" fill="#d8ff3c" font-size="84" font-family="Georgia">${name.slice(0, 1)}</text></svg>`);
+  const initial = [...String(name || "?").trim()][0]?.toUpperCase() || "?";
+  const hue = [...String(name || "?")].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+  const svg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 38% 32%)"/><stop offset="1" stop-color="hsl(${(hue + 36) % 360} 42% 22%)"/></linearGradient></defs><rect width="64" height="64" fill="url(#g)"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="#d8ff3c" font-size="26" font-family="Georgia">${initial}</text></svg>`);
   return `data:image/svg+xml,${svg}`;
 };
 
@@ -130,7 +132,7 @@ function ChatHeader({ host }: { host: ChatHostBridge }) {
           </a>
         ) : (
           <ProfileMenu
-            avatarUrl={avatarUrl(host.basePath, host.user!.photo, String(host.user!.name || "Профиль"))}
+            avatarUrl={profileMenuAvatarUrl(host.basePath, host.user!.photo)}
             userName={String(host.user!.name || "")}
             isPlus={Boolean(host.user!.plus)}
             profileHref={host.hrefFor("profile")}

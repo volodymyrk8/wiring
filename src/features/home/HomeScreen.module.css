@@ -112,7 +112,6 @@
   max-width: 22rem;
   margin: clamp(24px, 5vh, 44px) auto 0;
   padding: clamp(18px, 3.5vh, 28px) 8px 0;
-  border-top: 1px solid color-mix(in srgb, var(--line, rgba(0, 0, 0, 0.12)) 72%, transparent);
   text-align: center;
   font-family: var(--serif, "Fraunces", Georgia, serif);
   font-size: clamp(15px, 3.6vw, 17px);

@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Checkbox, LegalFooter, ProfileMenu } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileHostBridge } from "./types";
 import styles from "./ProfileScreen.module.css";
 
@@ -10,8 +11,6 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
   const [photo, setPhoto] = useState(!host.user.needs_photo_consent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const avatar = host.user.photo;
-
   const navigate = (view: string) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
     host.navigate(view);
@@ -48,7 +47,7 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
         onThemeSelect={host.onThemeSelect}
         rightSlot={
           <ProfileMenu
-            avatarUrl={avatar ? `${host.basePath}${avatar}` : undefined}
+            avatarUrl={profileMenuAvatarUrl(host.basePath, host.user.photo)}
             userName={String(host.user.name || "")}
             isPlus={Boolean(host.user.plus)}
             profileHref={host.hrefFor("profile")}

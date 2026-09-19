@@ -1,6 +1,7 @@
 import { useState, useRef } from "preact/hooks";
 import type { JSX } from "preact";
 import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
+import { ProfileAvatarIcon } from "./ProfileAvatarIcon";
 import styles from "./ProfileMenu.module.css";
 
 export type ProfileMenuProps = {
@@ -79,10 +80,7 @@ export function ProfileMenu({
           {avatarUrl ? (
             <img src={avatarUrl} alt="" />
           ) : (
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="7.8" r="3.4" />
-              <path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5" />
-            </svg>
+            <ProfileAvatarIcon />
           )}
         </span>
         {isPlus && (

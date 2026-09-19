@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, LegalFooter, ProfileMenu } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { AccountHostBridge } from "./types";
 import styles from "./AccountScreen.module.css";
 
@@ -32,7 +33,7 @@ function AccountHeader({ host, title, back = true }: { host: AccountHostBridge; 
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
     rightSlot={!host.user.guest ? <ProfileMenu
-      avatarUrl={avatarUrl(host.basePath, host.user.photo, String(host.user.name || "Профиль"))}
+      avatarUrl={profileMenuAvatarUrl(host.basePath, host.user.photo)}
       userName={String(host.user.name || "")}
       isPlus={Boolean(host.user.plus)}
       profileHref={host.hrefFor("profile")}

@@ -781,6 +781,9 @@ html[data-theme="dusk"] .theme-swatches .swatch[data-theme-set="dusk"] {
   object-position: center;
   display: block;
 }
+.avatar-link:not(:has(img)) {
+  color: var(--on-photo-muted, var(--muted));
+}
 .avatar-link.on { box-shadow: 0 0 0 2px var(--ink); }
 .plus-mark {
   position: absolute;
@@ -1429,8 +1432,8 @@ html[data-theme="slate"] .profile-menu-status {
   border-radius: 999px;
   overflow: hidden;
   box-sizing: border-box;
-  border: 1.5px solid var(--line);
-  background: var(--card);
+  border: 1px solid var(--line);
+  background: var(--photo);
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 .tabbar .nav-avatar img {
@@ -1438,6 +1441,16 @@ html[data-theme="slate"] .profile-menu-status {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.tabbar .nav-avatar--empty {
+  display: grid;
+  place-items: center;
+  color: var(--on-photo-muted, var(--muted));
+}
+.tabbar .nav-avatar--empty svg {
+  width: 11px;
+  height: 11px;
+  display: block;
 }
 .tabbar a.on .nav-avatar {
   border-color: var(--accent, var(--ink));

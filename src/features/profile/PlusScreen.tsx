@@ -2,23 +2,13 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, ProfileMenu, Switch } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileHostBridge, ProfileUser } from "./types";
 import styles from "./PlusScreen.module.css";
 
 const plusUntil = (timestamp?: number) => {
   if (!timestamp) return "";
   return new Date(timestamp * 1000).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
-};
-
-const avatarUrl = (basePath: string, photo: unknown, name = "Профиль") => {
-  let value = photo;
-  if (Array.isArray(value)) value = value[0];
-  if (value && typeof value === "object") value = (value as { url?: string }).url;
-  if (typeof value === "string" && value) {
-    if (value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("http")) return value;
-    return value.startsWith("/") ? `${basePath}${value}` : `${basePath}/public/${value}`;
-  }
-  return undefined;
 };
 
 const features = [
@@ -112,7 +102,7 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         onThemeSelect={host.onThemeSelect}
         rightSlot={signed ? (
           <ProfileMenu
-            avatarUrl={avatarUrl(host.basePath, user.photo, name)}
+            avatarUrl={profileMenuAvatarUrl(host.basePath, user.photo)}
             userName={name}
             isPlus={Boolean(user.plus)}
             profileHref={host.hrefFor("profile")}

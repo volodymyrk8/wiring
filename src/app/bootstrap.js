@@ -152,6 +152,10 @@ import { createInboxController } from "./inbox";
       `<circle cx="12" cy="7.8" r="3.4"/><path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5"/>`,
       { size: 20, strokeWidth: 1.8 }
     ),
+    profilePlaceholder: svgIcon(
+      `<circle cx="12" cy="7.8" r="3.4"/><path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5"/>`,
+      { size: 20, strokeWidth: 1.8 }
+    ),
     tag: svgIcon(`<path d="M4.5 12.8V5.5H12l7.2 7.2-6.5 6.5z"/><circle cx="8.2" cy="9.2" r="1" fill="currentColor" stroke="none"/>`, { size: 20 }),
     eye: svgIcon(`<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>`, { size: 18 }),
     eyeOff: svgIcon(`<path d="M3 4l17 16M10.5 10.7a2.6 2.6 0 0 0 3.7 3.6M9.4 5.5A11 11 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-4.2 4.6M6.2 6.7C3.8 8.3 2 12 2 12a17 17 0 0 0 5.4 5.2"/>`, { size: 18 }),
@@ -358,6 +362,12 @@ import { createInboxController } from "./inbox";
   };
   state.filters.real_only = false;
 
+  const photoRef = (photo) => {
+    if (Array.isArray(photo)) photo = photo[0];
+    if (photo && typeof photo === "object") photo = photo.url;
+    return String(photo || "").trim();
+  };
+
   const photoUrl = (photo, name) => {
     if (Array.isArray(photo)) photo = photo[0];
     if (photo && typeof photo === "object") photo = photo.url;
@@ -367,8 +377,9 @@ import { createInboxController } from "./inbox";
       return `${BASE}/public/${photo}`;
     }
     const hue = [...(name || "?")].reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+    const initial = [...String(name || "?").trim()][0]?.toUpperCase() || "?";
     const svg = encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 520'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='hsl(${hue} 40% 28%)'/><stop offset='1' stop-color='hsl(${(hue + 40) % 360} 50% 18%)'/></linearGradient></defs><rect width='400' height='520' fill='url(#g)'/><text x='200' y='280' text-anchor='middle' fill='#d8ff3c' font-size='84' font-family='Georgia'>${(name || "?").slice(0, 1)}</text></svg>`
+      `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='hsl(${hue} 38% 32%)'/><stop offset='1' stop-color='hsl(${(hue + 36) % 360} 42% 22%)'/></linearGradient></defs><rect width='64' height='64' fill='url(#g)'/><text x='32' y='32' dominant-baseline='central' text-anchor='middle' fill='#d8ff3c' font-size='26' font-family='Georgia' font-weight='500'>${initial}</text></svg>`
     );
     return `data:image/svg+xml,${svg}`;
   };
@@ -505,9 +516,10 @@ import { createInboxController } from "./inbox";
         || (state.view === "person" && from === "profile");
       const dest = state.user ? "profile" : "login";
       const label = state.user ? "Профиль" : "Войти";
-      const hasPhoto = Boolean(state.user && state.user.photo);
-      const icon = hasPhoto
-        ? `<span class="nav-avatar"><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></span>`
+      const icon = state.user
+        ? photoRef(state.user.photo)
+          ? `<span class="nav-avatar"><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></span>`
+          : `<span class="nav-avatar nav-avatar--empty" aria-hidden="true">${ICONS.profilePlaceholder}</span>`
         : ICONS.user;
       items.push([dest, label, icon, isMe]);
     }
@@ -533,7 +545,11 @@ import { createInboxController } from "./inbox";
     return `<div class="profile-pop">
       <button type="button" class="avatar-slot avatar-btn" id="profile-open" aria-expanded="false" aria-controls="profile-menu" aria-haspopup="true" aria-label="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}" title="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}">
         <span class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}">
-          <img src="${avatarUrl(state.user.photo, state.user.name)}" alt="">
+          ${
+            photoRef(state.user.photo)
+              ? `<img src="${avatarUrl(state.user.photo, state.user.name)}" alt="">`
+              : ICONS.profilePlaceholder
+          }
         </span>
         ${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">${ICONS.gem}</span>` : ""}
       </button>
@@ -861,7 +877,8 @@ import { createInboxController } from "./inbox";
       basePath: BASE,
       homeFaces: HOME_FACES,
       userTraits,
-      profileAvatar: state.user ? avatarUrl(state.user.photo, state.user.name) : undefined,
+      profileAvatar:
+        state.user && photoRef(state.user.photo) ? avatarUrl(state.user.photo, state.user.name) : undefined,
       userName: state.user?.name || "",
       hrefFor,
       navigate: (view) => {

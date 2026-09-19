@@ -11,6 +11,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
 
@@ -86,7 +87,8 @@ const photoSrc = (basePath: string, photo: unknown, name: string) => {
     return `${basePath}/public/${photo}`;
   }
   const hue = [...(name || "?")].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520"><rect width="400" height="520" fill="hsl(${hue} 32% 28%)"/><text x="200" y="280" text-anchor="middle" fill="#d8ff3c" font-size="84" font-family="Georgia">${(name || "?").slice(0, 1)}</text></svg>`)}`;
+  const initial = [...String(name || "?").trim()][0]?.toUpperCase() || "?";
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="hsl(${hue} 32% 28%)"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="#d8ff3c" font-size="26" font-family="Georgia">${initial}</text></svg>`)}`;
 };
 
 function PhotoManager({ host, user, consent, onChange }: { host: ProfileHostBridge; user: ProfileUser; consent: boolean; onChange: (user: ProfileUser) => void }) {
@@ -276,7 +278,7 @@ export function ProfileScreen({ host }: Props) {
         onThemeSelect={host.onThemeSelect}
         rightSlot={signed ? (
           <ProfileMenu
-            avatarUrl={primaryPhoto ? photoSrc(host.basePath, primaryPhoto.url, valueOf(user.name)) : photoSrc(host.basePath, user.photo, valueOf(user.name))}
+            avatarUrl={profileMenuAvatarUrl(host.basePath, primaryPhoto?.url || user.photo)}
             userName={valueOf(user.name)}
             isPlus={Boolean(user.plus)}
             profileHref={host.hrefFor("profile")}

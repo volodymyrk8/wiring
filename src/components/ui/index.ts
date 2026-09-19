@@ -11,6 +11,7 @@ export * from "./AccordionRow";
 export * from "./Select";
 export * from "./Modal";
 export * from "./BrandSection";
+export * from "./ProfileAvatarIcon";
 export * from "./ProfileMenu";
 export * from "./TagPicker";
 export * from "./useDismissibleLayer";

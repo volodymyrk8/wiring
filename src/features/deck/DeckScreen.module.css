@@ -14,9 +14,6 @@
 .filterFooter { display: flex; justify-content: flex-end; gap: 8px; }
 .pause { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; padding: 11px 13px; border: 1px solid var(--line); border-radius: 15px; background: var(--bg-2); color: var(--muted); font-size: 12px; line-height: 1.4; }
 .pause strong { color: var(--ink); font-weight: 500; }
-.profileNudge { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: 0 0 auto; padding: 11px 13px; border: 1px solid var(--accent-line); border-radius: 15px; background: var(--accent-soft); }
-.profileNudge strong { display: block; color: var(--ink); font-size: 13px; font-weight: 600; }
-.profileNudge p { margin: 3px 0 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
 .deck { position: relative; min-height: 220px; flex: 1 1 auto; margin: 0; overflow: visible; }
 .card { position: absolute; inset: 0; overflow: hidden; border-radius: 26px; background: var(--card); color: var(--ink); box-shadow: var(--shadow); touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .cardStacked { transform: scale(.96) translateY(10px); opacity: .55; pointer-events: none; }
@@ -53,8 +50,6 @@
 .error { margin: 0; color: var(--coral); font-size: 13px; text-align: center; }
 
 @media (max-width: 560px) {
-  .profileNudge { align-items: stretch; flex-direction: column; }
-  .profileNudge a { width: 100%; }
   .pause { align-items: stretch; flex-direction: column; }
   .pause button { width: 100%; }
   .deck { min-height: 220px; }

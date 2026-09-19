@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
 import type { LikeCard, LikesFilters, LikesHostBridge } from "./types";
 import styles from "./LikesScreen.module.css";
@@ -14,7 +15,8 @@ const avatarUrl = (basePath: string, photo: unknown, name = "?") => {
     if (value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("http")) return value;
     return value.startsWith("/") ? `${basePath}${value}` : `${basePath}/public/${value}`;
   }
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520"><rect width="400" height="520" fill="#303448"/><text x="200" y="280" text-anchor="middle" fill="#d8ff3c" font-size="84" font-family="Georgia">${String(name || "?").slice(0, 1)}</text></svg>`)}`;
+  const initial = [...String(name || "?").trim()][0]?.toUpperCase() || "?";
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#303448"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="#d8ff3c" font-size="26" font-family="Georgia">${initial}</text></svg>`)}`;
 };
 
 const iconFilter = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>;
@@ -162,7 +164,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
         onThemeSelect={host.onThemeSelect}
         rightSlot={host.user && !isGuest ? (
           <ProfileMenu
-            avatarUrl={avatarUrl(host.basePath, host.user.photo, String(host.user.name || "Профиль"))}
+            avatarUrl={profileMenuAvatarUrl(host.basePath, host.user.photo)}
             userName={String(host.user.name || "")}
             isPlus={Boolean(host.user.plus)}
             profileHref={host.hrefFor("profile")}
