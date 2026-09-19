@@ -1,6 +1,6 @@
 # Frontend migration map
 
-The application is intentionally in an incremental migration state. The shell remains the coordinator for session state, navigation, URL synchronization, and legacy screens; feature bundles own migrated UI.
+The application uses a thin shell coordinator. Feature bundles own all user-facing SPA screens; the shell keeps session state, navigation, URL synchronization, and cross-screen services.
 
 ## Current ownership
 
@@ -24,7 +24,7 @@ The application is intentionally in an incremental migration state. The shell re
 - session and route state;
 - navigation and URL synchronization;
 - shared host bridges for feature bundles;
-- legacy fallback rendering while a screen is being migrated.
+- cross-screen services such as API access, inbox polling, and photo upload.
 
 New screen markup, feature-specific event binding, and new polling must not be added there. Put them in a feature module or a small `src/app/` service when they are cross-screen concerns.
 
@@ -34,12 +34,12 @@ New screen markup, feature-specific event binding, and new polling must not be a
 2. Define a typed host bridge in `src/features/<name>/types.ts`.
 3. Move markup and event handlers into a Preact screen with CSS Modules.
 4. Mount it from the existing route without changing public URLs.
-5. Keep the legacy renderer only as a temporary load-failure fallback.
+5. Use a visible module-load error state while the bundle is unavailable; do not add a second legacy renderer.
 6. Add or update route/API tests and run `npm run typecheck`, `npm run build`, and `./scripts/test.sh`.
-7. Remove the old renderer and its global CSS only after the fallback is no longer needed.
+7. Remove the old renderer and its global CSS in the same migration change once the feature bundle is verified.
 
 ## Do not do during migration
 
 - Do not introduce a second global store just to move one screen.
 - Do not change API semantics and UI architecture in the same untested step.
-- Do not delete legacy code before the new bundle has a real fallback or the migration is verified locally.
+- Do not add screen markup or feature-specific event binding back to `bootstrap.js`.

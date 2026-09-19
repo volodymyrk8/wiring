@@ -12,7 +12,7 @@
 | Area | Source of truth | Rule |
 |---|---|---|
 | Server/API | `app.py`, domain modules, `database.py` | Keep HTTP handlers thin when extracting new domain code. |
-| SPA shell | `src/app/bootstrap.js` | Legacy-only. Do not add new screens here; extract or migrate existing code instead. |
+| SPA shell | `src/app/bootstrap.js` | Coordinator-only: routing, session state, API orchestration, and host bridges. Do not add screen markup here. |
 | Shared client API | `src/app/api.ts` | Use the shared client and preserve same-origin credentials. |
 | Inbox lifecycle | `src/app/inbox.ts` | Keep polling, badges, notices, and browser notifications here. |
 | Preact UI | `src/features/<name>/` | Put screen logic, types, and feature styles together. |

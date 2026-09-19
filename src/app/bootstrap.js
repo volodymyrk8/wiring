@@ -60,18 +60,12 @@ import { createInboxController } from "./inbox";
     likesIn: 0,
     unread: 0,
     busy: false,
-    pendingFiles: [],
-    guestNudge: false,
-    guestNudgeHidden: false,
-    notifySkip: localStorage.getItem("wiring-notify-skip") === "1",
+
     pendingPath: "",
     pendingRef: sessionStorage.getItem("wiring-ref") || "",
-    profileDraft: null,
-    profileEdit: null,
     chatId: null,
   };
   const urlSyncState = { lastUrl: "" };
-  let profileScrollY = 0;
 
   let routing = null;
   const ensureRouting = () => {
@@ -404,162 +398,6 @@ import { createInboxController } from "./inbox";
     return (list.find((x) => x.id === id) || {}).label || id;
   };
 
-  const itemOf = (kind, id) => (state.catalog?.[kind] || []).find((x) => x.id === id) || { id, label: id };
-
-  const tipText = (kind, id) => {
-    const item = itemOf(kind, id);
-    return item.tip || item.expand || item.hint || "";
-  };
-
-  const chipMark = (kind, id, extra = "") => {
-    const item = itemOf(kind, id);
-    const tip = escapeAttr(tipText(kind, id));
-    return `<span class="chip has-tip ${kind === "vibe" ? "vibe" : ""} ${extra}" data-tip="${tip}" tabindex="0">${escapeHtml(item.label || id)}<i class="tip-bubble">${escapeHtml(tipText(kind, id))}</i></span>`;
-  };
-
-  const TEST_HREF = "https://neuro-raznoobrazie.web.app/";
-  const TEST_LINK = `<a href="${TEST_HREF}" target="_blank" rel="noopener">neuro-raznoobrazie.web.app</a>`;
-  const GLOSS_LINK = `не знаешь, что выбрать? пройди тест: ${TEST_LINK}`;
-  const PICK_NEURO = "wiring-pick-neuro";
-
-  const seedNeuro = () => {
-    const q = new URLSearchParams(location.search).get("neuro") || "";
-    const stored = sessionStorage.getItem(PICK_NEURO) || "";
-    sessionStorage.removeItem(PICK_NEURO);
-    const id = q || stored;
-    return (state.catalog?.neuro || []).some((item) => item.id === id) ? [id] : [];
-  };
-
-  const uiButton = ({
-    variant = "solid",
-    slim = false,
-    fullWidth = false,
-    type = "button",
-    href = "",
-    nav = "",
-    disabled = false,
-    className = "",
-    id = "",
-    children = "",
-  } = {}) => {
-    const cls = ["btn", variant, slim ? "slim" : "", fullWidth ? "fullWidth" : "", className].filter(Boolean).join(" ");
-    const idAttr = id ? ` id="${escapeAttr(id)}"` : "";
-    if (href) {
-      const navAttr = nav ? ` data-nav="${escapeAttr(nav)}"` : "";
-      return `<a class="${cls}" href="${escapeAttr(href)}"${navAttr}${idAttr}><span>${children}</span></a>`;
-    }
-    return `<button class="${cls}" type="${escapeAttr(type)}"${idAttr}${disabled ? " disabled" : ""}><span>${children}</span></button>`;
-  };
-
-  const captionHtml = (kind, id) => {
-    const item = itemOf(kind, id);
-    const expand = item.expand || item.label || id;
-    const blurb = item.blurb || item.hint || "";
-    return `<b>${escapeHtml(expand)}</b>${blurb ? `<br>${escapeHtml(blurb)}` : ""}`;
-  };
-
-  const setCaption = (kind, id) => {
-    root.querySelectorAll(`[data-caption="${kind}"]`).forEach((el) => {
-      if (!id) {
-        el.hidden = true;
-        el.innerHTML = "";
-        return;
-      }
-      el.hidden = false;
-      el.innerHTML = captionHtml(kind, id);
-    });
-  };
-
-  const pickerBlock = (kind, selected, { id = "", lead = "", gloss = false, test = false, bindAs = "" } = {}) => `
-    <div class="chip-picker">
-      <p class="hint">${lead}${test ? ` Не знаешь, что выбрать? Пройди <a href="${TEST_HREF}" target="_blank" rel="noopener noreferrer">тест нейроотличий ↗</a>.` : ""}${gloss ? ` ${GLOSS_LINK}` : ""}</p>
-      <div class="chips"${id ? ` id="${id}"` : ""}>${chips(kind, selected, bindAs || kind)}</div>
-      ${kind === "intents" || bindAs ? "" : `<p class="chip-caption" data-caption="${kind}" hidden></p>`}
-    </div>`;
-
-  const chips = (kind, selected, bindKind = kind) =>
-    (state.catalog?.[kind] || [])
-      .map((item) => {
-        const on = selected.includes(item.id) ? "on" : "";
-        const tipText = item.tip || item.hint || "";
-        const tippy = (kind === "neuro" || kind === "vibe") && tipText && !String(bindKind).startsWith("hide");
-        const tip = tippy ? escapeAttr(tipText) : "";
-        const mark = tippy ? `<span class="tip-mark" data-tip-open title="что это">?</span>` : "";
-        return `<button type="button" class="chip ${tippy ? "has-tip" : ""} ${kind === "vibe" ? "vibe" : ""} ${on}" data-kind="${bindKind}" data-id="${item.id}"${
-          tip ? ` data-tip="${tip}"` : ""
-        }>${item.label}${mark}${tippy ? `<i class="tip-bubble">${escapeHtml(tipText)}</i>` : ""}</button>`;
-      })
-      .join("");
-
-  const bindTips = () => {
-    const placeTip = (el) => {
-      el.classList.remove("tip-start", "tip-end");
-      const chipRect = el.getBoundingClientRect();
-      const pad = 10;
-      const maxW = Math.min(280, window.innerWidth * 0.72);
-      const center = chipRect.left + chipRect.width / 2;
-      if (center - maxW / 2 < pad) el.classList.add("tip-start");
-      else if (center + maxW / 2 > window.innerWidth - pad) el.classList.add("tip-end");
-    };
-    root.querySelectorAll(".has-tip").forEach((el) => {
-      const kind = el.dataset.kind;
-      const id = el.dataset.id;
-      const show = () => {
-        root.querySelectorAll(".has-tip.show").forEach((other) => {
-          if (other !== el) other.classList.remove("show");
-        });
-        placeTip(el);
-        el.classList.add("show");
-        if (kind && id) setCaption(kind, id);
-      };
-      const hide = () => el.classList.remove("show");
-      el.addEventListener("pointerenter", () => {
-        if (el.matches(":hover")) show();
-      });
-      el.addEventListener("pointerleave", hide);
-      el.addEventListener("focus", show);
-      el.addEventListener("blur", hide);
-      if (el.tagName !== "BUTTON") {
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (el.classList.contains("show")) hide();
-          else show();
-        });
-      }
-      el.querySelectorAll("[data-tip-open]").forEach((mark) => {
-        mark.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (el.classList.contains("show")) hide();
-          else show();
-          if (kind && id) setCaption(kind, id);
-        });
-      });
-    });
-  };
-
-  const bindChips = (selectedMap) => {
-    root.querySelectorAll(".chip[data-id]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        if (e.target.closest("[data-tip-open]")) return;
-        const kind = btn.dataset.kind;
-        const id = btn.dataset.id;
-        const arr = selectedMap[kind];
-        const i = arr.indexOf(id);
-        if (i >= 0) {
-          arr.splice(i, 1);
-          btn.classList.remove("on");
-          btn.classList.remove("show");
-          setCaption(kind, arr.length ? arr[arr.length - 1] : "");
-        } else {
-          arr.push(id);
-          btn.classList.add("on");
-          setCaption(kind, id);
-        }
-      });
-    });
-  };
-
   const toast = (text, action) => {
     const el = document.createElement("div");
     el.className = action ? "toast tap" : "toast";
@@ -569,13 +407,8 @@ import { createInboxController } from "./inbox";
     setTimeout(() => el.remove(), action ? 10000 : 2200);
   };
 
-  const canNotify = () => typeof Notification !== "undefined";
-  const notifyAllowed = () => canNotify() && Notification.permission === "granted";
-  const canAskNotify = () =>
-    canNotify() && Notification.permission === "default" && !state.notifySkip && state.user && !state.user.guest;
-
   const pingBrowser = (text) => {
-    if (!notifyAllowed() || !text) return;
+    if (typeof Notification === "undefined" || Notification.permission !== "granted" || !text) return;
     try {
       const note = new Notification("WIRING", {
         body: text,
@@ -593,21 +426,6 @@ import { createInboxController } from "./inbox";
     }
   };
 
-  const askNotify = async () => {
-    if (!canNotify()) {
-      toast("этот браузер не умеет уведомления");
-      return;
-    }
-    try {
-      await Notification.requestPermission();
-    } catch {
-      /* ignore */
-    }
-    state.notifySkip = Notification.permission !== "granted";
-    if (state.notifySkip) localStorage.setItem("wiring-notify-skip", "1");
-    else localStorage.removeItem("wiring-notify-skip");
-    render();
-  };
 
   const compressImage = async (file) => {
     let bitmap;
@@ -814,30 +632,11 @@ import { createInboxController } from "./inbox";
       ? `<nav class="tabbar" aria-label="разделы">${navLinks("tab")}</nav>`
       : "";
 
-  const legalFooterBar = (signed = false) => `
-    <footer class="legal-footer-bar" aria-label="юридическая информация">
-      <span class="badge-18">18+</span>
-      <a href="/rules">правила</a>
-      <a href="/privacy">конфиденциальность</a>
-      <a href="/support">поддержка</a>
-      ${signed ? `<a href="/glossary">глоссарий</a>` : ""}
-    </footer>`;
-
   const authLayout = (body) => `
       ${appHead({ logoPosition: "center", showActions: true, showBack: true })}
       <div class="auth-shell">
         <section class="panel auth-panel">${body}</section>
       </div>`;
-
-  const ownTraitMarks = () => {
-    const neuro = state.user?.neuro || [];
-    const vibe = state.user?.vibe || [];
-    if (!neuro.length && !vibe.length) return `<p class="hint">Пока ничего не отмечено — это нормально.</p>`;
-    return `<div class="chips">${[
-      ...neuro.map((id) => `<span class="chip">${escapeHtml(labelOf("neuro", id))}</span>`),
-      ...vibe.map((id) => `<span class="chip vibe">${escapeHtml(labelOf("vibe", id))}</span>`),
-    ].join("")}</div>`;
-  };
 
   const cityGateView = () => ({
     html: `
@@ -873,52 +672,6 @@ import { createInboxController } from "./inbox";
     },
   });
 
-    const homeView = () => {
-    const signed = state.user && !state.user.guest;
-    const cta = signed
-      ? `<a class="home-cta" href="${hrefFor("deck")}" data-nav="deck">Перейти в ленту ${ICONS.arrow}</a>`
-      : `<a class="home-cta" href="${hrefFor("register")}" data-nav="register">Создать профиль</a>
-         <p class="home-more"><a href="${hrefFor("login")}" data-nav="login">Войти</a></p>`;
-    const traitsBody = signed
-      ? `${ownTraitMarks()}<a class="ghost slim" href="${hrefFor("profile")}" data-nav="profile">Изменить в профиле</a>`
-      : `<p class="hint">По желанию. Можно указать диагнозы позже, в анкете.</p>
-         <a class="ghost slim" href="${hrefFor("register")}" data-nav="register">Добавить при создании профиля</a>`;
-    return `
-    ${appHead()}
-    <section class="home-v2">
-      <h1 class="home-v2-title">Отличные люди рядом</h1>
-      <p class="home-v2-sub">Знакомства для нейроотличных</p>
-      <div class="home-faces" aria-hidden="true">${HOME_FACES.map(
-        (src) =>
-          `<div class="home-face"><img src="${BASE}/public/${src}" alt="" width="120" height="150" onerror="this.remove()"></div>`
-      ).join("")}</div>
-      ${cta}
-      <button type="button" class="home-row" id="traits-open" aria-expanded="false" aria-controls="home-traits">
-        <span class="nav-ico" aria-hidden="true">${ICONS.tag}</span>
-        <span class="grow"><strong>Мои особенности</strong><small>по желанию</small></span>
-        <span class="nav-ico" aria-hidden="true">${ICONS.plus}</span>
-      </button>
-      <div class="home-panel" id="home-traits" hidden>${traitsBody}</div>
-      <button type="button" class="home-row" id="about-open" aria-expanded="false" aria-controls="home-about">
-        <span class="nav-ico" aria-hidden="true">${ICONS.book}</span>
-        <span class="grow"><strong>Как устроен WIRING</strong></span>
-        <span class="nav-ico" aria-hidden="true">${ICONS.arrow}</span>
-      </button>
-      <div class="home-panel" id="home-about" hidden>
-        <p>Профиль — фото, особенности и как тебе писать. Лента — анкеты свайпом. Если симпатия взаимная, открывается чат.</p>
-      </div>
-      <p class="home-quiet">Можно быть собой.</p>
-    </section>
-    ${legalFooterBar(signed)}
-    ${tabbar()}`;
-  };
-
-  const options = (kind, selected) =>
-    (state.catalog[kind] || [])
-      .map((item) => `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${item.label}</option>`)
-      .join("");
-
-  const formatMultiline = (text) => escapeHtml(String(text || "")).replace(/\n/g, "<br>");
 
   const friendlyLike = () => {
     const intents = state.user?.intents || (state.user?.intent ? [state.user.intent] : []);
@@ -944,24 +697,6 @@ import { createInboxController } from "./inbox";
     const block = places.find((b) => b.country === country);
     const list = block ? [...(block.cities || [])] : places.flatMap((b) => b.cities || []);
     return list.sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  };
-
-  const citySelect = (name, selected, { required = true, allowEmpty = false, emptyLabel = "город или выбери из списка", id = "" } = {}) => {
-    const places = state.catalog.places || [];
-    const current = selected || "";
-    const listId = `${id || name || "city"}-list`;
-    const options = places
-      .flatMap((block) => block.cities || [])
-      .slice()
-      .sort((a, b) => String(a).localeCompare(String(b), "ru"))
-      .map((c) => `<option value="${escapeAttr(c)}"></option>`)
-      .join("");
-    return `<span class="city-combo">
-      <input name="${name}" ${id ? `id="${id}"` : ""} list="${listId}" value="${escapeAttr(current)}" ${
-        required && !allowEmpty ? "required" : ""
-      } maxlength="48" autocomplete="address-level2" placeholder="${escapeAttr(emptyLabel)}">
-      <datalist id="${listId}">${options}</datalist>
-    </span>`;
   };
 
   const placeFields = (selectedCity, { name = "city", required = true, id = "city", country = "" } = {}) => {
@@ -1000,14 +735,8 @@ import { createInboxController } from "./inbox";
         if (!list) return;
         const cities = citiesForCountry(sel.value);
         list.innerHTML = cities.map((c) => `<option value="${escapeAttr(c)}"></option>`).join("");
-        if (state.profileDraft) state.profileDraft.country = sel.value;
       });
     });
-  };
-
-  const clearProfileDraft = () => {
-    state.profileDraft = null;
-    state.profileEdit = null;
   };
 
   const logout = async () => {
@@ -1015,42 +744,9 @@ import { createInboxController } from "./inbox";
       await api("/api/logout", { method: "POST" });
     } catch (_) {}
     state.user = null;
-    clearProfileDraft();
     state.view = "home";
     stopInbox();
     render();
-  };
-
-  const captureProfileDraft = () => {
-    if (state.view !== "profile") return;
-    const form = root.querySelector("form#me");
-    if (!form || !state.user || state.user.guest) return;
-    // Before bind() profileEdit is empty — do not clobber tags with [].
-    const edit = state.profileEdit;
-    if (!edit) return;
-    const fd = new FormData(form);
-    state.profileDraft = {
-      name: String(fd.get("name") || ""),
-      age: String(fd.get("age") || ""),
-      country: root.querySelector("#profile-city-country")?.value || "",
-      city: String(fd.get("city") || ""),
-      gender: String(fd.get("gender") || ""),
-      looking_for: String(fd.get("looking_for") || ""),
-      height: String(fd.get("height") || ""),
-      job: String(fd.get("job") || ""),
-      bio: String(fd.get("bio") || ""),
-      communication: String(fd.get("communication") || ""),
-      neuro: [...(edit.neuro || [])],
-      vibe: [...(edit.vibe || [])],
-      intents: [...(edit.intents || [])],
-      prompts: (edit.prompts || []).map((p) => ({ id: p.id, answer: p.answer })),
-      hide_tags: [...(edit.hideNeuro || []), ...(edit.hideVibe || [])],
-      seek_min_age: String(fd.get("seek_min_age") || ""),
-      seek_max_age: String(fd.get("seek_max_age") || ""),
-      seek_place: String(fd.get("seek_place") || ""),
-      special_data_consent: Boolean(root.querySelector("#special-data-consent")?.checked),
-      photo_rights_consent: Boolean(root.querySelector("#photo-rights-consent")?.checked),
-    };
   };
 
   const passwordField = (name, { autocomplete = "current-password", required = true, value = "" } = {}) =>
@@ -1076,402 +772,6 @@ import { createInboxController } from "./inbox";
       });
     });
   };
-
-  const intentPicker = (selected, { id = "intents" } = {}) => {
-    const picked = Array.isArray(selected) ? [...selected] : selected ? [selected] : ["dating"];
-    return {
-      selected: picked,
-      html: `<div class="chip-picker">
-        <p class="hint">зачем ты здесь — можно несколько</p>
-        <div class="chips" id="${id}">${chips("intents", picked)}</div>
-      </div>`,
-    };
-  };
-
-  const promptFields = (prompts) => {
-    const used = new Set(prompts.map((p) => p.id));
-    return `
-      <div class="prompt-edit" id="prompts">
-        ${prompts
-          .map(
-            (p, i) => `
-          <div class="prompt-card" data-prompt-i="${i}">
-            <div class="q">${escapeHtml(labelOf("prompts", p.id))}</div>
-            <textarea data-prompt-answer="${i}" maxlength="280">${escapeHtml(p.answer)}</textarea>
-            <button type="button" class="ghost slim" data-prompt-del="${i}">убрать</button>
-          </div>`
-          )
-          .join("")}
-        ${
-          prompts.length < 3
-            ? `<label>добавить промпт
-                <select id="prompt-add">
-                  <option value="">выбери вопрос</option>
-                  ${(state.catalog.prompts || [])
-                    .filter((p) => !used.has(p.id))
-                    .map((p) => `<option value="${p.id}">${p.label}</option>`)
-                    .join("")}
-                </select>
-              </label>`
-            : ""
-        }
-      </div>`;
-  };
-
-  const bindPrompts = (prompts) => {
-    const redraw = () => {
-      const box = root.querySelector("#prompts");
-      if (!box) return;
-      box.outerHTML = promptFields(prompts);
-      bindPrompts(prompts);
-    };
-    root.querySelectorAll("[data-prompt-answer]").forEach((el) => {
-      el.addEventListener("input", () => {
-        prompts[Number(el.dataset.promptAnswer)].answer = el.value;
-      });
-    });
-    root.querySelectorAll("[data-prompt-del]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        prompts.splice(Number(btn.dataset.promptDel), 1);
-        redraw();
-      });
-    });
-    const add = root.querySelector("#prompt-add");
-    if (add) {
-      add.addEventListener("change", () => {
-        if (!add.value) return;
-        prompts.push({ id: add.value, answer: "" });
-        redraw();
-      });
-    }
-  };
-
-  const filePicker = (id) =>
-    `<label class="photo-add">+<input id="${id}" type="file" accept="image/*" multiple></label>`;
-
-  const profileNudge = () => {
-    if (!state.user || state.user.guest || !state.user.needs_profile) return "";
-    return `<div class="profile-nudge">
-      <div>
-        <strong>Анкета ещё пустая</strong>
-        <p>Можно смотреть ленту. Чтобы тебя находили — добавь фото, город и особенности.</p>
-      </div>
-      <a class="solid slim" href="${hrefFor("profile")}" data-nav="profile">дозаполнить</a>
-    </div>`;
-  };
-
-  const goAfterInvite = async () => {
-    if (state.pendingPath) {
-      const pending = state.pendingPath;
-      state.pendingPath = "";
-      history.replaceState({ view: "pending" }, "", `${BASE}${pending}`);
-      urlSyncState.lastUrl = `${BASE}${pending}`;
-      await hydrateFromUrl();
-      return;
-    }
-    state.view = "deck";
-    await loadFeed();
-    render();
-  };
-
-
-
-
-  const photoManager = (u) => {
-    const albums = u.albums || [];
-    const photos = Array.isArray(u.photos) && u.photos.length && typeof u.photos[0] === "object" ? u.photos : albums.flatMap((a) => a.photos || []);
-    const avatar = photos.find((ph) => ph.is_primary) || photos[0];
-    return `
-      ${
-        avatar
-          ? `<div class="avatar-pick">
-        <img class="avatar-preview" src="${avatarUrl(avatar.url, u.name)}" alt="">
-        <div class="hint">аватар</div>
-      </div>`
-          : ""
-      }
-      <div class="photo-grid">
-        ${photos
-          .map(
-            (ph) => `
-          <div class="photo-cell ${ph.is_primary ? "primary" : ""}" style="background-image:url('${photoUrl(ph.url, u.name)}')">
-            <button type="button" class="photo-pick-btn" data-primary="${ph.id}" aria-label="${ph.is_primary ? "это аватар" : "сделать аватаром"}"></button>
-            ${ph.is_primary ? `<span class="avatar-badge">аватар</span>` : ""}
-            <button type="button" class="photo-del" data-del-photo="${ph.id}" aria-label="убрать фото">×</button>
-          </div>`
-          )
-          .join("")}
-        ${filePicker("add-photos")}
-      </div>`;
-  };
-
-
-  const profileView = () => {
-    const u = state.user;
-    const d = state.profileDraft || {};
-    const neuro = [...(Array.isArray(d.neuro) ? d.neuro : u.neuro || [])];
-    const vibe = [...(Array.isArray(d.vibe) ? d.vibe : u.vibe || [])];
-    const prompts = (Array.isArray(d.prompts) ? d.prompts : u.prompts || []).map((p) => ({ ...p }));
-    const intentSeed = Array.isArray(d.intents) ? d.intents : u.intents || (u.intent ? [u.intent] : ["dating"]);
-    const intentsHold = intentPicker(intentSeed, { id: "me-intents" });
-    const nameVal = d.name != null ? d.name : u.name;
-    const ageVal = d.age != null && d.age !== "" ? d.age : u.age;
-    const cityVal = d.city != null ? d.city : u.city;
-    const countryVal = d.country || countryOfCity(cityVal);
-    const genderVal = d.gender || u.gender;
-    const lookingVal = d.looking_for || u.looking_for;
-    const heightVal = d.height != null ? d.height : u.height || "";
-    const jobVal = d.job != null ? d.job : u.job || "";
-    const bioVal = d.bio != null ? d.bio : u.bio;
-    const communicationVal = d.communication != null ? d.communication : u.communication || "";
-    const specialOn = d.special_data_consent != null ? d.special_data_consent : !u.needs_special_consent;
-    const photoOn = d.photo_rights_consent != null ? d.photo_rights_consent : !u.needs_photo_consent;
-    const seekMin = d.seek_min_age != null ? d.seek_min_age : u.seek_min_age || 18;
-    const seekMax = d.seek_max_age != null ? d.seek_max_age : u.seek_max_age || 99;
-    const seekPlace = d.seek_place != null ? d.seek_place : u.seek_place || "";
-    const hideTags = [...(Array.isArray(d.hide_tags) ? d.hide_tags : u.hide_tags || [])];
-    const hideNeuro = hideTags.filter((id) => (state.catalog?.neuro || []).some((x) => x.id === id));
-    const hideVibe = hideTags.filter((id) => (state.catalog?.vibe || []).some((x) => x.id === id));
-    const seekPlaceOpts = [
-      `<option value="" ${!seekPlace ? "selected" : ""}>везде</option>`,
-      cityVal
-        ? `<option value="${escapeAttr(cityVal)}" ${seekPlace === cityVal ? "selected" : ""}>только ${escapeHtml(cityVal)}</option>`
-        : "",
-      ...(state.catalog?.places || []).map(
-        (b) =>
-          `<option value="${escapeAttr(b.country)}" ${seekPlace === b.country ? "selected" : ""}>${escapeHtml(
-            b.country
-          )}</option>`
-      ),
-    ].join("");
-    return {
-      html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Профиль${u.guest ? "" : u.plus ? ` <span class="plus-pill on">WIRING+</span>` : ` <span class="plus-pill">без плюса</span>`}</h2>
-        ${
-          u.guest
-            ? `<p class="lede">Это гостевой просмотр. Чтобы тебя находили, грузили фото и можно было писать — собери свой аккаунт.</p>
-               <div class="actions"><a class="solid" href="${hrefFor("register")}" data-nav="register">создать профиль</a><button class="ghost" id="out">на главную</button></div>`
-            : `${
-                u.needs_profile
-                  ? `<p class="lede">Дозаполни анкету — без фото, города и особенностей тебя не видно в ленте. Можно сохранить и вернуться позже.</p>`
-                  : ""
-              }<form class="form" id="me">
-          <div class="consent-box">
-            <p class="hint">сначала согласия — без них анкету с особенностями и фото сохранить нельзя:</p>
-            <label class="check"><input name="special_data_consent" id="special-data-consent" type="checkbox" ${
-              specialOn ? "checked" : ""
-            } ${u.needs_special_consent && !specialOn ? "required" : ""} autocomplete="off"> согласен(на) на обработку и показ выбранных особенностей</label>
-            <label class="check"><input name="photo_rights_consent" id="photo-rights-consent" type="checkbox" ${
-              photoOn ? "checked" : ""
-            } ${u.needs_photo_consent && !photoOn ? "required" : ""} autocomplete="off"> загружаю только свои фото и разрешаю показывать их участникам WIRING</label>
-          </div>
-          <div>
-            <div class="hint">фото — минимум одно</div>
-            ${photoManager(u)}
-          </div>
-          <div class="row">
-            <label>имя<input name="name" value="${escapeAttr(nameVal)}" required></label>
-            <label>возраст<input name="age" type="number" min="18" max="99" value="${escapeAttr(ageVal)}" required></label>
-          </div>
-          ${placeFields(cityVal, { id: "profile-city", country: countryVal })}
-          <div class="row">
-            <label>кто ты<select name="gender">${options("genders", genderVal)}</select></label>
-            <label>кого ищешь<select name="looking_for">${options("looking_for", lookingVal)}</select></label>
-          </div>
-          ${intentsHold.html}
-          <div class="plus-box">
-            <div class="q">кто может меня находить</div>
-            <p class="hint">для ленты: кого пускать к тебе. взаимный «кого ищешь» и так учитывается.</p>
-            <div class="filter-row">
-              <label>от<input name="seek_min_age" type="number" min="18" max="99" value="${escapeAttr(seekMin)}"></label>
-              <label>до<input name="seek_max_age" type="number" min="18" max="99" value="${escapeAttr(seekMax)}"></label>
-              <label>место<select name="seek_place">${seekPlaceOpts}</select></label>
-            </div>
-            ${pickerBlock("neuro", hideNeuro, { id: "hide-neuro", lead: "не показывать, если у них есть диагноз:", gloss: false, bindAs: "hideNeuro" })}
-            ${pickerBlock("vibe", hideVibe, { id: "hide-vibe", lead: "не показывать, если у них такой вайб:", gloss: false, bindAs: "hideVibe" })}
-          </div>
-          <label>рост, см<input name="height" type="number" min="140" max="220" value="${escapeAttr(heightVal)}" placeholder="необязательно"></label>
-          <label>занятость<input name="job" maxlength="60" value="${escapeAttr(jobVal)}" placeholder="необязательно"></label>
-          ${pickerBlock("neuro", neuro, {
-            lead: "свои диагнозы и расстройства — хотя бы одно. Нажми «?» на теге — коротко, что это.",
-            test: true,
-          })}
-          ${pickerBlock("vibe", vibe, { lead: "вайб анкеты — как с тобой лучше быть." })}
-          <label>о себе<textarea name="bio" maxlength="1200" placeholder="специальный интерес, сенсорные лимиты, чего лучше не делать">${escapeHtml(bioVal)}</textarea></label>
-          <label>как тебе писать<textarea name="communication" maxlength="280" placeholder="голосовые ок / нет, small talk — сразу в блок">${escapeHtml(communicationVal)}</textarea></label>
-          <div>
-            <div class="hint">промпты — до трёх</div>
-            ${promptFields(prompts)}
-          </div>
-          <div class="plus-box">
-            <div class="q">уведомления</div>
-            ${
-              notifyAllowed()
-                ? `<p class="hint">браузерные уведомления включены — лайки и сообщения, пока вкладка жива.</p>`
-                : canNotify()
-                  ? `<p class="hint">браузер скажет, когда лайкнули или написали. работает, пока сайт открыт.</p>
-                     <button class="ghost slim" type="button" id="enable-notify">включить уведомления</button>`
-                  : `<p class="hint">этот браузер не умеет системные уведомления — смотри счётчики в шапке.</p>`
-            }
-          </div>
-          <a class="plus-box" href="${hrefFor("plus")}" data-nav="plus" style="display:flex;align-items:center;justify-content:space-between;text-decoration:none;color:inherit;cursor:pointer;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span class="badge-gem-icon" aria-hidden="true" style="width:22px;height:22px;">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M6 3h12l4 6-10 13L2 9Z"/>
-                  <path d="M11 3 8 9l4 13 4-13-3-6"/>
-                  <path d="M2 9h20"/>
-                </svg>
-              </span>
-              <div>
-                <div class="q" style="margin:0;">WIRING+</div>
-                <p class="hint" style="margin:2px 0 0;">${u.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</p>
-              </div>
-            </div>
-            <span class="ghost slim" style="pointer-events:none;">настроить ↗</span>
-          </a>
-          ${
-            u.ref_url
-              ? `<div class="plus-box">
-            <div class="q">пригласи своих</div>
-            <p class="hint">по ссылке зарегистрируется человек — WIRING+ на ${u.ref_days || 30} дней вам обоим. уже привели: ${u.ref_count || 0}</p>
-            <div class="ref-row">
-              <input id="ref-link" readonly value="${escapeAttr(u.ref_url)}">
-              <button class="ghost slim" type="button" id="ref-copy">копировать</button>
-            </div>
-          </div>`
-              : ""
-          }
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">сохранить</button>
-            <button class="ghost" type="button" id="out">выйти</button>
-            <button class="ghost" type="button" id="kill">удалить аккаунт</button>
-          </div>
-        </form>`
-        }
-        ${legalFooterBar(true)}
-      </section>
-      ${tabbar()}`,
-      bind() {
-        const out = root.querySelector("#out");
-        if (out) {
-          out.addEventListener("click", async () => {
-            await api("/api/logout", { method: "POST" });
-            state.user = null;
-            clearProfileDraft();
-            state.view = "home";
-            stopInbox();
-            render();
-          });
-        }
-        if (u.guest) return;
-        state.profileEdit = { neuro, vibe, intents: intentsHold.selected, prompts, hideNeuro, hideVibe };
-        bindChips({ neuro, vibe, intents: intentsHold.selected, hideNeuro, hideVibe });
-        bindTips();
-        bindPrompts(prompts);
-        bindPlaceCountry();
-        const killBtn = root.querySelector("#kill");
-        if (killBtn) {
-          killBtn.addEventListener("click", () => { void goToView("delete-account"); });
-        }
-        const add = root.querySelector("#add-photos");
-        if (add) {
-          add.addEventListener("change", async () => {
-            for (const file of add.files) {
-              try {
-                await uploadPhoto(file);
-              } catch (err) {
-                toast(err.message);
-              }
-            }
-            await refreshMe();
-            render();
-          });
-        }
-        root.querySelectorAll("[data-primary]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            if (btn.closest(".photo-cell")?.classList.contains("primary")) return;
-            try {
-              await api(`/api/photos/${btn.dataset.primary}`, { method: "PATCH", body: JSON.stringify({ is_primary: true }) });
-              await refreshMe();
-              toast("это теперь аватар");
-              render();
-            } catch (err) {
-              toast(err.message);
-            }
-          });
-        });
-        root.querySelectorAll("[data-del-photo]").forEach((btn) => {
-          btn.addEventListener("click", async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!confirm("Убрать это фото?")) return;
-            try {
-              await api(`/api/photos/${btn.dataset.delPhoto}`, { method: "DELETE" });
-              await refreshMe();
-              toast("фото удалено");
-              render();
-            } catch (err) {
-              toast(err.message);
-            }
-          });
-        });
-        root.querySelector("#me").addEventListener("submit", async (e) => {
-          e.preventDefault();
-          const form = new FormData(e.target);
-          const payload = Object.fromEntries(form.entries());
-          payload.age = Number(payload.age);
-          payload.height = payload.height ? Number(payload.height) : null;
-          const edit = state.profileEdit || {};
-          payload.neuro = [...(edit.neuro || neuro)];
-          payload.vibe = [...(edit.vibe || vibe)];
-          payload.intents = [...(edit.intents || intentsHold.selected)];
-          delete payload.intent;
-          payload.prompts = (edit.prompts || prompts).filter((p) => String(p.answer || "").trim().length >= 4);
-          payload.seek_min_age = Number(payload.seek_min_age || 18);
-          payload.seek_max_age = Number(payload.seek_max_age || 99);
-          payload.seek_place = String(payload.seek_place || "").trim();
-          payload.hide_tags = [...(edit.hideNeuro || hideNeuro), ...(edit.hideVibe || hideVibe)];
-          payload.special_data_consent = form.has("special_data_consent") || form.get("special_data_consent") === "1" || form.get("special_data_consent") === "on";
-          payload.photo_rights_consent = form.has("photo_rights_consent") || form.get("photo_rights_consent") === "1" || form.get("photo_rights_consent") === "on";
-          if (root.querySelector("#special-data-consent")?.checked) payload.special_data_consent = true;
-          if (root.querySelector("#photo-rights-consent")?.checked) payload.photo_rights_consent = true;
-          if (!payload.neuro.length) {
-            root.querySelector("#err").textContent = "отметь хотя бы одну особенность";
-            return;
-          }
-          if (!payload.special_data_consent) {
-            root.querySelector("#err").textContent = "отметь согласие на особенности — чекбоксы в начале анкеты";
-            root.querySelector("#special-data-consent")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-          if (!payload.photo_rights_consent) {
-            root.querySelector("#err").textContent = "отметь согласие на фото — чекбоксы в начале анкеты";
-            root.querySelector("#photo-rights-consent")?.scrollIntoView({ behavior: "smooth", block: "center" });
-            return;
-          }
-          const photos = Array.isArray(u.photos) ? u.photos : [];
-          if (!photos.length && !u.photo) {
-            root.querySelector("#err").textContent = "нужно хотя бы одно фото";
-            return;
-          }
-          try {
-            const data = await api("/api/me", { method: "PATCH", body: JSON.stringify(payload) });
-            state.user = data.user;
-            clearProfileDraft();
-            toast("сохранено");
-            render();
-          } catch (err) {
-            root.querySelector("#err").textContent = err.message;
-          }
-        });
-      },
-    };
-  };
-
 
   const openPerson = async (id, from) => {
     const data = await api(`/api/people/${id}`);
@@ -1523,7 +823,6 @@ import { createInboxController } from "./inbox";
         return;
       }
       if (direction === "snooze") toast("отложено на неделю");
-      else if (data.guest_nudge) state.guestNudge = true;
     } catch (err) {
       if (err?.payload?.matched && err.payload?.match?.id) {
         toast(err.message);
@@ -1714,7 +1013,6 @@ import { createInboxController } from "./inbox";
     deletePhoto: (id) => api(`/api/photos/${id}`, { method: "DELETE" }).then(() => undefined),
     onUserUpdated: (user) => {
       state.user = user;
-      clearProfileDraft();
     },
     onLogout: logout,
     onThemeSelect: (theme) => applyTheme(theme),
@@ -1814,7 +1112,6 @@ import { createInboxController } from "./inbox";
     continueAfterInvite: goAfterInvite,
     onDeleted: async () => {
       state.user = null;
-      clearProfileDraft();
       stopInbox();
       await goToView("home");
     },
@@ -1913,7 +1210,7 @@ import { createInboxController } from "./inbox";
   });
 
   const goToView = async (next, meta = {}) => {
-    if (meta.neuro && next === "register") sessionStorage.setItem(PICK_NEURO, meta.neuro);
+    if (meta.neuro && next === "register") sessionStorage.setItem("wiring_pick_neuro", meta.neuro);
     if (meta.neuro && next === "deck") {
       state.filters.neuro = [meta.neuro];
       persistFilters();
@@ -1934,7 +1231,6 @@ import { createInboxController } from "./inbox";
     state.view = next;
     state.photoIndex = 0;
     if (next !== "chat") state.chatId = null;
-    if (next !== "profile" && next !== "plus" && next !== "consents") clearProfileDraft();
     if (state.view === "deck" && state.user) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
@@ -1945,7 +1241,7 @@ import { createInboxController } from "./inbox";
       await loadLikes();
       await refreshMe();
     }
-    if (["profile", "consents", "plus"].includes(state.view) && state.user && !state.profileDraft) await refreshMe();
+    if (["profile", "consents", "plus"].includes(state.view) && state.user) await refreshMe();
     render();
   };
 
@@ -2003,11 +1299,8 @@ import { createInboxController } from "./inbox";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = homeView();
-      bindFold("#traits-open", "#home-traits");
-      bindFold("#about-open", "#home-about");
-      bindDataNavLinks();
-      bindThemeControls();
+      root.innerHTML = `<p class="err">не загрузился модуль home (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль home (${err.message}).`);
     }
   };
 
@@ -2030,11 +1323,7 @@ import { createInboxController } from "./inbox";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      const fallback = profileView();
-      root.innerHTML = fallback.html;
-      fallback.bind();
-      bindDataNavLinks();
-      bindThemeControls();
+      root.innerHTML = `<p class="err">не загрузился модуль profile (${escapeHtml(err.message)}). выполни npm run build</p>`;
       toast(`не загрузился модуль profile (${err.message}).`);
     }
   };
@@ -2152,10 +1441,6 @@ import { createInboxController } from "./inbox";
   };
 
   const render = () => {
-    if (state.view === "profile") {
-      captureProfileDraft();
-      profileScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-    }
     document.documentElement.dataset.view = state.view;
     document.documentElement.toggleAttribute("data-tabs", showsTabbar());
     let bound = null;
@@ -2245,14 +1530,11 @@ import { createInboxController } from "./inbox";
       void renderProfileFeature(state.view);
       return;
     }
-    else root.innerHTML = homeView();
+    else root.innerHTML = `<p class="err">неизвестный раздел приложения</p>`;
 
     if (bound) {
       root.innerHTML = bound.html;
       bound.bind();
-    }
-    if (state.view === "profile") {
-      requestAnimationFrame(() => window.scrollTo(0, profileScrollY));
     }
     bindDataNavLinks();
     root.querySelectorAll("[data-person]").forEach((btn) => {
@@ -2261,41 +1543,6 @@ import { createInboxController } from "./inbox";
         openPerson(Number(btn.dataset.person), btn.dataset.from || "deck");
       });
     });
-    const hideNudge = root.querySelector("#hide-nudge");
-    if (hideNudge) {
-      hideNudge.addEventListener("click", () => {
-        state.guestNudgeHidden = true;
-        render();
-      });
-    }
-    const enableNotify = root.querySelector("#enable-notify");
-    if (enableNotify) enableNotify.addEventListener("click", () => askNotify());
-    const copyRef = root.querySelector("#ref-copy");
-    if (copyRef) {
-      copyRef.addEventListener("click", async () => {
-        const link = (root.querySelector("#ref-link") || {}).value || "";
-        if (!link) return;
-        try {
-          await navigator.clipboard.writeText(link);
-          toast("ссылка скопирована");
-        } catch {
-          const input = root.querySelector("#ref-link");
-          if (input) {
-            input.focus();
-            input.select();
-          }
-          toast("скопируй ссылку");
-        }
-      });
-    }
-    const skipNotify = root.querySelector("#skip-notify");
-    if (skipNotify) {
-      skipNotify.addEventListener("click", () => {
-        state.notifySkip = true;
-        localStorage.setItem("wiring-notify-skip", "1");
-        render();
-      });
-    }
     bindThemeControls();
     root.querySelectorAll(".beta-wrap").forEach((wrap) => {
       wrap.addEventListener("click", (e) => {
@@ -2304,20 +1551,6 @@ import { createInboxController } from "./inbox";
         wrap.classList.toggle("is-open");
       });
     });
-    const bindFold = (btnId, panelId) => {
-      const foldBtn = root.querySelector(btnId);
-      const panel = root.querySelector(panelId);
-      if (!foldBtn || !panel) return;
-      foldBtn.addEventListener("click", () => {
-        const open = foldBtn.getAttribute("aria-expanded") === "true";
-        foldBtn.setAttribute("aria-expanded", String(!open));
-        panel.hidden = open;
-      });
-    };
-    bindFold("#traits-open", "#home-traits");
-    bindFold("#about-open", "#home-about");
-
-    bindTips();
     syncUrl();
   };
 
@@ -2410,7 +1643,6 @@ import { createInboxController } from "./inbox";
     state.user = me.user;
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread || 0;
-    state.guestNudge = !!me.user?.guest_nudge;
     if (me.user) {
       await applyInbox(
         { likes_in: me.user.likes_in, unread: me.user.unread, notices: me.user.notices || [] },

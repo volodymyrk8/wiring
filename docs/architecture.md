@@ -31,7 +31,7 @@ flowchart LR
 ```
 
 1. Почти все «страницы» (`/`, `/login`, `/feed`, `/chats/...`) — один **`templates/index.html`**: пустой `#app` + подключение собранного shell `public/dist/app.js`.
-2. **`src/app/bootstrap.js`** пока содержит legacy-совместимый shell, ходит в **`/api/*`**, хранит состояние в памяти и синхронизирует URL через history API. Общий API-клиент вынесен в `src/app/api.ts`, inbox-lifecycle — в `src/app/inbox.ts`, lazy-загрузка feature-бандлов — в `src/app/features.ts`; экраны постепенно переходят на Preact.
+2. **`src/app/bootstrap.js` — coordinator shell**: ходит в **`/api/*`**, хранит session state в памяти, синхронизирует URL через history API и передаёт typed host bridges в feature bundles. Общий API-клиент вынесен в `src/app/api.ts`, inbox-lifecycle — в `src/app/inbox.ts`, lazy-загрузка feature-бандлов — в `src/app/features.ts`; пользовательские экраны живут в Preact.
 3. Отдельные **серверные шаблоны**: `templates/admin.html`, `templates/legal.html` (правила, privacy, support).
 4. Доменная логика вынесена из монолита в модули рядом с `app.py`: `catalog`, `notify`, `premium`, `media`, `matchmaker`, и т.д.
 
@@ -47,10 +47,10 @@ flowchart LR
 **Компромиссы (не баги, а долг)**
 
 - **`app.py` большой** — маршруты и часть бизнес-логики в одном файле; дальше новые фичи лучше не раздувать его без нужды.
-- **`src/app/bootstrap.js` пока большой** — старые экраны ещё живут внутри shell; новые экраны выносятся в `src/features/*`, после чего соответствующий legacy-код удаляется.
+- **`src/app/bootstrap.js` всё ещё заметный** — в нём остаются routing, session state, API orchestration и host bridges; экранная разметка туда больше не добавляется.
 - **Нет отдельного API-контракта** (OpenAPI) — ок для одной команды и одного клиента.
-- **Основная зона миграции** — legacy-shell: новые экраны не добавляются в `bootstrap.js`, а существующие переносятся по одному в `src/features/*`.
-- **Уже мигрированы в Preact** — auth, home, profile, consents, WIRING+, likes, person, deck, account и chats; legacy-разметка этих экранов удаляется после проверки bundle и полного набора тестов.
+- **UI-граница** — новые экраны и feature-specific handlers добавляются только в `src/features/*`; `bootstrap.js` остаётся orchestration-слоем.
+- **Мигрированы в Preact** — auth, home, profile, consents, WIRING+, likes, person, deck, account и chats. Старые screen renderers и связанные global styles удалены.
 
 Итого: архитектура **простая и уместная** для WIRING; главный риск — рост двух монолитов (`app.py`, `src/app/bootstrap.js`), его гасим **KISS** и точечным выносом, а не новым стеком.
 
@@ -71,8 +71,7 @@ flowchart LR
 | HTTP API, сессии | `app.py` или новый модуль + импорт в `app.py` |
 | Справочники, тексты каталога | `catalog.py`, `cities.py`, … |
 | Разметка нового экрана | `src/features/<name>/` на Preact |
-| Временная legacy-разметка | `src/app/bootstrap.js` до миграции экрана |
-| Стили shell и legacy | `public/styles.css` |
+| Shell-стили и server-template compatibility | `public/styles.css` |
 | Стили Preact-экрана | рядом с экраном: `src/features/<name>/*.module.css` |
 | Админка / legal HTML | `templates/`, `legal_pages.py` |
 | Скрипты dev/seed | `scripts/` |
