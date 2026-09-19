@@ -30,12 +30,19 @@ const ArrowIcon = () => (
   </svg>
 );
 
+const UserIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="3.2" />
+    <path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8" />
+  </svg>
+);
+
 export type HomeScreenProps = {
   host: HomeHostBridge;
 };
 
 export function HomeScreen({ host }: HomeScreenProps) {
-  const { signed, basePath = "", homeFaces, userTraits, profileAvatar, hrefFor, navigate, onThemeSelect } = host;
+  const { signed, isPlus, basePath = "", homeFaces, userTraits, profileAvatar, hrefFor, navigate, onThemeSelect } = host;
 
   const handleNav = (view: string) => (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     e.preventDefault();
@@ -51,20 +58,33 @@ export function HomeScreen({ host }: HomeScreenProps) {
         onThemeSelect={onThemeSelect}
         rightSlot={
           signed ? (
+            <span class="avatar-slot">
+              <a
+                href={hrefFor("profile")}
+                onClick={handleNav("profile")}
+                class={`avatar-link${isPlus ? " plus" : ""}`}
+                data-nav="profile"
+                aria-label={isPlus ? "профиль · WIRING+" : "профиль"}
+              >
+                {profileAvatar ? (
+                  <img src={profileAvatar} alt="" />
+                ) : (
+                  <UserIcon />
+                )}
+              </a>
+              {isPlus && <span class="plus-mark" title="WIRING+" aria-hidden="true">+</span>}
+            </span>
+          ) : (
             <a
-              href={hrefFor("profile")}
-              onClick={handleNav("profile")}
-              class={styles.profileBtn}
-              data-nav="profile"
-              aria-label="мой профиль"
+              href={hrefFor("login")}
+              onClick={handleNav("login")}
+              class="icon-btn profile-slot"
+              data-nav="login"
+              aria-label="войти"
             >
-              {profileAvatar ? (
-                <img src={profileAvatar} alt="" class={styles.avatarImg} />
-              ) : (
-                <span class={styles.avatarPlaceholder} />
-              )}
+              <UserIcon />
             </a>
-          ) : undefined
+          )
         }
       />
 

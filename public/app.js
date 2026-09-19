@@ -2636,10 +2636,11 @@
 
     return {
       signed,
+      isPlus: Boolean(state.user?.plus),
       basePath: BASE,
       homeFaces: HOME_FACES,
       userTraits,
-      profileAvatar: state.user?.photo ? `${BASE}/${state.user.photo}` : undefined,
+      profileAvatar: state.user ? avatarUrl(state.user.photo, state.user.name) : undefined,
       hrefFor,
       navigate: (view) => {
         void goToView(view);
