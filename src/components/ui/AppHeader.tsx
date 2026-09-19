@@ -5,21 +5,21 @@ import { Select, type SelectOption } from "./Select";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
-  { id: "mist", label: "дымка" },
+  { id: "mist", label: "день" },
   { id: "pastel", label: "пастель" },
   { id: "night", label: "ночь" },
   { id: "dusk", label: "сумерки" },
-  { id: "slate", label: "грифель" },
+  { id: "slate", label: "графит" },
 ] as const;
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
 
 export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
-  { value: "mist", label: "дымка", swatchTheme: "mist" },
+  { value: "mist", label: "день", swatchTheme: "mist" },
   { value: "pastel", label: "пастель", swatchTheme: "pastel" },
   { value: "night", label: "ночь", swatchTheme: "night" },
   { value: "dusk", label: "сумерки", swatchTheme: "dusk" },
-  { value: "slate", label: "грифель", swatchTheme: "slate" },
+  { value: "slate", label: "графит", swatchTheme: "slate" },
 ];
 
 export type AppHeaderProps = {
