@@ -110,8 +110,8 @@ class LogicTest(unittest.TestCase):
         buf = BytesIO()
         Image.new("RGB", (800, 600), (20, 30, 40)).save(buf, format="JPEG")
         thumb = make_thumb(buf.getvalue())
-        out = Image.open(BytesIO(thumb))
-        self.assertLessEqual(max(out.size), 192)
+        with Image.open(BytesIO(thumb)) as out:
+            self.assertLessEqual(max(out.size), 192)
         self.assertLess(len(thumb), len(buf.getvalue()))
 
     def test_moderation_blocks_only_sexual(self):

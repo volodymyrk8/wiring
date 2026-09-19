@@ -94,11 +94,6 @@ import { createInboxController } from "./inbox";
     return state.pendingRef || sessionStorage.getItem("wiring-ref") || "";
   };
 
-  const currentHref = () =>
-    hrefFor(state.view, {
-      id: state.view === "chat" ? state.chatId : state.view === "person" ? state.person?.id : undefined,
-    });
-
   const syncUrl = () => {
     routing.syncViewToUrl(urlSyncState, BASE, state.view, {
       id:
@@ -231,15 +226,6 @@ import { createInboxController } from "./inbox";
       }
     });
   };
-  const themeSwatches = () =>
-    `<div class="theme-swatches" role="group" aria-label="цвет">
-      ${Object.entries(THEMES)
-        .map(
-          ([id, t]) =>
-            `<button type="button" class="swatch" data-theme-set="${id}" aria-label="${t.label}" title="${t.label}"></button>`
-        )
-        .join("")}
-    </div>`;
   const themePicker = () => {
     const cur = themeNow();
     return `<div class="theme-pop">

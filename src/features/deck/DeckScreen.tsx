@@ -82,7 +82,7 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: DeckHostBridge
   </div>;
 }
 
-function DeckCardView({ host, card, stacked, photoIndex, dragX, onPhotoChange, onOpen }: { host: DeckHostBridge; card: DeckCard; stacked?: boolean; photoIndex: number; dragX: number; onPhotoChange: (direction: number) => void; onOpen: () => void }) {
+function DeckCardView({ host, card, stacked, photoIndex, dragX, onOpen }: { host: DeckHostBridge; card: DeckCard; stacked?: boolean; photoIndex: number; dragX: number; onOpen: () => void }) {
   const photos = photosFor(card);
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...labels(host.catalog, "genders", card.gender)].filter(Boolean).join(" · ");
@@ -183,8 +183,8 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
       {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={unpause}>снять паузу</Button></aside> : null}
       {current ? <>
         <div class={styles.deck} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { startRef.current = null; setDragX(0); }}>
-          {next ? <DeckCardView host={host} card={next} stacked photoIndex={0} dragX={0} onPhotoChange={selectPhoto} onOpen={() => {}} /> : null}
-          <DeckCardView host={host} card={current} photoIndex={photoIndex} dragX={dragX} onPhotoChange={selectPhoto} onOpen={() => host.navigate("person", { id: current.id })} />
+          {next ? <DeckCardView host={host} card={next} stacked photoIndex={0} dragX={0} onOpen={() => {}} /> : null}
+          <DeckCardView host={host} card={current} photoIndex={photoIndex} dragX={dragX} onOpen={() => host.navigate("person", { id: current.id })} />
         </div>
         <div class={styles.controls}>
           <button type="button" class={`${styles.action} ${styles.pass}`} disabled={busy} onClick={() => action("pass")} aria-label="пропустить" title="пропустить">{iconPass}</button>

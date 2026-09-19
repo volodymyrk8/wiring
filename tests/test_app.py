@@ -682,6 +682,7 @@ class WiringTest(unittest.TestCase):
         media = self.client.get(msg["photo_url"])
         self.assertEqual(media.status_code, 200)
         self.assertTrue(media.data[:3] == b"\xff\xd8\xff" or media.mimetype.startswith("image"))
+        media.close()
         with patch("app.moderate_photo", side_effect=MediaError("это фото нельзя загрузить")):
             blocked = self.client.post(
                 "/api/messages/photo",
@@ -995,6 +996,8 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(full.status_code, 200)
         self.assertLess(len(small.data), len(full.data))
         self.assertIn("image/jpeg", small.headers.get("Content-Type", ""))
+        small.close()
+        full.close()
 
     def test_delete_account_soft_delete_and_password(self):
         # Register a new user
