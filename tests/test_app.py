@@ -16,7 +16,7 @@ os.environ["ADMIN_TOKEN"] = "test-admin-token"
 
 from PIL import Image
 
-from app import app, init_db, _rate  # noqa: E402
+from app import app, db, init_db, _rate  # noqa: E402
 from database import open_request_connection, table_names  # noqa: E402
 from media import MediaError  # noqa: E402
 from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
@@ -468,8 +468,23 @@ class WiringTest(unittest.TestCase):
         ids = [m["id"] for m in matches]
         self.assertEqual(ids[0], mia["id"], "свежий мэтч без сообщений выше старого чата")
         self.assertIn(leo["id"], ids)
+        self.client.post("/api/messages", json={"to_id": mia["id"], "body": "история должна остаться"})
         gone = self.client.post("/api/unmatch", json={"user_id": mia["id"]})
         self.assertEqual(gone.status_code, 200)
+        with app.app_context():
+            row = db().execute(
+                "SELECT body, deleted_at FROM messages WHERE from_id = ? AND to_id = ?",
+                (ada["id"], leo["id"]),
+            ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertIsNone(row["deleted_at"], "unmatching another chat must not touch its history")
+            mia_row = db().execute(
+                "SELECT body, deleted_at FROM messages WHERE from_id = ? AND to_id = ?",
+                (ada["id"], mia["id"]),
+            ).fetchone()
+            self.assertIsNotNone(mia_row, "unmatching must keep the message row")
+            self.assertEqual(mia_row["body"], "история должна остаться")
+            self.assertGreater(mia_row["deleted_at"], 0, "unmatching must soft-delete messages")
         after = {m["id"] for m in self.client.get("/api/matches").get_json()["matches"]}
         self.assertNotIn(mia["id"], after)
         feed_ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}

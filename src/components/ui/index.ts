@@ -1,8 +1,7 @@
 export * from "./Button";
 export * from "./Checkbox";
 export * from "./Input";
-export * from "./FieldFloating";
-export * from "./PasswordField";
+export * from "./Textarea";
 export * from "./LegalFooter";
 export * from "./AppHeader";
 export * from "./Tooltip";
@@ -11,3 +10,5 @@ export * from "./Select";
 export * from "./Modal";
 export * from "./BrandSection";
 export * from "./ProfileMenu";
+export * from "./TagPicker";
+export * from "./useDismissibleLayer";

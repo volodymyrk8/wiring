@@ -256,17 +256,6 @@
   margin-top: 14px;
 }
 
-.footerHint a {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: opacity 0.15s ease;
-}
-
-.footerHint a:hover {
-  opacity: 0.75;
-}
-
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }

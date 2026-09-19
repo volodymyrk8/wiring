@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
+import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
 import styles from "./Select.module.css";
 
 const CheckIcon = () => (
@@ -28,6 +29,11 @@ export type SelectProps<T extends string = string> = {
   defaultValue?: T;
   onChange?: (value: T) => void;
   placeholder?: string;
+  label?: string;
+  required?: boolean;
+  id?: string;
+  error?: string | boolean;
+  hint?: string;
   variant?: "default" | "iconOnly" | "pill";
   align?: "left" | "right";
   icon?: ComponentChildren;
@@ -45,6 +51,11 @@ export function Select<T extends string = string>({
   defaultValue,
   onChange,
   placeholder = "Выбрать…",
+  label: fieldLabel,
+  required,
+  id,
+  error,
+  hint,
   variant = "default",
   align = "right",
   icon,
@@ -57,6 +68,8 @@ export function Select<T extends string = string>({
 }: SelectProps<T>) {
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? options[0]?.value);
   const [isOpen, setIsOpen] = useState(false);
+  const [placement, setPlacement] = useState<"down" | "up">("down");
+  const [menuMaxHeight, setMenuMaxHeight] = useState(320);
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -64,33 +77,42 @@ export function Select<T extends string = string>({
   const selectedValue = isControlled ? controlledValue : internalValue;
   const selectedOption = options.find((o) => o.value === selectedValue);
 
+  useDismissibleLayer(wrapRef, isOpen, () => setIsOpen(false));
+
   useEffect(() => {
     if (!isOpen) return;
 
-    const onDocClick = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+    const updatePlacement = () => {
+      const wrap = wrapRef.current;
+      const menu = menuRef.current;
+      if (!wrap || !menu) return;
+      const rect = wrap.getBoundingClientRect();
+      const menuHeight = Math.min(menu.scrollHeight, 320);
+      const below = window.innerHeight - rect.bottom - 12;
+      const above = rect.top - 12;
+      const nextPlacement = below < menuHeight && above > below ? "up" : "down";
+      const available = Math.max(48, nextPlacement === "up" ? above : below);
+      setPlacement(nextPlacement);
+      setMenuMaxHeight(Math.min(320, available));
     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
+    requestAnimationFrame(updatePlacement);
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
 
-    document.addEventListener("click", onDocClick);
-    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("click", onDocClick);
-      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
     };
   }, [isOpen]);
 
   const toggleOpen = (e: JSX.TargetedMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsOpen((prev) => !prev);
+    if (!isOpen) {
+      announcePopupOpen(wrapRef.current);
+    }
+    setIsOpen(!isOpen);
   };
 
   const handleSelect = (option: SelectOption<T>) => (e: JSX.TargetedMouseEvent<HTMLButtonElement>) => {
@@ -106,15 +128,23 @@ export function Select<T extends string = string>({
 
   const isIconOnly = variant === "iconOnly";
   const isPill = variant === "pill";
+  const hasFieldLabel = Boolean(fieldLabel) && !isIconOnly;
+  const hasError = Boolean(error);
+  const errorId = id ? `${id}-error` : undefined;
+  const hintId = id ? `${id}-hint` : undefined;
 
   return (
-    <div ref={wrapRef} class={`${styles.selectWrap}${className ? ` ${className}` : ""}`}>
+    <div ref={wrapRef} class={`${styles.selectWrap}${hasFieldLabel ? ` ${styles.hasFieldLabel}` : ""}${hasError ? ` ${styles.hasError}` : ""}${className ? ` ${className}` : ""}`}>
       <button
+        id={id}
         type="button"
         class={`${styles.trigger}${isIconOnly ? ` ${styles.iconTrigger}` : ""}${isPill ? ` ${styles.pillTrigger}` : ""}${!showValue && !isIconOnly ? ` ${styles.compactTrigger}` : ""}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={ariaLabel || title || selectedOption?.label || placeholder}
+        aria-label={ariaLabel || fieldLabel || title || selectedOption?.label || placeholder}
+        aria-required={required}
+        aria-invalid={hasError}
+        aria-describedby={hasError && typeof error === "string" ? errorId : hint ? hintId : undefined}
         title={title || selectedOption?.label}
         onClick={toggleOpen}
       >
@@ -127,8 +157,12 @@ export function Select<T extends string = string>({
         ) : null}
 
         {!isIconOnly && showValue && (
-          <span class={styles.label}>{selectedOption?.label || placeholder}</span>
+          <span class={`${hasFieldLabel ? styles.value : styles.label}${!selectedOption ? ` ${styles.placeholder}` : ""}`}>
+            {selectedOption?.label || placeholder}
+          </span>
         )}
+
+        {hasFieldLabel && <span class={styles.fieldLabel}>{fieldLabel}</span>}
 
         {showChevron && !isIconOnly && (
           <span class={`${styles.chevron}${isOpen ? ` ${styles.chevronOpen}` : ""}`} aria-hidden="true">
@@ -137,12 +171,19 @@ export function Select<T extends string = string>({
         )}
       </button>
 
+      {typeof error === "string" && error ? (
+        <span id={errorId} class={styles.errorText} role="alert">{error}</span>
+      ) : hint ? (
+        <span id={hintId} class={styles.hintText}>{hint}</span>
+      ) : null}
+
       {isOpen && (
         <div
           ref={menuRef}
           role="listbox"
           tabIndex={-1}
-          class={`${styles.menu}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
+          style={{ maxHeight: `${menuMaxHeight}px` }}
+          class={`${styles.menu}${placement === "up" ? ` ${styles.menuUp}` : ""}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
         >
           {options.map((option) => {
             const isSelected = option.value === selectedValue;

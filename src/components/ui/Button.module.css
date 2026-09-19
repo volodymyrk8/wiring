@@ -48,6 +48,10 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+:global(html[data-theme="pastel"]) .solid {
+  color: #ffffff;
+}
+
 .solid:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 22px var(--accent-soft), 0 2px 4px rgba(0, 0, 0, 0.12);

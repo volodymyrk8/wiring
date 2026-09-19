@@ -271,6 +271,7 @@ def init_db() -> None:
             to_id INTEGER NOT NULL,
             body TEXT NOT NULL,
             created_at INTEGER NOT NULL,
+            deleted_at INTEGER DEFAULT NULL,
             FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
         );
@@ -297,6 +298,7 @@ def init_db() -> None:
             user_id INTEGER NOT NULL,
             other_id INTEGER NOT NULL,
             last_read_id INTEGER NOT NULL DEFAULT 0,
+            deleted_at INTEGER DEFAULT NULL,
             PRIMARY KEY (user_id, other_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
@@ -432,6 +434,8 @@ def init_db() -> None:
         )
     _ensure_column(conn, "messages", "reply_to_id", "INTEGER")
     _ensure_column(conn, "messages", "photo", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "messages", "deleted_at", "INTEGER")
+    _ensure_column(conn, "reads", "deleted_at", "INTEGER")
     # Map free-text cities onto the catalog when an alias/exact match exists.
     for row in conn.execute("SELECT id, city FROM users"):
         resolved = catalog_city(str(row["city"] or ""))
@@ -1131,13 +1135,13 @@ def blocked_ids(conn: Connection, uid: int) -> set[int]:
 
 def unread_count(conn: Connection, me: int, other: int) -> int:
     row = conn.execute(
-        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ?",
+        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ? AND COALESCE(deleted_at, 0) = 0",
         (me, other),
     ).fetchone()
     last_id = int(row["last_read_id"]) if row else 0
     return int(
         conn.execute(
-            "SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND id > ?",
+            "SELECT COUNT(*) AS n FROM messages WHERE from_id = ? AND to_id = ? AND id > ? AND COALESCE(deleted_at, 0) = 0",
             (other, me, last_id),
         ).fetchone()["n"]
     )
@@ -1147,7 +1151,8 @@ def mark_read(conn: Connection, me: int, other: int) -> None:
     last = conn.execute(
         """
         SELECT id FROM messages
-        WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+          AND COALESCE(deleted_at, 0) = 0
         ORDER BY id DESC LIMIT 1
         """,
         (me, other, other, me),
@@ -1155,8 +1160,8 @@ def mark_read(conn: Connection, me: int, other: int) -> None:
     last_id = int(last["id"]) if last else 0
     conn.execute(
         """
-        INSERT INTO reads (user_id, other_id, last_read_id) VALUES (?, ?, ?)
-        ON CONFLICT(user_id, other_id) DO UPDATE SET last_read_id = excluded.last_read_id
+        INSERT INTO reads (user_id, other_id, last_read_id, deleted_at) VALUES (?, ?, ?, NULL)
+        ON CONFLICT(user_id, other_id) DO UPDATE SET last_read_id = excluded.last_read_id, deleted_at = NULL
         """,
         (me, other, last_id),
     )
@@ -1245,35 +1250,26 @@ def _is_match(conn: Connection, a: int, b: int) -> bool:
 
 
 def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
-    """Remove chat: your side becomes a pass (diz), their like is dropped.
+    """Hide chat: your side becomes a pass, their like is dropped.
 
-    They leave Чаты and Лайки and stay out of the лента until you restore passes.
+    The chat history is retained and soft-deleted for audit/recovery. They leave
+    Чаты and Лайки and stay out of the лента until you restore passes.
     """
     now = int(time.time())
-    for row in conn.execute(
-        """
-        SELECT photo FROM messages
-        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
-          AND photo IS NOT NULL AND photo != ''
-        """,
-        (uid, other_id, other_id, uid),
-    ):
-        rel = str(row["photo"] or "")
-        if not rel or ".." in rel or rel.startswith("/"):
-            continue
-        full = os.path.join(UPLOAD_DIR, rel)
-        if os.path.isfile(full):
-            try:
-                os.remove(full)
-            except OSError:
-                pass
     conn.execute(
-        "DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)",
-        (uid, other_id, other_id, uid),
+        """
+        UPDATE messages SET deleted_at = ?
+        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+          AND deleted_at IS NULL
+        """,
+        (now, uid, other_id, other_id, uid),
     )
     conn.execute(
-        "DELETE FROM reads WHERE (user_id = ? AND other_id = ?) OR (user_id = ? AND other_id = ?)",
-        (uid, other_id, other_id, uid),
+        """
+        UPDATE reads SET deleted_at = ?
+        WHERE (user_id = ? AND other_id = ?) OR (user_id = ? AND other_id = ?)
+        """,
+        (now, uid, other_id, other_id, uid),
     )
     conn.execute(
         """
@@ -1310,6 +1306,7 @@ def index():
 @app.get("/chats")
 @app.get("/chats/<int:chat_id>")
 @app.get("/me")
+@app.get("/consents")
 @app.get("/plus")
 @app.get("/premium")
 @app.get("/onboard")
@@ -2134,7 +2131,8 @@ def api_matches():
         last = conn.execute(
             """
             SELECT body, photo, from_id, created_at, id FROM messages
-            WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+            WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+              AND COALESCE(deleted_at, 0) = 0
             ORDER BY id DESC LIMIT 1
             """,
             (uid, row["id"], row["id"], uid),
@@ -2243,7 +2241,8 @@ def api_messages(other_id: int):
     rows = conn.execute(
         """
         SELECT id, from_id, to_id, body, created_at, reply_to_id, photo FROM messages
-        WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+          AND COALESCE(deleted_at, 0) = 0
         ORDER BY id ASC
         """,
         (uid, other_id, other_id, uid),
@@ -2255,7 +2254,7 @@ def api_messages(other_id: int):
     )
     conn.commit()
     peer_read = conn.execute(
-        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ?",
+        "SELECT last_read_id FROM reads WHERE user_id = ? AND other_id = ? AND COALESCE(deleted_at, 0) = 0",
         (other_id, uid),
     ).fetchone()
     peer_read_id = int(peer_read["last_read_id"]) if peer_read else 0
@@ -2412,7 +2411,7 @@ def api_message_media(message_id: int):
     uid = session["uid"]
     conn = db()
     row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
-    if not row:
+    if not row or ("deleted_at" in row.keys() and row["deleted_at"]):
         abort(404)
     from_id = int(row["from_id"])
     to_id = int(row["to_id"])
@@ -2733,6 +2732,26 @@ def api_plus():
     if "paused" in data:
         paused = 1 if data.get("paused") else 0
     conn.execute("UPDATE users SET incognito = ?, paused = ? WHERE id = ?", (incognito, paused, uid))
+    conn.commit()
+    return jsonify({"ok": True, "user": current_user()})
+
+
+@app.patch("/api/me/consents")
+@login_required
+def api_patch_me_consents():
+    data = request.get_json(silent=True) or {}
+    uid = session["uid"]
+    conn = db()
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not me:
+        return jsonify({"ok": False, "error": "нет профиля"}), 401
+    now = int(time.time())
+    special_at = now if _consent_yes(data.get("special_data_consent")) else None
+    photo_at = now if _consent_yes(data.get("photo_rights_consent")) else None
+    conn.execute(
+        "UPDATE users SET special_data_consent_at = ?, photo_rights_consent_at = ? WHERE id = ?",
+        (special_at, photo_at, uid),
+    )
     conn.commit()
     return jsonify({"ok": True, "user": current_user()})
 

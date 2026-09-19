@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && vite build --config vite.home.config.ts && vite build --config vite.router.config.ts",
+    "build": "vite build && vite build --config vite.home.config.ts && vite build --config vite.profile.config.ts && vite build --config vite.chat.config.ts && vite build --config vite.router.config.ts",
     "dev:client": "vite build --watch",
     "test:router": "node tests/router.test.mjs"
   },

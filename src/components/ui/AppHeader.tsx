@@ -73,6 +73,7 @@ export type AppHeaderProps = {
   onThemeSelect?: (theme: ThemeName) => void;
   showBack?: boolean;
   backHref?: string;
+  backNav?: string;
   backLabel?: ComponentChildren;
   onBackClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   leftSlot?: ComponentChildren;
@@ -95,6 +96,7 @@ export function AppHeader({
   onThemeSelect,
   showBack,
   backHref,
+  backNav,
   backLabel,
   onBackClick,
   leftSlot,
@@ -130,7 +132,7 @@ export function AppHeader({
             variant="ghost"
             slim
             href={backHref || "/"}
-            nav="back"
+            nav={backNav || "back"}
             onClick={onBackClick}
             className={styles.backBtn}
             ariaLabel="Вернуться назад"
@@ -175,9 +177,12 @@ export function AppHeader({
           )}
         </a>
         {sectionTitle && (
-          <span class={styles.brandSection} aria-current="page">
-            {sectionTitle}
-          </span>
+          <>
+            <span class={styles.brandDivider} aria-hidden="true">/</span>
+            <span class={styles.brandSection} aria-current="page">
+              {sectionTitle}
+            </span>
+          </>
         )}
       </div>
 

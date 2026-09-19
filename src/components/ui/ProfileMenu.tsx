@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "preact/hooks";
+import { useState, useRef } from "preact/hooks";
 import type { JSX } from "preact";
+import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
 import styles from "./ProfileMenu.module.css";
 
 export type ProfileMenuProps = {
@@ -7,9 +8,11 @@ export type ProfileMenuProps = {
   userName?: string;
   isPlus?: boolean;
   profileHref?: string;
+  consentsHref?: string;
   plusHref?: string;
   supportHref?: string;
   onProfileClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
+  onConsentsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onPlusClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onLogout?: () => void;
   className?: string;
@@ -20,9 +23,11 @@ export function ProfileMenu({
   userName,
   isPlus,
   profileHref = "/profile",
+  consentsHref = "/consents",
   plusHref = "/plus",
   supportHref = "/support",
   onProfileClick,
+  onConsentsClick,
   onPlusClick,
   onLogout,
   className,
@@ -30,31 +35,12 @@ export function ProfileMenu({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleDocumentClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("click", handleDocumentClick);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("click", handleDocumentClick);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
+  useDismissibleLayer(containerRef, isOpen, () => setIsOpen(false));
 
   const toggleOpen = (e: JSX.TargetedMouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     e.stopPropagation();
+    if (!isOpen) announcePopupOpen(containerRef.current);
     setIsOpen(!isOpen);
   };
 
@@ -66,6 +52,11 @@ export function ProfileMenu({
   const handlePlusClick = (e: JSX.TargetedMouseEvent<HTMLAnchorElement>) => {
     setIsOpen(false);
     onPlusClick?.(e);
+  };
+
+  const handleConsentsClick = (e: JSX.TargetedMouseEvent<HTMLAnchorElement>) => {
+    setIsOpen(false);
+    onConsentsClick?.(e);
   };
 
   const handleLogoutClick = () => {
@@ -149,6 +140,21 @@ export function ProfileMenu({
               </svg>
             </span>
             <span class={styles.itemText}>Профиль</span>
+          </a>
+
+          <a
+            href={consentsHref}
+            class={styles.menuItem}
+            onClick={handleConsentsClick}
+            role="menuitem"
+          >
+            <span class={styles.itemIcon}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M7 3.5h10v17H7z" />
+                <path d="m9.5 12 1.7 1.7 3.5-3.8" />
+              </svg>
+            </span>
+            <span class={styles.itemText}>Согласия</span>
           </a>
 
           <a

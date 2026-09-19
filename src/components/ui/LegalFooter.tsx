@@ -15,17 +15,17 @@ export function LegalFooter({
       aria-label="юридическая информация"
     >
       <span class={styles.badge18}>18+</span>
-      <a class={styles.link} href="/rules">
+      <a class={styles.link} href="/rules" draggable={false}>
         правила
       </a>
-      <a class={styles.link} href="/privacy">
+      <a class={styles.link} href="/privacy" draggable={false}>
         конфиденциальность
       </a>
-      <a class={styles.link} href="/support">
+      <a class={styles.link} href="/support" draggable={false}>
         поддержка
       </a>
       {showGlossary && (
-        <a class={styles.link} href="/glossary">
+        <a class={styles.link} href="/glossary" draggable={false}>
           глоссарий
         </a>
       )}

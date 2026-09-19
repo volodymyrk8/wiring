@@ -12,7 +12,8 @@ export type InputProps = {
   maxLength?: number;
   autoComplete?: string;
   inputMode?: JSX.HTMLAttributes<HTMLInputElement>["inputMode"];
-  autoCapitalize?: string;
+  autoCapitalize?: "none" | "off" | "on" | "sentences" | "words" | "characters";
+  list?: string;
   enterKeyHint?: "enter" | "done" | "go" | "next" | "previous" | "search" | "send";
   value?: string;
   defaultValue?: string;
@@ -51,6 +52,7 @@ export function Input({
   autoComplete,
   inputMode,
   autoCapitalize,
+  list,
   enterKeyHint,
   value,
   defaultValue,
@@ -104,6 +106,7 @@ export function Input({
           autocomplete={autoComplete}
           inputMode={inputMode}
           autocapitalize={autoCapitalize}
+          list={list}
           enterKeyHint={enterKeyHint}
           placeholder=" "
           value={value}

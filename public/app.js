@@ -47,10 +47,12 @@
     filtersOpen: false,
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
     likesFiltersOpen: false,
+    likesPromoOpen: false,
     replyTo: null,
     reportFor: null,
     reportReason: "",
     reportDetails: "",
+    unmatchFor: null,
     resetToken: "",
     verifyEmail: "",
     recycled: false,
@@ -70,8 +72,13 @@
     profileDraft: null,
     profileEdit: null,
     matchesQuery: "",
+    chatDraft: "",
+    chatSending: false,
+    chatId: null,
   };
   let chatTimer = 0;
+  let chatPollBusy = false;
+  let chatOpenToken = 0;
   let inboxTimer = 0;
   const urlSyncState = { lastUrl: "" };
   let profileScrollY = 0;
@@ -107,14 +114,14 @@
 
   const currentHref = () =>
     hrefFor(state.view, {
-      id: state.view === "chat" ? state.thread?.peer?.id : state.view === "person" ? state.person?.id : undefined,
+      id: state.view === "chat" ? state.chatId || state.thread?.peer?.id : state.view === "person" ? state.person?.id : undefined,
     });
 
   const syncUrl = () => {
     routing.syncViewToUrl(urlSyncState, BASE, state.view, {
       id:
         state.view === "chat"
-          ? state.thread?.peer?.id
+          ? state.chatId || state.thread?.peer?.id
           : state.view === "person"
             ? state.person?.id
             : undefined,
@@ -180,10 +187,11 @@
     theme: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20, strokeWidth: 1.8 }),
     arrow: svgIcon(`<path d="M5 12h14M13 6l6 6-6 6"/>`, { size: 18 }),
     search: svgIcon(`<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.6 4.6"/>`, { size: 19, strokeWidth: 1.8 }),
-    more: svgIcon(`<circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/>`, { size: 20 }),
+    trash: svgIcon(`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`, { size: 19, strokeWidth: 1.7 }),
     send: svgIcon(`<path d="m21.5 3.5-19 7.3 7.3 2.7 2.7 7.5z"/><path d="M9.8 13.5 21.5 3.5"/>`, { size: 20, strokeWidth: 1.7 }),
     close: svgIcon(`<path d="m6 6 12 12M18 6 6 18"/>`, { size: 18, strokeWidth: 1.8 }),
     reply: svgIcon(`<path d="m9 17-5-5 5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`, { size: 13, strokeWidth: 2.2 }),
+    filter: svgIcon(`<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>`, { size: 14, strokeWidth: 1.8 }),
   };
 
   const THEME_ICONS = {
@@ -393,7 +401,7 @@
 
   const plusUntil = (ts) => {
     if (!ts) return "";
-    return new Date(ts * 1000).toLocaleDateString("ru", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(ts * 1000).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
   };
 
   const api = async (path, opts = {}) => {
@@ -490,6 +498,27 @@
 
   const emptyBox = (title, text, extra = "") =>
     `<div class="empty"><h2>${escapeHtml(title)}</h2><p>${text}</p>${extra}</div>`;
+
+  const uiButton = ({
+    variant = "solid",
+    slim = false,
+    fullWidth = false,
+    type = "button",
+    href = "",
+    nav = "",
+    disabled = false,
+    className = "",
+    id = "",
+    children = "",
+  } = {}) => {
+    const cls = ["btn", variant, slim ? "slim" : "", fullWidth ? "fullWidth" : "", className].filter(Boolean).join(" ");
+    const idAttr = id ? ` id="${escapeAttr(id)}"` : "";
+    if (href) {
+      const navAttr = nav ? ` data-nav="${escapeAttr(nav)}"` : "";
+      return `<a class="${cls}" href="${escapeAttr(href)}"${navAttr}${idAttr}><span>${children}</span></a>`;
+    }
+    return `<button class="${cls}" type="${escapeAttr(type)}"${idAttr}${disabled ? " disabled" : ""}><span>${children}</span></button>`;
+  };
 
   const matchRow = (m, { href, attrs = "", sub = "", unread = 0, locked = false, time = "" } = {}) => {
     if (locked) {
@@ -797,12 +826,12 @@
     return blob || file;
   };
 
-  const uploadPhoto = async (file) => {
+  const uploadPhoto = async (file, rightsConsent = false) => {
     const blob = await compressImage(file);
     const fd = new FormData();
     fd.append("file", blob, "photo.jpg");
     const rights = root.querySelector("#photo-rights-consent");
-    if (rights?.checked) fd.append("photo_rights_consent", "1");
+    if (rights?.checked || rightsConsent) fd.append("photo_rights_consent", "1");
     return api("/api/photos", { method: "POST", body: fd });
   };
 
@@ -838,14 +867,13 @@
       : d.toLocaleDateString("ru", { day: "numeric", month: "short" });
   };
 
-  const footer = () => `
-    <footer class="site-foot">
-      <span>18+</span>
-      <a href="/rules">правила</a>
-      <a href="/privacy">конфиденциальность</a>
-      <a href="/support">поддержка</a>
-      ${state.user && !state.user.guest ? `<a href="/glossary">глоссарий</a>` : ""}
-    </footer>`;
+  const chatTimeLabel = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts * 1000);
+    const date = d.toLocaleDateString("ru", { day: "numeric", month: "short" });
+    const time = d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+    return `${date}, ${time}`;
+  };
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
   const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
@@ -936,6 +964,10 @@
           <span class="profile-menu-icon">${ICONS.user}</span>
           <span class="profile-menu-text">Профиль</span>
         </a>
+        <a class="profile-menu-item" href="${hrefFor("consents")}" data-nav="consents">
+          <span class="profile-menu-icon">${svgIcon(`<path d="M7 3.5h10v17H7z"/><path d="m9.5 12 1.7 1.7 3.5-3.8"/>`, { size: 18 })}</span>
+          <span class="profile-menu-text">Согласия</span>
+        </a>
         <a class="profile-menu-item" href="/support">
           <span class="profile-menu-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -965,19 +997,23 @@
     const showActions = opts.showActions !== undefined ? opts.showActions : !isAuth;
     const showBack = opts.showBack !== undefined ? opts.showBack : isAuth;
     const backHref = opts.backHref || hrefFor("home");
+    const backNav = opts.backNav !== undefined ? opts.backNav : "back";
     const backLabel = opts.backLabel || "Назад";
     const centerClass = logoPos === "center" ? " center" : "";
     const sectionTitle = opts.sectionTitle || "";
     const brandBlock = `
       <div class="brand-group">
         <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span>${sectionTitle ? "" : `<span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span>`}</a>
-        ${sectionTitle ? `<span class="brand-section" aria-current="page">${escapeHtml(sectionTitle)}</span>` : ""}
+        ${sectionTitle ? `
+          <span class="brand-divider" aria-hidden="true">/</span>
+          <span class="brand-section" aria-current="page">${escapeHtml(sectionTitle)}</span>
+        ` : ""}
       </div>`;
     return `
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
       ${showBack ? `
       <div class="app-head-start">
-        <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="back" aria-label="Вернуться назад" title="Назад">
+        <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="${escapeAttr(backNav)}" aria-label="Вернуться назад" title="Назад">
           <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </a>
       </div>` : ""}
@@ -1004,14 +1040,11 @@
       ${signed ? `<a href="/glossary">глоссарий</a>` : ""}
     </footer>`;
 
-  const authLegalFoot = () => legalFooterBar(false);
-
   const authLayout = (body) => `
       ${appHead({ logoPosition: "center", showActions: true, showBack: true })}
       <div class="auth-shell">
         <section class="panel auth-panel">${body}</section>
-      </div>
-      ${tabbar()}`;
+      </div>`;
 
   const ownTraitMarks = () => {
     const neuro = state.user?.neuro || [];
@@ -1624,58 +1657,184 @@
   const likesGate = () => {
     if (state.user?.plus || !state.likes.length) return "";
     if (state.user?.guest) {
-      return `<div class="plus-box likes-gate">
-        <p class="hint">Без своего профиля и WIRING+ не видно, кто лайкнул. Собери аккаунт, потом открой анкеты.</p>
-        <a class="solid" href="${hrefFor("register")}" data-nav="register">создать профиль</a>
+      return `<div class="likes-gate-card guest-gate">
+        <div class="likes-gate-top">
+          <div class="likes-gate-badge">гость</div>
+          <div class="likes-gate-info">
+            <strong>Создай свой профиль</strong>
+            <p>Чтобы видеть, кто проявил интерес, и начинать диалоги.</p>
+          </div>
+        </div>
+        <div class="likes-gate-actions">
+          ${uiButton({
+            variant: "solid",
+            slim: true,
+            href: hrefFor("register"),
+            nav: "register",
+            children: "Создать анкету",
+          })}
+        </div>
       </div>`;
     }
-    return `<div class="plus-box likes-gate">
-      <p class="hint">Без WIRING+ фото скрыты. Открой, кто лайкнул — и ответь взаимно, если захочешь.</p>
-      <label>промокод<input id="plus-code" maxlength="24" placeholder="если есть код"></label>
-      <button class="ghost slim" type="button" id="plus-redeem">открыть, кто лайкнул</button>
+    return `<div class="likes-gate-card plus-gate">
+      <div class="likes-gate-top">
+        <div class="likes-gate-badge">WIRING+</div>
+        <div class="likes-gate-info">
+          <strong>Узнай, кто тебя лайкнул</strong>
+          <p>С WIRING+ входящие симпатии открыты сразу — не нужно ждать случайного совпадения в ленте.</p>
+        </div>
+      </div>
+      <div class="likes-gate-actions">
+        ${uiButton({
+          variant: "solid",
+          slim: true,
+          href: hrefFor("plus"),
+          nav: "plus",
+          children: "Узнать о WIRING+",
+        })}
+        ${uiButton({
+          variant: "ghost",
+          slim: true,
+          id: "likes-promo-toggle",
+          children: state.likesPromoOpen ? "Скрыть промокод" : "Ввести промокод",
+        })}
+      </div>
+      <div class="likes-promo-form" id="likes-promo-form"${state.likesPromoOpen ? "" : " hidden"}>
+        <input id="plus-code" maxlength="24" placeholder="Промокод WIRING+" autocomplete="off">
+        ${uiButton({
+          variant: "solid",
+          slim: true,
+          id: "plus-redeem",
+          children: "Активировать",
+        })}
+      </div>
     </div>`;
   };
 
   const likesView = () => {
     if (!state.likesFilters.intents) state.likesFilters.intents = [];
+    const hasActiveFilters = Boolean(
+      (state.likesFilters.neuro || []).length ||
+      (state.likesFilters.vibe || []).length ||
+      (state.likesFilters.intents || []).length ||
+      state.likesFilters.city ||
+      (state.likesFilters.min_age && state.likesFilters.min_age !== 18) ||
+      (state.likesFilters.max_age && state.likesFilters.max_age !== 99)
+    );
+
     const card = (m) => {
       if (m.hidden || !m.id) {
-        return `<article class="like-card locked" data-plus-gate>
-          <div class="like-card-media locked-face" aria-hidden="true"><i></i></div>
+        return `<article class="like-card locked" data-plus-gate role="button" tabindex="0" aria-label="Скрытая симпатия. Узнать о WIRING+">
+          <div class="like-card-media locked-media" aria-hidden="true">
+            <div class="locked-silhouette">
+              <span class="locked-icon">🔒</span>
+            </div>
+          </div>
           <div class="like-card-body">
-            <h3>кто-то лайкнул</h3>
-            <p class="meta">лайкнул тебя</p>
+            <div class="like-card-header">
+              <h3>Новая симпатия</h3>
+              <span class="like-lock-pill">Скрыто</span>
+            </div>
+            <p class="meta">Этот человек лайкнул твою анкету</p>
+            <p class="like-locked-hint">Фото и анкета доступны с подпиской WIRING+</p>
+            <div class="like-card-footer">
+              <span class="like-cta plus-cta">Открыть с WIRING+ →</span>
+            </div>
           </div>
         </article>`;
       }
       const bio = (m.bio || m.communication || "").trim();
+      const neuroTags = (m.neuro || []).slice(0, 2).map((id) => `<span class="like-tag">${escapeHtml(labelOf("neuro", id))}</span>`);
+      const vibeTags = (m.vibe || []).slice(0, 2).map((id) => `<span class="like-tag vibe">${escapeHtml(labelOf("vibe", id))}</span>`);
+      const tagsHtml = [...neuroTags, ...vibeTags].join("");
+
       return `<a class="like-card" data-person="${m.id}" data-from="likes" href="${hrefFor("person", { id: m.id })}">
-        <div class="like-card-media"><img src="${photoUrl(m.photo, m.name)}" alt=""></div>
+        <div class="like-card-media">
+          <img src="${photoUrl(m.photo, m.name)}" alt="${escapeAttr(m.name)}" loading="lazy">
+        </div>
         <div class="like-card-body">
-          <h3>${escapeHtml(m.name)}, ${m.age}</h3>
+          <div class="like-card-header">
+            <h3>${escapeHtml(m.name)}, ${m.age}</h3>
+            ${m.city ? `<span class="like-city-badge">${escapeHtml(m.city)}</span>` : ""}
+          </div>
           <p class="meta">${escapeHtml(m.city || "")}${intentLabels(m) ? ` · ${escapeHtml(intentLabels(m))}` : ""}</p>
-          ${bio ? `<p class="like-bio">${escapeHtml(bio.slice(0, 140))}${bio.length > 140 ? "…" : ""}</p>` : ""}
-          <span class="like-cta">открыть анкету</span>
+          ${tagsHtml ? `<div class="like-tags">${tagsHtml}</div>` : ""}
+          ${bio ? `<p class="like-bio">${escapeHtml(bio.slice(0, 130))}${bio.length > 130 ? "…" : ""}</p>` : ""}
+          <div class="like-card-footer">
+            <span class="like-cta">Смотреть анкету →</span>
+          </div>
         </div>
       </a>`;
     };
+
     const emptyHint =
       (state.matches || []).length
-        ? "Новых лайков нет — взаимные уже в Чатах. Когда кто-то лайкнет тебя первым, анкета появится здесь."
-        : "Когда кто-то лайкнет тебя первым, анкета появится здесь. Можно ответить лайком или пропустить.";
+        ? "Новых лайков нет — взаимные уже в чатах. Когда кто-то оценит твою анкету первым, она появится здесь."
+        : "Когда кто-то лайкнет тебя первым, анкета появится здесь. Можно ответить взаимностью или пропустить.";
+
+    const isEmpty = !state.likes.length && !hasActiveFilters && !state.likesFiltersOpen;
+    const isFilteredEmpty = !state.likes.length && hasActiveFilters;
+    const isGuest = !state.user || state.user?.guest;
+
+    let emptyContent = "";
+    if (isFilteredEmpty) {
+      emptyContent = `<div class="likes-empty">
+        <div class="likes-empty-icon">${ICONS.filter}</div>
+        <h2>Ничего не найдено</h2>
+        <p>По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска.</p>
+        ${uiButton({
+          variant: "ghost",
+          id: "likes-filters-clear-empty",
+          children: "Сбросить фильтры",
+        })}
+      </div>`;
+    } else if (isGuest) {
+      emptyContent = `<div class="likes-empty">
+        <div class="likes-empty-icon">✨</div>
+        <h2>Создай свой профиль</h2>
+        <p>Чтобы видеть людей, которым ты нравишься, и начинать диалоги.</p>
+        ${uiButton({
+          variant: "solid",
+          href: hrefFor("register"),
+          nav: "register",
+          children: `Создать анкету ${ICONS.arrow}`,
+        })}
+      </div>`;
+    } else {
+      emptyContent = `<div class="likes-empty">
+        <div class="likes-empty-icon">${friendlyLike().icon}</div>
+        <h2>Пока нет новых лайков</h2>
+        <p>${emptyHint}</p>
+        ${uiButton({
+          variant: "solid",
+          href: hrefFor("deck"),
+          nav: "deck",
+          children: `Смотреть ленту ${ICONS.arrow}`,
+        })}
+      </div>`;
+    }
+
     return `
-    ${appHead()}
+    ${appHead({ sectionTitle: "лайки" })}
     ${profileNudge()}
-    <section class="panel">
-      <h2>Кто лайкнул</h2>
+    <main class="likes-page${isEmpty || isFilteredEmpty ? " is-empty" : ""}">
+      ${
+        state.likes.length || hasActiveFilters || state.likesFiltersOpen
+          ? `<div class="likes-toolbar">
+              <button type="button" class="ghost slim likes-filters-btn${hasActiveFilters ? " active" : ""}" id="likes-filters-toggle" aria-label="Фильтры">
+                ${ICONS.filter}
+                <span>${state.likesFiltersOpen ? "скрыть фильтры" : "фильтры"}</span>
+                ${hasActiveFilters ? `<span class="likes-filter-dot" aria-hidden="true"></span>` : ""}
+              </button>
+            </div>`
+          : ""
+      }
+
       ${likesGate()}
-      <div class="deck-meta">
-        <button type="button" class="ghost slim" id="likes-filters-toggle">${state.likesFiltersOpen ? "скрыть фильтры" : "фильтры"}</button>
-        <span class="hint">${state.likes.length ? `${state.likes.length}` : ""}</span>
-      </div>
+
       ${
         state.likesFiltersOpen
-          ? `<div class="filters">
+          ? `<div class="filters panel">
               ${pickerBlock("neuro", state.likesFilters.neuro, { id: "l-neuro", lead: "диагнозы в лайках.", gloss: false })}
               ${pickerBlock("vibe", state.likesFilters.vibe, { id: "l-vibe", lead: "вайб.", gloss: false })}
               ${pickerBlock("intents", state.likesFilters.intents, { id: "l-intent", lead: "формат.", gloss: false })}
@@ -1688,12 +1847,13 @@
             </div>`
           : ""
       }
+
       ${
         state.likes.length
           ? `<div class="like-cards">${state.likes.map(card).join("")}</div>`
-          : emptyBox("Пока пусто", emptyHint)
+          : emptyContent
       }
-    </section>
+    </main>
     ${tabbar()}`;
   };
 
@@ -1773,11 +1933,11 @@
       ? `<div class="bubble-quote">${m.reply_to.has_photo && !m.reply_to.body ? "фото" : escapeHtml(m.reply_to.body || "фото")}</div>`
       : "";
     const photo = m.photo_url
-      ? `<a class="bubble-photo" href="${escapeAttr(m.photo_url)}" target="_blank" rel="noopener"><img src="${escapeAttr(m.photo_url)}" alt="" loading="lazy"></a>`
+      ? `<a class="bubble-photo" href="${escapeAttr(m.photo_url)}" target="_blank" rel="noopener"><img src="${escapeAttr(m.photo_url)}" alt="" decoding="async"></a>`
       : "";
     const text = m.body ? `<div class="bubble-body">${escapeHtml(m.body)}</div>` : "";
     const replyLabel = m.photo_url && !m.body ? "фото" : m.body || "фото";
-    return `<div class="bubble ${m.mine ? "mine" : ""}${m.photo_url ? " has-photo" : ""}" data-msg="${m.id}">${quote}${photo}${text}<span class="time"><button type="button" class="bubble-reply" data-reply="${m.id}" data-reply-body="${escapeAttr(replyLabel)}" title="ответить" aria-label="ответить">${ICONS.reply}</button>${timeLabel(m.created_at)}${
+    return `<div class="bubble ${m.mine ? "mine" : ""}${m.photo_url ? " has-photo" : ""}" data-msg="${m.id}">${quote}${photo}${text}<span class="time"><button type="button" class="bubble-reply" data-reply="${m.id}" data-reply-body="${escapeAttr(replyLabel)}" title="ответить" aria-label="ответить">${ICONS.reply}</button>${chatTimeLabel(m.created_at)}${
       m.mine
         ? `<i class="receipt${m.read ? " on" : ""}" title="${m.read ? "прочитано" : "отправлено"}">${m.read ? "✓✓" : "✓"}</i>`
         : ""
@@ -1794,7 +1954,16 @@
 
   const scrollThreadEnd = () => {
     const box = root.querySelector("#thread");
-    if (box) box.scrollTop = box.scrollHeight;
+    if (!box) return;
+    const move = () => {
+      if (document.documentElement.dataset.view !== "chat") return;
+      box.scrollTop = box.scrollHeight;
+    };
+    move();
+    requestAnimationFrame(move);
+    box.querySelectorAll("img").forEach((image) => {
+      if (!image.complete) image.addEventListener("load", move, { once: true });
+    });
   };
 
   let sendChatMessage = async (_body) => {};
@@ -1804,16 +1973,23 @@
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
+        state.chatDraft = root.querySelector("#composer input[name='body']")?.value || state.chatDraft || "";
         state.replyTo = { id: Number(btn.dataset.reply), body: btn.dataset.replyBody || "" };
         render();
-        root.querySelector("#composer input[name='body']")?.focus();
+        const input = root.querySelector("#composer input[name='body']");
+        if (input) {
+          input.value = state.chatDraft;
+          input.focus();
+          try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+        }
       });
     });
     root.querySelectorAll(".opener").forEach((btn) => {
       btn.addEventListener("click", () => {
         const field = root.querySelector("#composer input[name='body']");
         if (!field) return;
-        field.value = btn.textContent || "";
+        state.chatDraft = btn.textContent || "";
+        field.value = state.chatDraft;
         field.focus();
         try { field.setSelectionRange(field.value.length, field.value.length); } catch (_) {}
       });
@@ -1830,50 +2006,71 @@
   const bindComposer = () => {
     const composer = root.querySelector("#composer");
     sendChatMessage = async (body) => {
-      if (!state.thread?.peer?.id) return;
+      if (!state.thread?.peer?.id || state.chatSending) return;
+      const peerId = Number(state.thread.peer.id);
       const textBody = String(body || "").trim();
       if (!textBody) return;
       const payload = { to_id: state.thread.peer.id, body: textBody };
       if (state.replyTo?.id) payload.reply_to_id = state.replyTo.id;
-      await api("/api/messages", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      state.replyTo = null;
-      root.querySelector(".reply-bar")?.remove();
-      const fresh = await api(`/api/messages/${state.thread.peer.id}`);
-      applyThread(fresh, { scroll: true });
-      requestAnimationFrame(() => {
+      setChatSending(true);
+      try {
+        await api("/api/messages", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        if (!chatIsActive(peerId)) return;
+        state.chatDraft = "";
+        state.replyTo = null;
+        root.querySelector(".reply-bar")?.remove();
         const field = root.querySelector("#composer input[name='body']");
-        if (field) {
-          field.focus();
-          try { field.setSelectionRange(field.value.length, field.value.length); } catch (_) {}
-        }
-        pinChatHeight();
-        scrollThreadEnd();
-      });
+        if (field) field.value = "";
+        const fresh = await api(`/api/messages/${peerId}`);
+        if (!chatIsActive(peerId)) return;
+        applyThread(fresh, { scroll: true, peerId });
+        requestAnimationFrame(() => {
+          const input = root.querySelector("#composer input[name='body']");
+          if (input) {
+            input.focus();
+            try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+          }
+          pinChatHeight();
+          scrollThreadEnd();
+        });
+      } finally {
+        if (chatIsActive(peerId)) setChatSending(false);
+      }
     };
     const sendChatPhoto = async (file) => {
-      if (!state.thread?.peer?.id || !file) return;
-      const blob = await compressImage(file);
-      const fd = new FormData();
-      fd.append("to_id", String(state.thread.peer.id));
-      fd.append("file", blob, "photo.jpg");
-      const caption = String(root.querySelector("#composer input[name='body']")?.value || "").trim();
-      if (caption) fd.append("body", caption.slice(0, 500));
-      if (state.replyTo?.id) fd.append("reply_to_id", String(state.replyTo.id));
-      toast("отправляю фото…");
-      await api("/api/messages/photo", { method: "POST", body: fd });
-      state.replyTo = null;
-      root.querySelector(".reply-bar")?.remove();
-      const field = root.querySelector("#composer input[name='body']");
-      if (field) field.value = "";
-      const fresh = await api(`/api/messages/${state.thread.peer.id}`);
-      applyThread(fresh, { scroll: true });
-      requestAnimationFrame(() => {
-        pinChatHeight();
-        scrollThreadEnd();
-      });
+      if (!state.thread?.peer?.id || !file || state.chatSending) return;
+      const peerId = Number(state.thread.peer.id);
+      const caption = String(root.querySelector("#composer input[name='body']")?.value || state.chatDraft || "").trim();
+      const replyToId = state.replyTo?.id;
+      setChatSending(true);
+      try {
+        const blob = await compressImage(file);
+        const fd = new FormData();
+        fd.append("to_id", String(peerId));
+        fd.append("file", blob, "photo.jpg");
+        if (caption) fd.append("body", caption.slice(0, 500));
+        if (replyToId) fd.append("reply_to_id", String(replyToId));
+        toast("отправляю фото…");
+        await api("/api/messages/photo", { method: "POST", body: fd });
+        if (!chatIsActive(peerId)) return;
+        state.chatDraft = "";
+        state.replyTo = null;
+        root.querySelector(".reply-bar")?.remove();
+        const field = root.querySelector("#composer input[name='body']");
+        if (field) field.value = "";
+        const fresh = await api(`/api/messages/${peerId}`);
+        if (!chatIsActive(peerId)) return;
+        applyThread(fresh, { scroll: true, peerId });
+        requestAnimationFrame(() => {
+          pinChatHeight();
+          scrollThreadEnd();
+        });
+      } finally {
+        if (chatIsActive(peerId)) setChatSending(false);
+      }
     };
     if (!composer) return;
     const field = composer.querySelector("input[name='body']");
@@ -1886,7 +2083,7 @@
     };
     field?.addEventListener("focus", afterKeyboard);
     field?.addEventListener("input", () => {
-      requestAnimationFrame(scrollThreadEnd);
+      state.chatDraft = field.value;
     });
     const photoInput = root.querySelector("#chat-photo");
     if (photoInput) {
@@ -1903,15 +2100,16 @@
     }
     composer.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (state.chatSending) return;
       const body = new FormData(composer).get("body");
       try {
-        if (field) field.value = "";
         await sendChatMessage(body);
       } catch (err) {
         toast(err.message);
       }
     });
     bindChatThreadActions();
+    if (state.chatSending) setChatSending(true);
   };
 
   const chatView = () => {
@@ -1928,7 +2126,7 @@
           </a>
           <div class="chat-top-actions">
             <a class="chat-top-action" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat" aria-label="Открыть анкету" title="Анкета">${ICONS.user}</a>
-            <button class="chat-top-action" type="button" data-unmatch="${t.peer.id}" aria-label="Убрать чат" title="Убрать чат">${ICONS.more}</button>
+            <button class="chat-top-action chat-remove-action" type="button" data-unmatch="${t.peer.id}" aria-label="Убрать чат" title="Убрать чат">${ICONS.trash}</button>
           </div>
         </header>
         <div class="thread" id="thread">${threadInner(t)}</div>
@@ -1943,7 +2141,7 @@
               ${ICONS.photo}
               <input type="file" id="chat-photo" accept="image/*" hidden>
             </label>
-            <input name="body" maxlength="1000" placeholder="написать сообщение" autocomplete="off" enterkeyhint="send">
+            <input name="body" maxlength="1000" value="${escapeAttr(state.chatDraft)}" placeholder="написать сообщение" autocomplete="off" enterkeyhint="send">
             <button class="composer-send" type="submit" aria-label="Отправить сообщение" title="Отправить">${ICONS.send}</button>
           </form>
         </div>
@@ -2186,7 +2384,7 @@
               </span>
               <div>
                 <div class="q" style="margin:0;">WIRING+</div>
-                <p class="hint" style="margin:2px 0 0;">${u.plus ? `включён до ${plusUntil(u.plus_until)}` : "спокойный режим, инкогнито, пауза"}</p>
+                <p class="hint" style="margin:2px 0 0;">${u.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</p>
               </div>
             </div>
             <span class="ghost slim" style="pointer-events:none;">настроить ↗</span>
@@ -2338,7 +2536,7 @@
     const u = state.user || {};
     return {
       html: `
-        ${appHead({ showBack: false })}
+        ${appHead({ showBack: true, backHref: hrefFor("profile"), backNav: "profile", backLabel: "В профиль" })}
         <section class="panel plus-panel">
           <div class="plus-hero">
             <span class="badge-gem-icon hero-gem" aria-hidden="true">
@@ -2356,7 +2554,7 @@
             <div class="q">${u.plus ? "WIRING+ включён" : "WIRING+ выключен"}</div>
             ${
               u.plus
-                ? `<p class="hint">до ${plusUntil(u.plus_until)}</p>
+                ? `${u.plus_until ? `<p class="hint">Подписка заканчивается ${plusUntil(u.plus_until)}</p>` : `<p class="hint">Подписка активна</p>`}
                    <label class="check"><input id="plus-incognito" type="checkbox" ${u.incognito ? "checked" : ""}> инкогнито — меня не показывают, пока я сам не лайкну</label>
                    <label class="check"><input id="plus-paused" type="checkbox" ${u.paused ? "checked" : ""}> пауза — временно скрыть анкету</label>`
                 : `<p class="hint">спокойный режим: видно, кто лайкнул, инкогнито, пауза, заметки, отложить человека. сиды в ленте остаются.</p>
@@ -2454,59 +2652,106 @@
   const deleteAccountView = () => {
     return {
       html: `
-        ${appHead({ showBack: true, backHref: hrefFor("profile"), backLabel: "В профиль" })}
-        <section class="panel">
-          <h2>Удаление аккаунта</h2>
-          <div style="margin: 16px 0; padding: 16px; border-radius: 16px; background: color-mix(in srgb, var(--coral, #f43f5e) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--coral, #f43f5e) 35%, transparent); line-height: 1.55;">
-            <p style="margin: 0 0 8px 0; font-weight: 600; color: var(--coral, #f43f5e); font-size: 1.02rem;">
-              ⚠️ Профиль сразу пропадет из публичного доступа
-            </p>
-            <p style="margin: 0 0 10px 0; font-size: 0.92rem; color: var(--muted);">
-              В момент удаления ты мгновенно исчезнешь из ленты, поиска и чатов. Другие пользователи больше не увидят твои данные и анкету.
-            </p>
-            <p style="margin: 0 0 10px 0; font-size: 0.92rem; color: var(--ink);">
-              <strong>Восстановление:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления.
-            </p>
-            <p style="margin: 0; font-size: 0.88rem; color: var(--muted);">
-              Через 7 суток данные удалятся полностью. В базе сохраняется лишь запись об удалении (deletedAt).
-            </p>
-          </div>
-          <form class="form" id="delete-account-form">
-            <label>
-              текущий пароль для подтверждения
-              <input type="password" id="delete-password" name="password" required autocomplete="current-password" placeholder="введи свой пароль" />
-            </label>
-            <label class="check" style="margin-top: 6px;">
-              <input type="checkbox" id="delete-confirm-check" required />
-              подтверждаю удаление своего профиля
-            </label>
-            <div class="err" id="err"></div>
-            <div class="actions" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
-              <button class="solid" type="submit" id="delete-submit-btn" style="background: linear-gradient(135deg, var(--coral, #e11d48), color-mix(in srgb, var(--coral, #e11d48) 75%, #000)); color: #fff;">
-                удалить аккаунт навсегда
-              </button>
-              <a class="ghost" href="${hrefFor("profile")}" data-nav="profile">отмена</a>
+        ${appHead({ showBack: true, backHref: hrefFor("profile"), backNav: "profile", backLabel: "В профиль", sectionTitle: "удаление" })}
+        <main class="delete-account-page">
+          <section class="panel">
+            <h2 style="font-family: var(--serif); font-size: 24px; font-weight: 600; margin: 0 0 16px; color: var(--ink);">Удаление аккаунта</h2>
+            <div class="card-status err delete-warning-card" role="alert">
+              <span class="status-icon" aria-hidden="true">⚠️</span>
+              <div>
+                <h3>Профиль сразу пропадёт из публичного доступа</h3>
+                <p>В момент удаления ты мгновенно исчезнешь из ленты, поиска и чатов. Другие пользователи больше не увидят твои данные и анкету.</p>
+                <p class="delete-recovery-hint"><strong>Восстановление:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления.</p>
+                <p class="delete-final-hint">Через 7 суток данные удалятся полностью.</p>
+              </div>
             </div>
-          </form>
-          ${legalFooterBar(true)}
-        </section>
+            <form class="support-fields" id="delete-account-form">
+              <div class="field-floating password-wrap">
+                <input
+                  type="password"
+                  id="delete-password"
+                  name="password"
+                  required
+                  autocomplete="current-password"
+                  placeholder=" "
+                >
+                <span class="field-floating__label">Текущий пароль для подтверждения</span>
+                <button type="button" class="password-toggle" id="delete-password-toggle" aria-label="показать пароль" title="показать пароль">
+                  ${ICONS.eye}
+                </button>
+              </div>
+              <label class="ui-checkbox">
+                <span class="box-wrap">
+                  <input type="checkbox" id="delete-confirm-check" required>
+                  <span class="custom-box" aria-hidden="true">
+                    <svg class="check-icon" viewBox="0 0 16 16" fill="none">
+                      <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                </span>
+                <span class="ui-checkbox__text">Подтверждаю удаление своего профиля</span>
+              </label>
+              <div class="card-status err" id="delete-error-banner" role="alert" style="display: none; margin: 6px 0 0 0;">
+                <span class="status-icon">⚠️</span>
+                <div><p id="err" style="margin: 0;"></p></div>
+              </div>
+              <div class="support-actions" style="margin-top: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <button class="btn solid danger" type="submit" id="delete-submit-btn">
+                  <span>Удалить аккаунт навсегда</span>
+                </button>
+                <a class="btn ghost" href="${hrefFor("profile")}" data-nav="profile">
+                  <span>Отмена</span>
+                </a>
+              </div>
+            </form>
+            ${legalFooterBar(true)}
+          </section>
+        </main>
       `,
       bind() {
         bindDataNavLinks();
         const form = root.querySelector("#delete-account-form");
         const errEl = root.querySelector("#err");
+        const errBanner = root.querySelector("#delete-error-banner");
         const pwdInput = root.querySelector("#delete-password");
+        const pwdToggle = root.querySelector("#delete-password-toggle");
         const submitBtn = root.querySelector("#delete-submit-btn");
+
+        if (pwdToggle && pwdInput) {
+          pwdToggle.addEventListener("click", () => {
+            const isPwd = pwdInput.type === "password";
+            pwdInput.type = isPwd ? "text" : "password";
+            pwdToggle.innerHTML = isPwd ? ICONS.eyeOff : ICONS.eye;
+            pwdToggle.setAttribute("aria-label", isPwd ? "скрыть пароль" : "показать пароль");
+            pwdToggle.setAttribute("title", isPwd ? "скрыть пароль" : "показать пароль");
+            pwdToggle.classList.toggle("on", isPwd);
+          });
+        }
+
+        const showError = (msg) => {
+          if (!errBanner || !errEl) return;
+          if (msg) {
+            errEl.textContent = msg;
+            errBanner.style.display = "flex";
+          } else {
+            errEl.textContent = "";
+            errBanner.style.display = "none";
+          }
+        };
 
         form?.addEventListener("submit", async (e) => {
           e.preventDefault();
-          if (errEl) errEl.textContent = "";
+          showError("");
           const password = pwdInput ? pwdInput.value : "";
           if (!password) {
-            if (errEl) errEl.textContent = "введи пароль для подтверждения";
+            showError("введи пароль для подтверждения");
+            pwdInput?.focus();
             return;
           }
-          if (submitBtn) submitBtn.disabled = true;
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = "<span>Удаляем…</span>";
+          }
           try {
             const res = await api("/api/me/delete", {
               method: "POST",
@@ -2519,12 +2764,18 @@
               toast("Аккаунт удалён. Восстановить профиль можно в течение 7 суток.");
               await goToView("home");
             } else {
-              if (errEl) errEl.textContent = res?.error || "ошибка при удалении";
-              if (submitBtn) submitBtn.disabled = false;
+              showError(res?.error || "ошибка при удалении");
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = "<span>Удалить аккаунт навсегда</span>";
+              }
             }
           } catch (err) {
-            if (errEl) errEl.textContent = err.message || "ошибка сети";
-            if (submitBtn) submitBtn.disabled = false;
+            showError(err.message || "ошибка сети");
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = "<span>Удалить аккаунт навсегда</span>";
+            }
           }
         });
       },
@@ -2532,6 +2783,7 @@
   };
 
   const openPerson = async (id, from) => {
+    if (state.view === "chat") stopChatSession();
     const data = await api(`/api/people/${id}`);
     state.person = data.person;
     state.personFrom = from || "deck";
@@ -2570,6 +2822,20 @@
         <div class="actions">
           <button type="button" class="danger" id="report-send">отправить</button>
           <button type="button" class="ghost" id="report-cancel">отмена</button>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const chatUnmatchModal = () => {
+    if (!state.unmatchFor) return "";
+    return `<div class="modal-back chat-unmatch-modal" id="chat-unmatch-modal">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="chat-unmatch-title">
+        <h3 id="chat-unmatch-title">Убрать чат?</h3>
+        <p class="hint">Переписка сохранится, но чат исчезнет из списка.</p>
+        <div class="actions">
+          <button type="button" class="ghost" id="chat-unmatch-cancel">отмена</button>
+          <button type="button" class="danger" id="chat-unmatch-confirm">убрать чат</button>
         </div>
       </div>
     </div>`;
@@ -2676,6 +2942,35 @@
     }
   };
 
+  const chatIsActive = (peerId) =>
+    state.view === "chat" &&
+    Boolean(state.thread?.peer?.id) &&
+    Number(state.thread.peer.id) === Number(peerId);
+
+  const threadNearBottom = (box, threshold = 120) => {
+    if (!box) return true;
+    return box.scrollHeight - box.scrollTop - box.clientHeight <= threshold;
+  };
+
+  const setChatSending = (busy) => {
+    state.chatSending = Boolean(busy);
+    const composer = root.querySelector("#composer");
+    if (!composer) return;
+    composer.classList.toggle("is-sending", state.chatSending);
+    composer.setAttribute("aria-busy", String(state.chatSending));
+    composer.querySelectorAll("input, button, label").forEach((control) => {
+      control.disabled = state.chatSending;
+    });
+  };
+
+  const stopChatSession = () => {
+    clearInterval(chatTimer);
+    chatTimer = 0;
+    chatPollBusy = false;
+    chatOpenToken += 1;
+    state.chatSending = false;
+  };
+
   const threadDelta = (prev, next) => {
     if ((prev || []).length !== (next || []).length) return "new";
     for (let i = 0; i < next.length; i += 1) {
@@ -2684,12 +2979,16 @@
     return "";
   };
 
-  const applyThread = (fresh, { scroll = false } = {}) => {
+  const applyThread = (fresh, { scroll = false, peerId = state.thread?.peer?.id } = {}) => {
+    if (!fresh || !chatIsActive(peerId)) return;
     const kind = threadDelta(state.thread?.messages || [], fresh.messages || []);
     const field = root.querySelector("#composer input");
-    const draft = field?.value || "";
+    const draft = field?.value ?? state.chatDraft ?? "";
     const hadFocus = document.activeElement === field;
+    const box = root.querySelector("#thread");
+    const shouldScroll = scroll || (kind === "new" && threadNearBottom(box));
     state.thread = fresh;
+    state.chatDraft = draft;
     if (!kind && !scroll) return;
     // Keep composer alive on poll updates — full re-render breaks typing on mobile.
     if (state.view === "chat" && root.querySelector("#composer") && (kind === "new" || kind === "read" || scroll)) {
@@ -2698,35 +2997,26 @@
         thread.innerHTML = threadInner(fresh);
         bindChatThreadActions();
       }
-      if (field && draft) field.value = draft;
+      if (field) field.value = draft;
       if (hadFocus && field) field.focus();
-      if (scroll || kind === "new") scrollThreadEnd();
+      if (shouldScroll) scrollThreadEnd();
       return;
     }
     render();
     const input = root.querySelector("#composer input");
-    if (input && draft) input.value = draft;
+    if (input) input.value = draft;
     if (hadFocus && input) input.focus();
-    if (scroll || kind === "new") scrollThreadEnd();
+    if (shouldScroll) scrollThreadEnd();
   };
 
   const openChat = async (id) => {
-    const data = await api(`/api/messages/${id}`);
-    state.thread = data;
+    stopChatSession();
+    state.chatId = Number(id);
+    state.thread = null;
+    state.chatDraft = "";
+    state.replyTo = null;
     state.view = "chat";
     render();
-    const box = root.querySelector("#thread");
-    if (box) box.scrollTop = box.scrollHeight;
-    clearInterval(chatTimer);
-    chatTimer = setInterval(async () => {
-      if (state.view !== "chat" || !state.thread || state.thread.peer.id !== id) return;
-      try {
-        const fresh = await api(`/api/messages/${id}`);
-        applyThread(fresh);
-      } catch {
-        /* keep current thread */
-      }
-    }, 8000);
   };
 
   const resumeApp = async () => {
@@ -3012,14 +3302,8 @@
     }
     const unmatch = root.querySelector("#unmatch");
     if (unmatch) {
-      unmatch.addEventListener("click", async () => {
-        if (!confirm("Убрать мэтч? Переписка пропадёт, анкета уйдёт к пропущенным.")) return;
-        await api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: state.person.id }) });
-        state.person = null;
-        state.view = "matches";
-        const data = await api("/api/matches");
-        state.matches = data.matches;
-        toast("убрано · в пропущенных");
+      unmatch.addEventListener("click", () => {
+        state.unmatchFor = state.person?.id || null;
         render();
       });
     }
@@ -3068,6 +3352,24 @@
     return homeFeatureModulePromise;
   };
 
+  let profileFeatureUnmount = null;
+  let profileFeatureModulePromise = null;
+
+  const loadProfileFeatureModule = () => {
+    profileFeatureModulePromise ??= import(`${BASE}/public/dist/profile.js?v=2`);
+    return profileFeatureModulePromise;
+  };
+
+  const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
+  let chatFeatureUnmount = null;
+  let chatFeatureModulePromise = null;
+  let chatFeatureMountToken = 0;
+
+  const loadChatFeatureModule = () => {
+    chatFeatureModulePromise ??= import(`${BASE}/public/dist/chat.js?v=1`);
+    return chatFeatureModulePromise;
+  };
+
   const buildHomeHostBridge = () => {
     const signed = Boolean(state.user && !state.user.guest);
     const neuro = state.user?.neuro || [];
@@ -3095,6 +3397,55 @@
       onLogout: logout,
     };
   };
+
+  const buildProfileHostBridge = () => ({
+    user: state.user,
+    catalog: state.catalog,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view) => {
+      void goToView(view);
+    },
+    api,
+    toast,
+    uploadPhoto,
+    refreshUser: async () => {
+      await refreshMe();
+      return state.user;
+    },
+    setPrimaryPhoto: (id) => api(`/api/photos/${id}`, { method: "PATCH", body: JSON.stringify({ is_primary: true }) }).then(() => undefined),
+    deletePhoto: (id) => api(`/api/photos/${id}`, { method: "DELETE" }).then(() => undefined),
+    onUserUpdated: (user) => {
+      state.user = user;
+      clearProfileDraft();
+    },
+    onLogout: logout,
+    onThemeSelect: (theme) => applyTheme(theme),
+  });
+
+  const buildChatHostBridge = () => ({
+    mode: state.view === "chat" ? "chat" : "matches",
+    chatId: state.chatId || undefined,
+    user: state.user,
+    matches: state.matches,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => {
+      if (view === "chat" && params.id) {
+        void openChat(Number(params.id));
+        return;
+      }
+      if (view === "person" && params.id) {
+        void openPerson(Number(params.id), "chat");
+        return;
+      }
+      void goToView(view);
+    },
+    api,
+    toast,
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
+  });
 
   const buildAuthHostBridge = (mode) => ({
     mode,
@@ -3162,7 +3513,7 @@
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat", "delete-account", "plus"].includes(next)) {
+    if (!state.user && ["deck", "likes", "matches", "profile", "consents", "person", "chat", "delete-account", "plus"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -3175,9 +3526,11 @@
       render();
       return;
     }
+    if (state.view === "chat" && next !== "chat") stopChatSession();
     state.view = next;
     state.photoIndex = 0;
-    if (next !== "profile" && next !== "plus") clearProfileDraft();
+    if (next !== "chat") state.chatId = null;
+    if (next !== "profile" && next !== "plus" && next !== "consents") clearProfileDraft();
     if (state.view === "deck" && state.user) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
@@ -3189,7 +3542,7 @@
       await loadLikes();
       await refreshMe();
     }
-    if (["profile", "plus"].includes(state.view) && state.user && !state.profileDraft) await refreshMe();
+    if (["profile", "consents", "plus"].includes(state.view) && state.user && !state.profileDraft) await refreshMe();
     render();
   };
 
@@ -3255,6 +3608,56 @@
     }
   };
 
+  const renderProfileFeature = async (view = state.view) => {
+    profileFeatureUnmount?.();
+    profileFeatureUnmount = null;
+    root.innerHTML = '<div id="profile-feature-root"></div>' + tabbar();
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#profile-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await loadProfileFeatureModule();
+      profileFeatureUnmount = view === "consents"
+        ? mod.mountConsent(mountEl, buildProfileHostBridge())
+        : mod.mountProfile(mountEl, buildProfileHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      const fallback = profileView();
+      root.innerHTML = fallback.html;
+      fallback.bind();
+      bindDataNavLinks();
+      bindThemeControls();
+      toast(`не загрузился модуль profile (${err.message}).`);
+    }
+  };
+
+  const renderChatFeature = async () => {
+    const token = ++chatFeatureMountToken;
+    chatFeatureUnmount?.();
+    chatFeatureUnmount = null;
+    root.innerHTML = '<div id="chat-feature-root"></div>' + (state.view === "matches" ? tabbar() : "");
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#chat-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await loadChatFeatureModule();
+      if (token !== chatFeatureMountToken || !CHAT_FEATURE_VIEWS.has(state.view)) return;
+      chatFeatureUnmount = mod.mountChat(mountEl, buildChatHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      const fallback = state.view === "chat" ? chatView() : matchesView();
+      root.innerHTML = fallback;
+      if (state.view === "matches") bindMatchesList();
+      bindDataNavLinks();
+      bindThemeControls();
+      toast(`не загрузился модуль chat (${err.message}).`);
+    }
+  };
+
   const render = () => {
     if (state.view === "profile") {
       captureProfileDraft();
@@ -3262,7 +3665,7 @@
     }
     document.documentElement.dataset.view = state.view;
     document.documentElement.toggleAttribute("data-tabs", showsTabbar());
-    if (state.view !== "chat") clearInterval(chatTimer);
+    if (state.view !== "chat") stopChatSession();
     let bound = null;
     if (!AUTH_FEATURE_VIEWS.has(state.view)) {
       authFeatureUnmount?.();
@@ -3271,6 +3674,15 @@
     if (state.view !== "home") {
       homeFeatureUnmount?.();
       homeFeatureUnmount = null;
+    }
+    if (!["profile", "consents"].includes(state.view)) {
+      profileFeatureUnmount?.();
+      profileFeatureUnmount = null;
+    }
+    if (!CHAT_FEATURE_VIEWS.has(state.view)) {
+      chatFeatureMountToken += 1;
+      chatFeatureUnmount?.();
+      chatFeatureUnmount = null;
     }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
@@ -3301,11 +3713,16 @@
       return;
     }
     else if (state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile") bound = cityGateView();
-    else if (state.view === "chat") root.innerHTML = chatView();
-    else if (state.view === "matches") root.innerHTML = matchesView();
+    else if (CHAT_FEATURE_VIEWS.has(state.view)) {
+      void renderChatFeature();
+      return;
+    }
     else if (state.view === "likes") root.innerHTML = likesView();
     else if (state.view === "person") root.innerHTML = personView();
-    else if (state.view === "profile") bound = profileView();
+    else if (state.view === "profile" || state.view === "consents") {
+      void renderProfileFeature(state.view);
+      return;
+    }
     else if (state.view === "plus") bound = plusView();
     else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
@@ -3321,6 +3738,7 @@
     }
     if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
     if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
+    if (state.unmatchFor) root.insertAdjacentHTML("beforeend", chatUnmatchModal());
     if (state.view === "matches") bindMatchesList();
     bindDataNavLinks();
     root.querySelectorAll("[data-unmatch]").forEach((btn) => {
@@ -3328,21 +3746,50 @@
         e.preventDefault();
         e.stopPropagation();
         const id = Number(btn.dataset.unmatch);
-        if (!id || !confirm("Убрать из чатов? Переписка пропадёт, анкета уйдёт к пропущенным.")) return;
+        if (!id) return;
+        state.unmatchFor = id;
+        render();
+      });
+    });
+    const chatUnmatchBack = root.querySelector("#chat-unmatch-modal");
+    const closeChatUnmatch = () => {
+      state.unmatchFor = null;
+      render();
+    };
+    if (chatUnmatchBack) {
+      chatUnmatchBack.addEventListener("click", (e) => {
+        if (e.target === chatUnmatchBack) closeChatUnmatch();
+      });
+      root.querySelector("#chat-unmatch-cancel")?.addEventListener("click", closeChatUnmatch);
+      root.querySelector("#chat-unmatch-confirm")?.addEventListener("click", async (e) => {
+        const button = e.currentTarget;
+        const id = Number(state.unmatchFor);
+        if (!id || button.disabled) return;
+        button.disabled = true;
         try {
           await api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: id }) });
           state.matches = (state.matches || []).filter((m) => m.id !== id);
+          if (state.view === "person") {
+            const data = await api("/api/matches");
+            state.matches = data.matches;
+          }
           if (state.thread?.peer?.id === id) {
             state.thread = null;
             state.view = "matches";
           }
+          if (state.person?.id === id) {
+            state.person = null;
+            state.view = "matches";
+          }
+          state.unmatchFor = null;
           toast("убрано · в пропущенных");
           render();
         } catch (err) {
+          button.disabled = false;
           toast(err.message);
         }
       });
-    });
+    }
     const reportCancel = root.querySelector("#report-cancel");
     if (reportCancel) {
       reportCancel.addEventListener("click", () => {
@@ -3436,6 +3883,16 @@
         }
       });
     }
+    const promoToggle = root.querySelector("#likes-promo-toggle");
+    if (promoToggle) {
+      promoToggle.addEventListener("click", () => {
+        state.likesPromoOpen = !state.likesPromoOpen;
+        render();
+        if (state.likesPromoOpen) {
+          root.querySelector("#plus-code")?.focus();
+        }
+      });
+    }
     const redeem = root.querySelector("#plus-redeem");
     if (redeem) {
       redeem.addEventListener("click", async () => {
@@ -3451,14 +3908,24 @@
         }
       });
     }
+    const plusCodeInput = root.querySelector("#plus-code");
+    if (plusCodeInput && redeem) {
+      plusCodeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          redeem.click();
+        }
+      });
+    }
     root.querySelectorAll("[data-plus-gate]").forEach((el) => {
       el.addEventListener("click", () => {
-        const code = root.querySelector("#plus-code");
-        if (code) {
-          code.focus();
-          code.scrollIntoView({ behavior: "smooth", block: "center" });
+        goToView("plus");
+      });
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          goToView("plus");
         }
-        toast("WIRING+ откроет, кто лайкнул");
       });
     });
     const skipNotify = root.querySelector("#skip-notify");
@@ -3497,34 +3964,40 @@
         render();
       });
     }
-    if (state.view === "likes" && state.likesFiltersOpen) {
-      if (!state.likesFilters.intents) state.likesFilters.intents = [];
-      bindChips({ neuro: state.likesFilters.neuro, vibe: state.likesFilters.vibe, intents: state.likesFilters.intents });
+    if (state.view === "likes") {
       const applyLikes = async () => {
         await loadLikes();
         render();
       };
-      root.querySelectorAll("#l-neuro .chip, #l-vibe .chip, #l-intent .chip").forEach((btn) => {
-        btn.addEventListener("click", applyLikes);
-      });
-      const lMin = root.querySelector("#l-min-age");
-      const lMax = root.querySelector("#l-max-age");
-      const lCity = root.querySelector("#l-city");
-      if (lMin) lMin.addEventListener("change", async () => { state.likesFilters.min_age = Number(lMin.value) || 18; await applyLikes(); });
-      if (lMax) lMax.addEventListener("change", async () => { state.likesFilters.max_age = Number(lMax.value) || 99; await applyLikes(); });
-      if (lCity) {
-        const applyCity = async () => {
-          state.likesFilters.city = lCity.value.trim();
-          await applyLikes();
-        };
-        lCity.addEventListener("change", applyCity);
-        lCity.addEventListener("blur", applyCity);
-      }
-      const lClear = root.querySelector("#likes-filters-clear");
-      if (lClear) lClear.addEventListener("click", async () => {
+      const clearLikesFilters = async () => {
         state.likesFilters = { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" };
         await applyLikes();
-      });
+      };
+      const lClear = root.querySelector("#likes-filters-clear");
+      if (lClear) lClear.addEventListener("click", clearLikesFilters);
+      const lClearEmpty = root.querySelector("#likes-filters-clear-empty");
+      if (lClearEmpty) lClearEmpty.addEventListener("click", clearLikesFilters);
+
+      if (state.likesFiltersOpen) {
+        if (!state.likesFilters.intents) state.likesFilters.intents = [];
+        bindChips({ neuro: state.likesFilters.neuro, vibe: state.likesFilters.vibe, intents: state.likesFilters.intents });
+        root.querySelectorAll("#l-neuro .chip, #l-vibe .chip, #l-intent .chip").forEach((btn) => {
+          btn.addEventListener("click", applyLikes);
+        });
+        const lMin = root.querySelector("#l-min-age");
+        const lMax = root.querySelector("#l-max-age");
+        const lCity = root.querySelector("#l-city");
+        if (lMin) lMin.addEventListener("change", async () => { state.likesFilters.min_age = Number(lMin.value) || 18; await applyLikes(); });
+        if (lMax) lMax.addEventListener("change", async () => { state.likesFilters.max_age = Number(lMax.value) || 99; await applyLikes(); });
+        if (lCity) {
+          const applyCity = async () => {
+            state.likesFilters.city = lCity.value.trim();
+            await applyLikes();
+          };
+          lCity.addEventListener("change", applyCity);
+          lCity.addEventListener("blur", applyCity);
+        }
+      }
     }
 bindTips();
     if (state.user && state.view === "deck") wireDeck();
@@ -3596,18 +4069,14 @@ bindTips();
       return;
     }
     if (plan.kind === "chat") {
-      try {
-        await openChat(plan.id);
-      } catch (err) {
-        toast(err.message);
-        state.view = "matches";
-        const data = await api("/api/matches");
-        state.matches = data.matches;
-        render();
-      }
+      state.chatId = plan.id;
+      state.thread = null;
+      state.view = "chat";
+      render();
       return;
     }
     state.view = plan.view;
+    state.chatId = null;
     state.photoIndex = 0;
     if (state.view === "deck") await loadFeed();
     if (state.view === "matches") {
@@ -3616,7 +4085,7 @@ bindTips();
       state.thread = null;
     }
     if (state.view === "likes") await loadLikes();
-    if (state.view === "profile" || state.view === "plus") await refreshMe();
+    if (state.view === "profile" || state.view === "consents" || state.view === "plus") await refreshMe();
     render();
   };
 

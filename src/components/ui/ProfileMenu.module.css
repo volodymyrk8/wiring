@@ -350,3 +350,7 @@
   border: 1px solid var(--line, rgba(0, 0, 0, 0.1));
 }
 
+:global(html[data-theme="pastel"]) :global(.plus-mark) {
+  color: #ffffff;
+}
+

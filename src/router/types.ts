@@ -11,6 +11,7 @@ export type ViewId =
   | "matches"
   | "chat"
   | "profile"
+  | "consents"
   | "plus"
   | "onboard"
   | "person"

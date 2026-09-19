@@ -71,8 +71,10 @@ export function HomeScreen({ host }: HomeScreenProps) {
               userName={host.userName}
               isPlus={isPlus}
               profileHref={hrefFor("profile")}
+              consentsHref={hrefFor("consents")}
               plusHref={hrefFor("plus")}
               onProfileClick={handleNav("profile")}
+              onConsentsClick={handleNav("consents")}
               onPlusClick={handleNav("plus")}
               onLogout={host.onLogout}
             />
