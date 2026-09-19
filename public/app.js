@@ -128,8 +128,8 @@
       .replaceAll('"', "&quot;");
   const escapeAttr = escapeHtml;
 
-  const svgIcon = (inner, { fill = false, size = 22 } = {}) =>
-    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" fill="${fill ? "currentColor" : "none"}" stroke="${fill ? "none" : "currentColor"}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  const svgIcon = (inner, { fill = false, size = 22, strokeWidth = 1.6 } = {}) =>
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" fill="${fill ? "currentColor" : "none"}" stroke="${fill ? "none" : "currentColor"}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 
   const ICONS = {
     pass: svgIcon(`<path d="M6.2 6.2l11.6 11.6M17.8 6.2L6.2 17.8"/>`),
@@ -139,13 +139,16 @@
       { fill: true }
     ),
     snooze: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
-    home: svgIcon(`<path d="M3 10.5L12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H15a1 1 0 0 1-1-1v-4.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1V20a1 1 0 0 1-1 1H4.5A1.5 1.5 0 0 1 3 20z"/>`, { size: 20 }),
-    feed: svgIcon(
-      `<path d="M8.5 2.5h7a2 2 0 0 1 2 2v1.5" opacity="0.5"/><rect x="6.5" y="4.5" width="11" height="16" rx="2.5"/><circle cx="12" cy="9.5" r="1.7"/><path d="M9.6 15.5c0-1.3 1.1-2.1 2.4-2.1s2.4.8 2.4 2.1"/><path d="M4.5 12.5H1.5M3 10.5l-2 2 2 2"/><path d="M19.5 12.5h3M21 10.5l2 2-2 2"/>`,
+    home: svgIcon(
+      `<path d="M4 10.5L12 4l8 6.5V20a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 20z"/><path d="M9.5 21.5V14.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v7"/>`,
       { size: 20 }
     ),
+    feed: svgIcon(
+      `<path d="M7 3.5h10a2 2 0 0 1 2 2v10" opacity=\"0.4\"/><rect x=\"5\" y=\"5\" width=\"12\" height=\"15\" rx=\"2.2\"/><circle cx=\"11\" cy=\"10\" r=\"1.8\"/><path d=\"M8.2 16c.4-1.2 1.4-1.7 2.8-1.7s2.4.5 2.8 1.7\"/><path d=\"M19.5 12.5h3m-1.2-1.2l1.2 1.2-1.2 1.2\"/><path d=\"M1.5 12.5h3M2.7 11.3L1.5 12.5l1.2 1.2\"/>`,
+      { size: 21 }
+    ),
     heart: svgIcon(
-      `<path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572"/>`,
+      `<path d="M12 20.8S3.5 15.4 3.5 9.5a5.2 5.2 0 0 1 8.5-3.8 5.2 5.2 0 0 1 8.5 3.8c0 5.9-8.5 11.3-8.5 11.3z"/>`,
       { size: 20 }
     ),
     thumb: svgIcon(
@@ -153,7 +156,7 @@
       { size: 20 }
     ),
     chat: svgIcon(
-      `<path d="M20.5 11.5c0 4.4-3.8 8-8.5 8-1.5 0-2.9-.4-4.1-1L3.5 20l1.4-3.6C4.2 15.1 3.5 13.4 3.5 11.5c0-4.4 3.8-8 8.5-8s8.5 3.6 8.5 8z"/><circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="1" fill="currentColor" stroke="none"/>`,
+      `<path d="M20.5 11.5c0 4.2-3.8 7.5-8.5 7.5-1.4 0-2.8-.3-4-.9L3.5 19.5l1.4-3.4C4.1 14.8 3.5 13.2 3.5 11.5c0-4.2 3.8-7.5 8.5-7.5s8.5 3.3 8.5 7.5z"/><circle cx="8" cy="11.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="11.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="16" cy="11.5" r="0.9" fill="currentColor" stroke="none"/>`,
       { size: 20 }
     ),
     user: svgIcon(`<circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8"/>`, { size: 20 }),
@@ -174,9 +177,9 @@
   const THEMES = {
     mist: { label: "день", chrome: "#e9ebf3" },
     pastel: { label: "пастель", chrome: "#f3eee6" },
+    dusk: { label: "сумерки", chrome: "#1a1c24" },
     night: { label: "ночь", chrome: "#110e0c" },
     slate: { label: "сталь", chrome: "#0b0f14" },
-    dusk: { label: "сумерки", chrome: "#1a1c24" },
   };
   const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
   const applyTheme = (theme) => {
@@ -2627,7 +2630,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=6`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=7`);
     return homeFeatureModulePromise;
   };
 
