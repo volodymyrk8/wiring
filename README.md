@@ -17,23 +17,26 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env   # Postgres on localhost:5433 (docker compose)
-npm install && npm run build   # Preact auth feature → public/dist/
+npm install && npm run build   # app shell + Preact features → public/dist/
 ./scripts/dev.sh       # postgres (if set) + rebuild client + seed users
 ```
 
-**Frontend (TypeScript + Preact + Vite):** sources in `src/` (industry layout). Legacy shell: `public/app.js`. New UI: `src/components/ui/`, features in `src/features/<name>/`, bundle entries in `src/entries/`. After editing `src/`, run `npm run build` (or `npm run dev:client` for watch).
+**Frontend (TypeScript + Preact + Vite):** sources in `src/` (industry layout). Application shell: `src/app/bootstrap.js` → `public/dist/app.js`; `public/app.js` is only a compatibility shim. New UI: `src/components/ui/`, features in `src/features/<name>/`, bundle entries in `src/entries/`. After editing `src/`, run `npm run build` (or `npm run dev:client` for watch).
 
 ```
 src/
   components/ui/     # shared primitives (Button, FieldFloating, …)
+  app/               # application shell and shared API client
   features/auth/     # auth screens + mountAuth()
+  features/chat/     # chats list, thread, polling and composer
+  entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js
   entries/router.ts  # → public/dist/router.js (URL ↔ view)
   router/            # matchRoute, hrefFor, planRoute, syncViewToUrl
   lib/               # small helpers
 ```
 
-After `npm run build`, the legacy shell loads `public/dist/router.js`. Run `npm run test:router` to smoke-test routes.
+After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run test:router` to smoke-test routes.
 
 **Database:** PostgreSQL 16 is the only supported database engine. Local dev uses **PostgreSQL 16** in Docker (`docker compose up -d postgres`). `./scripts/dev.sh` starts postgres, waits until ready, seeds test users, and boots the dev server.
 
