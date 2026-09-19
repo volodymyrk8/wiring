@@ -13,6 +13,7 @@ export const SPA_PATHS = {
   matches: "/chats",
   profile: "/me",
   onboard: "/onboard",
+  deleteAccount: "/delete-account",
 } as const satisfies Record<string, string>;
 
 export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
@@ -28,6 +29,7 @@ export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
   [SPA_PATHS.matches]: "matches",
   [SPA_PATHS.profile]: "profile",
   [SPA_PATHS.onboard]: "onboard",
+  [SPA_PATHS.deleteAccount]: "delete-account",
 };
 
 /** Views that need no session (hydrate allows direct URL). */

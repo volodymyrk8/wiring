@@ -139,6 +139,10 @@
       { fill: true }
     ),
     snooze: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
+    gem: svgIcon(
+      `<path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>`,
+      { size: 10, strokeWidth: 2.2 }
+    ),
     home: svgIcon(
       `<path d="M4.5 11.5L12 5l7.5 6.5V19.5a1.5 1.5 0 0 1-1.5 1.5H14.5a1 1 0 0 1-1-1V15.5a1.5 1.5 0 0 0-3 0V20a1 1 0 0 1-1 1H6a1.5 1.5 0 0 1-1.5-1.5z"/>`,
       { size: 21, strokeWidth: 1.5 }
@@ -161,7 +165,7 @@
     ),
     user: svgIcon(
       `<circle cx="12" cy="7.8" r="3.4"/><path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5"/>`,
-      { size: 21, strokeWidth: 1.5 }
+      { size: 20, strokeWidth: 1.8 }
     ),
     tag: svgIcon(`<path d="M4.5 12.8V5.5H12l7.2 7.2-6.5 6.5z"/><circle cx="8.2" cy="9.2" r="1" fill="currentColor" stroke="none"/>`, { size: 20 }),
     eye: svgIcon(`<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>`, { size: 18 }),
@@ -172,30 +176,30 @@
       `<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9.5" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="M8 17l3.2-3.6a1.2 1.2 0 0 1 1.8 0L16.5 17"/>`,
       { size: 20 }
     ),
-    theme: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20 }),
+    theme: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20, strokeWidth: 1.8 }),
     arrow: svgIcon(`<path d="M5 12h14M13 6l6 6-6 6"/>`, { size: 18 }),
   };
 
   const THEME_ICONS = {
     mist: svgIcon(
       `<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"/>`,
-      { size: 20, strokeWidth: 1.9 }
+      { size: 20, strokeWidth: 1.8 }
     ),
     pastel: svgIcon(
       `<path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16"/>`,
-      { size: 20, strokeWidth: 1.9 }
+      { size: 20, strokeWidth: 1.8 }
     ),
     dusk: svgIcon(
       `<path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>`,
-      { size: 20, strokeWidth: 1.9 }
+      { size: 20, strokeWidth: 1.8 }
     ),
     night: svgIcon(
       `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`,
-      { size: 20, strokeWidth: 1.9 }
+      { size: 20, strokeWidth: 1.8 }
     ),
     slate: svgIcon(
       `<path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z"/><path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z"/>`,
-      { size: 20, strokeWidth: 1.9 }
+      { size: 20, strokeWidth: 1.8 }
     ),
   };
   const themeIcon = (theme) => THEME_ICONS[theme] || THEME_ICONS.mist;
@@ -786,7 +790,7 @@
     </footer>`;
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
-  const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat"]);
+  const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
   const showsTabbar = () => !QUIET_VIEWS.has(state.view);
   const HOME_FACE_SRC = Array.from({ length: 12 }, (_, i) => `people/${String(i + 1).padStart(2, "0")}.jpg`);
   const pickHomeFaces = () => {
@@ -846,7 +850,7 @@
     }
     const on = state.view === "profile";
     const plus = Boolean(state.user.plus);
-    return `<span class="avatar-slot"><a class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}" href="${hrefFor("profile")}" data-nav="profile" aria-label="${plus ? "профиль · WIRING+" : "профиль"}"${on ? ' aria-current="page"' : ""}><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></a>${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">+</span>` : ""}</span>`;
+    return `<span class="avatar-slot"><a class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}" href="${hrefFor("profile")}" data-nav="profile" aria-label="${plus ? "профиль · WIRING+" : "профиль"}"${on ? ' aria-current="page"' : ""}><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></a>${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">${ICONS.gem}</span>` : ""}</span>`;
   };
 
   const appHead = (opts = {}) => {
@@ -857,15 +861,21 @@
     const backHref = opts.backHref || hrefFor("home");
     const backLabel = opts.backLabel || "Назад";
     const centerClass = logoPos === "center" ? " center" : "";
+    const sectionTitle = opts.sectionTitle || "";
+    const brandBlock = `
+      <div class="brand-group">
+        <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span>${sectionTitle ? "" : `<span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span>`}</a>
+        ${sectionTitle ? `<span class="brand-section" aria-current="page">${escapeHtml(sectionTitle)}</span>` : ""}
+      </div>`;
     return `
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
       ${showBack ? `
       <div class="app-head-start">
         <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="back" aria-label="Вернуться назад" title="Назад">
-          <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </a>
       </div>` : ""}
-      <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
+      ${brandBlock}
       ${showActions ? `
       <div class="app-head-end">
         ${themePicker()}
@@ -1571,10 +1581,9 @@
   };
 
   const matchesView = () => `
-    ${appHead()}
+    ${appHead({ sectionTitle: "чаты" })}
     ${profileNudge()}
     <section class="panel">
-      <h2>Чаты</h2>
       ${
         state.matches.length
           ? `<div class="match-list">${state.matches
@@ -2053,15 +2062,13 @@
         bindTips();
         bindPrompts(prompts);
         bindPlaceCountry();
-        root.querySelector("#kill").addEventListener("click", async () => {
-          if (!confirm("Удалить аккаунт, фото и переписку безвозвратно?")) return;
-          await api("/api/me", { method: "DELETE" });
-          state.user = null;
-          clearProfileDraft();
-          state.view = "home";
-          stopInbox();
-          render();
-        });
+        const killBtn = root.querySelector("#kill");
+        if (killBtn) {
+          killBtn.addEventListener("click", () => {
+            state.deleteConfirmModal = true;
+            render();
+          });
+        }
         const add = root.querySelector("#add-photos");
         if (add) {
           add.addEventListener("change", async () => {
@@ -2164,6 +2171,109 @@
             render();
           } catch (err) {
             root.querySelector("#err").textContent = err.message;
+          }
+        });
+      },
+    };
+  };
+
+  const deleteConfirmModal = () => {
+    return `<div class="modal-back" id="delete-confirm-modal">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Удалить аккаунт">
+        <h3>Удалить аккаунт?</h3>
+        <p style="margin: 10px 0 12px; font-size: 0.95rem; line-height: 1.45;">
+          Твой профиль сразу пропадет из поиска, рекомендаций и чатов.
+        </p>
+        <div style="padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--coral, #f43f5e) 15%, transparent); border-left: 3px solid var(--coral, #f43f5e); margin-bottom: 14px; font-size: 0.88rem; line-height: 1.45;">
+          <strong>Обрати внимание:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления. Полное удаление данных произойдет через 7 суток.
+        </div>
+        <p style="margin: 0 0 18px; font-size: 0.88rem; color: var(--muted);">
+          Для подтверждения удаления потребуется ввести пароль на следующей странице.
+        </p>
+        <div class="actions" style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="ghost" id="delete-modal-cancel">отмена</button>
+          <button type="button" class="solid" id="delete-modal-proceed" style="background: linear-gradient(135deg, var(--coral, #e11d48), color-mix(in srgb, var(--coral, #e11d48) 75%, #000)); color: #fff;">
+            перейти к удалению
+          </button>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const deleteAccountView = () => {
+    return {
+      html: `
+        ${appHead({ showBack: true, backHref: hrefFor("profile"), backLabel: "В профиль" })}
+        <section class="panel">
+          <h2>Удаление аккаунта</h2>
+          <div style="margin: 16px 0; padding: 16px; border-radius: 16px; background: color-mix(in srgb, var(--coral, #f43f5e) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--coral, #f43f5e) 35%, transparent); line-height: 1.55;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: var(--coral, #f43f5e); font-size: 1.02rem;">
+              ⚠️ Профиль сразу пропадет из публичного доступа
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.92rem; color: var(--muted);">
+              В момент удаления ты мгновенно исчезнешь из ленты, поиска и чатов. Другие пользователи больше не увидят твои данные и анкету.
+            </p>
+            <p style="margin: 0 0 10px 0; font-size: 0.92rem; color: var(--ink);">
+              <strong>Восстановление:</strong> восстановить профиль можно в течение <strong>7 суток</strong> после удаления.
+            </p>
+            <p style="margin: 0; font-size: 0.88rem; color: var(--muted);">
+              Через 7 суток данные удалятся полностью. В базе сохраняется лишь запись об удалении (deletedAt).
+            </p>
+          </div>
+          <form class="form" id="delete-account-form">
+            <label>
+              текущий пароль для подтверждения
+              <input type="password" id="delete-password" name="password" required autocomplete="current-password" placeholder="введи свой пароль" />
+            </label>
+            <label class="check" style="margin-top: 6px;">
+              <input type="checkbox" id="delete-confirm-check" required />
+              подтверждаю удаление своего профиля
+            </label>
+            <div class="err" id="err"></div>
+            <div class="actions" style="margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="solid" type="submit" id="delete-submit-btn" style="background: linear-gradient(135deg, var(--coral, #e11d48), color-mix(in srgb, var(--coral, #e11d48) 75%, #000)); color: #fff;">
+                удалить аккаунт навсегда
+              </button>
+              <a class="ghost" href="${hrefFor("profile")}" data-nav="profile">отмена</a>
+            </div>
+          </form>
+          ${legalFooterBar(true)}
+        </section>
+      `,
+      bind() {
+        bindDataNavLinks();
+        const form = root.querySelector("#delete-account-form");
+        const errEl = root.querySelector("#err");
+        const pwdInput = root.querySelector("#delete-password");
+        const submitBtn = root.querySelector("#delete-submit-btn");
+
+        form?.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          if (errEl) errEl.textContent = "";
+          const password = pwdInput ? pwdInput.value : "";
+          if (!password) {
+            if (errEl) errEl.textContent = "введи пароль для подтверждения";
+            return;
+          }
+          if (submitBtn) submitBtn.disabled = true;
+          try {
+            const res = await api("/api/me/delete", {
+              method: "POST",
+              body: JSON.stringify({ password }),
+            });
+            if (res && res.ok) {
+              state.user = null;
+              clearProfileDraft();
+              stopInbox();
+              toast("Аккаунт удалён. Восстановить профиль можно в течение 7 суток.");
+              await goToView("home");
+            } else {
+              if (errEl) errEl.textContent = res?.error || "ошибка при удалении";
+              if (submitBtn) submitBtn.disabled = false;
+            }
+          } catch (err) {
+            if (errEl) errEl.textContent = err.message || "ошибка сети";
+            if (submitBtn) submitBtn.disabled = false;
           }
         });
       },
@@ -2799,7 +2909,7 @@
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat"].includes(next)) {
+    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat", "delete-account"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -2943,6 +3053,7 @@
     else if (state.view === "likes") root.innerHTML = likesView();
     else if (state.view === "person") root.innerHTML = personView();
     else if (state.view === "profile") bound = profileView();
+    else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
     else if (state.view === "invite") bound = inviteView();
     else root.innerHTML = deckView();
@@ -2955,6 +3066,7 @@
       requestAnimationFrame(() => window.scrollTo(0, profileScrollY));
     }
     if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
+    if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
     bindDataNavLinks();
     root.querySelectorAll("[data-unmatch]").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
@@ -3012,6 +3124,21 @@
           state.reportFor = null;
           render();
         }
+      });
+    }
+    const deleteModalBack = root.querySelector("#delete-confirm-modal");
+    if (deleteModalBack) {
+      const closeDelModal = () => {
+        state.deleteConfirmModal = false;
+        render();
+      };
+      deleteModalBack.addEventListener("click", (e) => {
+        if (e.target === deleteModalBack) closeDelModal();
+      });
+      root.querySelector("#delete-modal-cancel")?.addEventListener("click", closeDelModal);
+      root.querySelector("#delete-modal-proceed")?.addEventListener("click", async () => {
+        state.deleteConfirmModal = false;
+        await goToView("delete-account");
       });
     }
     root.querySelectorAll("[data-open]").forEach((btn) => {

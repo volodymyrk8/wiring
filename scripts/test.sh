@@ -12,4 +12,10 @@ if [[ -f package.json ]]; then
   npm run test:router
 fi
 
-python3 -m unittest discover -s tests -q
+if [[ -x .venv/bin/python ]]; then
+  PY=.venv/bin/python
+else
+  PY=python3
+fi
+
+"$PY" -m unittest discover -s tests -q

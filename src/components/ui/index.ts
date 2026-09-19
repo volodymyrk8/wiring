@@ -9,3 +9,4 @@ export * from "./Tooltip";
 export * from "./AccordionRow";
 export * from "./Select";
 export * from "./Modal";
+export * from "./BrandSection";

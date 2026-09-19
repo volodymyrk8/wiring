@@ -985,6 +985,54 @@ class WiringTest(unittest.TestCase):
         self.assertLess(len(small.data), len(full.data))
         self.assertIn("image/jpeg", small.headers.get("Content-Type", ""))
 
+    def test_delete_account_soft_delete_and_password(self):
+        # Register a new user
+        res = self.client.post(
+            "/api/register",
+            json={
+                "email": "del-test@example.com",
+                "password": "mysecretpassword",
+                "name": "Игорь",
+                "age_confirm": True,
+                "privacy_confirm": True,
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        user = res.get_json()["user"]
+        uid = user["id"]
+
+        # Deleting without password or wrong password fails
+        bad = self.client.post("/api/me/delete", json={"password": "wrong"})
+        self.assertEqual(bad.status_code, 401)
+        self.assertFalse(bad.get_json()["ok"])
+
+        # Deleting with correct password succeeds
+        ok = self.client.post("/api/me/delete", json={"password": "mysecretpassword"})
+        self.assertEqual(ok.status_code, 200)
+        self.assertTrue(ok.get_json()["ok"])
+
+        # In the database: record MUST NEVER be deleted! Only marked with deleted_at
+        from app import db
+        with app.app_context():
+            row = db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+            self.assertIsNotNone(row, "User row in database must not be deleted!")
+            self.assertIsNotNone(row["deleted_at"], "deleted_at flag must be set!")
+            self.assertGreater(row["deleted_at"], 0)
+
+        # Session is dropped
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertIsNone(me)
+
+        # Login is blocked
+        login = self.client.post("/api/login", json={"email": "del-test@example.com", "password": "mysecretpassword"})
+        self.assertEqual(login.status_code, 403)
+        self.assertIn("удалён", login.get_json()["error"])
+
+        # Excluded from people lookup
+        self._register("viewer@example.com")
+        p = self.client.get(f"/api/people/{uid}")
+        self.assertEqual(p.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,7 +18,7 @@ export type ThemeName = (typeof THEME_LIST)[number]["id"];
 export function ThemeIcon({ theme, size = 20 }: { theme: ThemeName; size?: number }) {
   if (theme === "mist") {
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="4" />
         <path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
       </svg>
@@ -26,27 +26,27 @@ export function ThemeIcon({ theme, size = 20 }: { theme: ThemeName; size?: numbe
   }
   if (theme === "pastel") {
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16" />
       </svg>
     );
   }
   if (theme === "dusk") {
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" />
       </svg>
     );
   }
   if (theme === "night") {
     return (
-      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z" />
       <path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z" />
     </svg>
@@ -77,6 +77,7 @@ export type AppHeaderProps = {
   onBackClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   leftSlot?: ComponentChildren;
   rightSlot?: ComponentChildren;
+  sectionTitle?: ComponentChildren;
   children?: ComponentChildren;
   className?: string;
 };
@@ -87,6 +88,7 @@ export function AppHeader({
   logoPosition = "left",
   showActions = true,
   showBetaBadge = true,
+  sectionTitle,
   showThemeSelect,
   showThemeSwatches,
   currentTheme,
@@ -140,7 +142,7 @@ export function AppHeader({
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.2"
+              strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
@@ -153,24 +155,31 @@ export function AppHeader({
         <div class={styles.headerStart}>{leftSlot}</div>
       ) : null}
 
-      <a
-        class={styles.brand}
-        href={homeHref}
-        onClick={onHomeClick}
-        data-nav="home"
-      >
-        <span class={styles.brandName}>
-          WIR<span>ING</span>
-        </span>
-        {showBetaBadge && (
-          <Tooltip
-            className={styles.betaTooltipWrap}
-            content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
-          >
-            <span class={styles.betaLabel}>beta</span>
-          </Tooltip>
+      <div class={styles.brandGroup}>
+        <a
+          class={styles.brand}
+          href={homeHref}
+          onClick={onHomeClick}
+          data-nav="home"
+        >
+          <span class={styles.brandName}>
+            WIR<span>ING</span>
+          </span>
+          {showBetaBadge && !sectionTitle && (
+            <Tooltip
+              className={styles.betaTooltipWrap}
+              content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
+            >
+              <span class={styles.betaLabel}>beta</span>
+            </Tooltip>
+          )}
+        </a>
+        {sectionTitle && (
+          <span class={styles.brandSection} aria-current="page">
+            {sectionTitle}
+          </span>
         )}
-      </a>
+      </div>
 
       {showActions && (
         <div class={styles.headerEnd}>

@@ -12,7 +12,8 @@ export type ViewId =
   | "chat"
   | "profile"
   | "onboard"
-  | "person";
+  | "person"
+  | "delete-account";
 
 export type MatchedRoute = {
   view: ViewId;

@@ -37,6 +37,14 @@ const UserIcon = () => (
   </svg>
 );
 
+const GemIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 3h12l4 6-10 13L2 9Z" />
+    <path d="M11 3 8 9l4 13 4-13-3-6" />
+    <path d="M2 9h20" />
+  </svg>
+);
+
 export type HomeScreenProps = {
   host: HomeHostBridge;
 };
@@ -72,7 +80,11 @@ export function HomeScreen({ host }: HomeScreenProps) {
                   <UserIcon />
                 )}
               </a>
-              {isPlus && <span class="plus-mark" title="WIRING+" aria-hidden="true">+</span>}
+              {isPlus && (
+                <span class="plus-mark" title="WIRING+" aria-hidden="true">
+                  <GemIcon />
+                </span>
+              )}
             </span>
           ) : (
             <a

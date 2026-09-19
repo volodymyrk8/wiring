@@ -22,6 +22,7 @@ const PATH_BY_VIEW: Record<ViewId, string | ((extra: { id?: number }) => string)
   profile: SPA_PATHS.profile,
   onboard: SPA_PATHS.onboard,
   person: (extra) => (extra.id ? `/p/${extra.id}` : SPA_PATHS.deck),
+  "delete-account": SPA_PATHS.deleteAccount,
 };
 
 export function hrefFor(basePath: string, view: ViewId, extra: { id?: number } = {}): string {

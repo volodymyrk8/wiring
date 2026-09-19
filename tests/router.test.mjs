@@ -27,6 +27,7 @@ assert.equal(normalizePath("/feed", "/prefix"), "/feed");
 assert.equal(hrefFor(BASE, "deck"), SPA_PATHS.deck);
 assert.equal(hrefFor(BASE, "chat", { id: 9 }), "/chats/9");
 assert.equal(hrefFor(BASE, "person", { id: 3 }), "/p/3");
+assert.equal(hrefFor(BASE, "delete-account"), SPA_PATHS.deleteAccount);
 
 const guest = { loggedIn: false };
 const member = { loggedIn: true, isGuest: false };
@@ -49,12 +50,14 @@ const guestChat = planRoute({ view: "chat", id: 1 }, guest, "/chats/1");
 assert.equal(guestChat.kind, "login");
 assert.equal(guestChat.pendingPath, "/chats/1");
 assert.equal(planRoute({ view: "likes" }, guest, "/likes").kind, "login");
+assert.equal(planRoute({ view: "delete-account" }, guest, "/delete-account").kind, "login");
 
 assert.equal(planRoute({ view: "login" }, member, "/sign-in").kind, "feed");
 assert.equal(planRoute({ view: "login" }, member, "/login").kind, "feed");
 assert.equal(planRoute({ view: "register" }, member, "/sign-up").kind, "feed");
 assert.equal(planRoute({ view: "register" }, member, "/register").kind, "feed");
 assert.equal(planRoute({ view: "onboard" }, member, "/onboard").kind, "feed");
+assert.equal(planRoute({ view: "delete-account" }, member, "/delete-account").kind, "show");
 assert.equal(planRoute({ view: "login" }, guestSession, "/sign-in").kind, "show");
 assert.equal(planRoute({ view: "login" }, guestSession, "/login").kind, "show");
 

@@ -219,6 +219,7 @@ def init_db() -> None:
             communication TEXT NOT NULL DEFAULT '',
             last_seen INTEGER NOT NULL DEFAULT 0,
             is_seed INTEGER NOT NULL DEFAULT 0,
+            deleted_at INTEGER DEFAULT NULL,
             created_at INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS user_tags (
@@ -413,8 +414,10 @@ def init_db() -> None:
         "seek_max_age": "INTEGER NOT NULL DEFAULT 99",
         "seek_place": "TEXT NOT NULL DEFAULT ''",
         "hide_tags": "TEXT NOT NULL DEFAULT ''",
+        "deleted_at": "INTEGER",
     }.items():
         _ensure_column(conn, "users", name, ddl)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(deleted_at)")
     had_email_verified = "email_verified_at" in _columns(conn, "users")
     _ensure_column(conn, "users", "email_verified_at", "INTEGER")
     if not had_email_verified:
@@ -713,6 +716,7 @@ def inbox_stats(uid: int) -> dict[str, int]:
         JOIN users u ON u.id = s.from_id
         WHERE s.to_id = ? AND s.direction = 'like'
           AND COALESCE(u.is_seed, 0) = 0
+          AND COALESCE(u.deleted_at, 0) = 0
           AND s.from_id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
           AND (
             EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
@@ -730,6 +734,7 @@ def inbox_stats(uid: int) -> dict[str, int]:
         SELECT u.id FROM users u
         JOIN swipes a ON a.to_id = u.id AND a.from_id = ? AND a.direction = 'like'
         JOIN swipes b ON b.from_id = u.id AND b.to_id = ? AND b.direction = 'like'
+        WHERE COALESCE(u.deleted_at, 0) = 0
         """,
         (uid, uid),
     ):
@@ -745,7 +750,7 @@ def current_user() -> dict[str, Any] | None:
         return None
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    if not row:
+    if not row or ("deleted_at" in row.keys() and row["deleted_at"]):
         return None
     if not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
         ensure_referral_code(conn, uid)
@@ -1141,7 +1146,10 @@ def mark_read(conn: Connection, me: int, other: int) -> None:
     )
 
 
-def wipe_user(conn: Connection, uid: int) -> None:
+def purge_user_aux_data(conn: Connection, uid: int) -> None:
+    """Purges auxiliary user data (photos, messages, etc.).
+    Database requirement: The user record in 'users' is NEVER deleted!
+    """
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
@@ -1158,10 +1166,27 @@ def wipe_user(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
-    conn.execute("DELETE FROM users WHERE id = ?", (uid,))
     folder = os.path.join(UPLOAD_DIR, str(uid))
     if os.path.isdir(folder):
         shutil.rmtree(folder, ignore_errors=True)
+
+
+def _purge_deleted_users_data(conn: Connection) -> None:
+    """Full auxiliary data wipe for accounts deleted > 7 days (604800s) ago.
+    The user row in 'users' is NEVER deleted, keeping the deleted_at flag.
+    """
+    cutoff = int(time.time()) - 7 * 86400
+    rows = conn.execute(
+        "SELECT id FROM users WHERE deleted_at IS NOT NULL AND deleted_at > 0 AND deleted_at < ?",
+        (cutoff,),
+    ).fetchall()
+    for r in rows:
+        purge_user_aux_data(conn, int(r["id"]))
+
+
+def wipe_user(conn: Connection, uid: int) -> None:
+    purge_user_aux_data(conn, uid)
+    conn.execute("DELETE FROM users WHERE id = ?", (uid,))
 
 
 def _purge_old_guests(conn: Connection) -> None:
@@ -1175,6 +1200,7 @@ def _purge_old_guests(conn: Connection) -> None:
     ]
     for uid in ids:
         wipe_user(conn, uid)
+    _purge_deleted_users_data(conn)
 
 
 def _clear_pair(conn: Connection, uid: int, target_id: int) -> None:
@@ -1185,6 +1211,12 @@ def _clear_pair(conn: Connection, uid: int, target_id: int) -> None:
 
 
 def _is_match(conn: Connection, a: int, b: int) -> bool:
+    row_b = conn.execute("SELECT deleted_at FROM users WHERE id = ?", (b,)).fetchone()
+    if row_b and "deleted_at" in row_b.keys() and row_b["deleted_at"]:
+        return False
+    row_a = conn.execute("SELECT deleted_at FROM users WHERE id = ?", (a,)).fetchone()
+    if row_a and "deleted_at" in row_a.keys() and row_a["deleted_at"]:
+        return False
     left = conn.execute(
         "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
         (a, b),
@@ -1263,6 +1295,7 @@ def index():
 @app.get("/chats/<int:chat_id>")
 @app.get("/me")
 @app.get("/onboard")
+@app.get("/delete-account")
 @app.get("/p/<int:person_id>")
 @app.get("/r/<code>")
 def spa_app(**_kwargs):
@@ -1271,7 +1304,7 @@ def spa_app(**_kwargs):
 
 @app.get("/health")
 def health():
-    count = db().execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    count = db().execute("SELECT COUNT(*) AS n FROM users WHERE COALESCE(deleted_at, 0) = 0").fetchone()["n"]
     return jsonify({"ok": True, "users": count})
 
 
@@ -1367,6 +1400,14 @@ def api_login():
     row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return jsonify({"ok": False, "error": "неверная почта или пароль"}), 401
+    if "deleted_at" in row.keys() and row["deleted_at"]:
+        return jsonify(
+            {
+                "ok": False,
+                "error": "аккаунт удалён (восстановление доступно в течение 7 суток)",
+                "deleted": True,
+            }
+        ), 403
     if email_verify_enforced() and not email_is_verified(row):
         return jsonify(
             {
@@ -1533,12 +1574,26 @@ def api_logout():
     return jsonify({"ok": True})
 
 
+@app.post("/api/me/delete")
 @app.delete("/api/me")
 @login_required
 def api_delete_me():
     uid = session["uid"]
     conn = db()
-    wipe_user(conn, uid)
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not me:
+        session.clear()
+        return jsonify({"ok": False, "error": "нет профиля"}), 401
+    data = request.get_json(silent=True) or {}
+    if not is_guest_email(str(me["email"])):
+        password = str(data.get("password") or "")
+        if not password:
+            return jsonify({"ok": False, "error": "введи пароль для подтверждения"}), 400
+        if not check_password_hash(me["password_hash"], password):
+            return jsonify({"ok": False, "error": "неверный пароль"}), 401
+    now = int(time.time())
+    # Database requirement: The user record in 'users' is NEVER deleted, only stamped with deleted_at!
+    conn.execute("UPDATE users SET deleted_at = ? WHERE id = ?", (now, uid))
     conn.commit()
     session.clear()
     return jsonify({"ok": True})
@@ -1651,6 +1706,8 @@ def _eligible_card(
     if is_guest_email(str(row["email"])):
         return None
     keys = set(row.keys())
+    if "deleted_at" in keys and row["deleted_at"]:
+        return None
     if "paused" in keys and int(row["paused"] or 0):
         return None
     if int(row["is_seed"] or 0) if "is_seed" in keys else 0:
@@ -1727,6 +1784,7 @@ def api_feed():
         """
         SELECT * FROM users
         WHERE id != ?
+          AND COALESCE(deleted_at, 0) = 0
           AND age BETWEEN ? AND ?
           AND (? = '' OR city = ?)
           AND id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
@@ -1783,7 +1841,7 @@ def api_swipe():
     if target_id in blocked_ids(conn, uid):
         return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
     target = conn.execute("SELECT * FROM users WHERE id = ?", (target_id,)).fetchone()
-    if not target:
+    if not target or ("deleted_at" in target.keys() and target["deleted_at"]):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if direction == "snooze":
@@ -1942,7 +2000,7 @@ def api_person(other_id: int):
     if other_id != uid and other_id in blocked_ids(conn, uid):
         return jsonify({"ok": False, "error": "этот человек скрыт"}), 404
     row = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
-    if not row or (other_id != uid and is_guest_email(str(row["email"]))):
+    if not row or ("deleted_at" in row.keys() and row["deleted_at"]) or (other_id != uid and is_guest_email(str(row["email"]))):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     payload = user_public(row, include_email=(other_id == uid), detail=True)
     payload["matched"] = other_id != uid and _is_match(conn, uid, other_id)
@@ -2000,6 +2058,7 @@ def api_likes():
         WHERE u.age BETWEEN ? AND ?
           AND (? = '' OR u.city = ?)
           AND COALESCE(u.is_seed, 0) = 0
+          AND COALESCE(u.deleted_at, 0) = 0
           AND u.id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
           AND (
             EXISTS (SELECT 1 FROM photos p WHERE p.user_id = u.id)
@@ -2044,6 +2103,7 @@ def api_matches():
         FROM users u
         JOIN swipes a ON a.to_id = u.id AND a.from_id = ? AND a.direction = 'like'
         JOIN swipes b ON b.from_id = u.id AND b.to_id = ? AND b.direction = 'like'
+        WHERE COALESCE(u.deleted_at, 0) = 0
         """,
         (uid, uid),
     ).fetchall()
@@ -2160,7 +2220,7 @@ def api_messages(other_id: int):
     if not _is_match(conn, uid, other_id):
         return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
-    if not other:
+    if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     rows = conn.execute(
         """
@@ -2216,6 +2276,8 @@ def api_send_message():
         return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
     sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
     reply_to_id = None
     raw_reply = data.get("reply_to_id")
     if raw_reply not in (None, "", 0, "0"):
@@ -2272,7 +2334,7 @@ def api_send_photo_message():
         return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
     sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
-    if not other:
+    if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     reply_to_id = None
     raw_reply = request.form.get("reply_to_id")
