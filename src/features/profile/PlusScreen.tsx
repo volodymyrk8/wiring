@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, ProfileMenu } from "@/components/ui";
+import { AppHeader, Button, ProfileMenu, Switch } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import type { ProfileHostBridge, ProfileUser } from "./types";
 import styles from "./PlusScreen.module.css";
@@ -143,15 +143,25 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
           {user.plus ? (
             <>
               <p class={styles.hint}>{user.plus_until ? `Подписка заканчивается ${plusUntil(user.plus_until)}` : "Подписка активна"}</p>
-              <div class={styles.checkList}>
-                <label class={styles.check}>
-                  <input type="checkbox" checked={Boolean(user.incognito)} disabled={busy !== null} onChange={(event) => void savePlus("incognito", event.currentTarget.checked)} />
-                  <span>инкогнито — меня не показывают, пока я сам не лайкну</span>
-                </label>
-                <label class={styles.check}>
-                  <input type="checkbox" checked={Boolean(user.paused)} disabled={busy !== null} onChange={(event) => void savePlus("paused", event.currentTarget.checked)} />
-                  <span>пауза — временно скрыть анкету</span>
-                </label>
+              <div class={styles.switchList}>
+                <Switch
+                  name="incognito"
+                  checked={Boolean(user.incognito)}
+                  disabled={busy !== null}
+                  loading={busy === "incognito"}
+                  onChange={(checked) => void savePlus("incognito", checked)}
+                >
+                  инкогнито — меня не показывают, пока я сам не лайкну
+                </Switch>
+                <Switch
+                  name="paused"
+                  checked={Boolean(user.paused)}
+                  disabled={busy !== null}
+                  loading={busy === "paused"}
+                  onChange={(checked) => void savePlus("paused", checked)}
+                >
+                  пауза — временно скрыть анкету
+                </Switch>
               </div>
             </>
           ) : (

@@ -79,27 +79,9 @@
   line-height: 1.45;
 }
 
-.checkList {
+.switchList {
   display: grid;
-  gap: 12px;
-}
-
-.check {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.4;
-  cursor: pointer;
-}
-
-.check input {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  margin: 1px 0 0;
-  accent-color: var(--lime);
+  gap: 4px;
 }
 
 .codeForm {

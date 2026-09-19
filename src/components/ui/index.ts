@@ -1,5 +1,6 @@
 export * from "./Button";
 export * from "./Checkbox";
+export * from "./Switch";
 export * from "./Input";
 export * from "./Textarea";
 export * from "./LegalFooter";
