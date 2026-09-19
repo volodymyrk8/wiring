@@ -51,8 +51,6 @@ import { createInboxController } from "./inbox";
     filters: { ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }), real_only: false },
     filtersOpen: false,
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
-    likesFiltersOpen: false,
-    likesPromoOpen: false,
     reportFor: null,
     reportReason: "",
     reportDetails: "",
@@ -665,9 +663,10 @@ import { createInboxController } from "./inbox";
     return api("/api/photos", { method: "POST", body: fd });
   };
 
-  const loadLikes = async () => {
+  const loadLikes = async (filters = state.likesFilters) => {
     const q = new URLSearchParams();
-    const f = state.likesFilters || {};
+    const f = filters || {};
+    state.likesFilters = { ...state.likesFilters, ...f };
     if ((f.neuro || []).length) q.set("neuro", f.neuro.join(","));
     if ((f.vibe || []).length) q.set("vibe", f.vibe.join(","));
     if ((f.intents || []).length) q.set("intent", f.intents.join(","));
@@ -1464,209 +1463,6 @@ import { createInboxController } from "./inbox";
         </div>
       </section>
       ${tabbar()}`;
-  };
-
-  const likesGate = () => {
-    if (state.user?.plus || !state.likes.length) return "";
-    if (state.user?.guest) {
-      return `<div class="likes-gate-card guest-gate">
-        <div class="likes-gate-top">
-          <div class="likes-gate-badge">гость</div>
-          <div class="likes-gate-info">
-            <strong>Создай свой профиль</strong>
-            <p>Чтобы видеть, кто проявил интерес, и начинать диалоги.</p>
-          </div>
-        </div>
-        <div class="likes-gate-actions">
-          ${uiButton({
-            variant: "solid",
-            slim: true,
-            href: hrefFor("register"),
-            nav: "register",
-            children: "Создать анкету",
-          })}
-        </div>
-      </div>`;
-    }
-    return `<div class="likes-gate-card plus-gate">
-      <div class="likes-gate-top">
-        <div class="likes-gate-badge">WIRING+</div>
-        <div class="likes-gate-info">
-          <strong>Узнай, кто тебя лайкнул</strong>
-          <p>С WIRING+ входящие симпатии открыты сразу — не нужно ждать случайного совпадения в ленте.</p>
-        </div>
-      </div>
-      <div class="likes-gate-actions">
-        ${uiButton({
-          variant: "solid",
-          slim: true,
-          href: hrefFor("plus"),
-          nav: "plus",
-          children: "Узнать о WIRING+",
-        })}
-        ${uiButton({
-          variant: "ghost",
-          slim: true,
-          id: "likes-promo-toggle",
-          children: state.likesPromoOpen ? "Скрыть промокод" : "Ввести промокод",
-        })}
-      </div>
-      <div class="likes-promo-form" id="likes-promo-form"${state.likesPromoOpen ? "" : " hidden"}>
-        <input id="plus-code" maxlength="24" placeholder="Промокод WIRING+" autocomplete="off">
-        ${uiButton({
-          variant: "solid",
-          slim: true,
-          id: "plus-redeem",
-          children: "Активировать",
-        })}
-      </div>
-    </div>`;
-  };
-
-  const likesView = () => {
-    if (!state.likesFilters.intents) state.likesFilters.intents = [];
-    const hasActiveFilters = Boolean(
-      (state.likesFilters.neuro || []).length ||
-      (state.likesFilters.vibe || []).length ||
-      (state.likesFilters.intents || []).length ||
-      state.likesFilters.city ||
-      (state.likesFilters.min_age && state.likesFilters.min_age !== 18) ||
-      (state.likesFilters.max_age && state.likesFilters.max_age !== 99)
-    );
-
-    const card = (m) => {
-      if (m.hidden || !m.id) {
-        return `<article class="like-card locked" data-plus-gate role="button" tabindex="0" aria-label="Скрытая симпатия. Узнать о WIRING+">
-          <div class="like-card-media locked-media" aria-hidden="true">
-            <div class="locked-silhouette">
-              <span class="locked-icon">🔒</span>
-            </div>
-          </div>
-          <div class="like-card-body">
-            <div class="like-card-header">
-              <h3>Новая симпатия</h3>
-              <span class="like-lock-pill">Скрыто</span>
-            </div>
-            <p class="meta">Этот человек лайкнул твою анкету</p>
-            <p class="like-locked-hint">Фото и анкета доступны с подпиской WIRING+</p>
-            <div class="like-card-footer">
-              <span class="like-cta plus-cta">Открыть с WIRING+ →</span>
-            </div>
-          </div>
-        </article>`;
-      }
-      const bio = (m.bio || m.communication || "").trim();
-      const neuroTags = (m.neuro || []).slice(0, 2).map((id) => `<span class="like-tag">${escapeHtml(labelOf("neuro", id))}</span>`);
-      const vibeTags = (m.vibe || []).slice(0, 2).map((id) => `<span class="like-tag vibe">${escapeHtml(labelOf("vibe", id))}</span>`);
-      const tagsHtml = [...neuroTags, ...vibeTags].join("");
-
-      return `<a class="like-card" data-person="${m.id}" data-from="likes" href="${hrefFor("person", { id: m.id })}">
-        <div class="like-card-media">
-          <img src="${photoUrl(m.photo, m.name)}" alt="${escapeAttr(m.name)}" loading="lazy">
-        </div>
-        <div class="like-card-body">
-          <div class="like-card-header">
-            <h3>${escapeHtml(m.name)}, ${m.age}</h3>
-            ${m.city ? `<span class="like-city-badge">${escapeHtml(m.city)}</span>` : ""}
-          </div>
-          <p class="meta">${escapeHtml(m.city || "")}${intentLabels(m) ? ` · ${escapeHtml(intentLabels(m))}` : ""}</p>
-          ${tagsHtml ? `<div class="like-tags">${tagsHtml}</div>` : ""}
-          ${bio ? `<p class="like-bio">${escapeHtml(bio.slice(0, 130))}${bio.length > 130 ? "…" : ""}</p>` : ""}
-          <div class="like-card-footer">
-            <span class="like-cta">Смотреть анкету →</span>
-          </div>
-        </div>
-      </a>`;
-    };
-
-    const emptyHint =
-      (state.matches || []).length
-        ? "Новых лайков нет — взаимные уже в чатах. Когда кто-то оценит твою анкету первым, она появится здесь."
-        : "Когда кто-то лайкнет тебя первым, анкета появится здесь. Можно ответить взаимностью или пропустить.";
-
-    const isEmpty = !state.likes.length && !hasActiveFilters && !state.likesFiltersOpen;
-    const isFilteredEmpty = !state.likes.length && hasActiveFilters;
-    const isGuest = !state.user || state.user?.guest;
-
-    let emptyContent = "";
-    if (isFilteredEmpty) {
-      emptyContent = `<div class="likes-empty">
-        <div class="likes-empty-icon">${ICONS.filter}</div>
-        <h2>Ничего не найдено</h2>
-        <p>По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска.</p>
-        ${uiButton({
-          variant: "ghost",
-          id: "likes-filters-clear-empty",
-          children: "Сбросить фильтры",
-        })}
-      </div>`;
-    } else if (isGuest) {
-      emptyContent = `<div class="likes-empty">
-        <div class="likes-empty-icon">✨</div>
-        <h2>Создай свой профиль</h2>
-        <p>Чтобы видеть людей, которым ты нравишься, и начинать диалоги.</p>
-        ${uiButton({
-          variant: "solid",
-          href: hrefFor("register"),
-          nav: "register",
-          children: `Создать анкету ${ICONS.arrow}`,
-        })}
-      </div>`;
-    } else {
-      emptyContent = `<div class="likes-empty">
-        <div class="likes-empty-icon">${friendlyLike().icon}</div>
-        <h2>Пока нет новых лайков</h2>
-        <p>${emptyHint}</p>
-        ${uiButton({
-          variant: "solid",
-          href: hrefFor("deck"),
-          nav: "deck",
-          children: `Смотреть ленту ${ICONS.arrow}`,
-        })}
-      </div>`;
-    }
-
-    return `
-    ${appHead({ sectionTitle: "лайки" })}
-    ${profileNudge()}
-    <main class="likes-page${isEmpty || isFilteredEmpty ? " is-empty" : ""}">
-      ${
-        state.likes.length || hasActiveFilters || state.likesFiltersOpen
-          ? `<div class="likes-toolbar">
-              <button type="button" class="ghost slim likes-filters-btn${hasActiveFilters ? " active" : ""}" id="likes-filters-toggle" aria-label="Фильтры">
-                ${ICONS.filter}
-                <span>${state.likesFiltersOpen ? "скрыть фильтры" : "фильтры"}</span>
-                ${hasActiveFilters ? `<span class="likes-filter-dot" aria-hidden="true"></span>` : ""}
-              </button>
-            </div>`
-          : ""
-      }
-
-      ${likesGate()}
-
-      ${
-        state.likesFiltersOpen
-          ? `<div class="filters panel">
-              ${pickerBlock("neuro", state.likesFilters.neuro, { id: "l-neuro", lead: "диагнозы в лайках.", gloss: false })}
-              ${pickerBlock("vibe", state.likesFilters.vibe, { id: "l-vibe", lead: "вайб.", gloss: false })}
-              ${pickerBlock("intents", state.likesFilters.intents, { id: "l-intent", lead: "формат.", gloss: false })}
-              <div class="filter-row">
-                <label>от<input id="l-min-age" type="number" min="18" max="99" value="${state.likesFilters.min_age}"></label>
-                <label>до<input id="l-max-age" type="number" min="18" max="99" value="${state.likesFilters.max_age}"></label>
-                <label>город${citySelect("l-city", state.likesFilters.city, { required: false, allowEmpty: true, emptyLabel: "неважно", id: "l-city" })}</label>
-              </div>
-              <div class="filter-foot"><button type="button" class="ghost slim" id="likes-filters-clear">сбросить</button></div>
-            </div>`
-          : ""
-      }
-
-      ${
-        state.likes.length
-          ? `<div class="like-cards">${state.likes.map(card).join("")}</div>`
-          : emptyContent
-      }
-    </main>
-    ${tabbar()}`;
   };
 
   const photoManager = (u) => {
@@ -2703,6 +2499,7 @@ import { createInboxController } from "./inbox";
   let authFeatureUnmount = null;
   let homeFeatureUnmount = null;
   let profileFeatureUnmount = null;
+  let likesFeatureUnmount = null;
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
@@ -2758,6 +2555,33 @@ import { createInboxController } from "./inbox";
     },
     onLogout: logout,
     onThemeSelect: (theme) => applyTheme(theme),
+  });
+
+  const buildLikesHostBridge = () => ({
+    user: state.user,
+    catalog: state.catalog,
+    likes: state.likes,
+    matchesCount: (state.matches || []).length,
+    filters: state.likesFilters,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => {
+      if (view === "person" && params.id) {
+        void openPerson(Number(params.id), "likes");
+        return;
+      }
+      void goToView(view);
+    },
+    api,
+    loadLikes,
+    toast,
+    onUserUpdated: (user) => {
+      state.user = user;
+      state.likesIn = user.likes_in || 0;
+      state.unread = user.unread || 0;
+    },
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
   });
 
   const buildChatHostBridge = () => ({
@@ -2971,6 +2795,26 @@ import { createInboxController } from "./inbox";
     }
   };
 
+  const renderLikesFeature = async () => {
+    likesFeatureUnmount?.();
+    likesFeatureUnmount = null;
+    root.innerHTML = '<div id="likes-feature-root"></div>' + tabbar();
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#likes-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await featureLoader.likes();
+      if (state.view !== "likes") return;
+      likesFeatureUnmount = mod.mountLikes(mountEl, buildLikesHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = `<p class="err">не загрузился модуль likes (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль likes (${err.message}).`);
+    }
+  };
+
   const renderChatFeature = async () => {
     const token = ++chatFeatureMountToken;
     chatFeatureUnmount?.();
@@ -3017,6 +2861,10 @@ import { createInboxController } from "./inbox";
       chatFeatureUnmount?.();
       chatFeatureUnmount = null;
     }
+    if (state.view !== "likes") {
+      likesFeatureUnmount?.();
+      likesFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
@@ -3050,7 +2898,10 @@ import { createInboxController } from "./inbox";
       void renderChatFeature();
       return;
     }
-    else if (state.view === "likes") root.innerHTML = likesView();
+    else if (state.view === "likes") {
+      void renderLikesFeature();
+      return;
+    }
     else if (state.view === "person") root.innerHTML = personView();
     else if (["profile", "consents", "plus"].includes(state.view)) {
       void renderProfileFeature(state.view);
@@ -3193,51 +3044,6 @@ import { createInboxController } from "./inbox";
         }
       });
     }
-    const promoToggle = root.querySelector("#likes-promo-toggle");
-    if (promoToggle) {
-      promoToggle.addEventListener("click", () => {
-        state.likesPromoOpen = !state.likesPromoOpen;
-        render();
-        if (state.likesPromoOpen) {
-          root.querySelector("#plus-code")?.focus();
-        }
-      });
-    }
-    const redeem = root.querySelector("#plus-redeem");
-    if (redeem) {
-      redeem.addEventListener("click", async () => {
-        const code = (root.querySelector("#plus-code") || {}).value || "";
-        try {
-          const data = await api("/api/premium/redeem", { method: "POST", body: JSON.stringify({ code }) });
-          state.user = data.user;
-          toast("WIRING+ включён");
-          if (state.view === "likes") await loadLikes();
-          render();
-        } catch (err) {
-          toast(err.message);
-        }
-      });
-    }
-    const plusCodeInput = root.querySelector("#plus-code");
-    if (plusCodeInput && redeem) {
-      plusCodeInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          redeem.click();
-        }
-      });
-    }
-    root.querySelectorAll("[data-plus-gate]").forEach((el) => {
-      el.addEventListener("click", () => {
-        goToView("plus");
-      });
-      el.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          goToView("plus");
-        }
-      });
-    });
     const skipNotify = root.querySelector("#skip-notify");
     if (skipNotify) {
       skipNotify.addEventListener("click", () => {
@@ -3267,48 +3073,6 @@ import { createInboxController } from "./inbox";
     bindFold("#traits-open", "#home-traits");
     bindFold("#about-open", "#home-about");
 
-    const likesToggle = root.querySelector("#likes-filters-toggle");
-    if (likesToggle) {
-      likesToggle.addEventListener("click", () => {
-        state.likesFiltersOpen = !state.likesFiltersOpen;
-        render();
-      });
-    }
-    if (state.view === "likes") {
-      const applyLikes = async () => {
-        await loadLikes();
-        render();
-      };
-      const clearLikesFilters = async () => {
-        state.likesFilters = { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" };
-        await applyLikes();
-      };
-      const lClear = root.querySelector("#likes-filters-clear");
-      if (lClear) lClear.addEventListener("click", clearLikesFilters);
-      const lClearEmpty = root.querySelector("#likes-filters-clear-empty");
-      if (lClearEmpty) lClearEmpty.addEventListener("click", clearLikesFilters);
-
-      if (state.likesFiltersOpen) {
-        if (!state.likesFilters.intents) state.likesFilters.intents = [];
-        bindChips({ neuro: state.likesFilters.neuro, vibe: state.likesFilters.vibe, intents: state.likesFilters.intents });
-        root.querySelectorAll("#l-neuro .chip, #l-vibe .chip, #l-intent .chip").forEach((btn) => {
-          btn.addEventListener("click", applyLikes);
-        });
-        const lMin = root.querySelector("#l-min-age");
-        const lMax = root.querySelector("#l-max-age");
-        const lCity = root.querySelector("#l-city");
-        if (lMin) lMin.addEventListener("change", async () => { state.likesFilters.min_age = Number(lMin.value) || 18; await applyLikes(); });
-        if (lMax) lMax.addEventListener("change", async () => { state.likesFilters.max_age = Number(lMax.value) || 99; await applyLikes(); });
-        if (lCity) {
-          const applyCity = async () => {
-            state.likesFilters.city = lCity.value.trim();
-            await applyLikes();
-          };
-          lCity.addEventListener("change", applyCity);
-          lCity.addEventListener("blur", applyCity);
-        }
-      }
-    }
 bindTips();
     if (state.user && state.view === "deck") wireDeck();
     if (state.user && state.view === "person") wirePerson();

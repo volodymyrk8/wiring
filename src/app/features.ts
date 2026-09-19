@@ -1,9 +1,10 @@
-type FeatureName = "auth" | "home" | "profile" | "chat";
+type FeatureName = "auth" | "home" | "profile" | "likes" | "chat";
 
 const FEATURE_FILES: Record<FeatureName, string> = {
   auth: "auth.js?v=4",
   home: "home.js?v=29",
   profile: "profile.js?v=2",
+  likes: "likes.js?v=1",
   chat: "chat.js?v=1",
 };
 
@@ -23,6 +24,7 @@ export function createFeatureLoader(basePath = "") {
     auth: () => load("auth"),
     home: () => load("home"),
     profile: () => load("profile"),
+    likes: () => load("likes"),
     chat: () => load("chat"),
   };
 }

@@ -12,7 +12,7 @@ The application is intentionally in an incremental migration state. The shell re
 | Consents | `src/features/profile/ConsentScreen.tsx` | Preact feature |
 | WIRING+ | `src/features/profile/PlusScreen.tsx` | Preact feature |
 | Chats and thread | `src/features/chat/ChatScreen.tsx` | Preact feature |
-| Likes | `src/app/bootstrap.js` | Legacy; next migration candidate |
+| Likes | `src/features/likes/` | Preact feature |
 | Person profile | `src/app/bootstrap.js` | Legacy; share profile types before migration |
 | Deck / swipe | `src/app/bootstrap.js` | Legacy; keep gesture behavior stable during migration |
 | Onboarding / delete account | `src/app/bootstrap.js` | Legacy; migrate only with API and recovery-flow tests |
