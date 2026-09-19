@@ -223,12 +223,15 @@
     menu.addEventListener("click", (e) => e.stopPropagation());
     if (!themeUiBound) {
       themeUiBound = true;
-      document.addEventListener("click", () => {
+      document.addEventListener("click", (e) => {
         const openMenu = document.getElementById("theme-menu");
         const openBtn = document.getElementById("theme-open");
         if (openMenu && !openMenu.hidden) {
           openMenu.hidden = true;
           if (openBtn) openBtn.setAttribute("aria-expanded", "false");
+        }
+        if (!e.target?.closest?.(".beta-wrap")) {
+          document.querySelectorAll(".beta-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
         }
       });
       document.addEventListener("keydown", (e) => {
@@ -242,6 +245,7 @@
             openBtn.focus();
           }
         }
+        document.querySelectorAll(".beta-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
       });
     }
   };
@@ -779,7 +783,7 @@
     const centerClass = logoPos === "center" ? " center" : "";
     return `
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
-      <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-label">beta</span></a>
+      <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span><span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span></a>
       ${showActions ? `
       <div class="app-head-end">
         ${themePicker()}
@@ -793,13 +797,16 @@
       ? `<nav class="tabbar" aria-label="разделы">${navLinks("tab")}</nav>`
       : "";
 
-  const authLegalFoot = () => `
-    <footer class="site-foot auth-legal-foot">
-      <span>18+</span>
+  const legalFooterBar = (signed = false) => `
+    <footer class="legal-footer-bar" aria-label="юридическая информация">
+      <span class="badge-18">18+</span>
       <a href="/rules">правила</a>
       <a href="/privacy">конфиденциальность</a>
       <a href="/support">поддержка</a>
+      ${signed ? `<a href="/glossary">глоссарий</a><a href="${TEST_HREF}" target="_blank" rel="noopener">тест</a>` : ""}
     </footer>`;
+
+  const authLegalFoot = () => legalFooterBar(false);
 
   const authLayout = (body) => `
       ${appHead({ logoPosition: "center", showActions: false })}
@@ -887,14 +894,8 @@
         <p>Профиль — фото, особенности и как тебе писать. Лента — анкеты свайпом. Если симпатия взаимная, открывается чат.</p>
       </div>
       <p class="home-quiet">Можно быть собой.</p>
-      <footer class="home-legal">
-        <span>18+</span>
-        <a href="/rules">Правила</a>
-        <a href="/privacy">Конфиденциальность</a>
-        <a href="/support">Поддержка</a>
-        ${signed ? `<a href="/glossary">Глоссарий</a><a href="${TEST_HREF}" target="_blank" rel="noopener">Тест</a>` : ""}
-      </footer>
     </section>
+    ${legalFooterBar(signed)}
     ${tabbar()}`;
   };
 
@@ -2930,6 +2931,13 @@
       });
     }
     bindThemeControls();
+    root.querySelectorAll(".beta-wrap").forEach((wrap) => {
+      wrap.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wrap.classList.toggle("is-open");
+      });
+    });
     const bindFold = (btnId, panelId) => {
       const foldBtn = root.querySelector(btnId);
       const panel = root.querySelector(panelId);

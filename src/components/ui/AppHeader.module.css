@@ -46,10 +46,16 @@
   color: var(--lime, #bbf246);
 }
 
-.betaLabel {
+.betaTooltipWrap {
   position: absolute;
   left: calc(100% - 10px);
   top: -8px;
+  display: inline-flex;
+  z-index: 100;
+}
+
+.betaLabel {
+  position: relative;
   white-space: nowrap;
   font-family: var(--sans, "IBM Plex Sans", -apple-system, sans-serif);
   font-size: 9px;
@@ -63,9 +69,17 @@
   padding: 1px 5px;
   line-height: 1.25;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  pointer-events: none;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  pointer-events: auto;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
+
+.betaTooltipWrap:hover .betaLabel,
+.betaTooltipWrap:focus-visible .betaLabel {
+  border-color: var(--accent-line, rgba(143, 168, 110, 0.38));
+  color: var(--ink, #333);
+  transform: translateY(-1px);
+}
+
 
 :global(html[data-theme="mist"]) .betaLabel {
   background: #e2e5ef;

@@ -1,4 +1,5 @@
 import type { ComponentChildren, JSX } from "preact";
+import { Tooltip } from "./Tooltip";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
@@ -53,7 +54,14 @@ export function AppHeader({
         <span class={styles.brandName}>
           WIR<span>ING</span>
         </span>
-        {showBetaBadge && <span class={styles.betaLabel}>beta</span>}
+        {showBetaBadge && (
+          <Tooltip
+            className={styles.betaTooltipWrap}
+            content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
+          >
+            <span class={styles.betaLabel}>beta</span>
+          </Tooltip>
+        )}
       </a>
 
       {showActions && (

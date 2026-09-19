@@ -1,32 +1,46 @@
 import styles from "./LegalFooter.module.css";
 
 type LegalFooterProps = {
-  showAgeLimit?: boolean;
-  openInNewTab?: boolean;
+  showGlossary?: boolean;
+  testHref?: string;
   className?: string;
 };
 
 export function LegalFooter({
-  showAgeLimit = true,
-  openInNewTab = true,
+  showGlossary = false,
+  testHref = "https://neuro-raznoobrazie.web.app/",
   className,
-}: LegalFooterProps) {
-  const targetProps = openInNewTab
-    ? { target: "_blank", rel: "noopener noreferrer" }
-    : {};
-
+}: LegalFooterProps = {}) {
   return (
-    <footer class={`${styles.footer}${className ? ` ${className}` : ""}`} aria-label="юридическая информация">
-      {showAgeLimit && <span class={styles.badge18}>18+</span>}
-      <a class={styles.link} href="/rules" {...targetProps}>
+    <footer
+      class={`${styles.footer}${className ? ` ${className}` : ""}`}
+      aria-label="юридическая информация"
+    >
+      <span class={styles.badge18}>18+</span>
+      <a class={styles.link} href="/rules">
         правила
       </a>
-      <a class={styles.link} href="/privacy" {...targetProps}>
+      <a class={styles.link} href="/privacy">
         конфиденциальность
       </a>
-      <a class={styles.link} href="/support" {...targetProps}>
+      <a class={styles.link} href="/support">
         поддержка
       </a>
+      {showGlossary && (
+        <a class={styles.link} href="/glossary">
+          глоссарий
+        </a>
+      )}
+      {showGlossary && testHref && (
+        <a
+          class={styles.link}
+          href={testHref}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          тест
+        </a>
+      )}
     </footer>
   );
 }

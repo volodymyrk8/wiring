@@ -3,7 +3,6 @@ import type { JSX } from "preact";
 import { Button } from "@/components/ui/Button";
 import { FieldFloating } from "@/components/ui/FieldFloating";
 import { PasswordField } from "@/components/ui/PasswordField";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { LegalFooter } from "@/components/ui/LegalFooter";
 import type { AuthHostBridge } from "@/features/auth/types";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -18,8 +17,6 @@ type FieldErrors = {
   name?: string;
   email?: string;
   password?: string;
-  age_confirm?: string;
-  privacy_confirm?: string;
 };
 
 export function AuthScreen({ host }: AuthScreenProps) {
@@ -31,9 +28,6 @@ export function AuthScreen({ host }: AuthScreenProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [ageConfirm, setAgeConfirm] = useState(false);
-  const [privacyConfirm, setPrivacyConfirm] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
 
   // Validation & Server state
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -85,15 +79,6 @@ export function AuthScreen({ host }: AuthScreenProps) {
       errs.password = "Пароль должен содержать минимум 6 символов";
     }
 
-    if (isRegister) {
-      if (!ageConfirm) {
-        errs.age_confirm = "Нужно подтвердить возраст 18+";
-      }
-      if (!privacyConfirm) {
-        errs.privacy_confirm = "Необходимо согласие на обработку данных";
-      }
-    }
-
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -116,9 +101,8 @@ export function AuthScreen({ host }: AuthScreenProps) {
           name: name.trim(),
           email: trimmedEmail,
           password,
-          age_confirm: ageConfirm,
-          privacy_confirm: privacyConfirm,
-          marketing_consent: marketingConsent,
+          age_confirm: true,
+          privacy_confirm: true,
         };
         const ref = host.getReferralCode();
         if (ref) body.ref = ref;
@@ -436,50 +420,6 @@ export function AuthScreen({ host }: AuthScreenProps) {
           }}
         />
 
-        {!isLogin && (
-          <div class={styles.checksGroup}>
-            <Checkbox
-              name="age_confirm"
-              checked={ageConfirm}
-              required
-              error={Boolean(fieldErrors.age_confirm)}
-              onChange={(checked) => {
-                setAgeConfirm(checked);
-                clearFieldError("age_confirm");
-              }}
-            >
-              Мне есть 18, и я принимаю{" "}
-              <a href="/rules" target="_blank" rel="noopener">
-                правила сервиса
-              </a>
-            </Checkbox>
-
-            <Checkbox
-              name="privacy_confirm"
-              checked={privacyConfirm}
-              required
-              error={Boolean(fieldErrors.privacy_confirm)}
-              onChange={(checked) => {
-                setPrivacyConfirm(checked);
-                clearFieldError("privacy_confirm");
-              }}
-            >
-              Даю согласие на обработку данных и принимаю{" "}
-              <a href="/privacy" target="_blank" rel="noopener">
-                политику конфиденциальности
-              </a>
-            </Checkbox>
-
-            <Checkbox
-              name="marketing_consent"
-              checked={marketingConsent}
-              onChange={(checked) => setMarketingConsent(checked)}
-            >
-              Получать новости и полезные обновления на почту
-            </Checkbox>
-          </div>
-        )}
-
         {serverError && (
           <div class={styles.errorBanner} role="alert">
             <span class={styles.errorIcon}>⚠️</span>
@@ -499,7 +439,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
           </div>
         )}
 
-        <div class={styles.actions}>
+        <div class={styles.submitArea}>
           <Button type="submit" disabled={busy} loading={busy} fullWidth>
             {busy
               ? isLogin
@@ -509,23 +449,53 @@ export function AuthScreen({ host }: AuthScreenProps) {
               ? "Войти"
               : "Создать аккаунт"}
           </Button>
-          <Button
-            variant="ghost"
-            href={hrefFor(isLogin ? "register" : "login")}
-            nav={isLogin ? "register" : "login"}
-            fullWidth
-          >
-            {isLogin ? "Создать профиль" : "У меня есть аккаунт"}
-          </Button>
-        </div>
 
-        {isLogin && (
-          <p class={styles.footerHint}>
-            <a href={hrefFor("forgot")} data-nav="forgot">
-              Напомнить пароль?
+          {isRegister && (
+            <p class={styles.legalDisclaimer}>
+              Нажимая «Создать аккаунт», ты подтверждаешь возраст 18+ и принимаешь{" "}
+              <a href="/rules" target="_blank" rel="noopener noreferrer">
+                правила сервиса
+              </a>{" "}
+              и{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                политику конфиденциальности
+              </a>
+            </p>
+          )}
+
+          <div class={styles.switchRow}>
+            <span class={styles.switchPrompt}>
+              {isLogin ? "Ещё нет профиля?" : "Уже есть аккаунт?"}
+            </span>
+            <a
+              class={styles.switchLink}
+              href={hrefFor(isLogin ? "register" : "login")}
+              data-nav={isLogin ? "register" : "login"}
+              onClick={(e) => {
+                e.preventDefault();
+                host.navigate(isLogin ? "register" : "login");
+              }}
+            >
+              {isLogin ? "Создать профиль" : "Войти"}
             </a>
-          </p>
-        )}
+          </div>
+
+          {isLogin && (
+            <div class={styles.forgotRow}>
+              <a
+                class={styles.forgotLink}
+                href={hrefFor("forgot")}
+                data-nav="forgot"
+                onClick={(e) => {
+                  e.preventDefault();
+                  host.navigate("forgot");
+                }}
+              >
+                Напомнить пароль?
+              </a>
+            </div>
+          )}
+        </div>
       </form>
       </div>
       <LegalFooter />
