@@ -1594,39 +1594,6 @@ a.solid, a.ghost { display: inline-block; text-align: center; text-decoration: n
   filter: blur(7px);
   transform: scale(1.4);
 }
-.password-wrap {
-  position: relative;
-  display: block;
-}
-.password-wrap input {
-  width: 100%;
-  padding-right: 44px;
-}
-.password-toggle {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 6px;
-  display: inline-grid;
-  place-items: center;
-  min-height: 36px;
-}
-.password-toggle.on { color: var(--lime); }
-.city-field.needs-city,
-.city-field.needs-city .city-select,
-.city-field.needs-city .city-combo input {
-  outline: 2px solid var(--coral);
-  outline-offset: 2px;
-  border-radius: 14px;
-}
-.city-select,
-.city-combo,
-.city-combo input { width: 100%; }
-.city-combo { display: block; }
 .bubble-quote {
   margin: 0 0 6px;
   padding: 6px 8px;
@@ -2355,17 +2322,6 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
   font-size: 14px;
   color: var(--ink);
   line-height: 1.45;
-}
-
-/* Delete Account Warning Card */
-
-.field-floating.password-wrap .password-toggle {
-  z-index: 2;
-  cursor: pointer;
-}
-
-.field-floating.password-wrap input {
-  padding-right: 48px;
 }
 
 .legal-nav {

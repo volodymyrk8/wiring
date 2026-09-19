@@ -15,7 +15,7 @@ The application uses a thin shell coordinator. Feature bundles own all user-faci
 | Likes | `src/features/likes/` | Preact feature |
 | Person profile | `src/features/person/` | Preact feature |
 | Deck / swipe | `src/features/deck/` | Preact feature; gesture behavior kept in feature boundary |
-| Invite / onboarding / delete account | `src/features/account/` | Preact feature |
+| City gate / invite / onboarding / delete account | `src/features/account/` | Preact feature |
 
 ## Shell responsibilities
 

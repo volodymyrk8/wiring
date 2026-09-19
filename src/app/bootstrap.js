@@ -638,41 +638,6 @@ import { createInboxController } from "./inbox";
         <section class="panel auth-panel">${body}</section>
       </div>`;
 
-  const cityGateView = () => ({
-    html: `
-      ${appHead()}
-      <section class="panel">
-        <h2>Уточни город</h2>
-        <p class="lede">Сначала страна, потом город из списка.</p>
-        <form class="form" id="city-gate">
-          ${placeFields(state.user?.city || "", { id: "gate-city" })}
-          <div class="err" id="err"></div>
-          <div class="actions">
-            <button class="solid" type="submit">сохранить и продолжить</button>
-          </div>
-        </form>
-      </section>
-      ${tabbar()}`,
-    bind() {
-      bindPlaceCountry();
-      root.querySelector("#city-gate").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const city = new FormData(e.target).get("city");
-        try {
-          const data = await api("/api/me/city", { method: "POST", body: JSON.stringify({ city }) });
-          state.user = data.user;
-          toast("город сохранён");
-          state.view = "deck";
-          await loadFeed();
-          render();
-        } catch (err) {
-          root.querySelector("#err").textContent = err.message;
-        }
-      });
-    },
-  });
-
-
   const friendlyLike = () => {
     const intents = state.user?.intents || (state.user?.intent ? [state.user.intent] : []);
     const soft = intents.length > 0 && intents.every((id) => id === "friends" || id === "chat");
@@ -683,62 +648,6 @@ import { createInboxController } from "./inbox";
     };
   };
 
-  const countryOfCity = (city) => {
-    const needle = String(city || "").trim();
-    if (!needle) return "";
-    for (const block of state.catalog?.places || []) {
-      if ((block.cities || []).includes(needle)) return block.country || "";
-    }
-    return "";
-  };
-
-  const citiesForCountry = (country) => {
-    const places = state.catalog?.places || [];
-    const block = places.find((b) => b.country === country);
-    const list = block ? [...(block.cities || [])] : places.flatMap((b) => b.cities || []);
-    return list.sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  };
-
-  const placeFields = (selectedCity, { name = "city", required = true, id = "city", country = "" } = {}) => {
-    const places = state.catalog?.places || [];
-    const pickedCountry = country || countryOfCity(selectedCity) || places[0]?.country || "";
-    const cities = citiesForCountry(pickedCountry);
-    const listId = `${id}-list`;
-    const countryOpts = places
-      .map(
-        (b) =>
-          `<option value="${escapeAttr(b.country)}" ${b.country === pickedCountry ? "selected" : ""}>${escapeHtml(
-            b.country
-          )}</option>`
-      )
-      .join("");
-    const cityOpts = cities.map((c) => `<option value="${escapeAttr(c)}"></option>`).join("");
-    return `
-      <label>страна
-        <select id="${id}-country" data-city-country="${id}" autocomplete="country-name">${countryOpts}</select>
-      </label>
-      <label class="city-field">город
-        <span class="city-combo">
-          <input name="${name}" id="${id}" list="${listId}" value="${escapeAttr(selectedCity || "")}" ${
-            required ? "required" : ""
-          } maxlength="48" autocomplete="address-level2" placeholder="выбери из списка" list="${listId}">
-          <datalist id="${listId}">${cityOpts}</datalist>
-        </span>
-      </label>`;
-  };
-
-  const bindPlaceCountry = () => {
-    root.querySelectorAll("[data-city-country]").forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const id = sel.dataset.cityCountry;
-        const list = root.querySelector(`#${id}-list`);
-        if (!list) return;
-        const cities = citiesForCountry(sel.value);
-        list.innerHTML = cities.map((c) => `<option value="${escapeAttr(c)}"></option>`).join("");
-      });
-    });
-  };
-
   const logout = async () => {
     try {
       await api("/api/logout", { method: "POST" });
@@ -747,30 +656,6 @@ import { createInboxController } from "./inbox";
     state.view = "home";
     stopInbox();
     render();
-  };
-
-  const passwordField = (name, { autocomplete = "current-password", required = true, value = "" } = {}) =>
-    `<label class="password-field">Пароль
-      <span class="password-wrap">
-        <input name="${name}" type="password" ${required ? "required" : ""} minlength="6" autocomplete="${autocomplete}" value="${escapeAttr(value)}">
-        <button type="button" class="password-toggle" aria-label="показать пароль" title="показать пароль">${ICONS.eye}</button>
-      </span>
-    </label>`;
-
-  const bindPasswordToggles = () => {
-    root.querySelectorAll(".password-wrap").forEach((wrap) => {
-      const input = wrap.querySelector("input");
-      const btn = wrap.querySelector(".password-toggle");
-      if (!input || !btn) return;
-      btn.addEventListener("click", () => {
-        const show = input.type === "password";
-        input.type = show ? "text" : "password";
-        btn.setAttribute("aria-label", show ? "скрыть пароль" : "показать пароль");
-        btn.title = show ? "скрыть пароль" : "показать пароль";
-        btn.classList.toggle("on", show);
-        btn.innerHTML = show ? ICONS.eyeOff : ICONS.eye;
-      });
-    });
   };
 
   const openPerson = async (id, from) => {
@@ -962,9 +847,12 @@ import { createInboxController } from "./inbox";
   let personFeatureUnmount = null;
   let deckFeatureUnmount = null;
   let accountFeatureUnmount = null;
+  const ACCOUNT_FEATURE_VIEWS = new Set(["invite", "delete-account", "onboard"]);
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
+
+  const cityGateActive = () => Boolean(state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile");
 
   const buildHomeHostBridge = () => {
     const signed = Boolean(state.user && !state.user.guest);
@@ -1397,20 +1285,22 @@ import { createInboxController } from "./inbox";
   const renderAccountFeature = async (view) => {
     accountFeatureUnmount?.();
     accountFeatureUnmount = null;
-    root.innerHTML = '<div id="account-feature-root"></div>' + (["invite", "onboard"].includes(view) ? tabbar() : "");
+    root.innerHTML = '<div id="account-feature-root"></div>' + (ACCOUNT_FEATURE_VIEWS.has(view) && view !== "delete-account" ? tabbar() : "");
     bindDataNavLinks();
     bindThemeControls();
     const mountEl = root.querySelector("#account-feature-root");
     if (!mountEl) return;
     try {
       const mod = await featureLoader.account();
-      if (!["invite", "delete-account", "onboard"].includes(state.view)) return;
+      if (view === "city-gate" ? !cityGateActive() : !ACCOUNT_FEATURE_VIEWS.has(state.view)) return;
       const accountHost = buildAccountHostBridge();
-      accountFeatureUnmount = view === "invite"
-        ? mod.mountInvite(mountEl, accountHost)
-        : view === "onboard"
-          ? mod.mountOnboard(mountEl, accountHost)
-          : mod.mountDeleteAccount(mountEl, accountHost);
+      accountFeatureUnmount = view === "city-gate"
+        ? mod.mountCityGate(mountEl, accountHost)
+        : view === "invite"
+          ? mod.mountInvite(mountEl, accountHost)
+          : view === "onboard"
+            ? mod.mountOnboard(mountEl, accountHost)
+            : mod.mountDeleteAccount(mountEl, accountHost);
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
@@ -1473,7 +1363,7 @@ import { createInboxController } from "./inbox";
       deckFeatureUnmount?.();
       deckFeatureUnmount = null;
     }
-    if (!["invite", "delete-account", "onboard"].includes(state.view)) {
+    if (!ACCOUNT_FEATURE_VIEWS.has(state.view) && !cityGateActive()) {
       accountFeatureUnmount?.();
       accountFeatureUnmount = null;
     }
@@ -1505,7 +1395,10 @@ import { createInboxController } from "./inbox";
       void renderHomeFeature();
       return;
     }
-    else if (state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile") bound = cityGateView();
+    else if (cityGateActive()) {
+      void renderAccountFeature("city-gate");
+      return;
+    }
     else if (CHAT_FEATURE_VIEWS.has(state.view)) {
       void renderChatFeature();
       return;
@@ -1522,7 +1415,7 @@ import { createInboxController } from "./inbox";
       void renderDeckFeature();
       return;
     }
-    else if (["invite", "delete-account", "onboard"].includes(state.view)) {
+    else if (ACCOUNT_FEATURE_VIEWS.has(state.view)) {
       void renderAccountFeature(state.view);
       return;
     }

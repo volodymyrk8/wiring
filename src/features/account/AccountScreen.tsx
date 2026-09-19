@@ -111,6 +111,40 @@ export function DeleteAccountScreen({ host }: { host: AccountHostBridge }) {
   </div>;
 }
 
+export function CityGateScreen({ host }: { host: AccountHostBridge }) {
+  const initialCity = String(host.user.city || "");
+  const initialCountry = (host.catalog.places || []).find((place) => place.cities.includes(initialCity))?.country || host.catalog.places?.[0]?.country || "";
+  const [country, setCountry] = useState(initialCountry);
+  const [city, setCity] = useState(initialCity);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const cities = host.catalog.places?.find((place) => place.country === country)?.cities || [];
+  const submit = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
+    event.preventDefault();
+    if (!city || busy) return;
+    setBusy(true); setError("");
+    try {
+      const response = await host.api("/api/me/city", { method: "POST", body: JSON.stringify({ city }) });
+      host.onUserUpdated(response.user);
+      host.toast("город сохранён");
+      host.navigate("deck");
+    } catch (caught) { setError(getErrorMessage(caught)); setBusy(false); }
+  };
+  return <div class={styles.root}>
+    <AccountHeader host={host} title="город" back={false} />
+    <main class={styles.content}><section class={styles.panel}>
+      <h1>Уточни город</h1>
+      <p class={styles.lede}>Сначала страна, потом город из списка.</p>
+      <form class={styles.onboard} onSubmit={submit}>
+        <label>страна<select value={country} onChange={(event) => { setCountry(event.currentTarget.value); setCity(""); }} required>{(host.catalog.places || []).map((place) => <option key={place.country} value={place.country}>{place.country}</option>)}</select></label>
+        <label>город<select value={city} onChange={(event) => setCity(event.currentTarget.value)} required><option value="">выбери город</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        {error ? <p class={styles.error} role="alert">{error}</p> : null}
+        <div class={styles.actions}><Button variant="solid" type="submit" disabled={busy} loading={busy}>сохранить и продолжить</Button></div>
+      </form>
+    </section><LegalFooter /></main>
+  </div>;
+}
+
 const photosOf = (user: AccountHostBridge["user"]) => Array.isArray(user.photos) ? user.photos : (user.albums || []).flatMap((album) => album.photos || []);
 const photoSrc = (host: AccountHostBridge, photo: unknown, name: string) => {
   const value = photo && typeof photo === "object" ? (photo as { url?: string }).url : photo;
