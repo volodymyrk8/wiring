@@ -20,7 +20,7 @@ function cssInjectedByJs(styleId: string): Plugin {
       if (!cssCode) return;
       for (const [fileName, chunk] of Object.entries(bundle)) {
         if (fileName.endsWith(".js") && "code" in chunk) {
-          const injection = `(function(){try{if(typeof document!=="undefined"){var s=document.getElementById(${JSON.stringify(styleId)});if(!s){s=document.createElement("style");s.id=${JSON.stringify(styleId)};s.textContent=${JSON.stringify(cssCode)};document.head.appendChild(s);}}}catch(e){}})();\n`;
+          const injection = `(function(){try{if(typeof document!=="undefined"){var s=document.getElementById(${JSON.stringify(styleId)});if(!s){s=document.createElement("style");s.id=${JSON.stringify(styleId)};document.head.appendChild(s);}s.textContent=${JSON.stringify(cssCode)};}}catch(e){}})();\n`;
           chunk.code = injection + chunk.code;
           break;
         }

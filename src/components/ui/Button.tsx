@@ -16,6 +16,7 @@ type ButtonProps = {
   children: ComponentChildren;
 };
 
+/** Design-system control — styles from `public/styles.css` (`.btn`, `.solid`, `.ghost`). */
 export function Button({
   variant = "solid",
   slim,
@@ -30,12 +31,11 @@ export function Button({
   ariaLabel,
   children,
 }: ButtonProps) {
-  const isSolid = variant === "solid";
   const classNames = [
-    styles.btn,
-    isSolid ? styles.solid : styles.ghost,
-    slim ? styles.slim : "",
-    fullWidth ? styles.fullWidth : "",
+    "btn",
+    variant === "solid" ? "solid" : "ghost",
+    slim ? "slim" : "",
+    fullWidth ? "fullWidth" : "",
     className,
   ]
     .filter(Boolean)
@@ -48,7 +48,7 @@ export function Button({
         href={href}
         data-nav={nav}
         onClick={onClick}
-        aria-disabled={disabled || loading}
+        aria-disabled={disabled || loading ? "true" : undefined}
         aria-label={ariaLabel}
       >
         <span>{children}</span>
@@ -61,7 +61,7 @@ export function Button({
       class={classNames}
       type={type}
       disabled={disabled || loading}
-      aria-busy={loading}
+      aria-busy={loading || undefined}
       onClick={onClick}
       aria-label={ariaLabel}
     >

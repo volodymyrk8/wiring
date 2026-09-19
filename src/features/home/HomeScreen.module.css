@@ -6,22 +6,36 @@
   flex-direction: column;
 }
 
+.hero {
+  margin: 2px 0 0;
+  padding: 0 0 2px;
+}
+
 .title {
+  margin: 0 0 6px;
   font-family: var(--serif, "Fraunces", Georgia, serif);
   font-weight: 500;
   letter-spacing: -0.04em;
-  font-size: clamp(30px, 8vw, 36px);
-  line-height: 1.1;
-  margin: 4px 0 8px;
-  overflow-wrap: anywhere;
+  font-size: clamp(30px, 8vw, 38px);
+  line-height: 1.12;
+  text-wrap: balance;
   color: var(--ink, #111);
 }
 
+.titleAccent {
+  font-weight: 600;
+  color: var(--lime, #7d82c4);
+}
+
 .sub {
-  color: var(--muted, #777);
   margin: 0 0 16px;
-  font-size: 16px;
-  line-height: 1.4;
+  max-width: 22em;
+  font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+  color: color-mix(in srgb, var(--ink, #32344a) 36%, var(--muted, #6d7084) 64%);
 }
 
 .ctaBtn {
@@ -160,9 +174,12 @@
 @media (max-width: 420px) {
   .title {
     font-size: 30px;
+    margin-bottom: 5px;
   }
+
   .sub {
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+    font-size: 15px;
   }
 }
 
@@ -173,11 +190,18 @@
 }
 
 @media (max-height: 700px) {
-  .title {
+  .hero {
     margin-top: 0;
   }
+
+  .title {
+    font-size: clamp(28px, 7.5vw, 32px);
+    margin-bottom: 6px;
+  }
+
   .sub {
     margin-bottom: 12px;
+    font-size: 15px;
   }
 }
 

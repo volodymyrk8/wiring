@@ -93,8 +93,12 @@ export function HomeScreen({ host }: HomeScreenProps) {
       />
 
       <section class={styles.home} aria-label="главная">
-        <h1 class={styles.title}>Отличные люди рядом</h1>
-        <p class={styles.sub}>Знакомства для нейроотличных</p>
+        <header class={styles.hero}>
+          <h1 class={styles.title}>
+            <span class={styles.titleAccent}>Отличные</span> люди рядом
+          </h1>
+          <p class={styles.sub}>Знакомства для нейроотличных</p>
+        </header>
 
         <HomeFaces faces={homeFaces} basePath={basePath} />
 

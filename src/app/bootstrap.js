@@ -465,14 +465,16 @@ import { createInboxController } from "./inbox";
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
   const QUIET_VIEWS = new Set(["login", "register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
   const showsTabbar = () => !QUIET_VIEWS.has(state.view);
-  const HOME_FACE_SRC = Array.from({ length: 12 }, (_, i) => `people/${String(i + 1).padStart(2, "0")}.jpg`);
+  const HOME_FACE_SRC = Array.from({ length: 12 }, (_, i) => `people/${String(i + 1).padStart(2, "0")}.jpg`).filter(
+    (src) => src !== "people/11.jpg",
+  );
   const pickHomeFaces = () => {
     const pool = HOME_FACE_SRC.slice();
     for (let i = pool.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return pool.slice(0, 3);
+    return pool.slice(0, 4);
   };
   const HOME_FACES = pickHomeFaces();
 
