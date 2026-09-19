@@ -9,6 +9,19 @@ if [[ "$url" != postgres* ]]; then
   exit 0
 fi
 
+if command -v pg_isready >/dev/null 2>&1 && pg_isready -d "$url" >/dev/null 2>&1; then
+  exit 0
+fi
+
+PY="python3"
+if [[ -x .venv/bin/python ]]; then
+  PY=".venv/bin/python"
+fi
+
+if "$PY" -c "import os, psycopg; conn = psycopg.connect(os.environ.get('DATABASE_URL','')); conn.close()" >/dev/null 2>&1; then
+  exit 0
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "DATABASE_URL is Postgres but docker is not installed." >&2
   exit 1

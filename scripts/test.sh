@@ -11,6 +11,8 @@ if [[ -f .env ]]; then
   set +a
 fi
 
+export DATABASE_URL="${TEST_DATABASE_URL:-postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test}"
+
 ./scripts/wait_for_postgres.sh
 
 if [[ -f package.json ]]; then
@@ -26,7 +28,5 @@ if [[ -x .venv/bin/python ]]; then
 else
   PY=python3
 fi
-
-export DATABASE_URL="${TEST_DATABASE_URL:-postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test}"
 
 "$PY" -m unittest discover -s tests -q
