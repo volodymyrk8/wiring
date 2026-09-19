@@ -98,9 +98,16 @@ See [tests/README.md](tests/README.md) and [docs/router.md](docs/router.md).
 
 ## Deploy
 
+**Local (same as before):**
+
 ```sh
+./scripts/test.sh   # optional
 ./deploy.sh
 ```
+
+**GitHub:** push/merge to `main` runs tests, then `./deploy.sh` via Actions. Set repository secret `DEPLOY_SSH_KEY` once — see [docs/github-actions.md](docs/github-actions.md).
+
+Repo: https://github.com/volodymyrk8/wiring
 
 ### PostgreSQL (production)
 
