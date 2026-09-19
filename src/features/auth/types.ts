@@ -1,4 +1,4 @@
-/** Contract between the legacy SPA shell (`public/app.js`) and the auth feature bundle. */
+/** Contract between the SPA shell and the auth feature bundle. */
 export type AuthMode = "login" | "register" | "forgot" | "verify" | "reset";
 
 export interface AuthHostBridge {

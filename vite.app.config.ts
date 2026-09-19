@@ -1,17 +1,3 @@
-import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { vanillaConfig } from "./vite.shared";
 
-export default defineConfig({
-  publicDir: false,
-  resolve: { alias: { "@": resolve(__dirname, "src") } },
-  build: {
-    outDir: "public/dist",
-    emptyOutDir: false,
-    lib: {
-      entry: resolve(__dirname, "src/entries/app.ts"),
-      formats: ["es"],
-      fileName: () => "app.js",
-    },
-    rollupOptions: { output: { inlineDynamicImports: true } },
-  },
-});
+export default vanillaConfig("entries/app.ts", "app.js");

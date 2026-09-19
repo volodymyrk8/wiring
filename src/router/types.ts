@@ -1,4 +1,4 @@
-/** SPA view ids (legacy name kept for app.js state.view). */
+/** SPA view ids (legacy name kept for the shell's state.view). */
 export type ViewId =
   | "home"
   | "login"

@@ -1302,87 +1302,6 @@ html[data-theme="slate"] .profile-menu-status {
   border: 1px solid var(--line);
 }
 
-/* Plus Dedicated Page */
-.plus-panel {
-  max-width: 540px;
-  margin: 0 auto;
-}
-
-.plus-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  margin: 8px 0 20px;
-}
-
-.plus-hero .hero-gem {
-  width: 32px;
-  height: 32px;
-  margin-bottom: 4px;
-}
-
-.plus-hero .hero-gem svg {
-  width: 17px;
-  height: 17px;
-}
-
-.plus-hero h2 {
-  margin: 0;
-  font-size: 1.7rem;
-  letter-spacing: 0.02em;
-}
-
-.plus-hero .lede {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--muted);
-  max-width: 380px;
-  line-height: 1.45;
-}
-
-.plus-features-list {
-  display: grid;
-  gap: 10px;
-  margin: 16px 0;
-}
-
-.plus-feature-item {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--card);
-  border: 1px solid var(--line);
-}
-
-.plus-feature-icon {
-  font-size: 20px;
-  line-height: 1;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.plus-feature-text {
-  font-size: 13.5px;
-  line-height: 1.4;
-}
-
-.plus-feature-text strong {
-  display: block;
-  font-size: 14px;
-  color: var(--ink);
-  margin-bottom: 2px;
-}
-
-.plus-feature-text .hint {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
 .tabbar {
   position: fixed;
   left: 0;
@@ -1487,8 +1406,8 @@ html[data-theme="slate"] .profile-menu-status {
 }
 .tabbar .nav-avatar {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   overflow: hidden;
   box-sizing: border-box;
@@ -3263,6 +3182,10 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
     width: 22px;
     height: 22px;
   }
+  .tabbar .nav-avatar {
+    width: 22px;
+    height: 22px;
+  }
   .tabbar .pip-slot {
     top: -5px;
     right: -9px;
@@ -3347,6 +3270,10 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
     height: 26px;
   }
   .tabbar .nav-ico svg {
+    width: 24px;
+    height: 24px;
+  }
+  .tabbar .nav-avatar {
     width: 24px;
     height: 24px;
   }
@@ -4579,15 +4506,6 @@ html.keyboard .composer-dock { padding-bottom: 6px; }
   height: 13px;
   filter: drop-shadow(0 1px 1px rgba(30, 20, 55, 0.18));
   animation: gemIconGlow 9.5s ease-in-out infinite;
-}
-.plus-hero .hero-gem {
-  width: 42px;
-  height: 42px;
-  margin-bottom: 6px;
-}
-.plus-hero .hero-gem svg {
-  width: 23px;
-  height: 23px;
 }
 html[data-theme] .badge-gem-icon {
   box-shadow: 0 2px 7px rgba(35, 25, 60, 0.16);

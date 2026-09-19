@@ -4,7 +4,7 @@
 
 Сайт: https://wiring.date/
 
-**Архитектура и принципы (KISS, минимум зависимостей):** [docs/architecture.md](docs/architecture.md)
+**Архитектура и принципы (KISS, минимум зависимостей):** [docs/architecture.md](docs/architecture.md). Карта миграции frontend: [docs/frontend-migration.md](docs/frontend-migration.md). Правила для AI coding agents: [AGENTS.md](AGENTS.md).
 
 ## Local
 
@@ -26,9 +26,10 @@ npm install && npm run build   # app shell + Preact features → public/dist/
 ```
 src/
   components/ui/     # shared primitives (Button, FieldFloating, …)
-  app/               # application shell and shared API client
+  app/               # shell, API client, inbox lifecycle, feature loaders
   features/auth/     # auth screens + mountAuth()
   features/chat/     # chats list, thread, polling and composer
+  features/profile/  # profile, consents, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js
   entries/router.ts  # → public/dist/router.js (URL ↔ view)
@@ -36,7 +37,7 @@ src/
   lib/               # small helpers
 ```
 
-After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run test:router` to smoke-test routes.
+After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run typecheck` for the TypeScript contract check and `npm run test:router` to smoke-test routes.
 
 **Database:** PostgreSQL 16 is the only supported database engine. Local dev uses **PostgreSQL 16** in Docker (`docker compose up -d postgres`). `./scripts/dev.sh` starts postgres, waits until ready, seeds test users, and boots the dev server.
 

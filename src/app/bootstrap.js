@@ -1,10 +1,12 @@
 import { createApi } from "./api";
+import { createFeatureLoader } from "./features";
 import { createInboxController } from "./inbox";
 
 (() => {
   const root = document.getElementById("app");
   const BASE = root.dataset.base || "";
   const api = createApi(BASE);
+  const featureLoader = createFeatureLoader(BASE);
   const pinChatHeight = () => {
     const port = window.visualViewport;
     const height = Math.round(port ? port.height : window.innerHeight);
@@ -382,11 +384,6 @@ import { createInboxController } from "./inbox";
     sessionStorage.setItem("wiring-filters", JSON.stringify(rest));
   };
   state.filters.real_only = false;
-
-  const plusUntil = (ts) => {
-    if (!ts) return "";
-    return new Date(ts * 1000).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
-  };
 
   const photoUrl = (photo, name) => {
     if (Array.isArray(photo)) photo = photo[0];
@@ -2056,100 +2053,6 @@ import { createInboxController } from "./inbox";
     };
   };
 
-  const plusView = () => {
-    const u = state.user || {};
-    return {
-      html: `
-        ${appHead({ showBack: true, backHref: hrefFor("profile"), backNav: "profile", backLabel: "В профиль" })}
-        <section class="panel plus-panel">
-          <div class="plus-hero">
-            <span class="badge-gem-icon hero-gem" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 3h12l4 6-10 13L2 9Z"/>
-                <path d="M11 3 8 9l4 13 4-13-3-6"/>
-                <path d="M2 9h20"/>
-              </svg>
-            </span>
-            <h2>WIRING+</h2>
-            <p class="lede">Спокойный и комфортный режим знакомств без лишней спешки и ограничений.</p>
-          </div>
-
-          <div class="plus-box${u.plus ? " on" : ""}">
-            <div class="q">${u.plus ? "WIRING+ включён" : "WIRING+ выключен"}</div>
-            ${
-              u.plus
-                ? `${u.plus_until ? `<p class="hint">Подписка заканчивается ${plusUntil(u.plus_until)}</p>` : `<p class="hint">Подписка активна</p>`}
-                   <label class="check"><input id="plus-incognito" type="checkbox" ${u.incognito ? "checked" : ""}> инкогнито — меня не показывают, пока я сам не лайкну</label>
-                   <label class="check"><input id="plus-paused" type="checkbox" ${u.paused ? "checked" : ""}> пауза — временно скрыть анкету</label>`
-                : `<p class="hint">спокойный режим: видно, кто лайкнул, инкогнито, пауза, заметки, отложить человека. сиды в ленте остаются.</p>
-                   <label>промокод<input id="plus-code" maxlength="24" placeholder="если есть код"></label>
-                   <button class="ghost slim" type="button" id="plus-redeem">активировать</button>`
-            }
-          </div>
-
-          <div class="plus-features-list">
-            <div class="plus-feature-item">
-              <div class="plus-feature-icon">👁️</div>
-              <div class="plus-feature-text">
-                <strong>Видно, кто лайкнул</strong>
-                <p class="hint">Открывай входящие симпатии и выбирай, кому ответить взаимностью.</p>
-              </div>
-            </div>
-            <div class="plus-feature-item">
-              <div class="plus-feature-icon">🕶️</div>
-              <div class="plus-feature-text">
-                <strong>Режим инкогнито</strong>
-                <p class="hint">Твоя анкета видна только тем людям, которых ты лайкнул сам.</p>
-              </div>
-            </div>
-            <div class="plus-feature-item">
-              <div class="plus-feature-icon">⏸️</div>
-              <div class="plus-feature-text">
-                <strong>Пауза анкеты</strong>
-                <p class="hint">Скрой себя из ленты на время отдыха — все текущие переписки и мэтчи сохранятся.</p>
-              </div>
-            </div>
-            <div class="plus-feature-item">
-              <div class="plus-feature-icon">📝</div>
-              <div class="plus-feature-text">
-                <strong>Заметки и закладки</strong>
-                <p class="hint">Оставляй личные пометки к профилям — их видишь только ты.</p>
-              </div>
-            </div>
-          </div>
-
-          ${
-            u.ref_url
-              ? `<div class="plus-box">
-            <div class="q">пригласи своих</div>
-            <p class="hint">по ссылке зарегистрируется человек — WIRING+ на ${u.ref_days || 30} дней вам обоим. уже привели: ${u.ref_count || 0}</p>
-            <div class="ref-row">
-              <input id="ref-link" readonly value="${escapeAttr(u.ref_url)}">
-              <button class="ghost slim" type="button" id="ref-copy">копировать</button>
-            </div>
-          </div>`
-              : ""
-          }
-        </section>
-        ${tabbar()}`,
-      bind() {
-        const savePlus = async (patch) => {
-          try {
-            const data = await api("/api/plus", { method: "PATCH", body: JSON.stringify(patch) });
-            state.user = data.user;
-            toast("сохранено");
-          } catch (err) {
-            toast(err.message);
-          }
-        };
-        const incognito = root.querySelector("#plus-incognito");
-        if (incognito) incognito.addEventListener("change", () => savePlus({ incognito: incognito.checked }));
-        const paused = root.querySelector("#plus-paused");
-        if (paused) paused.addEventListener("change", () => savePlus({ paused: paused.checked }));
-      },
-    };
-  };
-
   const deleteConfirmModal = () => {
     return `<div class="modal-back" id="delete-confirm-modal">
       <div class="modal-card" role="dialog" aria-modal="true" aria-label="Удалить аккаунт">
@@ -2798,38 +2701,11 @@ import { createInboxController } from "./inbox";
 
   const AUTH_FEATURE_VIEWS = new Set(["login", "register", "forgot", "verify", "reset"]);
   let authFeatureUnmount = null;
-  let authFeatureModulePromise = null;
-
-  const loadAuthFeatureModule = () => {
-    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=4`);
-    return authFeatureModulePromise;
-  };
-
   let homeFeatureUnmount = null;
-  let homeFeatureModulePromise = null;
-
-  const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=29`);
-    return homeFeatureModulePromise;
-  };
-
   let profileFeatureUnmount = null;
-  let profileFeatureModulePromise = null;
-
-  const loadProfileFeatureModule = () => {
-    profileFeatureModulePromise ??= import(`${BASE}/public/dist/profile.js?v=2`);
-    return profileFeatureModulePromise;
-  };
-
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
-  let chatFeatureModulePromise = null;
   let chatFeatureMountToken = 0;
-
-  const loadChatFeatureModule = () => {
-    chatFeatureModulePromise ??= import(`${BASE}/public/dist/chat.js?v=1`);
-    return chatFeatureModulePromise;
-  };
 
   const buildHomeHostBridge = () => {
     const signed = Boolean(state.user && !state.user.guest);
@@ -3036,7 +2912,7 @@ import { createInboxController } from "./inbox";
     const mountEl = root.querySelector("#auth-feature-root");
     if (!mountEl) return;
     try {
-      const mod = await loadAuthFeatureModule();
+      const mod = await featureLoader.auth();
       authFeatureUnmount = mod.mountAuth(mountEl, buildAuthHostBridge(mode));
       bindDataNavLinks();
       syncUrl();
@@ -3054,7 +2930,7 @@ import { createInboxController } from "./inbox";
     const mountEl = root.querySelector("#home-feature-root");
     if (!mountEl) return;
     try {
-      const mod = await loadHomeFeatureModule();
+      const mod = await featureLoader.home();
       homeFeatureUnmount = mod.mountHome(mountEl, buildHomeHostBridge());
       bindDataNavLinks();
       syncUrl();
@@ -3076,10 +2952,13 @@ import { createInboxController } from "./inbox";
     const mountEl = root.querySelector("#profile-feature-root");
     if (!mountEl) return;
     try {
-      const mod = await loadProfileFeatureModule();
+      const mod = await featureLoader.profile();
+      const profileHost = buildProfileHostBridge();
       profileFeatureUnmount = view === "consents"
-        ? mod.mountConsent(mountEl, buildProfileHostBridge())
-        : mod.mountProfile(mountEl, buildProfileHostBridge());
+        ? mod.mountConsent(mountEl, profileHost)
+        : view === "plus"
+          ? mod.mountPlus(mountEl, profileHost)
+          : mod.mountProfile(mountEl, profileHost);
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
@@ -3102,7 +2981,7 @@ import { createInboxController } from "./inbox";
     const mountEl = root.querySelector("#chat-feature-root");
     if (!mountEl) return;
     try {
-      const mod = await loadChatFeatureModule();
+      const mod = await featureLoader.chat();
       if (token !== chatFeatureMountToken || !CHAT_FEATURE_VIEWS.has(state.view)) return;
       chatFeatureUnmount = mod.mountChat(mountEl, buildChatHostBridge());
       bindDataNavLinks();
@@ -3129,7 +3008,7 @@ import { createInboxController } from "./inbox";
       homeFeatureUnmount?.();
       homeFeatureUnmount = null;
     }
-    if (!["profile", "consents"].includes(state.view)) {
+    if (!["profile", "consents", "plus"].includes(state.view)) {
       profileFeatureUnmount?.();
       profileFeatureUnmount = null;
     }
@@ -3173,11 +3052,10 @@ import { createInboxController } from "./inbox";
     }
     else if (state.view === "likes") root.innerHTML = likesView();
     else if (state.view === "person") root.innerHTML = personView();
-    else if (state.view === "profile" || state.view === "consents") {
+    else if (["profile", "consents", "plus"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
     }
-    else if (state.view === "plus") bound = plusView();
     else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
     else if (state.view === "invite") bound = inviteView();

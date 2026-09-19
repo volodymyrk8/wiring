@@ -1,0 +1,209 @@
+.root {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+.content {
+  display: grid;
+  width: 100%;
+  max-width: 760px;
+  gap: 16px;
+  margin-inline: auto;
+}
+
+.hero {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px 0 4px;
+  text-align: center;
+}
+
+.gem {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  margin-bottom: 2px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--lime) 18%, var(--bg-2)));
+  color: var(--lime);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--lime) 18%, transparent);
+}
+
+.hero h1 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(28px, 6vw, 38px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.hero p {
+  max-width: 520px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+}
+
+.panelActive {
+  border-color: color-mix(in srgb, var(--lime) 45%, var(--line));
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.checkList {
+  display: grid;
+  gap: 12px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 1px 0 0;
+  accent-color: var(--lime);
+}
+
+.codeForm {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.codeField {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.codeField input {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+
+.codeField input:focus {
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.featureList {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--line);
+}
+
+.feature {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-2);
+}
+
+.featureIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--accent-soft);
+  font-size: 18px;
+}
+
+.feature strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.feature p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.refRow {
+  display: flex;
+  gap: 8px;
+}
+
+.refRow input {
+  min-width: 0;
+  flex: 1;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+}
+
+.error {
+  margin: 0;
+  color: var(--coral);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 560px) {
+  .panel { padding: 16px; border-radius: 18px; }
+  .codeForm { align-items: stretch; flex-direction: column; }
+  .refRow { align-items: stretch; flex-direction: column; }
+  .refRow a, .refRow button { width: 100%; }
+}
