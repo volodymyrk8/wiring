@@ -8,3 +8,4 @@ export * from "./AppHeader";
 export * from "./Tooltip";
 export * from "./AccordionRow";
 export * from "./Select";
+export * from "./Modal";
