@@ -400,12 +400,6 @@ import { createInboxController } from "./inbox";
     return url.includes("?") ? `${url}&s=sm` : `${url}?s=sm`;
   };
 
-  const cardPhotos = (card) => {
-    const list = (card.photos || []).map((p) => (typeof p === "string" ? p : p.url)).filter(Boolean);
-    if (list.length) return list;
-    return card.photo ? [card.photo] : [];
-  };
-
   const labelOf = (kind, id) => {
     const list = state.catalog?.[kind] || [];
     return (list.find((x) => x.id === id) || {}).label || id;
@@ -424,20 +418,6 @@ import { createInboxController } from "./inbox";
     return `<span class="chip has-tip ${kind === "vibe" ? "vibe" : ""} ${extra}" data-tip="${tip}" tabindex="0">${escapeHtml(item.label || id)}<i class="tip-bubble">${escapeHtml(tipText(kind, id))}</i></span>`;
   };
 
-  const FEED_CHIP_LIMIT = 4;
-  const feedChipsHtml = (card) => {
-    const items = [
-      ...(card.neuro || []).map((id) => ({ kind: "neuro", id })),
-      ...(card.vibe || []).map((id) => ({ kind: "vibe", id })),
-    ];
-    const shown = items.slice(0, FEED_CHIP_LIMIT);
-    const rest = items.length - shown.length;
-    return (
-      shown.map((item) => chipMark(item.kind, item.id, "on")).join("") +
-      (rest > 0 ? `<span class="chip on more">+${rest}</span>` : "")
-    );
-  };
-
   const TEST_HREF = "https://neuro-raznoobrazie.web.app/";
   const TEST_LINK = `<a href="${TEST_HREF}" target="_blank" rel="noopener">neuro-raznoobrazie.web.app</a>`;
   const GLOSS_LINK = `не знаешь, что выбрать? пройди тест: ${TEST_LINK}`;
@@ -450,9 +430,6 @@ import { createInboxController } from "./inbox";
     const id = q || stored;
     return (state.catalog?.neuro || []).some((item) => item.id === id) ? [id] : [];
   };
-
-  const emptyBox = (title, text, extra = "") =>
-    `<div class="empty"><h2>${escapeHtml(title)}</h2><p>${text}</p>${extra}</div>`;
 
   const uiButton = ({
     variant = "solid",
@@ -942,30 +919,7 @@ import { createInboxController } from "./inbox";
       .map((item) => `<option value="${item.id}" ${item.id === selected ? "selected" : ""}>${item.label}</option>`)
       .join("");
 
-  const intentLabels = (card) => {
-    const ids = Array.isArray(card.intents) && card.intents.length ? card.intents : card.intent ? [card.intent] : [];
-    return ids.map((id) => labelOf("intents", id)).filter(Boolean).join(", ");
-  };
-
   const formatMultiline = (text) => escapeHtml(String(text || "")).replace(/\n/g, "<br>");
-
-  const lookingLabel = (card) => {
-    const raw = labelOf("looking_for", card.looking_for);
-    return raw ? `ищет ${raw}` : "";
-  };
-
-  const profileMeta = (card, { height = false } = {}) => {
-    const top = [
-      card.city,
-      card.job,
-      height && card.height ? `${card.height} см` : "",
-      labelOf("genders", card.gender),
-    ].filter(Boolean);
-    const seek = [lookingLabel(card), intentLabels(card)].filter(Boolean);
-    const topHtml = top.map((b) => escapeHtml(String(b))).join(" · ");
-    if (!seek.length) return topHtml;
-    return `${topHtml}<div class="meta-seek">${seek.map((b) => escapeHtml(String(b))).join(" · ")}</div>`;
-  };
 
   const friendlyLike = () => {
     const intents = state.user?.intents || (state.user?.intent ? [state.user.intent] : []);
@@ -1290,108 +1244,6 @@ import { createInboxController } from "./inbox";
     };
   };
 
-  const cardHtml = (card, stacked) => {
-    const photos = cardPhotos(card);
-    const idx = stacked ? 0 : state.photoIndex % Math.max(photos.length, 1);
-    const src = photoUrl(photos[idx] || card.photo, card.name);
-    return `
-    <article class="card ${stacked ? "stacked" : ""}">
-      <div class="card-media">
-        <img class="card-photo" src="${src}" alt="">
-        <div class="stamp yes">YES</div>
-        <div class="stamp no">NOPE</div>
-        ${
-          photos.length > 1 && !stacked
-            ? `<div class="dots">${photos.map((_, i) => `<i class="${i === idx ? "on" : ""}"></i>`).join("")}</div>`
-            : ""
-        }
-      </div>
-      <div class="card-body">
-        <div class="card-head">
-          <h3>${card.online ? '<span class="online-dot"></span>' : ""}${escapeHtml(card.name)}, ${card.age}</h3>
-          ${stacked ? "" : `<a class="card-more" href="${hrefFor("person", { id: card.id })}" id="open-person">анкета</a>`}
-        </div>
-        <div class="meta">${profileMeta(card)}</div>
-        ${card.bio ? `<p class="bio">${formatMultiline(card.bio)}</p>` : ""}
-        <div class="chips static">
-          ${feedChipsHtml(card)}
-        </div>
-      </div>
-    </article>`;
-  };
-
-  const emptyDeck = () => {
-    const filtered =
-      state.filters.neuro.length + state.filters.vibe.length + (state.filters.intents || []).length > 0 ||
-      state.filters.city ||
-      state.filters.min_age > 18 ||
-      state.filters.max_age < 99;
-    const hasPassed = Number(state.passed || 0) > 0;
-    return emptyBox(
-      filtered ? "По фильтрам никого нет" : "Анкеты на сегодня закончились",
-      filtered
-        ? "Сними часть фильтров — так лента снова откроется."
-        : hasPassed
-          ? "Пропущенные сами не вернутся. Можно вернуть их вручную — лайки и чаты не сбросятся."
-          : "Можно ослабить фильтры или заглянуть позже.",
-      `<div class="actions center">
-          ${filtered ? `<button class="ghost" id="clear-filters">сбросить фильтры</button>` : ""}
-          ${hasPassed ? `<button class="solid" id="restart">вернуть пропущенных</button>` : ""}
-        </div>`
-    );
-  };
-
-  const deckView = () => {
-    const card = state.cards[state.index];
-    const next = state.cards[state.index + 1];
-    const left = Math.max(0, state.cards.length - state.index);
-    return `
-      ${appHead()}
-      ${profileNudge()}
-      <section class="panel deck-panel">
-        <div class="deck-meta">
-          <button type="button" class="ghost slim js-filters">${state.filtersOpen ? "скрыть фильтры" : "фильтры"}</button>
-          <span class="hint">${state.recycled ? "снова пропущенные · " : ""}ещё ${left}</span>
-        </div>
-        ${
-          state.user?.paused
-            ? `<div class="nudge">анкета на паузе — тебя не показывают в чужой ленте.
-                <div class="actions"><button class="ghost slim" id="unpause">снять паузу</button></div>
-              </div>`
-            : ""
-        }
-        ${
-          state.filtersOpen
-            ? `<div class="filters">
-                ${pickerBlock("neuro", state.filters.neuro, { id: "f-neuro", lead: "фильтр по диагнозам. лента сужается, если выбрать сразу много." })}
-                ${pickerBlock("vibe", state.filters.vibe, { id: "f-vibe", lead: "фильтр по вайбу." })}
-                ${pickerBlock("intents", state.filters.intents || (state.filters.intents = []), { id: "f-intent", lead: "формат — можно несколько.", gloss: false })}
-                <div class="filter-row">
-                  <label>от<input id="min-age" type="number" min="18" max="99" value="${state.filters.min_age}"></label>
-                  <label>до<input id="max-age" type="number" min="18" max="99" value="${state.filters.max_age}"></label>
-                  <label>город${citySelect("f-city", state.filters.city, { required: false, allowEmpty: true, emptyLabel: "неважно", id: "f-city" })}</label>
-                </div>
-                <div class="filter-foot"><button type="button" class="ghost slim js-filters">скрыть фильтры</button></div>
-              </div>`
-            : ""
-        }
-        ${
-          card
-            ? `<div class="deck">
-                 ${next ? cardHtml(next, true) : ""}
-                 ${cardHtml(card, false)}
-               </div>
-               <div class="controls">
-                 <button class="pass" id="no" aria-label="пропустить" title="пропустить">${ICONS.pass}</button>
-                 <button class="undo" id="undo" aria-label="вернуть предыдущего" title="вернуть предыдущего">${ICONS.undo}</button>
-                 ${state.user?.plus ? `<button class="snooze" id="later" aria-label="отложить на неделю" title="отложить на неделю">${ICONS.snooze}</button>` : ""}
-                 <button class="like" id="yes" aria-label="${friendlyLike().label}" title="${friendlyLike().title}">${friendlyLike().icon}</button>
-               </div>`
-            : emptyDeck()
-        }
-      </section>
-      ${tabbar()}`;
-  };
 
 
   const photoManager = (u) => {
@@ -2087,192 +1939,18 @@ import { createInboxController } from "./inbox";
     }
   };
 
-  const cyclePhoto = (dir) => {
-    const card = state.cards[state.index];
-    const photos = card ? cardPhotos(card) : [];
-    if (photos.length < 2) return false;
-    state.photoIndex = (state.photoIndex + dir + photos.length) % photos.length;
-    const idx = state.photoIndex % photos.length;
-    const src = photoUrl(photos[idx] || card.photo, card.name);
-    const img = root.querySelector(".card:not(.stacked) .card-photo");
-    const dots = root.querySelectorAll(".card:not(.stacked) .dots i");
-    if (img) {
-      img.style.opacity = "0.35";
-      const next = new Image();
-      next.onload = () => {
-        img.src = src;
-        img.style.transition = "opacity 0.18s ease";
-        img.style.opacity = "1";
-      };
-      next.src = src;
-      if (next.complete) {
-        img.src = src;
-        img.style.transition = "opacity 0.18s ease";
-        img.style.opacity = "1";
-      }
-    } else {
-      render();
-      return true;
-    }
-    dots.forEach((dot, i) => dot.classList.toggle("on", i === idx));
-    return true;
-  };
-
-  const wireDeck = () => {
-    root.querySelectorAll(".js-filters").forEach((toggle) => {
-      toggle.addEventListener("click", () => {
-        state.filtersOpen = !state.filtersOpen;
-        render();
-      });
-    });
-    if (state.filtersOpen) {
-      if (!state.filters.intents) state.filters.intents = [];
-      bindChips({ neuro: state.filters.neuro, vibe: state.filters.vibe, intents: state.filters.intents });
-      const apply = async () => {
-        persistFilters();
-        await loadFeed();
-        render();
-      };
-      root.querySelectorAll("#f-neuro .chip, #f-vibe .chip, #f-intent .chip").forEach((btn) => {
-        btn.addEventListener("click", apply);
-      });
-      const minAge = root.querySelector("#min-age");
-      const maxAge = root.querySelector("#max-age");
-      const city = root.querySelector("#f-city");
-      if (minAge) minAge.addEventListener("change", async () => {
-        state.filters.min_age = Number(minAge.value) || 18;
-        await apply();
-      });
-      if (maxAge) maxAge.addEventListener("change", async () => {
-        state.filters.max_age = Number(maxAge.value) || 99;
-        await apply();
-      });
-      if (city) {
-        const applyCity = async () => {
-          state.filters.city = city.value.trim();
-          await apply();
-        };
-        city.addEventListener("change", applyCity);
-        city.addEventListener("blur", applyCity);
-      }
-    }
-    const clear = root.querySelector("#clear-filters");
-    if (clear) {
-      clear.addEventListener("click", async () => {
-        state.filters = { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false };
-        persistFilters();
-        await loadFeed();
-        render();
-      });
-    }
-    const restartBtn = root.querySelector("#restart");
-    if (restartBtn) restartBtn.addEventListener("click", () => restart());
-    const yes = root.querySelector("#yes");
-    const no = root.querySelector("#no");
-    const undo = root.querySelector("#undo");
-    if (yes) yes.addEventListener("click", () => swipe("like"));
-    if (no) no.addEventListener("click", () => swipe("pass"));
-    const later = root.querySelector("#later");
-    if (later) later.addEventListener("click", () => swipe("snooze"));
-    if (undo) undo.addEventListener("click", () => rewind());
-    const unpause = root.querySelector("#unpause");
-    if (unpause) {
-      unpause.addEventListener("click", async () => {
-        const data = await api("/api/plus", { method: "PATCH", body: JSON.stringify({ paused: false }) });
-        state.user = data.user;
-        render();
-      });
-    }
-    const more = root.querySelector("#open-person");
-    if (more) {
-      more.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const card = state.cards[state.index];
-        if (card) openPerson(card.id, "deck");
-      });
-    }
-    const card = root.querySelector(".card:not(.stacked)");
-    if (!card) return;
-    let x0 = 0;
-    let y0 = 0;
-    let dx = 0;
-    let dy = 0;
-    let axis = "";
-    let tracking = false;
-    const THRESHOLD = 130;
-    const start = (x, y) => {
-      tracking = true;
-      axis = "";
-      x0 = x;
-      y0 = y;
-      dx = 0;
-      dy = 0;
-    };
-    const move = (x, y) => {
-      if (!tracking) return;
-      dx = x - x0;
-      dy = y - y0;
-      if (!axis && (Math.abs(dx) > 14 || Math.abs(dy) > 14)) {
-        axis = Math.abs(dx) > Math.abs(dy) * 1.15 ? "x" : "y";
-      }
-      if (axis !== "x") return;
-      card.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
-      card.querySelector(".stamp.yes").style.opacity = dx > 24 ? Math.min(1, (dx - 24) / 90) : 0;
-      card.querySelector(".stamp.no").style.opacity = dx < -24 ? Math.min(1, (-dx - 24) / 90) : 0;
-    };
-    const end = (ev) => {
-      if (!tracking) return;
-      tracking = false;
-      if (axis === "x" && dx > THRESHOLD) swipe("like");
-      else if (axis === "x" && dx < -THRESHOLD) swipe("pass");
-      else if (axis === "x" && Math.abs(dx) > 40) {
-        cyclePhoto(dx < 0 ? 1 : -1);
-        card.style.transition = "transform 0.2s ease";
-        card.style.transform = "";
-        card.querySelectorAll(".stamp").forEach((s) => (s.style.opacity = 0));
-        setTimeout(() => (card.style.transition = ""), 200);
-      } else if (axis === "y" && Math.abs(dy) > 40) {
-        cyclePhoto(dy < 0 ? 1 : -1);
-        card.style.transition = "transform 0.2s ease";
-        card.style.transform = "";
-      } else if (!axis && Math.abs(dx) < 12 && Math.abs(dy) < 12) {
-        const rect = (card.querySelector(".card-media") || card).getBoundingClientRect();
-        const x = (ev && ev.clientX) || x0;
-        if (x < rect.left + rect.width * 0.32) cyclePhoto(-1);
-        else if (x > rect.right - rect.width * 0.32) cyclePhoto(1);
-        else {
-          card.style.transition = "transform 0.2s ease";
-          card.style.transform = "";
-        }
-      } else {
-        card.style.transition = "transform 0.2s ease";
-        card.style.transform = "";
-        card.querySelectorAll(".stamp").forEach((s) => (s.style.opacity = 0));
-        setTimeout(() => (card.style.transition = ""), 200);
-      }
-      axis = "";
-    };
-    card.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.target.closest("#open-person, .has-tip, .card-extra")) return;
-      card.setPointerCapture(e.pointerId);
-      start(e.clientX, e.clientY);
-    });
-    card.addEventListener("pointermove", (e) => move(e.clientX, e.clientY));
-    card.addEventListener("pointerup", end);
-    card.addEventListener("pointercancel", end);
-  };
 
 
-  const loadFeed = async () => {
+  const loadFeed = async (filters = state.filters) => {
+    state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
+    const f = state.filters;
     const q = new URLSearchParams();
-    if (state.filters.neuro.length) q.set("neuro", state.filters.neuro.join(","));
-    if (state.filters.vibe.length) q.set("vibe", state.filters.vibe.join(","));
-    if ((state.filters.intents || []).length) q.set("intent", state.filters.intents.join(","));
-    if (state.filters.min_age && state.filters.min_age !== 18) q.set("min_age", String(state.filters.min_age));
-    if (state.filters.max_age && state.filters.max_age !== 99) q.set("max_age", String(state.filters.max_age));
-    if (state.filters.city) q.set("city", state.filters.city);
+    if (f.neuro.length) q.set("neuro", f.neuro.join(","));
+    if (f.vibe.length) q.set("vibe", f.vibe.join(","));
+    if ((f.intents || []).length) q.set("intent", f.intents.join(","));
+    if (f.min_age && f.min_age !== 18) q.set("min_age", String(f.min_age));
+    if (f.max_age && f.max_age !== 99) q.set("max_age", String(f.max_age));
+    if (f.city) q.set("city", f.city);
     const data = await api(`/api/feed?${q.toString()}`);
     state.cards = data.cards || [];
     state.index = 0;
@@ -2287,6 +1965,7 @@ import { createInboxController } from "./inbox";
       state.user.likes_in = state.likesIn;
       state.user.unread = state.unread;
     }
+    return data;
   };
 
   const AUTH_FEATURE_VIEWS = new Set(["login", "register", "forgot", "verify", "reset"]);
@@ -2295,6 +1974,7 @@ import { createInboxController } from "./inbox";
   let profileFeatureUnmount = null;
   let likesFeatureUnmount = null;
   let personFeatureUnmount = null;
+  let deckFeatureUnmount = null;
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
@@ -2396,6 +2076,41 @@ import { createInboxController } from "./inbox";
     swipe,
     api,
     toast,
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
+  });
+
+  const buildDeckHostBridge = () => ({
+    user: state.user,
+    catalog: state.catalog,
+    cards: state.cards,
+    index: state.index,
+    filters: state.filters,
+    filtersOpen: state.filtersOpen,
+    recycled: state.recycled,
+    passed: state.passed,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => {
+      if (view === "person" && params.id) {
+        void openPerson(Number(params.id), "deck");
+        return;
+      }
+      void goToView(view);
+    },
+    loadFeed: async (filters = state.filters) => {
+      state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
+      persistFilters();
+      return loadFeed(state.filters);
+    },
+    swipe,
+    rewind,
+    restart,
+    api,
+    toast,
+    onUserUpdated: (user) => {
+      state.user = user;
+    },
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
   });
@@ -2657,6 +2372,26 @@ import { createInboxController } from "./inbox";
     }
   };
 
+  const renderDeckFeature = async () => {
+    deckFeatureUnmount?.();
+    deckFeatureUnmount = null;
+    root.innerHTML = '<div id="deck-feature-root"></div>' + tabbar();
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#deck-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await featureLoader.deck();
+      if (state.view !== "deck") return;
+      deckFeatureUnmount = mod.mountDeck(mountEl, buildDeckHostBridge());
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = `<p class="err">не загрузился модуль deck (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль deck (${err.message}).`);
+    }
+  };
+
   const renderChatFeature = async () => {
     const token = ++chatFeatureMountToken;
     chatFeatureUnmount?.();
@@ -2711,6 +2446,10 @@ import { createInboxController } from "./inbox";
       personFeatureUnmount?.();
       personFeatureUnmount = null;
     }
+    if (state.view !== "deck") {
+      deckFeatureUnmount?.();
+      deckFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
@@ -2752,6 +2491,10 @@ import { createInboxController } from "./inbox";
       void renderPersonFeature();
       return;
     }
+    else if (state.view === "deck") {
+      void renderDeckFeature();
+      return;
+    }
     else if (["profile", "consents", "plus"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
@@ -2759,7 +2502,7 @@ import { createInboxController } from "./inbox";
     else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
     else if (state.view === "invite") bound = inviteView();
-    else root.innerHTML = deckView();
+    else root.innerHTML = homeView();
 
     if (bound) {
       root.innerHTML = bound.html;
@@ -2848,7 +2591,6 @@ import { createInboxController } from "./inbox";
     bindFold("#about-open", "#home-about");
 
     bindTips();
-    if (state.user && state.view === "deck") wireDeck();
     syncUrl();
   };
 

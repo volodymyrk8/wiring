@@ -14,7 +14,7 @@ The application is intentionally in an incremental migration state. The shell re
 | Chats and thread | `src/features/chat/ChatScreen.tsx` | Preact feature |
 | Likes | `src/features/likes/` | Preact feature |
 | Person profile | `src/features/person/` | Preact feature |
-| Deck / swipe | `src/app/bootstrap.js` | Legacy; keep gesture behavior stable during migration |
+| Deck / swipe | `src/features/deck/` | Preact feature; gesture behavior kept in feature boundary |
 | Onboarding / delete account | `src/app/bootstrap.js` | Legacy; migrate only with API and recovery-flow tests |
 
 ## Shell responsibilities

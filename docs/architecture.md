@@ -10,7 +10,7 @@
 | БД | **PostgreSQL 16** (прод, local dev и тесты) | `DATABASE_URL` → Postgres (`docker-compose.yml` локально); миграции `init_db()` + `_ensure_column` |
 | Прод | **gunicorn** + nginx | см. `deploy/` |
 | Клиент | **Preact + TS** (`src/`) + shell (`src/app/`) | Vite → `public/dist/`; постепенная миграция экранов |
-| Стили | один **`public/styles.css`** | |
+| Стили | shell `public/styles.css` + CSS Modules внутри feature bundles | экранные стили не растут в глобальный файл |
 | Картинки | **`public/`** | `/public/...` через Flask |
 | Зависимости Python | см. `requirements.txt` | Flask, Werkzeug, gunicorn, Pillow; Telethon — только для опционального Telegram-воркера |
 
@@ -50,7 +50,7 @@ flowchart LR
 - **`src/app/bootstrap.js` пока большой** — старые экраны ещё живут внутри shell; новые экраны выносятся в `src/features/*`, после чего соответствующий legacy-код удаляется.
 - **Нет отдельного API-контракта** (OpenAPI) — ок для одной команды и одного клиента.
 - **Основная зона миграции** — legacy-shell: новые экраны не добавляются в `bootstrap.js`, а существующие переносятся по одному в `src/features/*`.
-- **Уже мигрированы в Preact** — auth, home, profile, consents, WIRING+, likes, person и chats; legacy-разметка этих экранов удаляется после проверки bundle и полного набора тестов.
+- **Уже мигрированы в Preact** — auth, home, profile, consents, WIRING+, likes, person, deck и chats; legacy-разметка этих экранов удаляется после проверки bundle и полного набора тестов.
 
 Итого: архитектура **простая и уместная** для WIRING; главный риск — рост двух монолитов (`app.py`, `src/app/bootstrap.js`), его гасим **KISS** и точечным выносом, а не новым стеком.
 
@@ -72,7 +72,8 @@ flowchart LR
 | Справочники, тексты каталога | `catalog.py`, `cities.py`, … |
 | Разметка нового экрана | `src/features/<name>/` на Preact |
 | Временная legacy-разметка | `src/app/bootstrap.js` до миграции экрана |
-| Общие стили | `public/styles.css` (+ при появлении UI-kit — отдельный css рядом) |
+| Стили shell и legacy | `public/styles.css` |
+| Стили Preact-экрана | рядом с экраном: `src/features/<name>/*.module.css` |
 | Админка / legal HTML | `templates/`, `legal_pages.py` |
 | Скрипты dev/seed | `scripts/` |
 | Документация продукта/деплоя | `README.md`, `docs/` |
