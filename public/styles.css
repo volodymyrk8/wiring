@@ -191,6 +191,13 @@ html[data-view="chat"] #app {
   padding-top: 12px;
   padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
+html[data-view="chat"] #chat-feature-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 html.keyboard[data-view="chat"] #app {
   padding-bottom: 8px;
 }
