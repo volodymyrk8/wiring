@@ -264,7 +264,7 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(sitemap.status_code, 200)
         self.assertIn(b"/support", sitemap.data)
         self.assertNotIn(b"/glossary", sitemap.data)
-        for path in ("/feed", "/likes", "/chats", "/me", "/login", "/register", "/verify", "/p/1", "/chats/1", "/r/abcd1234"):
+        for path in ("/feed", "/likes", "/chats", "/me", "/sign-in", "/sign-up", "/login", "/register", "/verify", "/p/1", "/chats/1", "/r/abcd1234"):
             page = self.client.get(path)
             self.assertEqual(page.status_code, 200, path)
             self.assertIn(b"WIRING", page.data)

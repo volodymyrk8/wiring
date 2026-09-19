@@ -42,6 +42,7 @@ for (const view of PUBLIC_VIEWS) {
   );
 }
 
+assert.equal(planRoute({ view: "register" }, guest, "/sign-up").kind, "show");
 assert.equal(planRoute({ view: "register" }, guest, "/register").kind, "show");
 assert.equal(planRoute({ view: "deck" }, guest, "/feed").kind, "login");
 const guestChat = planRoute({ view: "chat", id: 1 }, guest, "/chats/1");
@@ -49,9 +50,12 @@ assert.equal(guestChat.kind, "login");
 assert.equal(guestChat.pendingPath, "/chats/1");
 assert.equal(planRoute({ view: "likes" }, guest, "/likes").kind, "login");
 
+assert.equal(planRoute({ view: "login" }, member, "/sign-in").kind, "feed");
 assert.equal(planRoute({ view: "login" }, member, "/login").kind, "feed");
+assert.equal(planRoute({ view: "register" }, member, "/sign-up").kind, "feed");
 assert.equal(planRoute({ view: "register" }, member, "/register").kind, "feed");
 assert.equal(planRoute({ view: "onboard" }, member, "/onboard").kind, "feed");
+assert.equal(planRoute({ view: "login" }, guestSession, "/sign-in").kind, "show");
 assert.equal(planRoute({ view: "login" }, guestSession, "/login").kind, "show");
 
 assert.equal(planRoute({ view: "chat", id: 5 }, member, "/chats/5").kind, "chat");

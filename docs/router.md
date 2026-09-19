@@ -18,7 +18,7 @@ src/router/
 | Path | View | Notes |
 |------|------|--------|
 | `/` | home | |
-| `/login` … `/verify` | auth | Preact bundle |
+| `/sign-in`, `/sign-up` … `/verify` | auth | Preact bundle (aliases: `/login`, `/register`) |
 | `/feed` | deck | |
 | `/likes` | likes | |
 | `/chats` | matches | |

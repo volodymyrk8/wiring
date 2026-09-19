@@ -1250,6 +1250,8 @@ def index():
     return _spa()
 
 
+@app.get("/sign-in")
+@app.get("/sign-up")
 @app.get("/login")
 @app.get("/register")
 @app.get("/forgot")

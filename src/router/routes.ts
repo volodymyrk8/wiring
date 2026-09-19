@@ -3,8 +3,8 @@ import type { ViewId } from "@/router/types";
 /** Canonical SPA paths (must match Flask `@app.get` in app.py). */
 export const SPA_PATHS = {
   home: "/",
-  login: "/login",
-  register: "/register",
+  login: "/sign-in",
+  register: "/sign-up",
   forgot: "/forgot",
   reset: "/reset",
   verify: "/verify",
@@ -18,6 +18,8 @@ export const SPA_PATHS = {
 export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
   [SPA_PATHS.login]: "login",
   [SPA_PATHS.register]: "register",
+  "/login": "login",
+  "/register": "register",
   [SPA_PATHS.forgot]: "forgot",
   [SPA_PATHS.reset]: "reset",
   [SPA_PATHS.verify]: "verify",

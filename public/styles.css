@@ -212,7 +212,7 @@ html[data-view="verify"] #app {
   display: flex;
   flex-direction: column;
   padding-top: max(12px, env(safe-area-inset-top));
-  padding-bottom: 0;
+  padding-bottom: 0 !important;
 }
 html[data-view="login"] .app-head,
 html[data-view="register"] .app-head,
@@ -1537,13 +1537,22 @@ html[data-view="verify"] .analytics-consent {
 .bubble.has-photo .bubble-body { padding: 0 4px 2px; }
 .bubble.has-photo .time { padding: 0 4px; }
 
-.legal {
-  width: min(var(--container-page), 100%);
-  margin: 0 auto;
-  padding: 32px 20px max(32px, env(safe-area-inset-bottom));
+body.legal-page {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+.legal {
+  width: min(var(--container-page), 100%);
+  margin: 0 auto;
+  padding: 32px 20px 32px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+body.legal-page .legal {
+  min-height: auto;
+  flex: 1;
 }
 .legal.admin { width: min(var(--container-admin), 100%); }
 .legal-head {
@@ -1715,8 +1724,7 @@ html[data-view="verify"] .analytics-consent {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.legal-nav,
-.legal-footer-bar {
+.legal-nav {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1727,6 +1735,22 @@ html[data-view="verify"] .analytics-consent {
   font-size: 13px;
   color: var(--muted);
   user-select: none;
+}
+
+.legal-footer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 20px;
+  width: 100%;
+  margin-top: auto;
+  padding: 20px 20px max(18px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  user-select: none;
+  box-sizing: border-box;
 }
 
 .legal-footer-bar .badge-18 {
@@ -2183,7 +2207,7 @@ html[data-view="verify"] .analytics-consent {
   .deck { height: min(56dvh, 560px, calc(100dvh - 320px)); }
   .photo-grid { grid-template-columns: repeat(4, 1fr); }
   .admin-grid { grid-template-columns: repeat(3, 1fr); }
-  .legal { padding: 44px 28px 80px; }
+  .legal { padding: 44px 28px 48px; }
   .filter-row { grid-template-columns: 1fr 1fr 1.4fr; }
 }
 

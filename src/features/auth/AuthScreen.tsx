@@ -238,34 +238,36 @@ export function AuthScreen({ host }: AuthScreenProps) {
     const verifyTarget = host.verifyEmail;
     return (
       <div class={styles.container}>
-        <h2 class={`${styles.title} ${styles.titleWithLede}`}>Подтверди почту</h2>
-        <p class={styles.lede}>
-          Мы отправили ссылку
-          {verifyTarget ? (
-            <>
-              {" "}
-              на <strong>{verifyTarget}</strong>
-            </>
-          ) : (
-            ""
+        <div class={styles.authBody}>
+          <h2 class={`${styles.title} ${styles.titleWithLede}`}>Подтверди почту</h2>
+          <p class={styles.lede}>
+            Мы отправили ссылку
+            {verifyTarget ? (
+              <>
+                {" "}
+                на <strong>{verifyTarget}</strong>
+              </>
+            ) : (
+              ""
+            )}
+            . Открой письмо и перейди по ссылке — после этого можно войти.
+          </p>
+          {serverError && (
+            <div class={styles.errorBanner} role="alert">
+              <span class={styles.errorIcon}>⚠️</span>
+              <div class={styles.errorBody}>{serverError}</div>
+            </div>
           )}
-          . Открой письмо и перейди по ссылке — после этого можно войти.
-        </p>
-        {serverError && (
-          <div class={styles.errorBanner} role="alert">
-            <span class={styles.errorIcon}>⚠️</span>
-            <div class={styles.errorBody}>{serverError}</div>
+          <div class={styles.actions}>
+            <Button type="button" onClick={onResendVerify} fullWidth>
+              Отправить ссылку ещё раз
+            </Button>
+            <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
+              Назад ко входу
+            </Button>
           </div>
-        )}
-        <div class={styles.actions}>
-          <Button type="button" onClick={onResendVerify} fullWidth>
-            Отправить ссылку ещё раз
-          </Button>
-          <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-            Назад ко входу
-          </Button>
+          <p class={styles.footerHint}>Не видишь письмо? Проверь «Спам» и «Промоакции».</p>
         </div>
-        <p class={styles.footerHint}>Не видишь письмо? Проверь «Спам» и «Промоакции».</p>
         <LegalFooter />
       </div>
     );
@@ -274,37 +276,39 @@ export function AuthScreen({ host }: AuthScreenProps) {
   if (mode === "forgot") {
     return (
       <div class={styles.container}>
-        <h2 class={`${styles.title} ${styles.titleWithLede}`}>Сброс пароля</h2>
-        <p class={styles.lede}>Пришлём ссылку на почту, если такой аккаунт есть.</p>
-        <form class={styles.form} onSubmit={onSubmitForgot} noValidate>
-          <FieldFloating
-            label="Почта"
-            name="email"
-            type="email"
-            required
-            autoComplete="username"
-            value={email}
-            error={fieldErrors.email}
-            onInput={(e) => {
-              setEmail((e.currentTarget as HTMLInputElement).value);
-              clearFieldError("email");
-            }}
-          />
-          {serverError && (
-            <div class={styles.errorBanner} role="alert">
-              <span class={styles.errorIcon}>⚠️</span>
-              <div class={styles.errorBody}>{serverError}</div>
+        <div class={styles.authBody}>
+          <h2 class={`${styles.title} ${styles.titleWithLede}`}>Сброс пароля</h2>
+          <p class={styles.lede}>Пришлём ссылку на почту, если такой аккаунт есть.</p>
+          <form class={styles.form} onSubmit={onSubmitForgot} noValidate>
+            <FieldFloating
+              label="Почта"
+              name="email"
+              type="email"
+              required
+              autoComplete="username"
+              value={email}
+              error={fieldErrors.email}
+              onInput={(e) => {
+                setEmail((e.currentTarget as HTMLInputElement).value);
+                clearFieldError("email");
+              }}
+            />
+            {serverError && (
+              <div class={styles.errorBanner} role="alert">
+                <span class={styles.errorIcon}>⚠️</span>
+                <div class={styles.errorBody}>{serverError}</div>
+              </div>
+            )}
+            <div class={styles.actions}>
+              <Button type="submit" disabled={busy} loading={busy} fullWidth>
+                {busy ? "Отправляем…" : "Отправить ссылку"}
+              </Button>
+              <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
+                Назад ко входу
+              </Button>
             </div>
-          )}
-          <div class={styles.actions}>
-            <Button type="submit" disabled={busy} loading={busy} fullWidth>
-              {busy ? "Отправляем…" : "Отправить ссылку"}
-            </Button>
-            <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-              Назад ко входу
-            </Button>
-          </div>
-        </form>
+          </form>
+        </div>
         <LegalFooter />
       </div>
     );
@@ -313,33 +317,35 @@ export function AuthScreen({ host }: AuthScreenProps) {
   if (mode === "reset") {
     return (
       <div class={styles.container}>
-        <h2 class={styles.title}>Новый пароль</h2>
-        <form class={styles.form} onSubmit={onSubmitReset} noValidate>
-          <PasswordField
-            autoComplete="new-password"
-            showStrength
-            value={password}
-            error={fieldErrors.password}
-            onInput={(e) => {
-              setPassword((e.currentTarget as HTMLInputElement).value);
-              clearFieldError("password");
-            }}
-          />
-          {serverError && (
-            <div class={styles.errorBanner} role="alert">
-              <span class={styles.errorIcon}>⚠️</span>
-              <div class={styles.errorBody}>{serverError}</div>
+        <div class={styles.authBody}>
+          <h2 class={styles.title}>Новый пароль</h2>
+          <form class={styles.form} onSubmit={onSubmitReset} noValidate>
+            <PasswordField
+              autoComplete="new-password"
+              showStrength
+              value={password}
+              error={fieldErrors.password}
+              onInput={(e) => {
+                setPassword((e.currentTarget as HTMLInputElement).value);
+                clearFieldError("password");
+              }}
+            />
+            {serverError && (
+              <div class={styles.errorBanner} role="alert">
+                <span class={styles.errorIcon}>⚠️</span>
+                <div class={styles.errorBody}>{serverError}</div>
+              </div>
+            )}
+            <div class={styles.actions}>
+              <Button type="submit" disabled={busy} loading={busy} fullWidth>
+                {busy ? "Сохраняем…" : "Сохранить пароль"}
+              </Button>
+              <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
+                Назад ко входу
+              </Button>
             </div>
-          )}
-          <div class={styles.actions}>
-            <Button type="submit" disabled={busy} loading={busy} fullWidth>
-              {busy ? "Сохраняем…" : "Сохранить пароль"}
-            </Button>
-            <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-              Назад ко входу
-            </Button>
-          </div>
-        </form>
+          </form>
+        </div>
         <LegalFooter />
       </div>
     );
@@ -522,7 +528,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         )}
       </form>
       </div>
-      {isLogin && <LegalFooter />}
+      <LegalFooter />
     </div>
   );
 }
