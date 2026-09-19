@@ -20,6 +20,7 @@ const PATH_BY_VIEW: Record<ViewId, string | ((extra: { id?: number }) => string)
   matches: SPA_PATHS.matches,
   chat: (extra) => (extra.id ? `/chats/${extra.id}` : SPA_PATHS.matches),
   profile: SPA_PATHS.profile,
+  plus: SPA_PATHS.plus,
   onboard: SPA_PATHS.onboard,
   person: (extra) => (extra.id ? `/p/${extra.id}` : SPA_PATHS.deck),
   "delete-account": SPA_PATHS.deleteAccount,

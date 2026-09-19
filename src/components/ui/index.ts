@@ -10,3 +10,4 @@ export * from "./AccordionRow";
 export * from "./Select";
 export * from "./Modal";
 export * from "./BrandSection";
+export * from "./ProfileMenu";

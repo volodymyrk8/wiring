@@ -69,6 +69,7 @@
     pendingRef: sessionStorage.getItem("wiring-ref") || "",
     profileDraft: null,
     profileEdit: null,
+    matchesQuery: "",
   };
   let chatTimer = 0;
   let inboxTimer = 0;
@@ -80,7 +81,7 @@
   let routing = null;
   const ensureRouting = () => {
     if (routing) return Promise.resolve(routing);
-    return import(`${BASE}/public/dist/router.js`).then((mod) => {
+    return import(`${BASE}/public/dist/router.js?v=2`).then((mod) => {
       routing = mod;
       return mod;
     });
@@ -178,6 +179,11 @@
     ),
     theme: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20, strokeWidth: 1.8 }),
     arrow: svgIcon(`<path d="M5 12h14M13 6l6 6-6 6"/>`, { size: 18 }),
+    search: svgIcon(`<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.6 4.6"/>`, { size: 19, strokeWidth: 1.8 }),
+    more: svgIcon(`<circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/>`, { size: 20 }),
+    send: svgIcon(`<path d="m21.5 3.5-19 7.3 7.3 2.7 2.7 7.5z"/><path d="M9.8 13.5 21.5 3.5"/>`, { size: 20, strokeWidth: 1.7 }),
+    close: svgIcon(`<path d="m6 6 12 12M18 6 6 18"/>`, { size: 18, strokeWidth: 1.8 }),
+    reply: svgIcon(`<path d="m9 17-5-5 5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`, { size: 13, strokeWidth: 2.2 }),
   };
 
   const THEME_ICONS = {
@@ -324,6 +330,58 @@
       });
     });
     bindThemePicker();
+    bindProfileMenu();
+  };
+
+  let profileUiBound = false;
+  const bindProfileMenu = () => {
+    const wrap = root.querySelector(".profile-pop");
+    if (!wrap) return;
+    const btn = wrap.querySelector("#profile-open");
+    const menu = wrap.querySelector("#profile-menu");
+    if (!btn || !menu) return;
+    const setOpen = (open) => {
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+    };
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setOpen(menu.hidden);
+    });
+    menu.addEventListener("click", (e) => e.stopPropagation());
+
+    const logoutBtn = menu.querySelector("#profile-menu-logout");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setOpen(false);
+        void logout();
+      });
+    }
+
+    if (!profileUiBound) {
+      profileUiBound = true;
+      document.addEventListener("click", () => {
+        const m = document.getElementById("profile-menu");
+        const b = document.getElementById("profile-open");
+        if (m && !m.hidden) {
+          m.hidden = true;
+          if (b) b.setAttribute("aria-expanded", "false");
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        const m = document.getElementById("profile-menu");
+        const b = document.getElementById("profile-open");
+        if (m && !m.hidden) {
+          m.hidden = true;
+          if (b) {
+            b.setAttribute("aria-expanded", "false");
+            b.focus();
+          }
+        }
+      });
+    }
   };
   applyTheme(themeNow());
 
@@ -477,9 +535,9 @@
     });
   };
 
-  const pickerBlock = (kind, selected, { id = "", lead = "", gloss = false, bindAs = "" } = {}) => `
+  const pickerBlock = (kind, selected, { id = "", lead = "", gloss = false, test = false, bindAs = "" } = {}) => `
     <div class="chip-picker">
-      <p class="hint">${lead}${gloss ? ` ${GLOSS_LINK}` : ""}</p>
+      <p class="hint">${lead}${test ? ` Не знаешь, что выбрать? Пройди <a href="${TEST_HREF}" target="_blank" rel="noopener noreferrer">тест нейроотличий ↗</a>.` : ""}${gloss ? ` ${GLOSS_LINK}` : ""}</p>
       <div class="chips"${id ? ` id="${id}"` : ""}>${chips(kind, selected, bindAs || kind)}</div>
       ${kind === "intents" || bindAs ? "" : `<p class="chip-caption" data-caption="${kind}" hidden></p>`}
     </div>`;
@@ -823,7 +881,7 @@
       ],
     ];
     if (isTab) {
-      const isMe = state.view === "profile" || (state.view === "person" && from === "profile");
+      const isMe = state.view === "profile" || state.view === "plus" || (state.view === "person" && from === "profile");
       const dest = state.user ? "profile" : "login";
       const label = state.user ? "Профиль" : "Войти";
       const hasPhoto = Boolean(state.user && state.user.photo);
@@ -848,9 +906,57 @@
       const dest = state.user ? "profile" : "login";
       return `<a class="icon-btn profile-slot" href="${hrefFor(dest)}" data-nav="${dest}" aria-label="${state.user ? "профиль" : "войти"}">${ICONS.user}</a>`;
     }
-    const on = state.view === "profile";
+    const on = state.view === "profile" || state.view === "plus";
     const plus = Boolean(state.user.plus);
-    return `<span class="avatar-slot"><a class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}" href="${hrefFor("profile")}" data-nav="profile" aria-label="${plus ? "профиль · WIRING+" : "профиль"}"${on ? ' aria-current="page"' : ""}><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></a>${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">${ICONS.gem}</span>` : ""}</span>`;
+    const name = escapeHtml(state.user.name || "Профиль");
+    return `<div class="profile-pop">
+      <button type="button" class="avatar-slot avatar-btn" id="profile-open" aria-expanded="false" aria-controls="profile-menu" aria-haspopup="true" aria-label="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}" title="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}">
+        <span class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}">
+          <img src="${avatarUrl(state.user.photo, state.user.name)}" alt="">
+        </span>
+        ${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">${ICONS.gem}</span>` : ""}
+      </button>
+      <div class="profile-menu" id="profile-menu" hidden>
+        <div class="profile-menu-header">
+          <span class="profile-menu-name">${name}</span>
+        </div>
+        <div class="profile-menu-divider"></div>
+        <a class="profile-menu-item profile-menu-plus" href="${hrefFor("plus")}" data-nav="plus">
+          <span class="badge-gem-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 3h12l4 6-10 13L2 9Z"/>
+              <path d="M11 3 8 9l4 13 4-13-3-6"/>
+              <path d="M2 9h20"/>
+            </svg>
+          </span>
+          <span class="profile-menu-text">WIRING+</span>
+          ${plus ? `<span class="profile-menu-status">активен</span>` : `<span class="profile-menu-status inactive">подключить</span>`}
+        </a>
+        <a class="profile-menu-item" href="${hrefFor("profile")}" data-nav="profile">
+          <span class="profile-menu-icon">${ICONS.user}</span>
+          <span class="profile-menu-text">Профиль</span>
+        </a>
+        <a class="profile-menu-item" href="/support">
+          <span class="profile-menu-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </span>
+          <span class="profile-menu-text">Поддержка</span>
+        </a>
+        <div class="profile-menu-divider"></div>
+        <button type="button" class="profile-menu-item profile-menu-logout" id="profile-menu-logout">
+          <span class="profile-menu-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </span>
+          <span class="profile-menu-text">Выйти</span>
+        </button>
+      </div>
+    </div>`;
   };
 
   const appHead = (opts = {}) => {
@@ -1109,6 +1215,17 @@
   const clearProfileDraft = () => {
     state.profileDraft = null;
     state.profileEdit = null;
+  };
+
+  const logout = async () => {
+    try {
+      await api("/api/logout", { method: "POST" });
+    } catch (_) {}
+    state.user = null;
+    clearProfileDraft();
+    state.view = "home";
+    stopInbox();
+    render();
   };
 
   const captureProfileDraft = () => {
@@ -1580,32 +1697,76 @@
     ${tabbar()}`;
   };
 
-  const matchesView = () => `
+  const matchesView = () => {
+    const matches = state.matches || [];
+    return `
     ${appHead({ sectionTitle: "чаты" })}
     ${profileNudge()}
-    <section class="panel">
-      ${
-        state.matches.length
-          ? `<div class="match-list">${state.matches
-              .map((m) =>
-                `<div class="match-wrap">
-                  ${matchRow(m, {
-                    href: hrefFor("chat", { id: m.id }),
-                    attrs: `data-open="${m.id}"`,
-                    sub: m.last_message
-                      ? `${state.user?.id && m.last_from_id === state.user.id ? "ты: " : ""}${escapeHtml(m.last_message)}`
-                      : "взаимно · напиши первым",
-                    time: timeLabel(m.last_at),
-                    unread: m.unread || 0,
-                  })}
-                  <button type="button" class="match-remove" data-unmatch="${m.id}" aria-label="убрать из чатов" title="убрать из чатов">×</button>
-                </div>`
-              )
-              .join("")}</div>`
-          : emptyBox("Пока тихо", "Лайкни анкету. Если человек ответит тем же — здесь появится переписка.")
-      }
-    </section>
+    <main class="chat-list-page">
+      <div class="chat-list-intro">
+        <p class="chat-list-lede">Здесь можно продолжить разговор без спешки — в своём ритме.</p>
+      </div>
+      <section class="chat-list-card" aria-label="Список чатов">
+        <label class="chat-search">
+          ${ICONS.search}
+          <input id="chat-search" type="search" value="${escapeAttr(state.matchesQuery)}" placeholder="найти диалог" autocomplete="off">
+          <kbd>⌘ K</kbd>
+        </label>
+        ${
+          matches.length
+            ? `<div class="match-list">${matches
+                  .map((m) =>
+                    `<div class="match-wrap">
+                      ${matchRow(m, {
+                        href: hrefFor("chat", { id: m.id }),
+                        attrs: `data-open="${m.id}"`,
+                        sub: m.last_message
+                          ? `${state.user?.id && m.last_from_id === state.user.id ? "ты: " : ""}${escapeHtml(m.last_message)}`
+                          : "взаимно · напиши первым",
+                        time: timeLabel(m.last_at),
+                        unread: m.unread || 0,
+                      })}
+                      <button type="button" class="match-remove" data-unmatch="${m.id}" aria-label="убрать из чатов" title="убрать из чатов">${ICONS.close}</button>
+                    </div>`
+                  )
+                  .join("")}</div><div class="chat-no-results" hidden><span>${ICONS.search}</span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>`
+            : `<div class="chat-empty"><div class="chat-empty-icon">${ICONS.chat}</div><h2>Первый мэтч — уже начало</h2><p>Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.</p><a class="solid" href="${hrefFor("deck")}" data-nav="deck">перейти в ленту ${ICONS.arrow}</a></div>`
+        }
+      </section>
+    </main>
     ${tabbar()}`;
+  };
+
+  const bindMatchesList = () => {
+    const search = root.querySelector("#chat-search");
+    if (!search) return;
+    if (!document.documentElement.dataset.chatSearchShortcut) {
+      document.documentElement.dataset.chatSearchShortcut = "bound";
+      document.addEventListener("keydown", (event) => {
+        if (state.view !== "matches" || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+        event.preventDefault();
+        document.querySelector("#chat-search")?.focus();
+      });
+    }
+    search.addEventListener("input", () => {
+      state.matchesQuery = search.value;
+      const query = state.matchesQuery.trim().toLowerCase();
+      root.querySelectorAll(".match-wrap").forEach((row) => {
+        const match = row.querySelector(".match");
+        const text = match?.textContent?.toLowerCase() || "";
+        row.hidden = Boolean(query && !text.includes(query));
+      });
+      const noResults = root.querySelector(".chat-no-results");
+      const visible = Array.from(root.querySelectorAll(".match-wrap")).some((row) => !row.hidden);
+      if (noResults) noResults.hidden = visible || !query;
+    });
+    search.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        search.value = "";
+        search.dispatchEvent(new Event("input"));
+      }
+    });
+  };
 
   const bubbleHtml = (m) => {
     const quote = m.reply_to
@@ -1616,7 +1777,7 @@
       : "";
     const text = m.body ? `<div class="bubble-body">${escapeHtml(m.body)}</div>` : "";
     const replyLabel = m.photo_url && !m.body ? "фото" : m.body || "фото";
-    return `<div class="bubble ${m.mine ? "mine" : ""}${m.photo_url ? " has-photo" : ""}" data-msg="${m.id}">${quote}${photo}${text}<span class="time"><button type="button" class="bubble-reply" data-reply="${m.id}" data-reply-body="${escapeAttr(replyLabel)}" title="ответить" aria-label="ответить">ответить</button>${timeLabel(m.created_at)}${
+    return `<div class="bubble ${m.mine ? "mine" : ""}${m.photo_url ? " has-photo" : ""}" data-msg="${m.id}">${quote}${photo}${text}<span class="time"><button type="button" class="bubble-reply" data-reply="${m.id}" data-reply-body="${escapeAttr(replyLabel)}" title="ответить" aria-label="ответить">${ICONS.reply}</button>${timeLabel(m.created_at)}${
       m.mine
         ? `<i class="receipt${m.read ? " on" : ""}" title="${m.read ? "прочитано" : "отправлено"}">${m.read ? "✓✓" : "✓"}</i>`
         : ""
@@ -1758,27 +1919,34 @@
     if (!t) return matchesView();
     const reply = state.replyTo;
     return `
-      ${appHead()}
-      <section class="panel chat-panel">
-        <div class="deck-meta">
-          <a class="ghost slim" href="${hrefFor("matches")}" data-nav="matches">← чаты</a>
-          <a class="ghost slim" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat">анкета</a>
-        </div>
-        <h2>${escapeHtml(t.peer.name)}</h2>
+      <section class="chat-screen">
+        <header class="chat-topbar">
+          <a class="chat-back" href="${hrefFor("matches")}" data-nav="matches" aria-label="Вернуться к чатам" title="Чаты">${ICONS.arrow}</a>
+          <a class="chat-peer" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat">
+            <img src="${avatarUrl(t.peer.photo, t.peer.name)}" alt="">
+            <span class="chat-peer-copy"><strong>${escapeHtml(t.peer.name)}</strong><small>взаимная симпатия</small></span>
+          </a>
+          <div class="chat-top-actions">
+            <a class="chat-top-action" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat" aria-label="Открыть анкету" title="Анкета">${ICONS.user}</a>
+            <button class="chat-top-action" type="button" data-unmatch="${t.peer.id}" aria-label="Убрать чат" title="Убрать чат">${ICONS.more}</button>
+          </div>
+        </header>
         <div class="thread" id="thread">${threadInner(t)}</div>
-        ${
-          reply
-            ? `<div class="reply-bar"><span>ответ: ${escapeHtml((reply.body || "").slice(0, 90))}</span><button type="button" class="ghost slim" id="reply-cancel">×</button></div>`
-            : ""
-        }
-        <form class="composer" id="composer">
-          <label class="composer-attach" title="фото" aria-label="прикрепить фото">
-            ${ICONS.photo}
-            <input type="file" id="chat-photo" accept="image/*" hidden>
-          </label>
-          <input name="body" maxlength="1000" placeholder="сообщение" autocomplete="off" enterkeyhint="send">
-          <button class="solid" type="submit">отправить</button>
-        </form>
+        <div class="composer-dock">
+          ${
+            reply
+              ? `<div class="reply-bar"><span><b>ответ на сообщение</b>${escapeHtml((reply.body || "").slice(0, 90))}</span><button type="button" class="reply-cancel" id="reply-cancel" aria-label="Отменить ответ">${ICONS.close}</button></div>`
+              : ""
+          }
+          <form class="composer" id="composer">
+            <label class="composer-attach" title="фото" aria-label="прикрепить фото">
+              ${ICONS.photo}
+              <input type="file" id="chat-photo" accept="image/*" hidden>
+            </label>
+            <input name="body" maxlength="1000" placeholder="написать сообщение" autocomplete="off" enterkeyhint="send">
+            <button class="composer-send" type="submit" aria-label="Отправить сообщение" title="Отправить">${ICONS.send}</button>
+          </form>
+        </div>
       </section>`;
   };
 
@@ -1985,7 +2153,10 @@
           </div>
           <label>рост, см<input name="height" type="number" min="140" max="220" value="${escapeAttr(heightVal)}" placeholder="необязательно"></label>
           <label>занятость<input name="job" maxlength="60" value="${escapeAttr(jobVal)}" placeholder="необязательно"></label>
-          ${pickerBlock("neuro", neuro, { lead: "свои диагнозы и расстройства — хотя бы одно. Нажми «?» на теге — коротко, что это." })}
+          ${pickerBlock("neuro", neuro, {
+            lead: "свои диагнозы и расстройства — хотя бы одно. Нажми «?» на теге — коротко, что это.",
+            test: true,
+          })}
           ${pickerBlock("vibe", vibe, { lead: "вайб анкеты — как с тобой лучше быть." })}
           <label>о себе<textarea name="bio" maxlength="1200" placeholder="специальный интерес, сенсорные лимиты, чего лучше не делать">${escapeHtml(bioVal)}</textarea></label>
           <label>как тебе писать<textarea name="communication" maxlength="280" placeholder="голосовые ок / нет, small talk — сразу в блок">${escapeHtml(communicationVal)}</textarea></label>
@@ -2009,18 +2180,22 @@
                   : `<p class="hint">этот браузер не умеет системные уведомления — смотри счётчики в шапке.</p>`
             }
           </div>
-          <div class="plus-box${u.plus ? " on" : ""}">
-            <div class="q">${u.plus ? "WIRING+ включён" : "WIRING+ выключен"}</div>
-            ${
-              u.plus
-                ? `<p class="hint">до ${plusUntil(u.plus_until)}</p>
-                   <label class="check"><input id="plus-incognito" type="checkbox" ${u.incognito ? "checked" : ""}> инкогнито — меня не показывают, пока я сам не лайкну</label>
-                   <label class="check"><input id="plus-paused" type="checkbox" ${u.paused ? "checked" : ""}> пауза — временно скрыть анкету</label>`
-                : `<p class="hint">спокойный режим: видно, кто лайкнул, инкогнито, пауза, заметки, отложить человека. сиды в ленте остаются.</p>
-                   <label>промокод<input id="plus-code" maxlength="24" placeholder="если есть код"></label>
-                   <button class="ghost slim" type="button" id="plus-redeem">активировать</button>`
-            }
-          </div>
+          <a class="plus-box" href="${hrefFor("plus")}" data-nav="plus" style="display:flex;align-items:center;justify-content:space-between;text-decoration:none;color:inherit;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span class="badge-gem-icon" aria-hidden="true" style="width:22px;height:22px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h12l4 6-10 13L2 9Z"/>
+                  <path d="M11 3 8 9l4 13 4-13-3-6"/>
+                  <path d="M2 9h20"/>
+                </svg>
+              </span>
+              <div>
+                <div class="q" style="margin:0;">WIRING+</div>
+                <p class="hint" style="margin:2px 0 0;">${u.plus ? `включён до ${plusUntil(u.plus_until)}` : "спокойный режим, инкогнито, пауза"}</p>
+              </div>
+            </div>
+            <span class="ghost slim" style="pointer-events:none;">настроить ↗</span>
+          </a>
           ${
             u.ref_url
               ? `<div class="plus-box">
@@ -2111,19 +2286,6 @@
             }
           });
         });
-        const savePlus = async (patch) => {
-          try {
-            const data = await api("/api/plus", { method: "PATCH", body: JSON.stringify(patch) });
-            state.user = data.user;
-            toast("сохранено");
-          } catch (err) {
-            toast(err.message);
-          }
-        };
-        const incognito = root.querySelector("#plus-incognito");
-        if (incognito) incognito.addEventListener("change", () => savePlus({ incognito: incognito.checked }));
-        const paused = root.querySelector("#plus-paused");
-        if (paused) paused.addEventListener("change", () => savePlus({ paused: paused.checked }));
         root.querySelector("#me").addEventListener("submit", async (e) => {
           e.preventDefault();
           const form = new FormData(e.target);
@@ -2173,6 +2335,100 @@
             root.querySelector("#err").textContent = err.message;
           }
         });
+      },
+    };
+  };
+
+  const plusView = () => {
+    const u = state.user || {};
+    return {
+      html: `
+        ${appHead({ showBack: false })}
+        <section class="panel plus-panel">
+          <div class="plus-hero">
+            <span class="badge-gem-icon hero-gem" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 3h12l4 6-10 13L2 9Z"/>
+                <path d="M11 3 8 9l4 13 4-13-3-6"/>
+                <path d="M2 9h20"/>
+              </svg>
+            </span>
+            <h2>WIRING+</h2>
+            <p class="lede">Спокойный и комфортный режим знакомств без лишней спешки и ограничений.</p>
+          </div>
+
+          <div class="plus-box${u.plus ? " on" : ""}">
+            <div class="q">${u.plus ? "WIRING+ включён" : "WIRING+ выключен"}</div>
+            ${
+              u.plus
+                ? `<p class="hint">до ${plusUntil(u.plus_until)}</p>
+                   <label class="check"><input id="plus-incognito" type="checkbox" ${u.incognito ? "checked" : ""}> инкогнито — меня не показывают, пока я сам не лайкну</label>
+                   <label class="check"><input id="plus-paused" type="checkbox" ${u.paused ? "checked" : ""}> пауза — временно скрыть анкету</label>`
+                : `<p class="hint">спокойный режим: видно, кто лайкнул, инкогнито, пауза, заметки, отложить человека. сиды в ленте остаются.</p>
+                   <label>промокод<input id="plus-code" maxlength="24" placeholder="если есть код"></label>
+                   <button class="ghost slim" type="button" id="plus-redeem">активировать</button>`
+            }
+          </div>
+
+          <div class="plus-features-list">
+            <div class="plus-feature-item">
+              <div class="plus-feature-icon">👁️</div>
+              <div class="plus-feature-text">
+                <strong>Видно, кто лайкнул</strong>
+                <p class="hint">Открывай входящие симпатии и выбирай, кому ответить взаимностью.</p>
+              </div>
+            </div>
+            <div class="plus-feature-item">
+              <div class="plus-feature-icon">🕶️</div>
+              <div class="plus-feature-text">
+                <strong>Режим инкогнито</strong>
+                <p class="hint">Твоя анкета видна только тем людям, которых ты лайкнул сам.</p>
+              </div>
+            </div>
+            <div class="plus-feature-item">
+              <div class="plus-feature-icon">⏸️</div>
+              <div class="plus-feature-text">
+                <strong>Пауза анкеты</strong>
+                <p class="hint">Скрой себя из ленты на время отдыха — все текущие переписки и мэтчи сохранятся.</p>
+              </div>
+            </div>
+            <div class="plus-feature-item">
+              <div class="plus-feature-icon">📝</div>
+              <div class="plus-feature-text">
+                <strong>Заметки и закладки</strong>
+                <p class="hint">Оставляй личные пометки к профилям — их видишь только ты.</p>
+              </div>
+            </div>
+          </div>
+
+          ${
+            u.ref_url
+              ? `<div class="plus-box">
+            <div class="q">пригласи своих</div>
+            <p class="hint">по ссылке зарегистрируется человек — WIRING+ на ${u.ref_days || 30} дней вам обоим. уже привели: ${u.ref_count || 0}</p>
+            <div class="ref-row">
+              <input id="ref-link" readonly value="${escapeAttr(u.ref_url)}">
+              <button class="ghost slim" type="button" id="ref-copy">копировать</button>
+            </div>
+          </div>`
+              : ""
+          }
+        </section>
+        ${tabbar()}`,
+      bind() {
+        const savePlus = async (patch) => {
+          try {
+            const data = await api("/api/plus", { method: "PATCH", body: JSON.stringify(patch) });
+            state.user = data.user;
+            toast("сохранено");
+          } catch (err) {
+            toast(err.message);
+          }
+        };
+        const incognito = root.querySelector("#plus-incognito");
+        if (incognito) incognito.addEventListener("change", () => savePlus({ incognito: incognito.checked }));
+        const paused = root.querySelector("#plus-paused");
+        if (paused) paused.addEventListener("change", () => savePlus({ paused: paused.checked }));
       },
     };
   };
@@ -2805,7 +3061,7 @@
   let authFeatureModulePromise = null;
 
   const loadAuthFeatureModule = () => {
-    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=3`);
+    authFeatureModulePromise ??= import(`${BASE}/public/dist/auth.js?v=4`);
     return authFeatureModulePromise;
   };
 
@@ -2813,7 +3069,7 @@
   let homeFeatureModulePromise = null;
 
   const loadHomeFeatureModule = () => {
-    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=22`);
+    homeFeatureModulePromise ??= import(`${BASE}/public/dist/home.js?v=29`);
     return homeFeatureModulePromise;
   };
 
@@ -2833,6 +3089,7 @@
       homeFaces: HOME_FACES,
       userTraits,
       profileAvatar: state.user ? avatarUrl(state.user.photo, state.user.name) : undefined,
+      userName: state.user?.name || "",
       hrefFor,
       navigate: (view) => {
         void goToView(view);
@@ -2840,6 +3097,7 @@
       onThemeSelect: (theme) => {
         applyTheme(theme);
       },
+      onLogout: logout,
     };
   };
 
@@ -2909,7 +3167,7 @@
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat", "delete-account"].includes(next)) {
+    if (!state.user && ["deck", "likes", "matches", "profile", "person", "chat", "delete-account", "plus"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -2924,7 +3182,7 @@
     }
     state.view = next;
     state.photoIndex = 0;
-    if (next !== "profile") clearProfileDraft();
+    if (next !== "profile" && next !== "plus") clearProfileDraft();
     if (state.view === "deck" && state.user) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
@@ -2936,7 +3194,7 @@
       await loadLikes();
       await refreshMe();
     }
-    if (state.view === "profile" && state.user && !state.profileDraft) await refreshMe();
+    if (["profile", "plus"].includes(state.view) && state.user && !state.profileDraft) await refreshMe();
     render();
   };
 
@@ -3053,6 +3311,7 @@
     else if (state.view === "likes") root.innerHTML = likesView();
     else if (state.view === "person") root.innerHTML = personView();
     else if (state.view === "profile") bound = profileView();
+    else if (state.view === "plus") bound = plusView();
     else if (state.view === "delete-account") bound = deleteAccountView();
     else if (state.view === "onboard") bound = onboardView();
     else if (state.view === "invite") bound = inviteView();
@@ -3067,6 +3326,7 @@
     }
     if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
     if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
+    if (state.view === "matches") bindMatchesList();
     bindDataNavLinks();
     root.querySelectorAll("[data-unmatch]").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
@@ -3361,7 +3621,7 @@ bindTips();
       state.thread = null;
     }
     if (state.view === "likes") await loadLikes();
-    if (state.view === "profile") await refreshMe();
+    if (state.view === "profile" || state.view === "plus") await refreshMe();
     render();
   };
 

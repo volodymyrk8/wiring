@@ -1310,6 +1310,8 @@ def index():
 @app.get("/chats")
 @app.get("/chats/<int:chat_id>")
 @app.get("/me")
+@app.get("/plus")
+@app.get("/premium")
 @app.get("/onboard")
 @app.get("/delete-account")
 @app.get("/p/<int:person_id>")

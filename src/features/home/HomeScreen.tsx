@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { AppHeader, LegalFooter, AccordionRow, Button } from "@/components/ui";
+import { AppHeader, LegalFooter, AccordionRow, Button, ProfileMenu } from "@/components/ui";
 import { HomeFaces } from "./components/HomeFaces";
 import type { HomeHostBridge } from "./types";
 import styles from "./HomeScreen.module.css";
@@ -66,26 +66,16 @@ export function HomeScreen({ host }: HomeScreenProps) {
         onThemeSelect={onThemeSelect}
         rightSlot={
           signed ? (
-            <span class="avatar-slot">
-              <a
-                href={hrefFor("profile")}
-                onClick={handleNav("profile")}
-                class={`avatar-link${isPlus ? " plus" : ""}`}
-                data-nav="profile"
-                aria-label={isPlus ? "профиль · WIRING+" : "профиль"}
-              >
-                {profileAvatar ? (
-                  <img src={profileAvatar} alt="" />
-                ) : (
-                  <UserIcon />
-                )}
-              </a>
-              {isPlus && (
-                <span class="plus-mark" title="WIRING+" aria-hidden="true">
-                  <GemIcon />
-                </span>
-              )}
-            </span>
+            <ProfileMenu
+              avatarUrl={profileAvatar}
+              userName={host.userName}
+              isPlus={isPlus}
+              profileHref={hrefFor("profile")}
+              plusHref={hrefFor("plus")}
+              onProfileClick={handleNav("profile")}
+              onPlusClick={handleNav("plus")}
+              onLogout={host.onLogout}
+            />
           ) : (
             <a
               href={hrefFor("login")}

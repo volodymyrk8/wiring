@@ -12,6 +12,7 @@ export const SPA_PATHS = {
   likes: "/likes",
   matches: "/chats",
   profile: "/me",
+  plus: "/plus",
   onboard: "/onboard",
   deleteAccount: "/delete-account",
 } as const satisfies Record<string, string>;
@@ -28,6 +29,9 @@ export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
   [SPA_PATHS.likes]: "likes",
   [SPA_PATHS.matches]: "matches",
   [SPA_PATHS.profile]: "profile",
+  [SPA_PATHS.plus]: "plus",
+  "/plus": "plus",
+  "/premium": "plus",
   [SPA_PATHS.onboard]: "onboard",
   [SPA_PATHS.deleteAccount]: "delete-account",
 };

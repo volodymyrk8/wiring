@@ -11,6 +11,7 @@ export type ViewId =
   | "matches"
   | "chat"
   | "profile"
+  | "plus"
   | "onboard"
   | "person"
   | "delete-account";
