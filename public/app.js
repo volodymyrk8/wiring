@@ -40,7 +40,6 @@
     photoIndex: 0,
     matches: [],
     likes: [],
-    thread: null,
     person: null,
     personFrom: "deck",
     filters: { ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }), real_only: false },
@@ -48,7 +47,6 @@
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
     likesFiltersOpen: false,
     likesPromoOpen: false,
-    replyTo: null,
     reportFor: null,
     reportReason: "",
     reportDetails: "",
@@ -71,14 +69,8 @@
     pendingRef: sessionStorage.getItem("wiring-ref") || "",
     profileDraft: null,
     profileEdit: null,
-    matchesQuery: "",
-    chatDraft: "",
-    chatSending: false,
     chatId: null,
   };
-  let chatTimer = 0;
-  let chatPollBusy = false;
-  let chatOpenToken = 0;
   let inboxTimer = 0;
   const urlSyncState = { lastUrl: "" };
   let profileScrollY = 0;
@@ -114,14 +106,14 @@
 
   const currentHref = () =>
     hrefFor(state.view, {
-      id: state.view === "chat" ? state.chatId || state.thread?.peer?.id : state.view === "person" ? state.person?.id : undefined,
+      id: state.view === "chat" ? state.chatId : state.view === "person" ? state.person?.id : undefined,
     });
 
   const syncUrl = () => {
     routing.syncViewToUrl(urlSyncState, BASE, state.view, {
       id:
         state.view === "chat"
-          ? state.chatId || state.thread?.peer?.id
+          ? state.chatId
           : state.view === "person"
             ? state.person?.id
             : undefined,
@@ -180,17 +172,8 @@
     eyeOff: svgIcon(`<path d="M3 4l17 16M10.5 10.7a2.6 2.6 0 0 0 3.7 3.6M9.4 5.5A11 11 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-4.2 4.6M6.2 6.7C3.8 8.3 2 12 2 12a17 17 0 0 0 5.4 5.2"/>`, { size: 18 }),
     book: svgIcon(`<path d="M5 5.5h6.2A3.3 3.3 0 0 1 14.5 8.8V19H8.2A3.2 3.2 0 0 0 5 22.2z"/><path d="M19 5.5h-6.2A3.3 3.3 0 0 0 9.5 8.8V19H16a3.2 3.2 0 0 1 3 3.2z"/>`, { size: 20 }),
     plus: svgIcon(`<path d="M12 6v12M6 12h12"/>`, { size: 20 }),
-    photo: svgIcon(
-      `<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9.5" cy="10" r="1.6" fill="currentColor" stroke="none"/><path d="M8 17l3.2-3.6a1.2 1.2 0 0 1 1.8 0L16.5 17"/>`,
-      { size: 20 }
-    ),
     theme: svgIcon(`<path d="M14.2 4.4A7.2 7.2 0 1 0 19.6 14 5.6 5.6 0 0 1 14.2 4.4z"/>`, { size: 20, strokeWidth: 1.8 }),
     arrow: svgIcon(`<path d="M5 12h14M13 6l6 6-6 6"/>`, { size: 18 }),
-    search: svgIcon(`<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.6 4.6"/>`, { size: 19, strokeWidth: 1.8 }),
-    trash: svgIcon(`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`, { size: 19, strokeWidth: 1.7 }),
-    send: svgIcon(`<path d="m21.5 3.5-19 7.3 7.3 2.7 2.7 7.5z"/><path d="M9.8 13.5 21.5 3.5"/>`, { size: 20, strokeWidth: 1.7 }),
-    close: svgIcon(`<path d="m6 6 12 12M18 6 6 18"/>`, { size: 18, strokeWidth: 1.8 }),
-    reply: svgIcon(`<path d="m9 17-5-5 5-5"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`, { size: 13, strokeWidth: 2.2 }),
     filter: svgIcon(`<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>`, { size: 14, strokeWidth: 1.8 }),
   };
 
@@ -520,31 +503,6 @@
     return `<button class="${cls}" type="${escapeAttr(type)}"${idAttr}${disabled ? " disabled" : ""}><span>${children}</span></button>`;
   };
 
-  const matchRow = (m, { href, attrs = "", sub = "", unread = 0, locked = false, time = "" } = {}) => {
-    if (locked) {
-      return `
-    <div class="match locked" ${attrs}>
-      <div class="locked-face" aria-hidden="true"><i></i></div>
-      <div>
-        <h3>кто-то лайкнул</h3>
-        <p>${sub}</p>
-      </div>
-    </div>`;
-    }
-    return `
-    <a class="match ${unread ? "has-unread" : ""}" href="${href}" ${attrs}>
-      <img src="${avatarUrl(m.photo, m.name)}" alt="" width="64" height="64">
-      <div class="match-body">
-        <div class="match-head">
-          <h3>${escapeHtml(m.name)}, ${m.age}</h3>
-          ${time ? `<time class="match-time">${escapeHtml(time)}</time>` : ""}
-        </div>
-        <p>${sub}</p>
-      </div>
-      ${unread ? `<span class="unread">${unread}</span>` : ""}
-    </a>`;
-  };
-
   const captionHtml = (kind, id) => {
     const item = itemOf(kind, id);
     const expand = item.expand || item.label || id;
@@ -764,7 +722,7 @@
     const shown = [];
     for (const note of fresh) {
       seenNotices.add(note.id);
-      const inChat = state.view === "chat" && state.thread?.peer?.id === note.from_id && note.kind === "message";
+      const inChat = state.view === "chat" && state.chatId === note.from_id && note.kind === "message";
       if (inChat || !announce) continue;
       toast(note.body, noticeAction(note));
       pingBrowser(note.body);
@@ -855,24 +813,6 @@
     state.user = me.user;
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread || 0;
-  };
-
-  const timeLabel = (ts) => {
-    if (!ts) return "";
-    const d = new Date(ts * 1000);
-    const now = new Date();
-    const same = d.toDateString() === now.toDateString();
-    return same
-      ? d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })
-      : d.toLocaleDateString("ru", { day: "numeric", month: "short" });
-  };
-
-  const chatTimeLabel = (ts) => {
-    if (!ts) return "";
-    const d = new Date(ts * 1000);
-    const date = d.toLocaleDateString("ru", { day: "numeric", month: "short" });
-    const time = d.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
-    return `${date}, ${time}`;
   };
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
@@ -1857,297 +1797,6 @@
     ${tabbar()}`;
   };
 
-  const matchesView = () => {
-    const matches = state.matches || [];
-    return `
-    ${appHead({ sectionTitle: "чаты" })}
-    ${profileNudge()}
-    <main class="chat-list-page">
-      <div class="chat-list-intro">
-        <p class="chat-list-lede">Здесь можно продолжить разговор без спешки — в своём ритме.</p>
-      </div>
-      <section class="chat-list-card" aria-label="Список чатов">
-        <label class="chat-search">
-          ${ICONS.search}
-          <input id="chat-search" type="search" value="${escapeAttr(state.matchesQuery)}" placeholder="найти диалог" autocomplete="off">
-          <kbd>⌘ K</kbd>
-        </label>
-        ${
-          matches.length
-            ? `<div class="match-list">${matches
-                  .map((m) =>
-                    `<div class="match-wrap">
-                      ${matchRow(m, {
-                        href: hrefFor("chat", { id: m.id }),
-                        attrs: `data-open="${m.id}"`,
-                        sub: m.last_message
-                          ? `${state.user?.id && m.last_from_id === state.user.id ? "ты: " : ""}${escapeHtml(m.last_message)}`
-                          : "взаимно · напиши первым",
-                        time: timeLabel(m.last_at),
-                        unread: m.unread || 0,
-                      })}
-                      <button type="button" class="match-remove" data-unmatch="${m.id}" aria-label="убрать из чатов" title="убрать из чатов">${ICONS.close}</button>
-                    </div>`
-                  )
-                  .join("")}</div><div class="chat-no-results" hidden><span>${ICONS.search}</span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>`
-            : `<div class="chat-empty"><div class="chat-empty-icon">${ICONS.chat}</div><h2>Первый мэтч — уже начало</h2><p>Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.</p><a class="solid" href="${hrefFor("deck")}" data-nav="deck">перейти в ленту ${ICONS.arrow}</a></div>`
-        }
-      </section>
-    </main>
-    ${tabbar()}`;
-  };
-
-  const bindMatchesList = () => {
-    const search = root.querySelector("#chat-search");
-    if (!search) return;
-    if (!document.documentElement.dataset.chatSearchShortcut) {
-      document.documentElement.dataset.chatSearchShortcut = "bound";
-      document.addEventListener("keydown", (event) => {
-        if (state.view !== "matches" || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
-        event.preventDefault();
-        document.querySelector("#chat-search")?.focus();
-      });
-    }
-    search.addEventListener("input", () => {
-      state.matchesQuery = search.value;
-      const query = state.matchesQuery.trim().toLowerCase();
-      root.querySelectorAll(".match-wrap").forEach((row) => {
-        const match = row.querySelector(".match");
-        const text = match?.textContent?.toLowerCase() || "";
-        row.hidden = Boolean(query && !text.includes(query));
-      });
-      const noResults = root.querySelector(".chat-no-results");
-      const visible = Array.from(root.querySelectorAll(".match-wrap")).some((row) => !row.hidden);
-      if (noResults) noResults.hidden = visible || !query;
-    });
-    search.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        search.value = "";
-        search.dispatchEvent(new Event("input"));
-      }
-    });
-  };
-
-  const bubbleHtml = (m) => {
-    const quote = m.reply_to
-      ? `<div class="bubble-quote">${m.reply_to.has_photo && !m.reply_to.body ? "фото" : escapeHtml(m.reply_to.body || "фото")}</div>`
-      : "";
-    const photo = m.photo_url
-      ? `<a class="bubble-photo" href="${escapeAttr(m.photo_url)}" target="_blank" rel="noopener"><img src="${escapeAttr(m.photo_url)}" alt="" decoding="async"></a>`
-      : "";
-    const text = m.body ? `<div class="bubble-body">${escapeHtml(m.body)}</div>` : "";
-    const replyLabel = m.photo_url && !m.body ? "фото" : m.body || "фото";
-    return `<div class="bubble ${m.mine ? "mine" : ""}${m.photo_url ? " has-photo" : ""}" data-msg="${m.id}">${quote}${photo}${text}<span class="time"><button type="button" class="bubble-reply" data-reply="${m.id}" data-reply-body="${escapeAttr(replyLabel)}" title="ответить" aria-label="ответить">${ICONS.reply}</button>${chatTimeLabel(m.created_at)}${
-      m.mine
-        ? `<i class="receipt${m.read ? " on" : ""}" title="${m.read ? "прочитано" : "отправлено"}">${m.read ? "✓✓" : "✓"}</i>`
-        : ""
-    }</span></div>`;
-  };
-
-  const threadInner = (t) => {
-    if ((t.messages || []).length) return t.messages.map(bubbleHtml).join("");
-    return `<p class="hint">Напиши первым. Подсказки по анкете — ткни, отредактируй и отправь.</p>
-       <div class="openers">${(t.openers || [])
-         .map((o) => `<button type="button" class="ghost slim opener">${escapeHtml(o)}</button>`)
-         .join("")}</div>`;
-  };
-
-  const scrollThreadEnd = () => {
-    const box = root.querySelector("#thread");
-    if (!box) return;
-    const move = () => {
-      if (document.documentElement.dataset.view !== "chat") return;
-      box.scrollTop = box.scrollHeight;
-    };
-    move();
-    requestAnimationFrame(move);
-    box.querySelectorAll("img").forEach((image) => {
-      if (!image.complete) image.addEventListener("load", move, { once: true });
-    });
-  };
-
-  let sendChatMessage = async (_body) => {};
-
-  const bindChatThreadActions = () => {
-    root.querySelectorAll("[data-reply]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        state.chatDraft = root.querySelector("#composer input[name='body']")?.value || state.chatDraft || "";
-        state.replyTo = { id: Number(btn.dataset.reply), body: btn.dataset.replyBody || "" };
-        render();
-        const input = root.querySelector("#composer input[name='body']");
-        if (input) {
-          input.value = state.chatDraft;
-          input.focus();
-          try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
-        }
-      });
-    });
-    root.querySelectorAll(".opener").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const field = root.querySelector("#composer input[name='body']");
-        if (!field) return;
-        state.chatDraft = btn.textContent || "";
-        field.value = state.chatDraft;
-        field.focus();
-        try { field.setSelectionRange(field.value.length, field.value.length); } catch (_) {}
-      });
-    });
-    const replyCancel = root.querySelector("#reply-cancel");
-    if (replyCancel) {
-      replyCancel.addEventListener("click", () => {
-        state.replyTo = null;
-        root.querySelector(".reply-bar")?.remove();
-      });
-    }
-  };
-
-  const bindComposer = () => {
-    const composer = root.querySelector("#composer");
-    sendChatMessage = async (body) => {
-      if (!state.thread?.peer?.id || state.chatSending) return;
-      const peerId = Number(state.thread.peer.id);
-      const textBody = String(body || "").trim();
-      if (!textBody) return;
-      const payload = { to_id: state.thread.peer.id, body: textBody };
-      if (state.replyTo?.id) payload.reply_to_id = state.replyTo.id;
-      setChatSending(true);
-      try {
-        await api("/api/messages", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-        if (!chatIsActive(peerId)) return;
-        state.chatDraft = "";
-        state.replyTo = null;
-        root.querySelector(".reply-bar")?.remove();
-        const field = root.querySelector("#composer input[name='body']");
-        if (field) field.value = "";
-        const fresh = await api(`/api/messages/${peerId}`);
-        if (!chatIsActive(peerId)) return;
-        applyThread(fresh, { scroll: true, peerId });
-        requestAnimationFrame(() => {
-          const input = root.querySelector("#composer input[name='body']");
-          if (input) {
-            input.focus();
-            try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
-          }
-          pinChatHeight();
-          scrollThreadEnd();
-        });
-      } finally {
-        if (chatIsActive(peerId)) setChatSending(false);
-      }
-    };
-    const sendChatPhoto = async (file) => {
-      if (!state.thread?.peer?.id || !file || state.chatSending) return;
-      const peerId = Number(state.thread.peer.id);
-      const caption = String(root.querySelector("#composer input[name='body']")?.value || state.chatDraft || "").trim();
-      const replyToId = state.replyTo?.id;
-      setChatSending(true);
-      try {
-        const blob = await compressImage(file);
-        const fd = new FormData();
-        fd.append("to_id", String(peerId));
-        fd.append("file", blob, "photo.jpg");
-        if (caption) fd.append("body", caption.slice(0, 500));
-        if (replyToId) fd.append("reply_to_id", String(replyToId));
-        toast("отправляю фото…");
-        await api("/api/messages/photo", { method: "POST", body: fd });
-        if (!chatIsActive(peerId)) return;
-        state.chatDraft = "";
-        state.replyTo = null;
-        root.querySelector(".reply-bar")?.remove();
-        const field = root.querySelector("#composer input[name='body']");
-        if (field) field.value = "";
-        const fresh = await api(`/api/messages/${peerId}`);
-        if (!chatIsActive(peerId)) return;
-        applyThread(fresh, { scroll: true, peerId });
-        requestAnimationFrame(() => {
-          pinChatHeight();
-          scrollThreadEnd();
-        });
-      } finally {
-        if (chatIsActive(peerId)) setChatSending(false);
-      }
-    };
-    if (!composer) return;
-    const field = composer.querySelector("input[name='body']");
-    const afterKeyboard = () => {
-      pinChatHeight();
-      requestAnimationFrame(() => {
-        pinChatHeight();
-        scrollThreadEnd();
-      });
-    };
-    field?.addEventListener("focus", afterKeyboard);
-    field?.addEventListener("input", () => {
-      state.chatDraft = field.value;
-    });
-    const photoInput = root.querySelector("#chat-photo");
-    if (photoInput) {
-      photoInput.addEventListener("change", async () => {
-        const file = photoInput.files?.[0];
-        photoInput.value = "";
-        if (!file) return;
-        try {
-          await sendChatPhoto(file);
-        } catch (err) {
-          toast(err.message);
-        }
-      });
-    }
-    composer.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (state.chatSending) return;
-      const body = new FormData(composer).get("body");
-      try {
-        await sendChatMessage(body);
-      } catch (err) {
-        toast(err.message);
-      }
-    });
-    bindChatThreadActions();
-    if (state.chatSending) setChatSending(true);
-  };
-
-  const chatView = () => {
-    const t = state.thread;
-    if (!t) return matchesView();
-    const reply = state.replyTo;
-    return `
-      <section class="chat-screen">
-        <header class="chat-topbar">
-          <a class="chat-back" href="${hrefFor("matches")}" data-nav="matches" aria-label="Вернуться к чатам" title="Чаты">${ICONS.arrow}</a>
-          <a class="chat-peer" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat">
-            <img src="${avatarUrl(t.peer.photo, t.peer.name)}" alt="">
-            <span class="chat-peer-copy"><strong>${escapeHtml(t.peer.name)}</strong><small>взаимная симпатия</small></span>
-          </a>
-          <div class="chat-top-actions">
-            <a class="chat-top-action" href="${hrefFor("person", { id: t.peer.id })}" data-person="${t.peer.id}" data-from="chat" aria-label="Открыть анкету" title="Анкета">${ICONS.user}</a>
-            <button class="chat-top-action chat-remove-action" type="button" data-unmatch="${t.peer.id}" aria-label="Убрать чат" title="Убрать чат">${ICONS.trash}</button>
-          </div>
-        </header>
-        <div class="thread" id="thread">${threadInner(t)}</div>
-        <div class="composer-dock">
-          ${
-            reply
-              ? `<div class="reply-bar"><span><b>ответ на сообщение</b>${escapeHtml((reply.body || "").slice(0, 90))}</span><button type="button" class="reply-cancel" id="reply-cancel" aria-label="Отменить ответ">${ICONS.close}</button></div>`
-              : ""
-          }
-          <form class="composer" id="composer">
-            <label class="composer-attach" title="фото" aria-label="прикрепить фото">
-              ${ICONS.photo}
-              <input type="file" id="chat-photo" accept="image/*" hidden>
-            </label>
-            <input name="body" maxlength="1000" value="${escapeAttr(state.chatDraft)}" placeholder="написать сообщение" autocomplete="off" enterkeyhint="send">
-            <button class="composer-send" type="submit" aria-label="Отправить сообщение" title="Отправить">${ICONS.send}</button>
-          </form>
-        </div>
-      </section>`;
-  };
-
   const photoManager = (u) => {
     const albums = u.albums || [];
     const photos = Array.isArray(u.photos) && u.photos.length && typeof u.photos[0] === "object" ? u.photos : albums.flatMap((a) => a.photos || []);
@@ -2783,7 +2432,6 @@
   };
 
   const openPerson = async (id, from) => {
-    if (state.view === "chat") stopChatSession();
     const data = await api(`/api/people/${id}`);
     state.person = data.person;
     state.personFrom = from || "deck";
@@ -2942,97 +2590,20 @@
     }
   };
 
-  const chatIsActive = (peerId) =>
-    state.view === "chat" &&
-    Boolean(state.thread?.peer?.id) &&
-    Number(state.thread.peer.id) === Number(peerId);
-
-  const threadNearBottom = (box, threshold = 120) => {
-    if (!box) return true;
-    return box.scrollHeight - box.scrollTop - box.clientHeight <= threshold;
-  };
-
-  const setChatSending = (busy) => {
-    state.chatSending = Boolean(busy);
-    const composer = root.querySelector("#composer");
-    if (!composer) return;
-    composer.classList.toggle("is-sending", state.chatSending);
-    composer.setAttribute("aria-busy", String(state.chatSending));
-    composer.querySelectorAll("input, button, label").forEach((control) => {
-      control.disabled = state.chatSending;
-    });
-  };
-
-  const stopChatSession = () => {
-    clearInterval(chatTimer);
-    chatTimer = 0;
-    chatPollBusy = false;
-    chatOpenToken += 1;
-    state.chatSending = false;
-  };
-
-  const threadDelta = (prev, next) => {
-    if ((prev || []).length !== (next || []).length) return "new";
-    for (let i = 0; i < next.length; i += 1) {
-      if (Boolean(prev[i]?.read) !== Boolean(next[i]?.read)) return "read";
-    }
-    return "";
-  };
-
-  const applyThread = (fresh, { scroll = false, peerId = state.thread?.peer?.id } = {}) => {
-    if (!fresh || !chatIsActive(peerId)) return;
-    const kind = threadDelta(state.thread?.messages || [], fresh.messages || []);
-    const field = root.querySelector("#composer input");
-    const draft = field?.value ?? state.chatDraft ?? "";
-    const hadFocus = document.activeElement === field;
-    const box = root.querySelector("#thread");
-    const shouldScroll = scroll || (kind === "new" && threadNearBottom(box));
-    state.thread = fresh;
-    state.chatDraft = draft;
-    if (!kind && !scroll) return;
-    // Keep composer alive on poll updates — full re-render breaks typing on mobile.
-    if (state.view === "chat" && root.querySelector("#composer") && (kind === "new" || kind === "read" || scroll)) {
-      const thread = root.querySelector("#thread");
-      if (thread) {
-        thread.innerHTML = threadInner(fresh);
-        bindChatThreadActions();
-      }
-      if (field) field.value = draft;
-      if (hadFocus && field) field.focus();
-      if (shouldScroll) scrollThreadEnd();
-      return;
-    }
-    render();
-    const input = root.querySelector("#composer input");
-    if (input) input.value = draft;
-    if (hadFocus && input) input.focus();
-    if (shouldScroll) scrollThreadEnd();
-  };
-
   const openChat = async (id) => {
-    stopChatSession();
     state.chatId = Number(id);
-    state.thread = null;
-    state.chatDraft = "";
-    state.replyTo = null;
     state.view = "chat";
     render();
   };
 
   const resumeApp = async () => {
     if (!state.user) return;
-    const draft = root.querySelector("#composer input")?.value || "";
     await pollInbox();
     try {
       if (state.view === "matches") {
         const data = await api("/api/matches");
         state.matches = data.matches;
         render();
-      } else if (state.view === "chat" && state.thread?.peer?.id) {
-        const fresh = await api(`/api/messages/${state.thread.peer.id}`);
-        applyThread(fresh, { scroll: true });
-        const input = root.querySelector("#composer input");
-        if (input && draft) input.value = draft;
       } else if (state.view === "likes") {
         await loadLikes();
         render();
@@ -3526,7 +3097,6 @@
       render();
       return;
     }
-    if (state.view === "chat" && next !== "chat") stopChatSession();
     state.view = next;
     state.photoIndex = 0;
     if (next !== "chat") state.chatId = null;
@@ -3535,7 +3105,6 @@
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
       state.matches = data.matches;
-      state.thread = null;
       await refreshMe();
     }
     if (state.view === "likes" && state.user) {
@@ -3649,11 +3218,7 @@
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      const fallback = state.view === "chat" ? chatView() : matchesView();
-      root.innerHTML = fallback;
-      if (state.view === "matches") bindMatchesList();
-      bindDataNavLinks();
-      bindThemeControls();
+      root.innerHTML = `<p class="err">не загрузился модуль chat (${escapeHtml(err.message)}). выполни npm run build</p>`;
       toast(`не загрузился модуль chat (${err.message}).`);
     }
   };
@@ -3665,7 +3230,6 @@
     }
     document.documentElement.dataset.view = state.view;
     document.documentElement.toggleAttribute("data-tabs", showsTabbar());
-    if (state.view !== "chat") stopChatSession();
     let bound = null;
     if (!AUTH_FEATURE_VIEWS.has(state.view)) {
       authFeatureUnmount?.();
@@ -3739,18 +3303,7 @@
     if (state.reportFor) root.insertAdjacentHTML("beforeend", reportModal());
     if (state.deleteConfirmModal) root.insertAdjacentHTML("beforeend", deleteConfirmModal());
     if (state.unmatchFor) root.insertAdjacentHTML("beforeend", chatUnmatchModal());
-    if (state.view === "matches") bindMatchesList();
     bindDataNavLinks();
-    root.querySelectorAll("[data-unmatch]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = Number(btn.dataset.unmatch);
-        if (!id) return;
-        state.unmatchFor = id;
-        render();
-      });
-    });
     const chatUnmatchBack = root.querySelector("#chat-unmatch-modal");
     const closeChatUnmatch = () => {
       state.unmatchFor = null;
@@ -3772,10 +3325,6 @@
           if (state.view === "person") {
             const data = await api("/api/matches");
             state.matches = data.matches;
-          }
-          if (state.thread?.peer?.id === id) {
-            state.thread = null;
-            state.view = "matches";
           }
           if (state.person?.id === id) {
             state.person = null;
@@ -3843,19 +3392,12 @@
         await goToView("delete-account");
       });
     }
-    root.querySelectorAll("[data-open]").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        if (btn.tagName === "A") e.preventDefault();
-        openChat(Number(btn.dataset.open));
-      });
-    });
     root.querySelectorAll("[data-person]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         if (btn.tagName === "A") e.preventDefault();
         openPerson(Number(btn.dataset.person), btn.dataset.from || "deck");
       });
     });
-    bindComposer();
     const hideNudge = root.querySelector("#hide-nudge");
     if (hideNudge) {
       hideNudge.addEventListener("click", () => {
@@ -4070,7 +3612,6 @@ bindTips();
     }
     if (plan.kind === "chat") {
       state.chatId = plan.id;
-      state.thread = null;
       state.view = "chat";
       render();
       return;
@@ -4082,7 +3623,6 @@ bindTips();
     if (state.view === "matches") {
       const data = await api("/api/matches");
       state.matches = data.matches;
-      state.thread = null;
     }
     if (state.view === "likes") await loadLikes();
     if (state.view === "profile" || state.view === "consents" || state.view === "plus") await refreshMe();
