@@ -315,7 +315,7 @@ html[data-view="verify"] .auth-shell {
   padding: 0;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius: 50%;
   background: var(--card);
   border: 1px solid var(--line);
   color: var(--ink);
@@ -648,7 +648,7 @@ html[data-theme="dusk"] .swatch[data-theme-set="dusk"] {
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 50%;
   background: var(--card);
   color: inherit;
   padding: 0;
