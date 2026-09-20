@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import {
   AppHeader,
@@ -40,6 +40,8 @@ type Draft = {
 };
 
 type Props = { host: ProfileHostBridge };
+
+const draftStorageKey = (userId: number) => `wiring-profile-draft-${userId}`;
 
 const valueOf = (value: unknown, fallback = "") => (value === null || value === undefined ? fallback : String(value));
 const idsOf = (value: unknown, fallback: string[] = []) => (Array.isArray(value) ? value.map(String) : fallback);
@@ -179,8 +181,70 @@ export function ProfileScreen({ host }: Props) {
     if (typeof Notification === "undefined") return "unsupported";
     return Notification.permission;
   });
+  const draftTimerRef = useRef<number | null>(null);
+  const draftSyncRef = useRef(false);
 
   const signed = !user.guest;
+  const profilePayload = () => ({
+    name: draft.name.trim(),
+    age: Number(draft.age) || undefined,
+    city: draft.city.trim(),
+    gender: draft.gender,
+    looking_for: draft.lookingFor,
+    height: draft.height ? Number(draft.height) : null,
+    job: draft.job.trim(),
+    bio: draft.bio,
+    communication: draft.communication,
+    neuro: draft.neuro,
+    vibe: draft.vibe,
+    intents: draft.intents,
+    seek_min_age: Number(draft.seekMinAge || 18),
+    seek_max_age: Number(draft.seekMaxAge || 99),
+    seek_place: draft.seekPlace,
+    hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
+    prompts: draft.prompts.filter((prompt) => prompt.answer.trim().length >= 4),
+    special_data_consent: draft.neuro.length ? true : undefined,
+    photo_rights_consent: draft.photoConsent ? true : undefined,
+  });
+
+  const userId = Number(user.id || 0);
+
+  useEffect(() => {
+    if (!signed || !userId) return;
+    try {
+      const raw = localStorage.getItem(draftStorageKey(userId));
+      if (!raw) return;
+      const stored = JSON.parse(raw) as Draft;
+      setDraft((current) => ({ ...current, ...stored }));
+    } catch {
+      /* ignore corrupt draft */
+    }
+  }, [signed, userId]);
+
+  useEffect(() => {
+    if (!signed || !userId || draftSyncRef.current) return;
+    if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = window.setTimeout(() => {
+      try {
+        localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft));
+      } catch {
+        /* ignore quota */
+      }
+      void (async () => {
+        try {
+          await host.api("/api/me", {
+            method: "PATCH",
+            body: JSON.stringify({ ...profilePayload(), draft: true }),
+          });
+        } catch {
+          /* offline or validation — local copy still kept */
+        }
+      })();
+    }, 1400);
+    return () => {
+      if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+    };
+  }, [draft, signed, userId]);
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
@@ -202,6 +266,30 @@ export function ProfileScreen({ host }: Props) {
     return Object.keys(next).length === 0;
   };
 
+  const saveDraftNow = async () => {
+    setServerError("");
+    setBusy(true);
+    try {
+      const response = await host.api("/api/me", {
+        method: "PATCH",
+        body: JSON.stringify({ ...profilePayload(), draft: true }),
+      });
+      const nextUser = response.user as ProfileUser;
+      setUser(nextUser);
+      host.onUserUpdated(nextUser);
+      try {
+        localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft));
+      } catch {
+        /* ignore */
+      }
+      host.toast(user.needs_profile ? "черновик сохранён · анкета ещё не в ленте" : "черновик сохранён");
+    } catch (caught) {
+      setServerError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     event.preventDefault();
     setServerError("");
@@ -213,31 +301,20 @@ export function ProfileScreen({ host }: Props) {
     try {
       const response = await host.api("/api/me", {
         method: "PATCH",
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          age: Number(draft.age),
-          city: draft.city.trim(),
-          gender: draft.gender,
-          looking_for: draft.lookingFor,
-          height: draft.height ? Number(draft.height) : null,
-          job: draft.job.trim(),
-          bio: draft.bio,
-          communication: draft.communication,
-          neuro: draft.neuro,
-          vibe: draft.vibe,
-          intents: draft.intents,
-          seek_min_age: Number(draft.seekMinAge || 18),
-          seek_max_age: Number(draft.seekMaxAge || 99),
-          seek_place: draft.seekPlace,
-          hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
-          prompts: draft.prompts.filter((prompt) => prompt.answer.trim().length >= 4),
-        }),
+        body: JSON.stringify(profilePayload()),
       });
       const nextUser = response.user as ProfileUser;
+      draftSyncRef.current = true;
       setUser(nextUser);
       setDraft(makeDraft(nextUser, host.catalog));
+      try {
+        localStorage.removeItem(draftStorageKey(userId));
+      } catch {
+        /* ignore */
+      }
       host.onUserUpdated(nextUser);
       host.toast("сохранено");
+      draftSyncRef.current = false;
     } catch (caught) {
       setServerError(getErrorMessage(caught));
     } finally {
@@ -308,6 +385,12 @@ export function ProfileScreen({ host }: Props) {
             </div>
           </div>
 
+          {user.needs_profile ? (
+            <p class={styles.draftHint} role="status">
+              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото, город и хотя бы одна особенность.
+            </p>
+          ) : null}
+
           <form class={styles.form} onSubmit={save} noValidate>
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Фото</h2></div>
@@ -374,7 +457,12 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             {(serverError || errors.photos) && <div class={styles.serverError} role="alert">{serverError || errors.photos}</div>}
-            <div class={styles.submitRow}><Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Сохранить профиль"}</Button><Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button><Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button></div>
+            <div class={styles.submitRow}>
+              <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Опубликовать в ленте"}</Button>
+              <Button variant="ghost" type="button" fullWidth disabled={busy} onClick={() => void saveDraftNow()}>Сохранить черновик</Button>
+              <Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button>
+              <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button>
+            </div>
           </form>
         </main>
       )}

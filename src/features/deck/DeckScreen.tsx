@@ -1,4 +1,4 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, ProfileMenu, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -69,6 +69,9 @@ function DeckHeader({ host }: { host: DeckHostBridge }) {
 
 function FilterPanel({ host, filters, onApply, onClear }: { host: DeckHostBridge; filters: DeckFilters; onApply: (filters: DeckFilters) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(filters);
+  useEffect(() => {
+    setDraft(filters);
+  }, [filters]);
   const cities = (host.catalog.places || []).flatMap((place) => place.cities).filter((city, index, list) => list.indexOf(city) === index);
   const update = <K extends keyof DeckFilters>(key: K, value: DeckFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
   return <div class={styles.filters}>
@@ -104,7 +107,7 @@ function DeckCardView({ host, card, stacked, photoIndex, dragX, onOpen }: { host
       <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2>{!stacked ? <a class={styles.more} href={host.hrefFor("person", { id: card.id })} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpen(); }}>анкета</a> : null}</div>
       {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <><br /></> : null}{secondary}</p> : null}
       {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
-      {tags.length ? <div class={styles.tags}>{tags.slice(0, 5).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
+      {tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
   </article>;
 }
@@ -189,7 +192,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         </div>
         <div class={styles.controls}>
           <button type="button" class={`${styles.action} ${styles.pass}`} disabled={busy} onClick={() => action("pass")} aria-label="пропустить" title="пропустить">{iconPass}</button>
-          <button type="button" class={`${styles.action} ${styles.undo}`} disabled={busy} onClick={undo} aria-label="вернуть предыдущего" title="вернуть предыдущего">{iconUndo}</button>
+          <button type="button" class={`${styles.action} ${styles.undo}`} disabled={busy} onClick={undo} aria-label="отменить последний свайп" title="отменить последний свайп (не размэтч)">{iconUndo}</button>
           {host.user.plus ? <button type="button" class={`${styles.action} ${styles.snooze}`} disabled={busy} onClick={() => action("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconSnooze}</button> : null}
           <button type="button" class={`${styles.action} ${styles.like}`} disabled={busy} onClick={() => action("like")} aria-label="лайк" title="лайк">{iconLike}</button>
         </div>

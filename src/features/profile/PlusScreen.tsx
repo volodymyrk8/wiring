@@ -96,8 +96,10 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         homeHref={host.hrefFor("home")}
         onHomeClick={navigate("home")}
         showBack
+        backLabel="назад"
         backHref={host.hrefFor("profile")}
         onBackClick={navigate("profile")}
+        className={styles.header}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={signed ? (

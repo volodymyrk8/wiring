@@ -95,7 +95,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
               nav="deck"
               onClick={handleNav("deck")}
             >
-              Перейти в ленту <ArrowIcon />
+              Показать ленту <ArrowIcon />
             </Button>
           ) : (
             <div class={styles.guestCta}>

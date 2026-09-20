@@ -71,6 +71,7 @@ function PersonHeader({ host }: { host: PersonHostBridge }) {
 
 export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const person = host.person;
+  const isSelf = Boolean(host.user?.id && person.id === host.user.id);
   const photos = photosFor(person);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -172,18 +173,21 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         {tags.length ? <div class={styles.tags}>{tags.map((tag) => <span key={`${tag.vibe ? "vibe" : "neuro"}-${tag.id}`} class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`}>{tag.label}</span>)}</div> : null}
         {(person.prompts || []).map((prompt) => <div class={styles.prompt} key={prompt.id}><strong>{host.catalog.prompts?.find((item) => item.id === prompt.id)?.label || prompt.id}</strong><p>{prompt.answer}</p></div>)}
         <div class={styles.actions}>
-          {host.personFrom === "deck" || host.personFrom === "likes" ? <>
+          {isSelf ? (
+            <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
+          ) : null}
+          {!isSelf && (host.personFrom === "deck" || host.personFrom === "likes") ? <>
             <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => performSwipe("pass")} aria-label="пропустить" title="пропустить">{iconPass}</button>
             {host.user.plus ? <button type="button" class={`${styles.actionIcon} ${styles.snooze}`} disabled={busy} onClick={() => performSwipe("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconClock}</button> : null}
             <button type="button" class={`${styles.actionIcon} ${styles.like}`} disabled={busy} onClick={() => performSwipe("like")} aria-label="лайк" title="лайк">{iconLike}</button>
           </> : null}
-          {person.matched ? <Button slim className={styles.matchedAction} href={host.hrefFor("chat", { id: person.id })} nav="chat" onClick={go("chat", { id: person.id })}>написать</Button> : null}
+          {!isSelf && person.matched ? <Button slim className={styles.matchedAction} href={host.hrefFor("chat", { id: person.id })} nav="chat" onClick={go("chat", { id: person.id })}>написать</Button> : null}
         </div>
-        <div class={styles.safety}>
+        {!isSelf ? <div class={styles.safety}>
           {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("unmatch")}>размэтчить</Button> : null}
           {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("block")}>в блок</Button> : null}
           <Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(true)}>пожаловаться</Button>
-        </div>
+        </div> : null}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </div>
     </main>

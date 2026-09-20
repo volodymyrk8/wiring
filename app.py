@@ -899,7 +899,7 @@ def intents_of(row_or_value: Any) -> list[str]:
 
 
 def parse_profile(
-    data: dict[str, Any], *, require_password: bool, require_neuro: bool = True
+    data: dict[str, Any], *, require_password: bool, require_neuro: bool = True, draft: bool = False
 ) -> tuple[dict[str, Any] | None, str | None]:
     name = str(data.get("name") or "").strip()
     city_raw = str(data.get("city") or "").strip()
@@ -930,9 +930,14 @@ def parse_profile(
     if not (18 <= age <= 99):
         return None, "только 18+"
     if not city or len(city) < 2 or len(city) > 48:
-        return None, "город: 2–48 символов"
+        if not draft:
+            return None, "город: 2–48 символов"
+        city = str(data.get("city") or "").strip() or "—"
     if not is_catalog_city(city):
-        return None, "выбери город из списка"
+        if draft and len(city) >= 2:
+            pass
+        else:
+            return None, "выбери город из списка"
     if len(bio) > 1200:
         return None, "био до 1200 символов"
     if len(job) > 60:
@@ -1655,20 +1660,53 @@ def api_delete_me():
     return jsonify({"ok": True})
 
 
+def _merge_me_for_draft(me: Row, data: dict[str, Any]) -> dict[str, Any]:
+    tags = tags_for(me["id"])
+    intents = intents_of(me)
+    return {
+        "name": data.get("name", me["name"]),
+        "age": data.get("age", me["age"]),
+        "city": data.get("city", me["city"]),
+        "gender": data.get("gender", me["gender"]),
+        "looking_for": data.get("looking_for", me["looking_for"]),
+        "bio": data.get("bio", me["bio"]),
+        "job": data.get("job", me["job"] if "job" in me.keys() else ""),
+        "communication": data.get("communication", me["communication"] if "communication" in me.keys() else ""),
+        "intents": data.get("intents", intents),
+        "intent": data.get("intent", intents[0] if intents else "dating"),
+        "height": data.get("height", me["height"] if "height" in me.keys() else None),
+        "neuro": data.get("neuro", tags["neuro"]),
+        "vibe": data.get("vibe", tags["vibe"]),
+        "prompts": data.get("prompts", prompts_for(me["id"])),
+        "seek_min_age": data.get("seek_min_age", me["seek_min_age"] if "seek_min_age" in me.keys() else 18),
+        "seek_max_age": data.get("seek_max_age", me["seek_max_age"] if "seek_max_age" in me.keys() else 99),
+        "seek_place": data.get("seek_place", me["seek_place"] if "seek_place" in me.keys() else ""),
+        "hide_tags": data.get("hide_tags", hide_tags_of(me)),
+        "photo": data.get("photo", me["photo"]),
+        "special_data_consent": data.get("special_data_consent"),
+        "photo_rights_consent": data.get("photo_rights_consent"),
+    }
+
+
 @app.patch("/api/me")
 @login_required
 def api_patch_me():
     data = request.get_json(silent=True) or {}
-    parsed, err = parse_profile(
-        {**data, "email": "x@y.zz", "password": "ignore1"}, require_password=False, require_neuro=True
-    )
-    if err or parsed is None:
-        return jsonify({"ok": False, "error": err}), 400
+    draft = bool(data.get("draft"))
     uid = session["uid"]
     conn = db()
     me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not me:
         return jsonify({"ok": False, "error": "нет профиля"}), 401
+    payload_in = _merge_me_for_draft(me, data) if draft else {**data}
+    parsed, err = parse_profile(
+        {**payload_in, "email": "x@y.zz", "password": "ignore1"},
+        require_password=False,
+        require_neuro=not draft,
+        draft=draft,
+    )
+    if err or parsed is None:
+        return jsonify({"ok": False, "error": err}), 400
     now = int(time.time())
     special_at = me["special_data_consent_at"] if "special_data_consent_at" in me.keys() else None
     photo_at = me["photo_rights_consent_at"] if "photo_rights_consent_at" in me.keys() else None
@@ -1676,7 +1714,7 @@ def api_patch_me():
         special_at = special_at or now
     if _consent_yes(data.get("photo_rights_consent")):
         photo_at = photo_at or now
-    if parsed["neuro"] and not special_at:
+    if parsed["neuro"] and not special_at and not draft:
         return jsonify({"ok": False, "error": "нужно согласие на обработку и показ выбранных особенностей"}), 400
     me_keys = set(me.keys())
     seek_min = parsed.get("seek_min_age")
@@ -1738,10 +1776,11 @@ def api_patch_me():
             return jsonify({"ok": False, "error": "фото не найдено"}), 404
         conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (pid, uid))
         _sync_primary_photo(conn, uid)
-    maybe_finish_onboard(conn, uid)
+    if not draft:
+        maybe_finish_onboard(conn, uid)
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True)})
+    return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True), "draft": draft})
 
 
 def _eligible_card(
@@ -2482,6 +2521,8 @@ def api_unmatch():
     except (TypeError, ValueError):
         return jsonify({"ok": False, "error": "нет человека"}), 400
     conn = db()
+    if not _is_match(conn, uid, other_id):
+        return jsonify({"ok": False, "error": "размэтч возможен только после взаимного лайка"}), 400
     _unmatch_pair(conn, uid, other_id)
     conn.commit()
     return jsonify({"ok": True})

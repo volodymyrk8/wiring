@@ -42,6 +42,17 @@
 .infoCard p, .plusLink small { display: block; margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .plusLink { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .plusLink > span:last-child { flex-shrink: 0; color: var(--lime); font-size: 12px; }
+.draftHint {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--bg-2));
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .submitRow { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
 .submitRow > :first-child { flex: 1 1 100%; }
 .guestCard { width: 100%; max-width: var(--container-app, 540px); margin: auto auto; padding: 26px 16px; box-sizing: border-box; }

@@ -6,6 +6,10 @@
   flex-direction: column;
 }
 
+.header :global(.brandGroup) {
+  min-width: 0;
+}
+
 .content {
   display: grid;
   width: 100%;

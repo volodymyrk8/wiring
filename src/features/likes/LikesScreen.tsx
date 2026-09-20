@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -30,6 +30,9 @@ const photoFor = (host: LikesHostBridge, item: LikeCard) => avatarUrl(host.baseP
 
 function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridge; filters: LikesFilters; onApply: (filters: LikesFilters) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(filters);
+  useEffect(() => {
+    setDraft(filters);
+  }, [filters]);
   const places = host.catalog.places || [];
   const cities = places.flatMap((place) => place.cities).filter((city, index, list) => list.indexOf(city) === index);
   const update = <K extends keyof LikesFilters>(key: K, value: LikesFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));

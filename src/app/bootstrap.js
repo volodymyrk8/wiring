@@ -200,14 +200,23 @@ import { createInboxController } from "./inbox";
     slate: { label: "полночь", chrome: "#0b0f14" },
   };
   const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
-  const applyTheme = (theme) => {
-    const next = THEMES[theme] ? theme : "mist";
-    document.documentElement.dataset.theme = next;
+  const persistThemeChoice = (next) => {
     try {
       localStorage.setItem(THEME_KEY, next);
     } catch {
       /* ignore */
     }
+    try {
+      document.cookie = `${THEME_KEY}=${encodeURIComponent(next)}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const applyTheme = (theme) => {
+    const next = THEMES[theme] ? theme : "mist";
+    document.documentElement.dataset.theme = next;
+    persistThemeChoice(next);
     const color = THEMES[next].chrome;
     const metas = document.querySelectorAll('meta[name="theme-color"]');
     if (metas.length > 0) {
@@ -447,15 +456,25 @@ import { createInboxController } from "./inbox";
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    try {
+      bitmap.close?.();
+    } catch {
+      /* ignore */
+    }
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
     return blob || file;
   };
 
   const uploadPhoto = async (file, rightsConsent = false) => {
-    const blob = await compressImage(file);
+    const compressed = await compressImage(file);
+    const blob = compressed instanceof Blob ? compressed : file;
+    const fallbackName = blob.type === "image/png" ? "photo.png" : blob.type === "image/webp" ? "photo.webp" : "photo.jpg";
+    const uploadName = file.name && /\.(jpe?g|png|webp)$/i.test(file.name) ? file.name : fallbackName;
     const fd = new FormData();
-    fd.append("file", blob, "photo.jpg");
+    fd.append("file", blob, uploadName);
     const rights = root.querySelector("#photo-rights-consent");
     if (rights?.checked || rightsConsent) fd.append("photo_rights_consent", "1");
     return api("/api/photos", { method: "POST", body: fd });
@@ -512,7 +531,7 @@ import { createInboxController } from "./inbox";
         || state.view === "plus"
         || state.view === "login"
         || (state.view === "person" && from === "profile");
-      const dest = state.user ? "profile" : "login";
+      const dest = state.user ? "my-preview" : "login";
       const label = state.user ? "Профиль" : "Войти";
       const icon = state.user
         ? photoRef(state.user.photo)
@@ -1146,6 +1165,10 @@ import { createInboxController } from "./inbox";
     if (state.view === "person" && next === "deck") {
       state.view = "deck";
       render();
+      return;
+    }
+    if (next === "my-preview" && state.user?.id) {
+      await openPerson(state.user.id, "profile");
       return;
     }
     state.view = next;

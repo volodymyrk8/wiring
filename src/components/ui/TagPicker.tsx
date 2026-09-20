@@ -40,7 +40,16 @@ export function TagPicker({ options, selected, onChange, label, tone = "default"
               onClick={() => toggle(option)}
             >
               {option.label}
-              {option.hint && <span class={styles.question} aria-hidden="true">?</span>}
+              {option.hint && (
+                <span
+                  class={styles.question}
+                  aria-hidden="true"
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  ?
+                </span>
+              )}
               {option.hint && <span class={styles.tip} role="tooltip">{option.hint}</span>}
             </button>
           );

@@ -97,7 +97,7 @@ export function AppHeader({
   showBack,
   backHref,
   backNav,
-  backLabel,
+  backLabel = "назад",
   onBackClick,
   leftSlot,
   rightSlot,
@@ -152,6 +152,7 @@ export function AppHeader({
               >
                 <path d="m15 18-6-6 6-6" />
               </svg>
+              {backLabel !== false ? <span class={styles.backLabel}>{backLabel}</span> : null}
             </Button>
           </div>
         ) : leftSlot ? (

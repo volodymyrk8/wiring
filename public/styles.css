@@ -96,7 +96,7 @@ html[data-theme="slate"] {
   --coral: #b8899a;
   --card: #121820;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-  --on-accent: #0b0f14;
+  --on-accent: #ffffff;
   --on-danger: #ffffff;
   --pass: #1c2430;
   --photo: #1a222c;
@@ -122,7 +122,7 @@ html[data-theme="dusk"] {
   --coral: #c9a0ae;
   --card: #222530;
   --shadow: 0 20px 56px rgba(0, 0, 0, 0.35);
-  --on-accent: #1a1c24;
+  --on-accent: #ffffff;
   --on-danger: #fff8f5;
   --pass: #2e3140;
   --photo: #2a2d3a;
@@ -1499,9 +1499,11 @@ html[data-theme="slate"] .profile-menu-status {
 }
 .tabbar .pip-slot {
   position: absolute;
-  top: -4px;
-  right: -8px;
+  top: 50%;
+  left: 50%;
   z-index: 2;
+  transform: translate(6px, -14px);
+  pointer-events: none;
 }
 .tabbar .pip {
   display: inline-flex;
@@ -2307,9 +2309,22 @@ body.support-page .legal,
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.btn.solid span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: inherit;
+}
+
 html[data-theme="pastel"] .btn.solid,
 html[data-theme="pastel"] .solid {
   color: #ffffff;
+}
+
+html[data-theme="night"] .btn.solid,
+html[data-theme="night"] .btn.solid span {
+  color: #111111;
 }
 
 .btn.solid:hover:not(:disabled) {
@@ -2781,7 +2796,7 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
     box-shadow: var(--shadow);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
-    background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+    background: color-mix(in srgb, var(--bg-2) 96%, transparent);
   }
   .tabbar a {
     min-height: 54px;
@@ -2806,8 +2821,7 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
     height: 22px;
   }
   .tabbar .pip-slot {
-    top: -5px;
-    right: -9px;
+    transform: translate(7px, -15px);
   }
   .tabbar .pip {
     min-width: 16px;
@@ -2908,8 +2922,7 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
     height: 24px;
   }
   .tabbar .pip-slot {
-    top: -5px;
-    right: -9px;
+    transform: translate(7px, -15px);
   }
   .tabbar .pip {
     min-width: 17px;

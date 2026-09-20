@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 NEURO: list[dict[str, str]] = [
-    {"id": "asd", "label": "ASD / аутизм", "hint": "сенсорика, скрипты, честность"},
-    {"id": "adhd", "label": "ADHD / СДВГ", "hint": "гиперфокус, дедлайны как миф"},
-    {"id": "audhd", "label": "AuDHD", "hint": "два ядра, один процессор"},
-    {"id": "bpd", "label": "BPD / ПРЛ", "hint": "интенсивность как климат"},
-    {"id": "ocd", "label": "OCD / ОКР", "hint": "ритуалы, проверка, контроль"},
-    {"id": "bipolar", "label": "биполярное / БАР", "hint": "амплитуда, не настроение"},
-    {"id": "cptsd", "label": "CPTSD / КПТСР", "hint": "тело помнит раньше головы"},
-    {"id": "anxiety", "label": "тревожное", "hint": "мозг пишет fanfic про катастрофы"},
-    {"id": "depression", "label": "депрессия", "hint": "батарея на 12%"},
-    {"id": "dyslexia", "label": "дислексия", "hint": "мысли быстрее текста"},
+    {"id": "asd", "label": "РАС (ASD)", "hint": "аутичный спектр. темнота, тишина и специнтересы"},
+    {"id": "adhd", "label": "СДВГ (ADHD)", "hint": "сто мыслей в минуту 24/7"},
+    {"id": "audhd", "label": "AuDHD", "hint": "к-к-комбо! РАС и СДВГ в одном флаконе"},
+    {"id": "bpd", "label": "ПРЛ (BPD)", "hint": "интенсивность, крайности и фонтан эмоций"},
+    {"id": "ocd", "label": "ОКР (OCD)", "hint": "мозг требует навязчивых ритуалов"},
+    {"id": "bipolar", "label": "БАР-спектр", "hint": "эра прайма, эра депрессии, и так по кругу"},
+    {"id": "cptsd", "label": "КПТСР (CPTSD)", "hint": "всегда настороже из-за длительной травмы"},
+    {"id": "ptsd", "label": "ПТСР (PTSD)", "hint": "вьетнамские флешбэки о пережитых травмах"},
+    {"id": "anxiety", "label": "ГТР / тревожное", "hint": "сто сценариев катастрофы в голове"},
+    {"id": "social_phobia", "label": "социофобия", "hint": "люди — страшно, вырубай"},
+    {"id": "depression", "label": "депрессия", "hint": "мир в серых тонах"},
+    {"id": "dyslexia", "label": "дислексия / дисграфия", "hint": "собрать буквы — целый квест"},
     {"id": "dyspraxia", "label": "диспраксия", "hint": "тело иногда лагает"},
-    {"id": "tourette", "label": "Tourette", "hint": "тики не характер"},
-    {"id": "pda", "label": "PDA", "hint": "спрос ломает нервную систему"},
-    {"id": "rsd", "label": "RSD", "hint": "отказ ощущается как ожог"},
-    {"id": "hsp", "label": "HSP", "hint": "слишком много мира сразу"},
-    {"id": "2e", "label": "2e / gifted", "hint": "слишком быстро и слишком сложно"},
+    {"id": "tourette", "label": "синдром Туретта", "hint": "непроизвольные тики"},
 ]
+
+# Still valid on old profiles; hidden from new pickers via catalog order only.
+LEGACY_NEURO_IDS = frozenset({"pda", "rsd", "hsp", "2e"})
 
 VIBE: list[dict[str, str]] = [
     {"id": "neurospicy", "label": "neurospicy", "hint": "слово 2024+, смысл размыт"},
@@ -95,7 +96,7 @@ REPORT_REASONS = [
 
 DEFAULT_ALBUMS = ["я", "жизнь", "special interest", "звери"]
 
-NEURO_IDS = {item["id"] for item in NEURO}
+NEURO_IDS = {item["id"] for item in NEURO} | LEGACY_NEURO_IDS
 VIBE_IDS = {item["id"] for item in VIBE}
 LOOKING_IDS = {item["id"] for item in LOOKING_FOR}
 GENDER_IDS = {item["id"] for item in GENDERS}
