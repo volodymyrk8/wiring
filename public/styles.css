@@ -2309,11 +2309,16 @@ body.support-page .legal,
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.btn.solid span {
+.btn > span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.btn.solid span {
   color: inherit;
 }
 
