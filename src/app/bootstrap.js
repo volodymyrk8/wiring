@@ -1,3 +1,5 @@
+import { applyTheme, themeNow } from "../lib/theme";
+import { fetchFeed } from "./feed";
 import { createApi } from "./api";
 import { createFeatureLoader } from "./features";
 import { createInboxController } from "./inbox";
@@ -42,6 +44,7 @@ import { createInboxController } from "./inbox";
     catalog: null,
     view: "home",
     cards: [],
+    feedHasMore: true,
     index: 0,
     photoIndex: 0,
     matches: [],
@@ -166,214 +169,6 @@ import { createInboxController } from "./inbox";
     filter: svgIcon(`<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>`, { size: 14, strokeWidth: 1.8 }),
   };
 
-  const THEME_ICONS = {
-    mist: svgIcon(
-      `<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"/>`,
-      { size: 20, strokeWidth: 1.8 }
-    ),
-    pastel: svgIcon(
-      `<path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16"/>`,
-      { size: 20, strokeWidth: 1.8 }
-    ),
-    dusk: svgIcon(
-      `<path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>`,
-      { size: 20, strokeWidth: 1.8 }
-    ),
-    night: svgIcon(
-      `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`,
-      { size: 20, strokeWidth: 1.8 }
-    ),
-    slate: svgIcon(
-      `<path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z"/><path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z"/>`,
-      { size: 20, strokeWidth: 1.8 }
-    ),
-  };
-  const themeIcon = (theme) => THEME_ICONS[theme] || THEME_ICONS.mist;
-  const CHECK_ICON = `<span class="check" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>`;
-
-  const THEME_KEY = "wiring-theme";
-  const THEMES = {
-    mist: { label: "день", chrome: "#e9ebf3" },
-    pastel: { label: "пастель", chrome: "#f3eee6" },
-    dusk: { label: "сумерки", chrome: "#1a1c24" },
-    night: { label: "ночь", chrome: "#110e0c" },
-    slate: { label: "полночь", chrome: "#0b0f14" },
-  };
-  const themeNow = () => (THEMES[document.documentElement.dataset.theme] ? document.documentElement.dataset.theme : "mist");
-  const persistThemeChoice = (next) => {
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    try {
-      document.cookie = `${THEME_KEY}=${encodeURIComponent(next)}; path=/; max-age=31536000; SameSite=Lax`;
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const applyTheme = (theme) => {
-    const next = THEMES[theme] ? theme : "mist";
-    document.documentElement.dataset.theme = next;
-    persistThemeChoice(next);
-    const color = THEMES[next].chrome;
-    const metas = document.querySelectorAll('meta[name="theme-color"]');
-    if (metas.length > 0) {
-      metas.forEach((m) => {
-        m.setAttribute("content", color);
-        m.content = color;
-      });
-    } else {
-      const meta = document.createElement("meta");
-      meta.name = "theme-color";
-      meta.content = color;
-      document.head.appendChild(meta);
-    }
-
-    const openBtn = document.getElementById("theme-open");
-    if (openBtn) {
-      openBtn.innerHTML = themeIcon(next);
-      const lbl = `Оформление: ${THEMES[next].label}`;
-      openBtn.setAttribute("aria-label", lbl);
-      openBtn.setAttribute("title", lbl);
-    }
-    document.querySelectorAll(".theme-opt").forEach((opt) => {
-      const isSel = opt.dataset.themeSet === next;
-      opt.classList.toggle("active", isSel);
-      opt.classList.toggle("selectedOption", isSel);
-      const chk = opt.querySelector(".check");
-      if (isSel && !chk) {
-        opt.insertAdjacentHTML("beforeend", CHECK_ICON);
-      } else if (!isSel && chk) {
-        chk.remove();
-      }
-    });
-  };
-  const themePicker = () => {
-    const cur = themeNow();
-    return `<div class="theme-pop">
-      <button type="button" class="icon-btn" id="theme-open" aria-expanded="false" aria-controls="theme-menu" aria-haspopup="true" aria-label="Оформление: ${escapeAttr(THEMES[cur]?.label || cur)}" title="Оформление: ${escapeAttr(THEMES[cur]?.label || cur)}">${themeIcon(cur)}</button>
-      <div class="theme-menu" id="theme-menu" hidden>
-        ${Object.entries(THEMES)
-          .map(
-            ([id, t]) =>
-              `<button type="button" class="theme-opt${id === cur ? " selectedOption active" : ""}" data-theme-set="${id}"><span class="theme-opt-icon">${THEME_ICONS[id]}</span><span class="theme-opt-label">${t.label}</span>${id === cur ? CHECK_ICON : ""}</button>`
-          )
-          .join("")}
-      </div>
-    </div>`;
-  };
-  let themeUiBound = false;
-  const bindThemePicker = () => {
-    const wrap = root.querySelector(".theme-pop");
-    if (!wrap) return;
-    const btn = wrap.querySelector("#theme-open");
-    const menu = wrap.querySelector("#theme-menu");
-    if (!btn || !menu) return;
-    const setOpen = (open) => {
-      menu.hidden = !open;
-      btn.setAttribute("aria-expanded", String(open));
-    };
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setOpen(menu.hidden);
-    });
-    menu.addEventListener("click", (e) => e.stopPropagation());
-    if (!themeUiBound) {
-      themeUiBound = true;
-      document.addEventListener("click", (e) => {
-        const openMenu = document.getElementById("theme-menu");
-        const openBtn = document.getElementById("theme-open");
-        if (openMenu && !openMenu.hidden) {
-          openMenu.hidden = true;
-          if (openBtn) openBtn.setAttribute("aria-expanded", "false");
-        }
-        if (!e.target?.closest?.(".beta-wrap")) {
-          document.querySelectorAll(".beta-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
-        }
-      });
-      document.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape") return;
-        const openMenu = document.getElementById("theme-menu");
-        const openBtn = document.getElementById("theme-open");
-        if (openMenu && !openMenu.hidden) {
-          openMenu.hidden = true;
-          if (openBtn) {
-            openBtn.setAttribute("aria-expanded", "false");
-            openBtn.focus();
-          }
-        }
-        document.querySelectorAll(".beta-wrap.is-open").forEach((w) => w.classList.remove("is-open"));
-      });
-    }
-  };
-  const bindThemeControls = () => {
-    root.querySelectorAll("[data-theme-set]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        applyTheme(btn.dataset.themeSet);
-        const menu = root.querySelector("#theme-menu");
-        const trigger = root.querySelector("#theme-open");
-        if (menu && !menu.hidden) {
-          menu.hidden = true;
-          if (trigger) trigger.setAttribute("aria-expanded", "false");
-        }
-      });
-    });
-    bindThemePicker();
-    bindProfileMenu();
-  };
-
-  let profileUiBound = false;
-  const bindProfileMenu = () => {
-    const wrap = root.querySelector(".profile-pop");
-    if (!wrap) return;
-    const btn = wrap.querySelector("#profile-open");
-    const menu = wrap.querySelector("#profile-menu");
-    if (!btn || !menu) return;
-    const setOpen = (open) => {
-      menu.hidden = !open;
-      btn.setAttribute("aria-expanded", String(open));
-    };
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setOpen(menu.hidden);
-    });
-    menu.addEventListener("click", (e) => e.stopPropagation());
-
-    const logoutBtn = menu.querySelector("#profile-menu-logout");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setOpen(false);
-        void logout();
-      });
-    }
-
-    if (!profileUiBound) {
-      profileUiBound = true;
-      document.addEventListener("click", () => {
-        const m = document.getElementById("profile-menu");
-        const b = document.getElementById("profile-open");
-        if (m && !m.hidden) {
-          m.hidden = true;
-          if (b) b.setAttribute("aria-expanded", "false");
-        }
-      });
-      document.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape") return;
-        const m = document.getElementById("profile-menu");
-        const b = document.getElementById("profile-open");
-        if (m && !m.hidden) {
-          m.hidden = true;
-          if (b) {
-            b.setAttribute("aria-expanded", "false");
-            b.focus();
-          }
-        }
-      });
-    }
-  };
   applyTheme(themeNow());
 
   const persistFilters = () => {
@@ -544,7 +339,8 @@ import { createInboxController } from "./inbox";
     return items
       .map(([view, label, icon, on]) => {
         const badge = view === "likes" ? countSlot("likes") : view === "matches" ? countSlot("unread") : "";
-        return `<a href="${hrefFor(view)}" data-nav="${view}" class="${kind}-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>
+        const href = view === "my-preview" ? hrefFor("person", { id: state.user.id }) : hrefFor(view);
+        return `<a href="${href}" data-nav="${view}" class="${kind}-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>
           <span class="nav-ico" aria-hidden="true">${icon}${badge}</span>
           <span class="nav-lbl">${label}</span>
         </a>`;
@@ -552,119 +348,10 @@ import { createInboxController } from "./inbox";
       .join("");
   };
 
-  const profileSlot = () => {
-    if (!state.user || state.user.guest) {
-      const dest = state.user ? "profile" : "login";
-      return `<a class="icon-btn profile-slot" href="${hrefFor(dest)}" data-nav="${dest}" aria-label="${state.user ? "профиль" : "войти"}">${ICONS.user}</a>`;
-    }
-    const on = state.view === "profile" || state.view === "plus";
-    const plus = Boolean(state.user.plus);
-    const name = escapeHtml(state.user.name || "Профиль");
-    return `<div class="profile-pop">
-      <button type="button" class="avatar-slot avatar-btn" id="profile-open" aria-expanded="false" aria-controls="profile-menu" aria-haspopup="true" aria-label="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}" title="${plus ? "Меню профиля · WIRING+" : "Меню профиля"}">
-        <span class="avatar-link${on ? " on" : ""}${plus ? " plus" : ""}">
-          ${
-            photoRef(state.user.photo)
-              ? `<img src="${avatarUrl(state.user.photo, state.user.name)}" alt="">`
-              : ICONS.profilePlaceholder
-          }
-        </span>
-        ${plus ? `<span class="plus-mark" title="WIRING+" aria-hidden="true">${ICONS.gem}</span>` : ""}
-      </button>
-      <div class="profile-menu" id="profile-menu" hidden>
-        <div class="profile-menu-header">
-          <span class="profile-menu-name">${name}</span>
-        </div>
-        <div class="profile-menu-divider"></div>
-        <a class="profile-menu-item profile-menu-plus" href="${hrefFor("plus")}" data-nav="plus">
-          <span class="badge-gem-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 3h12l4 6-10 13L2 9Z"/>
-              <path d="M11 3 8 9l4 13 4-13-3-6"/>
-              <path d="M2 9h20"/>
-            </svg>
-          </span>
-          <span class="profile-menu-text">WIRING+</span>
-          ${plus ? `<span class="profile-menu-status">активен</span>` : `<span class="profile-menu-status inactive">подключить</span>`}
-        </a>
-        <a class="profile-menu-item" href="${hrefFor("profile")}" data-nav="profile">
-          <span class="profile-menu-icon">${ICONS.user}</span>
-          <span class="profile-menu-text">Профиль</span>
-        </a>
-        <a class="profile-menu-item" href="${hrefFor("consents")}" data-nav="consents">
-          <span class="profile-menu-icon">${svgIcon(`<path d="M7 3.5h10v17H7z"/><path d="m9.5 12 1.7 1.7 3.5-3.8"/>`, { size: 18 })}</span>
-          <span class="profile-menu-text">Согласия</span>
-        </a>
-        <a class="profile-menu-item" href="/support">
-          <span class="profile-menu-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-          </span>
-          <span class="profile-menu-text">Поддержка</span>
-        </a>
-        <div class="profile-menu-divider"></div>
-        <button type="button" class="profile-menu-item profile-menu-logout" id="profile-menu-logout">
-          <span class="profile-menu-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-            </svg>
-          </span>
-          <span class="profile-menu-text">Выйти</span>
-        </button>
-      </div>
-    </div>`;
-  };
-
-  const appHead = (opts = {}) => {
-    const isAuth = QUIET_VIEWS.has(state.view) && state.view !== "chat";
-    const logoPos = opts.logoPosition !== undefined ? opts.logoPosition : (isAuth ? "center" : "left");
-    const showActions = opts.showActions !== undefined ? opts.showActions : !isAuth;
-    const showBack = opts.showBack !== undefined ? opts.showBack : isAuth;
-    const backHref = opts.backHref || hrefFor("home");
-    const backNav = opts.backNav !== undefined ? opts.backNav : "back";
-    const backLabel = opts.backLabel || "Назад";
-    const centerClass = logoPos === "center" ? " center" : "";
-    const sectionTitle = opts.sectionTitle || "";
-    const brandBlock = `
-      <div class="brand-group">
-        <a class="brand" href="${hrefFor("home")}" data-nav="home"><span class="brand-name">WIR<span>ING</span></span>${sectionTitle ? "" : `<span class="beta-wrap" tabindex="0" role="button" aria-haspopup="dialog" aria-label="О бета-версии"><span class="beta-label">beta</span><span class="beta-popover" role="tooltip">Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.</span></span>`}</a>
-        ${sectionTitle ? `
-          <span class="brand-divider" aria-hidden="true">/</span>
-          <span class="brand-section" aria-current="page">${escapeHtml(sectionTitle)}</span>
-        ` : ""}
-      </div>`;
-    return `
-    <header class="app-head${centerClass}" data-logo-position="${logoPos}">
-      <div class="app-head-inner">
-        ${showBack ? `
-        <div class="app-head-start">
-          <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="${escapeAttr(backNav)}" aria-label="Вернуться назад" title="Назад">
-            <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-          </a>
-        </div>` : ""}
-        ${brandBlock}
-        ${showActions ? `
-        <div class="app-head-end">
-          ${themePicker()}
-          ${isAuth ? "" : profileSlot()}
-        </div>` : ""}
-      </div>
-    </header>`;
-  };
-
   const tabbar = () =>
     showsTabbar()
       ? `<nav class="tabbar" aria-label="разделы">${navLinks("tab")}</nav>`
       : "";
-
-  const authLayout = (body) => `
-      ${appHead({ logoPosition: "center", showActions: true, showBack: true })}
-      <div class="auth-shell">
-        <section class="panel auth-panel">${body}</section>
-      </div>`;
 
   const friendlyLike = () => {
     const intents = state.user?.intents || (state.user?.intent ? [state.user.intent] : []);
@@ -681,6 +368,9 @@ import { createInboxController } from "./inbox";
       await api("/api/logout", { method: "POST" });
     } catch (_) {}
     state.user = null;
+    state.cards = [];
+    state.index = 0;
+    state.feedHasMore = true;
     state.view = "home";
     stopInbox();
     render();
@@ -702,17 +392,16 @@ import { createInboxController } from "./inbox";
     if (!card || state.busy) return;
     const targetId = card.id;
     state.busy = true;
-    const el = root.querySelector(".card:not(.stacked)");
-    if (el) {
-      el.style.transition = "transform 0.28s ease, opacity 0.28s ease";
-      el.style.transform = `translateX(${direction === "like" ? 160 : -160}px) rotate(${direction === "like" ? 12 : -12}deg)`;
-      el.style.opacity = "0";
-    }
     try {
       const data = await api("/api/swipe", {
         method: "POST",
         body: JSON.stringify({ target_id: targetId, direction }),
       });
+      const removedIndex = state.cards.findIndex((candidate) => candidate.id === targetId);
+      state.cards = state.cards.filter((candidate) => candidate.id !== targetId);
+      if (removedIndex >= 0 && removedIndex < state.index) state.index -= 1;
+      state.index = Math.min(state.index, state.cards.length);
+      state.photoIndex = 0;
       if (data.matched && data.match?.id) {
         toast(`взаимно с ${data.match.name}`);
         // Drop the card now so a second gesture can't pass over the mutual like.
@@ -759,45 +448,13 @@ import { createInboxController } from "./inbox";
         await loadLikes();
         await refreshMe();
       } else {
-        state.index += 1;
-        state.photoIndex = 0;
-        if (!state.cards[state.index]) await loadFeed();
+        if (!state.cards.length && state.feedHasMore) await loadFeed();
       }
     } else {
-      // Advance without full-page flicker when next card is already loaded.
-      state.index += 1;
-      state.photoIndex = 0;
-      if (!state.cards[state.index]) await loadFeed();
-    }
-    state.busy = false;
-    // Let the fly-off finish, then paint.
-    await new Promise((r) => setTimeout(r, 180));
-    render();
-  };
-
-  const rewind = async () => {
-    if (state.busy) return;
-    state.busy = true;
-    try {
-      const data = await api("/api/rewind", { method: "POST" });
-      await loadFeed();
-      toast(data.undid === "like" ? "лайк отменён" : "пропуск отменён");
-    } catch (err) {
-      toast(err.message);
+      if (!state.cards.length && state.feedHasMore) await loadFeed();
     }
     state.busy = false;
     render();
-  };
-
-  const restart = async () => {
-    try {
-      const data = await api("/api/deck/restart", { method: "POST" });
-      await loadFeed();
-      toast(data.cleared ? `вернуто: ${data.cleared}` : "некого возвращать");
-      render();
-    } catch (err) {
-      toast(err.message);
-    }
   };
 
   const openChat = async (id) => {
@@ -842,15 +499,8 @@ import { createInboxController } from "./inbox";
 
   const loadFeed = async (filters = state.filters) => {
     state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
-    const f = state.filters;
-    const q = new URLSearchParams();
-    if (f.neuro.length) q.set("neuro", f.neuro.join(","));
-    if (f.vibe.length) q.set("vibe", f.vibe.join(","));
-    if ((f.intents || []).length) q.set("intent", f.intents.join(","));
-    if (f.min_age && f.min_age !== 18) q.set("min_age", String(f.min_age));
-    if (f.max_age && f.max_age !== 99) q.set("max_age", String(f.max_age));
-    if (f.city) q.set("city", f.city);
-    const data = await api(`/api/feed?${q.toString()}`);
+    const data = await fetchFeed(api, state.filters);
+    state.feedHasMore = !!data.has_more;
     state.cards = data.cards || [];
     state.index = 0;
     state.photoIndex = 0;
@@ -991,8 +641,7 @@ import { createInboxController } from "./inbox";
     index: state.index,
     filters: state.filters,
     filtersOpen: state.filtersOpen,
-    recycled: state.recycled,
-    passed: state.passed,
+    hasMore: state.feedHasMore,
     basePath: BASE,
     hrefFor,
     navigate: (view, params = {}) => {
@@ -1002,14 +651,18 @@ import { createInboxController } from "./inbox";
       }
       void goToView(view);
     },
-    loadFeed: async (filters = state.filters) => {
-      state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
+    loadFeed: (filters, signal) => fetchFeed(api, filters, signal),
+    onFeedChange: (cards, index, filters, hasMore) => {
+      state.cards = cards;
+      state.index = index;
+      state.filters = filters;
+      state.feedHasMore = hasMore;
       persistFilters();
-      return loadFeed(state.filters);
     },
-    swipe,
-    rewind,
-    restart,
+    onMatch: (match) => {
+      toast(`взаимно с ${match.name || "тобой"}`);
+      void openChat(match.id);
+    },
     api,
     toast,
     onUserUpdated: (user) => {
@@ -1175,7 +828,7 @@ import { createInboxController } from "./inbox";
     state.view = next;
     state.photoIndex = 0;
     if (next !== "chat") state.chatId = null;
-    if (state.view === "deck" && state.user) await loadFeed();
+    if (state.view === "deck" && state.user && !state.cards.length) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
       state.matches = data.matches;
@@ -1215,10 +868,8 @@ import { createInboxController } from "./inbox";
     authFeatureUnmount?.();
     authFeatureUnmount = null;
     const withTabbar = mode === "login" && showsTabbar();
-    root.innerHTML = authLayout('<div id="auth-feature-root"></div>') + (withTabbar ? tabbar() : "");
+    root.innerHTML = '<div id="auth-feature-root"></div>' + (withTabbar ? tabbar() : "");
     bindDataNavLinks();
-    if (withTabbar) bindProfileMenu();
-    bindThemeControls();
     const mountEl = root.querySelector("#auth-feature-root");
     if (!mountEl) return;
     try {
@@ -1236,7 +887,6 @@ import { createInboxController } from "./inbox";
     homeFeatureUnmount = null;
     root.innerHTML = '<div id="home-feature-root"></div>' + tabbar();
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#home-feature-root");
     if (!mountEl) return;
     try {
@@ -1255,7 +905,6 @@ import { createInboxController } from "./inbox";
     profileFeatureUnmount = null;
     root.innerHTML = '<div id="profile-feature-root"></div>' + tabbar();
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#profile-feature-root");
     if (!mountEl) return;
     try {
@@ -1279,7 +928,6 @@ import { createInboxController } from "./inbox";
     likesFeatureUnmount = null;
     root.innerHTML = '<div id="likes-feature-root"></div>' + tabbar();
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#likes-feature-root");
     if (!mountEl) return;
     try {
@@ -1305,7 +953,6 @@ import { createInboxController } from "./inbox";
     }
     root.innerHTML = '<div id="person-feature-root"></div>' + tabbar();
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#person-feature-root");
     if (!mountEl) return;
     try {
@@ -1325,7 +972,6 @@ import { createInboxController } from "./inbox";
     deckFeatureUnmount = null;
     root.innerHTML = '<div id="deck-feature-root"></div>' + tabbar();
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#deck-feature-root");
     if (!mountEl) return;
     try {
@@ -1345,7 +991,6 @@ import { createInboxController } from "./inbox";
     accountFeatureUnmount = null;
     root.innerHTML = '<div id="account-feature-root"></div>' + (ACCOUNT_FEATURE_VIEWS.has(view) && view !== "delete-account" ? tabbar() : "");
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#account-feature-root");
     if (!mountEl) return;
     try {
@@ -1373,7 +1018,6 @@ import { createInboxController } from "./inbox";
     chatFeatureUnmount = null;
     root.innerHTML = '<div id="chat-feature-root"></div>' + (state.view === "matches" ? tabbar() : "");
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#chat-feature-root");
     if (!mountEl) return;
     try {
@@ -1393,7 +1037,6 @@ import { createInboxController } from "./inbox";
     supportFeatureUnmount = null;
     root.innerHTML = '<div id="support-feature-root"></div>';
     bindDataNavLinks();
-    bindThemeControls();
     const mountEl = root.querySelector("#support-feature-root");
     if (!mountEl) return;
     try {
@@ -1535,7 +1178,6 @@ import { createInboxController } from "./inbox";
         openPerson(Number(btn.dataset.person), btn.dataset.from || "deck");
       });
     });
-    bindThemeControls();
     root.querySelectorAll(".beta-wrap").forEach((wrap) => {
       wrap.addEventListener("click", (e) => {
         e.preventDefault();

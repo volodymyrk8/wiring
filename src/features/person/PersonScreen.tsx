@@ -1,6 +1,7 @@
-import { useRef, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
+import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { PersonHostBridge, PersonProfile } from "./types";
@@ -80,8 +81,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(host.catalog.report_reasons?.[0]?.id || "");
   const [reportDetails, setReportDetails] = useState("");
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const swipedRef = useRef(false);
+  const [photoAspect, setPhotoAspect] = useState(3 / 4);
 
   const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
   const go = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
@@ -90,6 +90,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   };
   const selectPhoto = (index: number) => setPhotoIndex((index + photos.length) % Math.max(photos.length, 1));
   const changePhoto = (direction: number) => selectPhoto(photoIndex + direction);
+  const gesture = usePhotoSwipe(changePhoto);
   const run = async (action: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
@@ -118,26 +119,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     host.toast("жалоба отправлена, человек скрыт");
     host.navigate("deck");
   });
-  const onPointerDown = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("[data-photo]")) return;
-    startRef.current = { x: event.clientX, y: event.clientY };
-    swipedRef.current = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const onPointerUp = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
-    const start = startRef.current;
-    startRef.current = null;
-    if (!start) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy)) {
-      swipedRef.current = true;
-      changePhoto(dx < 0 ? 1 : -1);
-    }
-  };
   const onHeroClick = (event: JSX.TargetedMouseEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("[data-photo]")) return;
-    if (swipedRef.current) { swipedRef.current = false; return; }
     const rect = event.currentTarget.getBoundingClientRect();
     changePhoto(event.clientX < rect.left + rect.width * .4 ? -1 : 1);
   };
@@ -157,16 +139,18 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     <PersonHeader host={host} />
     <main class={styles.content}>
       <Button variant="ghost" slim href={host.hrefFor(backView)} nav={backView} onClick={go(backView)} className={styles.back}>{iconArrow}<span>назад</span></Button>
-      <section class={styles.hero} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => { startRef.current = null; }} onClick={onHeroClick} aria-label={`Фото анкеты ${person.name}`}>
+      <section {...gesture} class={styles.hero} style={{ "--photo-aspect": photoAspect }} tabIndex={photos.length > 1 ? 0 : -1} onClick={onHeroClick}
+        onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); } }} aria-label={`Фото анкеты ${person.name}`}>
         {photos.length > 1 ? <div class={styles.dots}>{photos.map((_, index) => <i key={index} class={index === photoIndex ? styles.active : ""} />)}</div> : null}
-        <img class={styles.heroImage} src={photoUrl(host.basePath, photos[photoIndex] || person.photo, person.name)} alt={`Фото ${person.name}`} />
+        <img class={styles.heroImage} src={photoUrl(host.basePath, photos[photoIndex] || person.photo, person.name)} alt={`Фото ${photoIndex + 1} из ${photos.length || 1}: ${person.name}`} draggable={false}
+          onLoad={(event) => { const image = event.currentTarget; if (image.naturalHeight) setPhotoAspect(image.naturalWidth / image.naturalHeight); }} />
         <div class={styles.heroOverlay}>
           <h1>{person.online ? <span class={styles.online} aria-label="в сети" /> : null}{person.name}{person.age ? `, ${person.age}` : ""}</h1>
           {meta ? <p class={styles.meta}>{meta}</p> : null}
           {secondaryMeta ? <p class={`${styles.meta} ${styles.metaSecondary}`}>{secondaryMeta}</p> : null}
         </div>
       </section>
-      {photos.length > 1 ? <div class={styles.photoStrip} aria-label="Фотографии анкеты">{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-label={`Фото ${index + 1}`}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
+      {photos.length > 1 ? <div class={styles.photoStrip} aria-label="Фотографии анкеты">{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-pressed={index === photoIndex} aria-label={`Фото ${index + 1} из ${photos.length}`}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
       <div class={styles.body}>
         {person.bio ? <p class={styles.bio}>{person.bio}</p> : null}
         {person.communication ? <div class={styles.prompt}><strong>как тебе писать</strong><p>{person.communication}</p></div> : null}

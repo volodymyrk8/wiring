@@ -13,6 +13,7 @@ export type ModalProps = {
   closeOnEsc?: boolean;
   className?: string;
   ariaLabel?: string;
+  responsiveSheet?: boolean;
 };
 
 export function Modal({
@@ -26,16 +27,35 @@ export function Modal({
   closeOnEsc = true,
   className,
   ariaLabel,
+  responsiveSheet = false,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
 
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(modalRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+    ) || []).filter((element) => element.getClientRects().length > 0);
+    (focusable()[0] || modalRef.current)?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (closeOnEsc && e.key === "Escape") {
+      if (closeOnEsc && e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
-        onClose();
+        closeRef.current();
+      }
+      if (e.key === "Tab") {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (!first) { e.preventDefault(); modalRef.current?.focus(); }
+        else if (e.shiftKey && (document.activeElement === first || document.activeElement === modalRef.current)) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault(); first.focus();
+        }
       }
     };
 
@@ -47,8 +67,9 @@ export function Modal({
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
     };
-  }, [isOpen, closeOnEsc, onClose]);
+  }, [isOpen, closeOnEsc]);
 
   if (!isOpen) return null;
 
@@ -60,7 +81,7 @@ export function Modal({
 
   return (
     <div
-      class={styles.backdrop}
+      class={`${styles.backdrop}${responsiveSheet ? ` ${styles.responsiveSheet}` : ""}`}
       onClick={handleBackdropClick}
       data-modal-backdrop="true"
     >
@@ -68,6 +89,7 @@ export function Modal({
         ref={modalRef}
         class={`${styles.modal}${className ? ` ${className}` : ""}`}
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-label={typeof title === "string" ? title : ariaLabel || "диалоговое окно"}
       >

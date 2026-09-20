@@ -27,6 +27,7 @@ from database import (
     open_request_connection,
     table_names as _db_table_names,
 )
+from feed import claim_feed, ensure_feed_history, exclude_profile, mark_viewed
 from catalog import (
     GENDER_IDS,
     INTENT_IDS,
@@ -388,6 +389,7 @@ def init_db() -> None:
         );
         """
     )
+    ensure_feed_history(conn)
     ensure_filter_tables(conn)
     ensure_task_tables(conn)
     ensure_opener_table(conn)
@@ -1188,6 +1190,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     """
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
+    conn.execute("DELETE FROM feed_history WHERE user_id = ? OR other_id = ?", (uid, uid))
     conn.execute("DELETE FROM user_tags WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM user_prompts WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM photos WHERE user_id = ?", (uid,))
@@ -1908,47 +1911,54 @@ def api_feed():
             (me["id"],),
         )
     }
-    unseen_rows = db().execute(
-        """
-        SELECT * FROM users
-        WHERE id != ?
-          AND COALESCE(deleted_at, 0) = 0
-          AND age BETWEEN ? AND ?
-          AND (? = '' OR city = ?)
-          AND id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
-          AND (
-            EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id)
-            OR (photo IS NOT NULL AND photo != '')
-          )
-        ORDER BY id ASC
-        """,
-        (me["id"], min_age, max_age, city_q, city_q, me["id"]),
-    ).fetchall()
+    limit = max(1, min(30, request.args.get("limit", type=int) or 30))
+
+    def eligible(row):
+        if intent_filter and not any(i in intent_filter for i in intents_of(row)):
+            return None
+        return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
+                              skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me)
+
+    cards, has_more = claim_feed(db(), int(me["id"]), min_age=min_age, max_age=max_age,
+                                 city=city_q, limit=limit, eligible=eligible)
     liked = db().execute(
         "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
         (me["id"],),
     ).fetchone()["n"]
-    unseen = [
-        c
-        for row in unseen_rows
-        if (c := _eligible_card(me, row, neuro_filter, vibe_filter, blocked, skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me))
-        and (not intent_filter or any(i in intent_filter for i in intents_of(row)))
-    ]
     passed_n = db().execute(
         "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'pass'",
         (me["id"],),
     ).fetchone()["n"]
-    return jsonify(
+    db().commit()
+    response = jsonify(
         {
             "ok": True,
-            "cards": unseen[:30],
+            "cards": cards,
+            "has_more": has_more,
             "recycled": False,
-            "unseen": len(unseen),
+            "unseen": len(cards),
             "passed": int(passed_n),
             "liked": int(liked),
             **inbox_stats(me["id"]),
         }
     )
+
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.post("/api/feed/view")
+@login_required
+def api_feed_view():
+    data = request.get_json(silent=True) or {}
+    try:
+        target_id = int(data.get("target_id"))
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "error": "нет цели"}), 400
+    if not mark_viewed(db(), session["uid"], target_id):
+        return jsonify({"ok": False, "error": "анкета не выдавалась"}), 404
+    db().commit()
+    return jsonify({"ok": True})
 
 
 @app.post("/api/swipe")
@@ -1988,6 +1998,8 @@ def api_swipe():
                 "match": user_public(target),
             }
         ), 409
+    if direction == "pass":
+        exclude_profile(conn, uid, target_id)
     prev = conn.execute(
         "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
         (uid, target_id),
@@ -2091,6 +2103,8 @@ def api_rewind():
         return jsonify({"ok": True, "card": user_public(target) if target else None, "undid": "snooze"})
     if not last:
         return jsonify({"ok": False, "error": "нечего возвращать"}), 404
+    if last["direction"] == "pass":
+        return jsonify({"ok": False, "error": "исключённые анкеты не возвращаются"}), 409
     if last["direction"] == "like" and _is_match(conn, uid, int(last["to_id"])):
         return jsonify(
             {"ok": False, "error": "это уже взаимный лайк — убрать можно только из чата"}
@@ -2104,20 +2118,8 @@ def api_rewind():
 @app.post("/api/deck/restart")
 @login_required
 def api_deck_restart():
-    """Manually restore passed profiles into the deck. Likes stay untouched."""
-    uid = session["uid"]
-    conn = db()
-    targets = [
-        int(r["to_id"])
-        for r in conn.execute(
-            "SELECT to_id FROM swipes WHERE from_id = ? AND direction = 'pass'",
-            (uid,),
-        )
-    ]
-    for target_id in targets:
-        _clear_pair(conn, uid, target_id)
-    conn.commit()
-    return jsonify({"ok": True, "cleared": len(targets)})
+    """Compatibility response for older clients: permanent exclusions cannot reset."""
+    return jsonify({"ok": False, "error": "исключённые анкеты не возвращаются"}), 410
 
 
 @app.get("/api/people/<int:other_id>")

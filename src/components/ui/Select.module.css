@@ -53,26 +53,6 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.iconTrigger {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
-  max-width: 44px;
-  max-height: 44px;
-  padding: 0;
-  justify-content: center;
-  border-radius: 50%;
-  box-sizing: border-box;
-  flex-shrink: 0;
-  background: transparent !important;
-}
-
-.iconTrigger:hover {
-  background: transparent !important;
-  border-color: var(--accent-line, rgba(143, 168, 110, 0.38));
-}
-
 .pillTrigger {
   min-height: 40px;
   padding: 6px 14px 6px 8px;
@@ -347,14 +327,6 @@
 
 /* Tablet (768px - 1024px) */
 @media (min-width: 768px) {
-  .iconTrigger {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
-    max-width: 48px;
-    max-height: 48px;
-  }
   .iconTrigger .swatch {
     width: 24px;
     height: 24px;
@@ -364,14 +336,6 @@
 
 /* Desktop (1025px+) */
 @media (min-width: 1025px) {
-  .iconTrigger {
-    width: 50px;
-    height: 50px;
-    min-width: 50px;
-    min-height: 50px;
-    max-width: 50px;
-    max-height: 50px;
-  }
   .iconTrigger .swatch {
     width: 25px;
     height: 25px;

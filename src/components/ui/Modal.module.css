@@ -149,3 +149,18 @@
     width: 100%;
   }
 }
+
+/* Mobile <768, tablet 768–1024, desktop >=1025 (shared UI breakpoints). */
+.responsiveSheet .modal { width: min(100%, 560px); max-height: min(88dvh, 760px); }
+.responsiveSheet .closeBtn { width: 44px; height: 44px; min-height: 44px; }
+.responsiveSheet .body { min-height: 0; }
+.responsiveSheet .footer { flex-direction: row; flex-wrap: nowrap; }
+.responsiveSheet .footer > * { flex: 1; width: auto; }
+@media (max-width: 767px) {
+  .responsiveSheet { place-items: end center; padding: env(safe-area-inset-top) 0 0; }
+  .responsiveSheet .modal { width: 100%; max-height: 94dvh; border-radius: 24px 24px 0 0; padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .backdrop, .modal { animation: none; }
+  .closeBtn { transition: none; }
+}

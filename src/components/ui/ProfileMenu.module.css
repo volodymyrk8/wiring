@@ -4,23 +4,6 @@
   flex-shrink: 0;
 }
 
-.avatarBtn {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  outline: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.avatarBtn:focus-visible :global(.avatar-link) {
-  outline: 2px solid var(--lime, #7d82c4);
-  outline-offset: 2px;
-}
-
 .profileMenu {
   position: absolute;
   top: calc(100% + 6px);

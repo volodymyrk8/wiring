@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
+import { IconButton } from "./IconButton";
 import styles from "./Select.module.css";
 
 const CheckIcon = () => (
@@ -127,6 +128,7 @@ export function Select<T extends string = string>({
   };
 
   const isIconOnly = variant === "iconOnly";
+  const Trigger = isIconOnly ? IconButton : "button";
   const isPill = variant === "pill";
   const hasFieldLabel = Boolean(fieldLabel) && !isIconOnly;
   const hasError = Boolean(error);
@@ -135,10 +137,10 @@ export function Select<T extends string = string>({
 
   return (
     <div ref={wrapRef} class={`${styles.selectWrap}${hasFieldLabel ? ` ${styles.hasFieldLabel}` : ""}${hasError ? ` ${styles.hasError}` : ""}${className ? ` ${className}` : ""}`}>
-      <button
+      <Trigger
         id={id}
         type="button"
-        class={`${styles.trigger}${isIconOnly ? ` ${styles.iconTrigger}` : ""}${isPill ? ` ${styles.pillTrigger}` : ""}${!showValue && !isIconOnly ? ` ${styles.compactTrigger}` : ""}`}
+        class={`${isIconOnly ? styles.iconTrigger : styles.trigger}${isPill ? ` ${styles.pillTrigger}` : ""}${!showValue && !isIconOnly ? ` ${styles.compactTrigger}` : ""}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel || fieldLabel || title || selectedOption?.label || placeholder}
@@ -169,7 +171,7 @@ export function Select<T extends string = string>({
             <ChevronIcon />
           </span>
         )}
-      </button>
+      </Trigger>
 
       {typeof error === "string" && error ? (
         <span id={errorId} class={styles.errorText} role="alert">{error}</span>

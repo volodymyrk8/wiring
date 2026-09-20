@@ -26,7 +26,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/styles.css?v=81">
 </head>
-<body>
+<body class="admin-page">
   {% include "components/header.html" %}
   <main class="legal admin">
     <h1>статистика</h1>
@@ -257,26 +257,5 @@
       <p class="legal-nav"><a href="/admin?out=1">выйти</a></p>
     {% endif %}
   </main>
-  <script>
-    (function () {
-      var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
-      document.querySelectorAll("[data-theme-set]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var next = btn.getAttribute("data-theme-set");
-          if (!ok[next]) next = "mist";
-          document.documentElement.dataset.theme = next;
-          try {
-            localStorage.setItem("wiring-theme", next);
-          } catch (e) {}
-          var color = ok[next];
-          var metas = document.querySelectorAll('meta[name="theme-color"]');
-          metas.forEach(function (m) {
-            m.setAttribute("content", color);
-            m.content = color;
-          });
-        });
-      });
-    })();
-  </script>
 </body>
 </html>

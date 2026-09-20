@@ -10,6 +10,8 @@ export type InputProps = {
   required?: boolean;
   minLength?: number;
   maxLength?: number;
+  min?: number;
+  max?: number;
   autoComplete?: string;
   inputMode?: JSX.HTMLAttributes<HTMLInputElement>["inputMode"];
   autoCapitalize?: "none" | "off" | "on" | "sentences" | "words" | "characters";
@@ -49,6 +51,8 @@ export function Input({
   required,
   minLength,
   maxLength,
+  min,
+  max,
   autoComplete,
   inputMode,
   autoCapitalize,
@@ -103,6 +107,8 @@ export function Input({
           required={required}
           minLength={minLength}
           maxLength={maxLength}
+          min={min}
+          max={max}
           autocomplete={autoComplete}
           inputMode={inputMode}
           autocapitalize={autoCapitalize}

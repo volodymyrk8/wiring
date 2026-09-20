@@ -23,6 +23,10 @@ from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
 
 
 class WiringTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        init_db()
+
     def setUp(self):
         conn = open_request_connection()
         tables = table_names(conn)
@@ -115,7 +119,7 @@ class WiringTest(unittest.TestCase):
         second = self.client.post("/api/demo")
         self.assertNotEqual(second.get_json()["user"]["email"], first_email)
 
-    def test_pass_recycles_and_rewind(self):
+    def test_pass_is_permanent_even_for_legacy_rewind(self):
         self._peers(3)
         self.client.post("/api/demo")
         feed = self.client.get("/api/feed").get_json()
@@ -124,11 +128,11 @@ class WiringTest(unittest.TestCase):
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
         self.assertNotIn(target["id"], ids)
         rewind = self.client.post("/api/rewind")
-        self.assertEqual(rewind.status_code, 200)
+        self.assertEqual(rewind.status_code, 409)
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
-        self.assertIn(target["id"], ids)
+        self.assertNotIn(target["id"], ids)
 
-    def test_restart_after_all_swipes(self):
+    def test_legacy_restart_cannot_restore_exclusions(self):
         self._peers(3)
         self.client.post("/api/demo")
         feed = self.client.get("/api/feed").get_json()
@@ -136,16 +140,98 @@ class WiringTest(unittest.TestCase):
         second = feed["cards"][1]
         self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "pass"})
         self.client.post("/api/swipe", json={"target_id": second["id"], "direction": "like"})
-        # Passes stay out until the user manually restores them.
+        # Permanent exclusions cannot be reset by an older client.
         mid = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
         self.assertNotIn(first["id"], mid)
         self.assertNotIn(second["id"], mid)
         restart = self.client.post("/api/deck/restart")
-        self.assertEqual(restart.status_code, 200)
-        self.assertGreaterEqual(restart.get_json()["cleared"], 1)
+        self.assertEqual(restart.status_code, 410)
         again = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
-        self.assertIn(first["id"], again)
+        self.assertNotIn(first["id"], again)
         self.assertNotIn(second["id"], again)
+
+    def test_feed_delivery_is_persistent_per_user_and_view_is_not_a_swipe(self):
+        me = self._register()
+        self._peers(5)
+        self._login("ada@example.com")
+        first_response = self.client.get("/api/feed?limit=2")
+        self.assertEqual(first_response.headers["Cache-Control"], "no-store")
+        first = first_response.get_json()
+        self.assertEqual(len(first["cards"]), 2)
+        self.assertTrue(first["has_more"])
+        target = first["cards"][0]["id"]
+        self.assertEqual(self.client.post("/api/feed/view", json={"target_id": target}).status_code, 200)
+        self.assertEqual(self.client.post("/api/feed/view", json={"target_id": target}).status_code, 200)
+        self.assertEqual(self.client.post("/api/feed/view", json={"target_id": me["id"]}).status_code, 404)
+        self._logout()
+        self._login("ada@example.com")
+        later = self.client.get("/api/feed?limit=30").get_json()
+        self.assertEqual(len(later["cards"]), 3)
+        self.assertFalse(later["has_more"])
+        self.assertTrue({c["id"] for c in first["cards"]}.isdisjoint({c["id"] for c in later["cards"]}))
+        self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
+        with app.app_context():
+            conn = db()
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM swipes WHERE from_id = ?", (me["id"],)).fetchone()["n"], 0)
+            row = conn.execute("SELECT * FROM feed_history WHERE user_id = ? AND other_id = ?", (me["id"], target)).fetchone()
+            self.assertIsNotNone(row["viewed_at"])
+            self.assertIsNone(row["excluded_at"])
+        self._logout()
+        self._register(email="new-viewer@example.com", name="Новый")
+        others = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
+        self.assertIn(target, others)
+
+    def test_feed_concurrent_requests_claim_disjoint_pages(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        me = self._register()
+        self._peers(6)
+        barrier = Barrier(2)
+
+        def fetch_page():
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["uid"] = me["id"]
+            barrier.wait(timeout=5)
+            response = client.get("/api/feed?limit=3")
+            return response.status_code, response.get_json()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            jobs = [executor.submit(fetch_page) for _ in range(2)]
+            pages = [job.result(timeout=20) for job in jobs]
+        self.assertEqual([status for status, _ in pages], [200, 200])
+        ids = [[c["id"] for c in page["cards"]] for _, page in pages]
+        self.assertEqual([len(page) for page in ids], [3, 3])
+        self.assertTrue(set(ids[0]).isdisjoint(ids[1]))
+
+    def test_exclusion_survives_swipe_cleanup_and_migration_is_idempotent(self):
+        from feed import ensure_feed_history
+        me = self._register()
+        self._peers(1)
+        self._login("ada@example.com")
+        target = self.client.get("/api/feed?limit=1").get_json()["cards"][0]["id"]
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": target, "direction": "pass"}).status_code, 200)
+        with app.app_context():
+            conn = db()
+            # Simulate a pre-migration pass with no history row.
+            conn.execute("DELETE FROM feed_history WHERE user_id = ? AND other_id = ?", (me["id"], target))
+            ensure_feed_history(conn)
+            ensure_feed_history(conn)
+            conn.execute("DELETE FROM swipes WHERE from_id = ? AND to_id = ?", (me["id"], target))
+            conn.commit()
+            row = conn.execute("SELECT excluded_at FROM feed_history WHERE user_id = ? AND other_id = ?", (me["id"], target)).fetchone()
+            self.assertIsNotNone(row["excluded_at"])
+        self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
+
+    def test_feed_filter_misses_do_not_consume_candidates(self):
+        self._register()
+        self._peers(2)
+        self._login("ada@example.com")
+        response = self.client.get("/api/feed?city=NoSuchTestCity&limit=2").get_json()
+        self.assertEqual(response["cards"], [])
+        self.assertFalse(response["has_more"])
+        response = self.client.get("/api/feed?limit=2").get_json()
+        self.assertEqual(len(response["cards"]), 2)
 
     def test_reject_underage(self):
         self.client.post(
@@ -736,8 +822,8 @@ class WiringTest(unittest.TestCase):
         self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
         self.client.post("/api/logout")
         self.client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
-        everyone = self.client.get("/api/feed").get_json()["cards"]
         live = self.client.get("/api/feed?real=1").get_json()["cards"]
+        everyone = self.client.get("/api/feed").get_json()["cards"]
         self.assertTrue(any(c["name"] == "Лео" for c in everyone))
         self.assertFalse(any(c["name"] == "Лео" for c in live))
         self.assertGreater(len(everyone), len(live))
@@ -751,14 +837,14 @@ class WiringTest(unittest.TestCase):
         self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
         self._logout()
         self._login("ada@example.com")
-        cards = self.client.get("/api/feed").get_json()["cards"]
-        self.assertTrue(cards)
-        denied = self.client.post("/api/swipe", json={"target_id": cards[0]["id"], "direction": "snooze"})
+        with app.app_context():
+            target_id = db().execute("SELECT id FROM users WHERE email = ?", ("leo@example.com",)).fetchone()["id"]
+        denied = self.client.post("/api/swipe", json={"target_id": target_id, "direction": "snooze"})
         self.assertEqual(denied.status_code, 403)
         plus = self._plus()
         self.assertTrue(plus["plus"])
-        all_cards = self.client.get("/api/feed").get_json()["cards"]
         live = self.client.get("/api/feed?real=1").get_json()["cards"]
+        all_cards = self.client.get("/api/feed").get_json()["cards"]
         self.assertTrue(any(c["name"] == "Лео" for c in all_cards))
         self.assertTrue(any(c["name"] == "Живой" for c in live))
         self.assertFalse(any(c["name"] == "Лео" for c in live))
@@ -804,7 +890,7 @@ class WiringTest(unittest.TestCase):
         back = self.client.post("/api/rewind")
         self.assertEqual(back.status_code, 200)
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
-        self.assertIn(target["id"], ids)
+        self.assertNotIn(target["id"], ids)
 
     def test_admin_can_grant_plus(self):
         self._register()

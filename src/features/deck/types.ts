@@ -38,6 +38,16 @@ export type DeckCatalog = {
   places?: PlaceBlock[];
 };
 
+export type FeedPage = {
+  cards: DeckCard[];
+  has_more: boolean;
+  unseen?: number;
+  passed?: number;
+  liked?: number;
+  likes_in?: number;
+  unread?: number;
+};
+
 export type DeckHostBridge = {
   user: ProfileUser;
   catalog: DeckCatalog;
@@ -45,19 +55,13 @@ export type DeckHostBridge = {
   index: number;
   filters: DeckFilters;
   filtersOpen: boolean;
-  recycled: boolean;
-  passed: number;
+  hasMore: boolean;
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;
   navigate: (view: string, params?: Record<string, string | number>) => void;
-  loadFeed: (filters?: DeckFilters) => Promise<{
-    cards?: DeckCard[];
-    recycled?: boolean;
-    passed?: number;
-  }>;
-  swipe: (direction: "like" | "pass" | "snooze") => Promise<void>;
-  rewind: () => Promise<void>;
-  restart: () => Promise<void>;
+  loadFeed: (filters: DeckFilters, signal?: AbortSignal) => Promise<FeedPage>;
+  onFeedChange: (cards: DeckCard[], index: number, filters: DeckFilters, hasMore: boolean) => void;
+  onMatch: (match: { id: number; name?: string }) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   toast: (message: string) => void;
   onUserUpdated: (user: ProfileUser) => void;

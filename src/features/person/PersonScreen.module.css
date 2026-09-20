@@ -4,8 +4,8 @@
 .back :global(span) { gap: 6px !important; }
 .back :global(span > span) { line-height: 18px; font-weight: 600; }
 .content { display: grid; gap: 16px; width: 100%; max-width: var(--container-app, 540px); margin: 0 auto; padding-inline: 16px; box-sizing: border-box; }
-.hero { position: relative; overflow: hidden; border-radius: 24px; background: var(--photo); color: var(--on-photo); touch-action: pan-y; user-select: none; }
-.heroImage { display: block; width: 100%; max-height: min(72dvh, 720px); object-fit: cover; transition: opacity 0.22s ease; }
+.hero { width: min(100%, calc(min(72dvh, 720px) * var(--photo-aspect))); justify-self: center; position: relative; overflow: hidden; border-radius: 24px; background: var(--photo); color: var(--on-photo); touch-action: pan-y; user-select: none; }
+.heroImage { display: block; width: 100%; max-height: min(72dvh, 720px); object-fit: contain; height: auto; }
 .hero { animation: personHeroIn 0.28s ease; }
 @keyframes personHeroIn {
   from { opacity: 0.88; transform: translateY(6px); }
@@ -50,9 +50,12 @@
 .reportForm textarea:focus { border-color: var(--lime); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 
 @media (max-width: 560px) {
-  .hero { border-radius: 18px; }
+  .hero { width: min(100%, calc(min(66dvh, 560px) * var(--photo-aspect))); border-radius: 18px; }
   .heroImage { max-height: min(66dvh, 560px); }
   .heroOverlay { padding: 42px 14px 14px; }
   .photoThumb, .photoThumb img { width: 62px; }
   .photoThumb img { height: 82px; }
 }
+
+.hero:focus { outline: none; }
+@media (prefers-reduced-motion: reduce) { .hero { animation: none; } }

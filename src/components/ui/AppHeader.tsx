@@ -70,6 +70,7 @@ export type AppHeaderProps = {
   showThemeSelect?: boolean;
   showThemeSwatches?: boolean;
   currentTheme?: ThemeName;
+  themePosition?: "start" | "end";
   onThemeSelect?: (theme: ThemeName) => void;
   showBack?: boolean;
   backHref?: string;
@@ -93,6 +94,7 @@ export function AppHeader({
   showThemeSelect,
   showThemeSwatches,
   currentTheme,
+  themePosition = "end",
   onThemeSelect,
   showBack,
   backHref,
@@ -119,6 +121,23 @@ export function AppHeader({
   }, [currentTheme]);
 
   const shouldShowThemeDropdown = (showThemeSelect ?? (showThemeSwatches !== undefined ? showThemeSwatches : Boolean(onThemeSelect))) && Boolean(onThemeSelect);
+
+  const themeControl = shouldShowThemeDropdown && onThemeSelect && (
+              <Select<ThemeName>
+                align={themePosition === "start" ? "left" : "right"}
+                options={THEME_OPTIONS}
+                value={activeTheme}
+                onChange={(theme) => {
+                  setActiveTheme(theme);
+                  onThemeSelect(theme);
+                }}
+                showValue={false}
+                showChevron={false}
+                variant="iconOnly"
+                ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+                title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+              />
+            );
 
   return (
     <header
@@ -155,8 +174,8 @@ export function AppHeader({
               {backLabel !== false ? <span class={styles.backLabel}>{backLabel}</span> : null}
             </Button>
           </div>
-        ) : leftSlot ? (
-          <div class={styles.headerStart}>{leftSlot}</div>
+        ) : (leftSlot || (themePosition === "start" && themeControl)) ? (
+          <div class={styles.headerStart}>{themePosition === "start" && themeControl}{leftSlot}</div>
         ) : null}
 
         <div class={styles.brandGroup}>
@@ -190,21 +209,7 @@ export function AppHeader({
 
         {showActions && (
           <div class={styles.headerEnd}>
-            {shouldShowThemeDropdown && onThemeSelect && (
-              <Select<ThemeName>
-                options={THEME_OPTIONS}
-                value={activeTheme}
-                onChange={(theme) => {
-                  setActiveTheme(theme);
-                  onThemeSelect(theme);
-                }}
-                showValue={false}
-                showChevron={false}
-                variant="iconOnly"
-                ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
-                title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
-              />
-            )}
+            {themePosition === "end" && themeControl}
             {rightSlot}
             {children}
           </div>

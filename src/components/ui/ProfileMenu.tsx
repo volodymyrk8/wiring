@@ -2,6 +2,7 @@ import { useState, useRef } from "preact/hooks";
 import type { JSX } from "preact";
 import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
 import { ProfileAvatarIcon } from "./ProfileAvatarIcon";
+import { IconButton } from "./IconButton";
 import styles from "./ProfileMenu.module.css";
 
 export type ProfileMenuProps = {
@@ -69,9 +70,8 @@ export function ProfileMenu({
 
   return (
     <div ref={containerRef} class={`${styles.profilePop}${className ? ` ${className}` : ""}`}>
-      <button
-        type="button"
-        class={`avatar-slot ${styles.avatarBtn}`}
+      <IconButton
+        class="avatar-slot"
         onClick={toggleOpen}
         aria-expanded={isOpen}
         aria-haspopup="menu"
@@ -95,7 +95,7 @@ export function ProfileMenu({
             </svg>
           </span>
         )}
-      </button>
+      </IconButton>
 
       {isOpen && (
         <div class={styles.profileMenu} role="menu">

@@ -1,0 +1,28 @@
+.button {
+  --icon-button-size: 44px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--icon-button-size);
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  min-width: var(--icon-button-size);
+  min-height: var(--icon-button-size);
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .14s ease;
+}
+.button:hover { border-color: var(--accent-line); }
+.button:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+.button:disabled { opacity: .55; cursor: default; }
+.button > svg { width: 20px; height: 20px; }
+@media (min-width: 768px) { .button { --icon-button-size: 48px; } }
+@media (min-width: 1025px) { .button { --icon-button-size: 50px; } }
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } }

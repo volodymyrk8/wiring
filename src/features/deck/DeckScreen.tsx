@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, ProfileMenu, TagPicker } from "@/components/ui";
+import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { profileMenuAvatarUrl } from "@/lib/profile-photo";
+import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
 import styles from "./DeckScreen.module.css";
 
@@ -30,10 +30,8 @@ const photosFor = (card: DeckCard) => {
   return photos.length ? photos : card.photo ? [card.photo] : [];
 };
 
-const iconFilter = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>;
+const iconFilter = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h5m4 0h7M4 17h9m4 0h3" /><circle cx="11" cy="7" r="2" /><circle cx="15" cy="17" r="2" /></svg>;
 const iconPass = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
-const iconUndo = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 8 5 12l4 4" /><path d="M5 12h8a6 6 0 0 1 6 6" /></svg>;
-const iconSnooze = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></svg>;
 const iconLike = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" /></svg>;
 
 const labels = (catalog: DeckHostBridge["catalog"], kind: "genders" | "looking_for" | "intents", values: unknown) => {
@@ -41,7 +39,7 @@ const labels = (catalog: DeckHostBridge["catalog"], kind: "genders" | "looking_f
   return ids.map((id) => catalog[kind]?.find((item) => item.id === id)?.label || String(id)).filter(Boolean);
 };
 
-function DeckHeader({ host }: { host: DeckHostBridge }) {
+function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHostBridge; filtersOpen: boolean; filtered: boolean; onFilters: () => void }) {
   const navigate = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
     host.navigate(view, params);
@@ -49,155 +47,254 @@ function DeckHeader({ host }: { host: DeckHostBridge }) {
   return <AppHeader
     homeHref={host.hrefFor("home")}
     onHomeClick={navigate("home")}
-    sectionTitle="лента"
+    className={styles.header}
+    logoPosition="center"
+    themePosition="start"
+    showBetaBadge={false}
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
-    rightSlot={!host.user.guest ? <ProfileMenu
-      avatarUrl={profileMenuAvatarUrl(host.basePath, host.user.photo)}
-      userName={String(host.user.name || "")}
-      isPlus={Boolean(host.user.plus)}
-      profileHref={host.hrefFor("profile")}
-      consentsHref={host.hrefFor("consents")}
-      plusHref={host.hrefFor("plus")}
-      onProfileClick={navigate("profile")}
-      onConsentsClick={navigate("consents")}
-      onPlusClick={navigate("plus")}
-      onLogout={host.onLogout}
-    /> : <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label="войти">♡</a>}
+    rightSlot={<IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
   />;
 }
 
-function FilterPanel({ host, filters, onApply, onClear }: { host: DeckHostBridge; filters: DeckFilters; onApply: (filters: DeckFilters) => void; onClear: () => void }) {
+const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false });
+
+function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: DeckHostBridge; filters: DeckFilters; busy: boolean; error: string; onApply: (filters: DeckFilters) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(filters);
-  useEffect(() => {
-    setDraft(filters);
-  }, [filters]);
-  const cities = (host.catalog.places || []).flatMap((place) => place.cities).filter((city, index, list) => list.indexOf(city) === index);
+  const [minAge, setMinAge] = useState(String(filters.min_age));
+  const [maxAge, setMaxAge] = useState(String(filters.max_age));
+  const cities = [...new Set((host.catalog.places || []).flatMap((place) => place.cities))];
   const update = <K extends keyof DeckFilters>(key: K, value: DeckFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  return <div class={styles.filters}>
-    <div class={styles.filterGroup}><p class={styles.filterLabel}>диагнозы</p><TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} /></div>
-    <div class={styles.filterGroup}><p class={styles.filterLabel}>вайб</p><TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" /></div>
-    <div class={styles.filterGroup}><p class={styles.filterLabel}>формат</p><TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} /></div>
-    <div class={styles.range}>
-      <label>от<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
-      <label>до<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
-    </div>
-    <label class={styles.filterGroup}><span class={styles.filterLabel}>город</span><select class={styles.citySelect} value={draft.city} onChange={(event) => update("city", event.currentTarget.value)}><option value="">неважно</option>{cities.map((city) => <option key={city} value={city}>{city}</option>)}</select></label>
-    <div class={styles.filterFooter}><Button variant="ghost" slim onClick={onClear}>сбросить</Button><Button variant="solid" slim onClick={() => onApply(draft)}>применить</Button></div>
-  </div>;
+  const reset = () => { setDraft(defaultFilters()); setMinAge("18"); setMaxAge("99"); };
+  return <Modal isOpen onClose={onClose} title="Фильтры ленты" responsiveSheet
+    footer={<><Button variant="ghost" disabled={busy} onClick={reset}>Сбросить</Button><Button type="submit" form="deck-filters" loading={busy}>Применить</Button></>}>
+    <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
+      event.preventDefault();
+      if (!busy) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) });
+    }}>
+      <p class={styles.filterIntro}>Выбери, кого хочешь видеть. Изменения сохранятся после применения.</p>
+      <fieldset class={styles.filterFields} disabled={busy}>
+        <div class={styles.range}>
+          <Input label="Возраст от" name="deck-min-age" type="number" inputMode="numeric" required min={18} max={Number(maxAge) || 99} value={minAge} onInput={(event) => setMinAge(event.currentTarget.value)} />
+          <Input label="Возраст до" name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
+        </div>
+        <Input label="Город" name="deck-city" value={draft.city} list="deck-cities" autoComplete="off" hint="Оставь пустым, если город неважен." onInput={(event) => update("city", event.currentTarget.value)} />
+        <datalist id="deck-cities">{cities.map((city) => <option key={city} value={city} />)}</datalist>
+        <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
+        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
+        <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
+      </fieldset>
+      {error ? <p class={styles.error} role="alert">{error}</p> : null}
+    </form>
+  </Modal>;
 }
 
-function DeckCardView({ host, card, stacked, photoIndex, dragX, onOpen }: { host: DeckHostBridge; card: DeckCard; stacked?: boolean; photoIndex: number; dragX: number; onOpen: () => void }) {
+function DeckCardView({ host, card, active, onVertical, actions, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; actions?: JSX.Element; heightLimit: number }) {
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoAspect, setPhotoAspect] = useState(3 / 4);
+  const cardRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (!active && cardRef.current?.contains(document.activeElement)) {
+      cardRef.current.closest<HTMLElement>('[role="region"]')?.focus({ preventScroll: true });
+    }
+  }, [active]);
   const photos = photosFor(card);
+  const changePhoto = (direction: number) => setPhotoIndex((index) => (index + direction + Math.max(photos.length, 1)) % Math.max(photos.length, 1));
+  const gesture = usePhotoSwipe(changePhoto, onVertical);
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...labels(host.catalog, "genders", card.gender)].filter(Boolean).join(" · ");
-  const secondary = [...(labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`)), ...labelsIntent].join(" · ");
+  const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), ...labelsIntent].join(" · ");
   const tags = [
     ...(card.neuro || []).map((id) => ({ id: `neuro-${id}`, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
     ...(card.vibe || []).map((id) => ({ id: `vibe-${id}`, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),
   ];
-  const style = stacked ? undefined : { transform: `translateX(${dragX}px) rotate(${dragX / 18}deg)` };
-  return <article class={`${styles.card}${stacked ? ` ${styles.cardStacked}` : ""}`} style={style}>
+  return <><article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
+    onKeyDown={(event) => {
+      if ((event.target as HTMLElement).closest("button, a")) return;
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); }
+    }} style={{ "--photo-aspect": photoAspect, "--card-height-limit": `${heightLimit}px` }} aria-label={`${card.name}, ${card.age}`}>
     <div class={styles.media}>
-      <img class={styles.photo} src={photoUrl(host.basePath, photos[photoIndex] || card.photo, card.name)} alt="" draggable={false} />
-      {!stacked && photos.length > 1 ? <div class={styles.dots}>{photos.map((_, index) => <i key={index} class={index === photoIndex ? styles.active : ""} />)}</div> : null}
-      {!stacked ? <div class={styles.stamps}><span class={styles.stamp} style={{ opacity: dragX > 24 ? Math.min(1, (dragX - 24) / 90) : 0 }}>YES</span><span class={`${styles.stamp} ${styles.stampNo}`} style={{ opacity: dragX < -24 ? Math.min(1, (-dragX - 24) / 90) : 0 }}>NOPE</span></div> : null}
+      <img class={styles.photo} src={photoUrl(host.basePath, photos[photoIndex] || card.photo, card.name)} alt="" draggable={false}
+        onLoad={(event) => { const image = event.currentTarget; if (image.naturalHeight) setPhotoAspect(image.naturalWidth / image.naturalHeight); }} />
     </div>
+    {photos.length > 1 ? <span class={styles.srOnly} aria-live={active ? "polite" : "off"}>Фото {photoIndex + 1} из {photos.length}</span> : null}
+    {photos.length > 1 ? <div class={styles.photoChoices} role="group" aria-label="Фотографии">
+      {photos.map((_, index) => <IconButton key={index} class={styles.photoChoice} tabIndex={active ? 0 : -1} aria-label={`Фото ${index + 1} из ${photos.length}`} aria-pressed={index === photoIndex} onClick={() => setPhotoIndex(index)}>{index + 1}</IconButton>)}
+    </div> : null}
     <div class={styles.body}>
-      <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2>{!stacked ? <a class={styles.more} href={host.hrefFor("person", { id: card.id })} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpen(); }}>анкета</a> : null}</div>
-      {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <><br /></> : null}{secondary}</p> : null}
+      <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2></div>
+      {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <br /> : null}{secondary}</p> : null}
       {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
       {tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
-  </article>;
+  </article>{actions}</>;
 }
 
 export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const [cards, setCards] = useState(host.cards);
   const [index, setIndex] = useState(host.index);
-  const [photoIndex, setPhotoIndex] = useState(0);
+  const [hasMore, setHasMore] = useState(host.hasMore);
   const [filters, setFilters] = useState(host.filters);
-  const [filtersOpen, setFiltersOpen] = useState(host.filtersOpen);
-  const [recycled, setRecycled] = useState(host.recycled);
-  const [passed, setPassed] = useState(host.passed);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [excludeOpen, setExcludeOpen] = useState(false);
   const [paused, setPaused] = useState(Boolean(host.user.paused));
   const [busy, setBusy] = useState(false);
-  const [dragX, setDragX] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-  const axisRef = useRef("");
+  const [cardHeight, setCardHeight] = useState(640);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const actionRef = useRef<AbortController | null>(null);
+  const viewedRef = useRef(new Set<number>());
+  const indexRef = useRef(index);
+  indexRef.current = index;
+  const dragRef = useRef<{ y: number } | null>(null);
   const current = cards[index];
-  const next = cards[index + 1];
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99);
 
-  const applyFilters = async (nextFilters: DeckFilters) => {
-    if (busy) return;
+  useEffect(() => {
+    host.onFeedChange(cards, index, filters, hasMore);
+  }, [cards, index, filters, hasMore]);
+
+  useEffect(() => () => { requestRef.current?.abort(); actionRef.current?.abort(); }, []);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const align = () => {
+      setCardHeight(Math.max(120, viewport.clientHeight - 90));
+      viewport.scrollTop = indexRef.current * viewport.clientHeight;
+    };
+    align();
+    const observer = new ResizeObserver(align);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!current || viewedRef.current.has(current.id)) return;
+    const controller = new AbortController();
+    void host.api("/api/feed/view", { method: "POST", signal: controller.signal, body: JSON.stringify({ target_id: current.id }) })
+      .then(() => { viewedRef.current.add(current.id); })
+      .catch(() => { /* Delivery was already reserved; a failed acknowledgement cannot cause repeats. */ });
+    return () => controller.abort();
+  }, [current?.id]);
+
+  const loadPage = async (nextFilters = filters, replace = false) => {
+    if (requestRef.current || actionRef.current) return;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setLoading(true); setError("");
+    try {
+      const response = await host.loadFeed(nextFilters, controller.signal);
+      if (controller.signal.aborted) return;
+      setHasMore(response.has_more);
+      setCards((previous) => replace ? response.cards : [...previous, ...response.cards.filter((card) => !previous.some((old) => old.id === card.id))]);
+      if (replace) {
+        setFilters(nextFilters); setIndex(0); indexRef.current = 0; setFiltersOpen(false);
+        if (viewportRef.current) viewportRef.current.scrollTop = 0;
+      }
+    } catch (caught) {
+      if (!controller.signal.aborted) setError(getErrorMessage(caught));
+    } finally {
+      if (!controller.signal.aborted) { requestRef.current = null; setLoading(false); }
+    }
+  };
+
+  useEffect(() => {
+    if (!filtersOpen && !excludeOpen && !busy && !error && hasMore && index >= cards.length - 1) void loadPage();
+  }, [index, cards.length, hasMore, filtersOpen, excludeOpen, busy, error]);
+
+  const advance = (direction: number) => {
+    const viewport = viewportRef.current;
+    if (!viewport || filtersOpen || excludeOpen) return;
+    const last = cards.length; // Final slide can load new candidates or explain exhaustion.
+    const next = Math.max(0, Math.min(last, indexRef.current + direction));
+    viewport.scrollTo({ top: next * viewport.clientHeight, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+  };
+
+  const act = async (direction: "like" | "pass") => {
+    if (!current || actionRef.current || requestRef.current) return;
+    const controller = new AbortController();
+    actionRef.current = controller;
+    const targetId = current.id;
     setBusy(true); setError("");
     try {
-      const response = await host.loadFeed(nextFilters);
-      setFilters(nextFilters); setCards(response.cards || []); setIndex(0); setPhotoIndex(0); setRecycled(Boolean(response.recycled)); setPassed(Number(response.passed || 0)); setFiltersOpen(false);
-    } catch (caught) { setError(getErrorMessage(caught)); } finally { setBusy(false); }
+      const response = await host.api("/api/swipe", { method: "POST", signal: controller.signal, body: JSON.stringify({ target_id: targetId, direction }) });
+      if (controller.signal.aborted) return;
+      const remaining = cards.filter((card) => card.id !== targetId);
+      const nextIndex = Math.min(index, remaining.length);
+      setCards(remaining); setIndex(nextIndex); setExcludeOpen(false);
+      host.onFeedChange(remaining, nextIndex, filters, hasMore);
+      if (response.matched && response.match) host.onMatch(response.match);
+      else host.toast(direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+    } catch (caught) {
+      if (!controller.signal.aborted) setError(getErrorMessage(caught));
+    } finally {
+      if (!controller.signal.aborted) { actionRef.current = null; setBusy(false); }
+    }
   };
-  const clearFilters = () => void applyFilters({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false });
-  const action = (direction: "like" | "pass" | "snooze") => {
-    if (!current || busy) return;
-    setBusy(true); setError(""); setDragX(direction === "like" ? 520 : -520);
-    void host.swipe(direction).finally(() => setBusy(false));
+
+  const unpause = async () => {
+    if (actionRef.current) return;
+    const controller = new AbortController(); actionRef.current = controller; setBusy(true);
+    try {
+      const response = await host.api("/api/plus", { method: "PATCH", signal: controller.signal, body: JSON.stringify({ paused: false }) });
+      if (!controller.signal.aborted) { host.onUserUpdated(response.user); setPaused(false); }
+    } catch (caught) { if (!controller.signal.aborted) setError(getErrorMessage(caught)); }
+    finally { if (!controller.signal.aborted) { actionRef.current = null; setBusy(false); } }
   };
-  const undo = () => { if (busy) return; setBusy(true); void host.rewind().finally(() => setBusy(false)); };
-  const restart = () => { if (busy) return; setBusy(true); void host.restart().finally(() => setBusy(false)); };
-  const unpause = () => void (async () => {
-    if (busy) return;
-    setBusy(true); setError("");
-    try { const response = await host.api("/api/plus", { method: "PATCH", body: JSON.stringify({ paused: false }) }); host.onUserUpdated(response.user); setPaused(false); host.toast("пауза снята"); } catch (caught) { setError(getErrorMessage(caught)); } finally { setBusy(false); }
-  })();
-  const selectPhoto = (direction: number) => {
-    const photos = current ? photosFor(current) : [];
-    if (photos.length < 2) return;
-    setPhotoIndex((value) => (value + direction + photos.length) % photos.length);
-  };
-  const onPointerDown = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest("a, button, .chip")) return;
-    startRef.current = { x: event.clientX, y: event.clientY }; axisRef.current = ""; setDragX(0); event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const onPointerMove = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
-    if (!startRef.current) return;
-    const dx = event.clientX - startRef.current.x; const dy = event.clientY - startRef.current.y;
-    if (!axisRef.current && (Math.abs(dx) > 14 || Math.abs(dy) > 14)) axisRef.current = Math.abs(dx) > Math.abs(dy) * 1.15 ? "x" : "y";
-    if (axisRef.current === "x") setDragX(dx);
-  };
-  const onPointerUp = (event: JSX.TargetedPointerEvent<HTMLElement>) => {
-    const start = startRef.current; startRef.current = null;
+
+  const finishDrag = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
+    const start = dragRef.current;
     if (!start) return;
-    const dx = event.clientX - start.x; const dy = event.clientY - start.y;
-    if (axisRef.current === "x" && dx > 130) action("like");
-    else if (axisRef.current === "x" && dx < -130) action("pass");
-    else if (axisRef.current === "x" && Math.abs(dx) > 40) { selectPhoto(dx < 0 ? 1 : -1); setDragX(0); }
-    else if (axisRef.current === "y" && Math.abs(dy) > 40) { selectPhoto(dy < 0 ? 1 : -1); setDragX(0); }
-    else setDragX(0);
-    axisRef.current = "";
+    dragRef.current = null; setDragging(false);
+    const distance = start.y - event.clientY;
+    if (Math.abs(distance) > 40) advance(distance > 0 ? 1 : -1);
   };
-  const navigate = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => { event.preventDefault(); host.navigate(view, params); };
 
   return <div class={styles.root}>
-    <DeckHeader host={host} />
-    <main class={styles.content}>
-      <div class={styles.toolbar}><Button variant="ghost" slim className={styles.filterButton} onClick={() => setFiltersOpen((open) => !open)}>{iconFilter}<span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span></Button><span class={styles.toolbarHint}>{recycled ? "снова пропущенные · " : ""}ещё {Math.max(0, cards.length - index)}</span></div>
-      {filtersOpen ? <FilterPanel host={host} filters={filters} onApply={(nextFilters) => void applyFilters(nextFilters)} onClear={clearFilters} /> : null}
-      {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={unpause}>снять паузу</Button></aside> : null}
-      {current ? <>
-        <div class={styles.deck} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { startRef.current = null; setDragX(0); }}>
-          {next ? <DeckCardView host={host} card={next} stacked photoIndex={0} dragX={0} onOpen={() => {}} /> : null}
-          <DeckCardView host={host} card={current} photoIndex={photoIndex} dragX={dragX} onOpen={() => host.navigate("person", { id: current.id })} />
-        </div>
-        <div class={styles.controls}>
-          <button type="button" class={`${styles.action} ${styles.pass}`} disabled={busy} onClick={() => action("pass")} aria-label="пропустить" title="пропустить">{iconPass}</button>
-          <button type="button" class={`${styles.action} ${styles.undo}`} disabled={busy} onClick={undo} aria-label="отменить последний свайп" title="отменить последний свайп (не размэтч)">{iconUndo}</button>
-          {host.user.plus ? <button type="button" class={`${styles.action} ${styles.snooze}`} disabled={busy} onClick={() => action("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconSnooze}</button> : null}
-          <button type="button" class={`${styles.action} ${styles.like}`} disabled={busy} onClick={() => action("like")} aria-label="лайк" title="лайк">{iconLike}</button>
-        </div>
-      </> : <section class={styles.empty}><h2>{filtered ? "По фильтрам никого нет" : "Анкеты на сегодня закончились"}</h2><p>{filtered ? "Сними часть фильтров — так лента снова откроется." : passed ? "Пропущенные сами не вернутся. Можно вернуть их вручную — лайки и чаты не сбросятся." : "Можно ослабить фильтры или заглянуть позже."}</p>{filtered ? <Button variant="ghost" slim onClick={clearFilters}>сбросить фильтры</Button> : passed ? <Button variant="solid" slim onClick={restart}>вернуть пропущенных</Button> : null}</section>}
+    <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
+    {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value) => void loadPage(value, true)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
+    <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
+      footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>
+      <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
+    </Modal>
+    <main class={styles.content} aria-label="Лента">
+      {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
+      <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
+        onScroll={(event) => setIndex(Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight))))}
+        onKeyDown={(event) => {
+          if ((event.target as HTMLElement).closest("button, a, input")) return;
+          if (["ArrowDown", "PageDown", " "].includes(event.key)) { event.preventDefault(); advance(1); }
+          else if (["ArrowUp", "PageUp"].includes(event.key)) { event.preventDefault(); advance(-1); }
+        }}
+        onPointerDown={(event) => {
+          if (event.pointerType !== "mouse" || event.button !== 0 || (event.target as HTMLElement).closest("button, a")) return;
+          dragRef.current = { y: event.clientY };
+          event.currentTarget.setPointerCapture(event.pointerId); setDragging(true); event.currentTarget.focus();
+        }}
+        onPointerUp={finishDrag}
+        onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
+        {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
+          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance}
+            actions={<div class={styles.controls}>{cardIndex === index ? <>
+              <IconButton class={styles.exclude} disabled={busy || loading} onClick={() => setExcludeOpen(true)} aria-label="Больше не показывать" title="Больше не показывать">{iconPass}</IconButton>
+              <Button variant="ghost" className={styles.openProfile} href={host.hrefFor("person", { id: card.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: card.id }); }}>Открыть профиль</Button>
+              <IconButton class={styles.like} disabled={busy || loading} onClick={() => void act("like")} aria-label="Лайк" title="Лайк">{iconLike}</IconButton>
+            </> : null}</div>} />
+        </section>)}
+        <section class={styles.slide} aria-hidden={index < cards.length}>
+          <div class={styles.empty}>
+            <h2>{loading ? "Ищем новые анкеты…" : "Новых анкет пока нет"}</h2>
+            <p>{loading ? "Ещё немного." : filtered ? "Можно изменить фильтры. Уже выданные анкеты не повторяются." : "Загляни позже. Уже выданные анкеты не повторяются."}</p>
+            {!loading && index >= cards.length ? <Button variant="ghost" disabled={busy} onClick={() => void loadPage()}>{error ? "Повторить" : "Проверить новые"}</Button> : null}
+          </div>
+        </section>
+      </div>
+      {error && !filtersOpen && !excludeOpen ? <p class={styles.error} role="alert">{error}</p> : null}
     </main>
   </div>;
 }

@@ -46,7 +46,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
       <AppHeader
         homeHref={hrefFor("home")}
         onHomeClick={handleNav("home")}
-        showThemeSwatches={true}
+        showThemeSelect
         onThemeSelect={onThemeSelect}
         rightSlot={
           signed ? (

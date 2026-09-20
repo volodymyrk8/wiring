@@ -84,3 +84,17 @@ flowchart LR
 - [README.md](../README.md) — local, тестовые пользователи, деплой
 - [docs/telegram-triage.md](telegram-triage.md) — опциональный Telegram-воркер (Telethon)
 - [V2.md](../V2.md) — продуктовые/UI-цели v2
+
+Серверные legal/admin-шаблоны подключают общий Preact `AppHeader` через `src/entries/server-header.tsx` → `public/dist/server-header.js`. Auth также использует `AppHeader`; выбор темы сохраняется общим `src/lib/theme.ts`.
+
+### Vertical discovery feed
+
+`src/features/deck/` owns vertical scroll snap, mouse dragging, keyboard navigation, explicit likes and confirmed exclusions. Scrolling never creates a swipe. Previously loaded cards can be revisited within the current SPA session; acted-on cards are removed from that cache, including actions on the person screen. `src/app/feed.ts` requests two cards at a time through the shared API and cancellable requests.
+
+The gesture viewport fills the available feed width and height, including space beside and below each card. Interactive targets keep their own clicks. Images retain their natural aspect ratio with a 508px width cap and a viewport-dependent height limit; like/exclude sit in a compact separate panel below the card. The scroll container has no focus outline; interactive buttons retain `:focus-visible`. Reduced-motion navigation uses instant scrolling. No visible swipe instruction or reserved instruction row is rendered.
+
+`src/lib/usePhotoSwipe.ts` locks the first clear pointer axis for both deck and person galleries. Horizontal swipes change only the photo; touch vertical scrolling stays native (`touch-action: pan-y`), while vertical mouse drags on a deck card delegate to feed navigation. Interactive elements are excluded from gesture capture and completed drags suppress accidental clicks. Numbered photo buttons/thumbnails and Left/Right keys provide alternatives; the deck announces the current photo and moves focus out of a card when it becomes inactive. A shared Button link in the external action panel is the only profile-opening control for each card. Person photos also retain their natural proportions; reduced motion disables the gallery entrance animation.
+
+`GET /api/feed` accepts `limit` (1–30, default 30), returns `cards` and `has_more`, and sends `Cache-Control: no-store`. `feed.py` reserves eligible candidates in random order in PostgreSQL `feed_history`, with a unique `(user_id, other_id)` pair. Locking the viewer row serializes concurrent page requests. Existing mutual preferences, filters, blocks and privacy checks apply before reservation. The additive `init_db` migration is idempotent and backfills historical passes.
+
+`delivered_at` is committed before the response, so reloads, retries, other tabs and subsequent logins cannot deliver the same candidate again. This deliberately also consumes prefetched cards and responses lost in transit. `POST /api/feed/view` idempotently records `viewed_at` for an already delivered card without creating a swipe. Explicit pass persists `excluded_at` independently of swipe rows. History has no TTL and follows the existing account deletion lifecycle. Legacy `/api/deck/restart` returns 410; `/api/rewind` rejects pass with 409. Likes, matches and message soft-deletion retain their existing lifecycle.

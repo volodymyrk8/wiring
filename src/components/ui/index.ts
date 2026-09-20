@@ -15,3 +15,4 @@ export * from "./ProfileAvatarIcon";
 export * from "./ProfileMenu";
 export * from "./TagPicker";
 export * from "./useDismissibleLayer";
+export * from "./IconButton";

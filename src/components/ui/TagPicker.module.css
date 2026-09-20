@@ -14,7 +14,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 34px;
+  min-height: 44px;
   padding: 7px 11px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -72,3 +72,7 @@
 
 .tag:hover .tip,
 .tag:focus-visible .tip { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tag { transition: none; }
+}

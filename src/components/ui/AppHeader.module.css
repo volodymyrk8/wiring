@@ -36,6 +36,7 @@
 
 .headerStart {
   display: flex;
+  gap: 8px;
   align-items: center;
   flex-shrink: 0;
 }
@@ -203,7 +204,7 @@
   transition: color 0.16s ease;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .brandGroup {
     gap: 8px;
   }
@@ -345,51 +346,6 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-}
-
-.swatches {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.swatch {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 6px;
-  border: 1px solid rgba(63, 55, 47, 0.2);
-  cursor: pointer;
-  background: #f3eee6;
-  transition: transform 0.12s ease, outline-color 0.15s ease;
-}
-
-.swatch:hover {
-  transform: scale(1.1);
-}
-
-.swatch[data-theme-set="pastel"] {
-  background: #f3eee6;
-}
-
-.swatch[data-theme-set="mist"] {
-  background: #e9ebf3;
-}
-
-.swatch[data-theme-set="night"] {
-  background: #110e0c;
-  border-color: rgba(244, 234, 216, 0.28);
-}
-
-.swatch[data-theme-set="slate"] {
-  background: #0b0f14;
-  border-color: rgba(167, 184, 204, 0.35);
-}
-
-.swatch[data-theme-set="dusk"] {
-  background: #1a1c24;
-  border-color: rgba(154, 165, 209, 0.35);
 }
 
 @media (max-width: 420px) {

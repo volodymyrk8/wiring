@@ -13,6 +13,7 @@ type ButtonProps = {
   onClick?: (e: any) => void;
   className?: string;
   ariaLabel?: string;
+  form?: string;
   children: ComponentChildren;
 };
 
@@ -29,6 +30,7 @@ export function Button({
   onClick,
   className,
   ariaLabel,
+  form,
   children,
 }: ButtonProps) {
   const classNames = [
@@ -64,6 +66,7 @@ export function Button({
       aria-busy={loading || undefined}
       onClick={onClick}
       aria-label={ariaLabel}
+      form={form}
     >
       {loading && (
         <svg

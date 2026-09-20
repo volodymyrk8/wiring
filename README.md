@@ -31,7 +31,7 @@ src/
   features/chat/     # chats list, thread, polling and composer
   features/likes/    # incoming likes, filters and WIRING+ gate
   features/person/   # public profile, photo gallery and safety actions
-  features/deck/     # swipe feed, filters and undo/restart actions
+  features/deck/     # vertical feed, filters and explicit like/exclude actions
   features/account/  # invite, onboarding and delete-account flows
   features/profile/  # profile, consents, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
@@ -126,3 +126,9 @@ sudo -u postgres psql -c "CREATE DATABASE wiring OWNER wiring_app;"
 echo 'DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring' | sudo tee -a /etc/wiring.env
 sudo systemctl restart wiring
 ```
+
+Server documents mount the same Preact `AppHeader` via `src/entries/server-header.tsx` → `public/dist/server-header.js`. Theme choice uses the shared `src/lib/theme.ts` helper.
+
+The `/feed` screen scrolls vertically without creating likes or passes. Like and permanent exclusion are explicit actions. Random delivery history is stored in PostgreSQL; see `docs/architecture.md` for reservation and prefetch semantics.
+
+Feed photos support horizontal swipes, numbered photo controls and Left/Right keys. The shared “Открыть профиль” button opens the full profile, whose gallery uses the same gesture handling.

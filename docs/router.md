@@ -39,3 +39,9 @@ Legal/admin (`/rules`, `/privacy`, `/admin`, …) are **server templates**, not 
 4. Auth screens call `syncUrl()` after Preact mount.
 
 When adding a route: update **`routes.ts`**, **`app.py`** SPA GET, and **`router.test.mjs`**.
+
+Server legal/admin templates load `public/dist/server-header.js` to mount the shared `AppHeader`; document bodies remain server-rendered and URLs are unchanged. Auth headers mount with the Preact auth feature.
+
+The `/feed` URL is unchanged. The vertical Preact feed uses `GET /api/feed?limit=2` and `POST /api/feed/view`; scrolling does not call `/api/swipe`. Like/pass are explicit actions, with a shared Modal confirmation for permanent pass. SPA navigation retains loaded cards and position; document reload requests unseen delivery history, as documented in `architecture.md`.
+
+The feed’s “Открыть профиль” Button link uses the existing `/p/:id` route. Horizontal photo gestures and Left/Right keys are local gallery state and do not change the URL or send a swipe action.
