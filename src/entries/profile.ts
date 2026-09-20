@@ -1,2 +1,2 @@
-export { mountProfile, mountConsent, mountPlus } from "@/features/profile";
+export { mountProfile, mountConsent, mountPlus, mountNotifications } from "@/features/profile";
 export type { ProfileHostBridge, ProfileCatalog, ProfilePhoto, ProfileUser } from "@/features/profile";

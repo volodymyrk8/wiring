@@ -6,8 +6,6 @@
   const consentKey = "wiring-analytics-consent";
   if (!hasGa && !hasYm) return;
 
-  const removeBanner = () => document.querySelector(".analytics-consent")?.remove();
-
   const loadGa = () => {
     if (window.__wiringAnalyticsLoaded) return;
     window.__wiringAnalyticsLoaded = true;

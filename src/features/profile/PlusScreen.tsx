@@ -96,7 +96,6 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         homeHref={host.hrefFor("home")}
         onHomeClick={navigate("home")}
         showBack
-        backLabel="назад"
         backHref={host.hrefFor("profile")}
         onBackClick={navigate("profile")}
         className={styles.header}
@@ -110,9 +109,11 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
             profileHref={host.hrefFor("profile")}
             consentsHref={host.hrefFor("consents")}
             plusHref={host.hrefFor("plus")}
+            notificationsHref={host.hrefFor("notifications")}
             onProfileClick={navigate("profile")}
             onConsentsClick={navigate("consents")}
             onPlusClick={navigate("plus")}
+            onNotificationsClick={navigate("notifications")}
             onLogout={host.onLogout}
           />
         ) : null}

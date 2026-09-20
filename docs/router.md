@@ -24,6 +24,7 @@ src/router/
 | `/chats` | matches | |
 | `/chats/:id` | chat | Deep link |
 | `/me` | profile | |
+| `/notifications` | notifications | Preact profile bundle |
 | `/onboard` | onboard | |
 | `/p/:id` | person | Deep link |
 | `/r/:code` | register | Referral invite |

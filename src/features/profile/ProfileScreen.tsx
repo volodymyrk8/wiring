@@ -7,7 +7,6 @@ import {
   LegalFooter,
   ProfileMenu,
   Select,
-  Switch,
   TagPicker,
   Textarea,
 } from "@/components/ui";
@@ -177,11 +176,6 @@ export function ProfileScreen({ host }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [notifyBusy, setNotifyBusy] = useState(false);
-  const [notifyState, setNotifyState] = useState<NotificationPermission | "unsupported">(() => {
-    if (typeof Notification === "undefined") return "unsupported";
-    return Notification.permission;
-  });
   const draftTimerRef = useRef<number | null>(null);
   const draftSyncRef = useRef(false);
 
@@ -323,43 +317,6 @@ export function ProfileScreen({ host }: Props) {
     }
   };
 
-  const notifyEnabled = user.notify_enabled !== false;
-  const notifyPush = notifyEnabled && user.notify_push !== false;
-
-  const patchNotifications = async (patch: { enabled?: boolean; push?: boolean }) => {
-    if (notifyBusy) return;
-    setNotifyBusy(true);
-    setServerError("");
-    try {
-      let push = patch.push;
-      if (push && typeof Notification !== "undefined") {
-        if (Notification.permission === "default") {
-          const permission = await Notification.requestPermission();
-          setNotifyState(permission);
-          if (permission !== "granted") push = false;
-        } else if (Notification.permission === "denied") {
-          push = false;
-          host.toast("разреши уведомления в настройках браузера");
-        }
-      }
-      const body: { enabled?: boolean; push?: boolean } = {};
-      if (patch.enabled !== undefined) body.enabled = patch.enabled;
-      if (push !== undefined) body.push = push;
-      else if (patch.push !== undefined) body.push = patch.push;
-      const response = await host.api("/api/notifications", {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
-      const nextUser = response.user as ProfileUser;
-      setUser(nextUser);
-      host.onUserUpdated(nextUser);
-    } catch (caught) {
-      setServerError(getErrorMessage(caught));
-    } finally {
-      setNotifyBusy(false);
-    }
-  };
-
   const addPrompt = (event: JSX.TargetedEvent<HTMLSelectElement, Event>) => {
     const id = event.currentTarget.value;
     if (!id || draft.prompts.some((prompt) => prompt.id === id)) return;
@@ -388,6 +345,7 @@ export function ProfileScreen({ host }: Props) {
             profileHref={host.hrefFor("profile")}
             consentsHref={host.hrefFor("consents")}
             plusHref={host.hrefFor("plus")}
+            notificationsHref={host.hrefFor("notifications")}
             onProfileClick={handleNav("profile")}
             onConsentsClick={handleNav("consents")}
             onPlusClick={handleNav("plus")}
@@ -477,33 +435,7 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Уведомления и WIRING+</h2></div>
-              <div class={styles.notifyList}>
-                <Switch
-                  name="notify-enabled"
-                  checked={notifyEnabled}
-                  disabled={notifyBusy}
-                  loading={notifyBusy}
-                  onChange={(checked) => void patchNotifications({ enabled: checked })}
-                >
-                  уведомления о лайках и сообщениях — всплывающие подсказки на сайте
-                </Switch>
-                <Switch
-                  name="notify-push"
-                  checked={notifyPush && notifyState === "granted"}
-                  disabled={notifyBusy || !notifyEnabled || notifyState === "unsupported"}
-                  loading={notifyBusy}
-                  onChange={(checked) => void patchNotifications({ push: checked })}
-                >
-                  системные уведомления — когда вкладка в фоне (Android, iOS, компьютер)
-                </Switch>
-              </div>
-              {notifyEnabled && notifyState === "denied" ? (
-                <p class={styles.notifyHint}>Браузер запретил системные уведомления. Их можно включить в настройках сайта в Safari или Chrome.</p>
-              ) : null}
-              {notifyEnabled && notifyState === "unsupported" ? (
-                <p class={styles.notifyHint}>Этот браузер не показывает системные уведомления — останутся подсказки на сайте и счётчики в меню.</p>
-              ) : null}
+              <div class={styles.sectionTitle}><h2>WIRING+</h2></div>
               <a class={styles.plusLink} href={host.hrefFor("plus")} data-nav="plus" onClick={handleNav("plus")}><span><strong>WIRING+</strong><small>{user.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</small></span><span>настроить ↗</span></a>
               {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>WIRING+ на {user.ref_days || 30} дней вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
             </section>

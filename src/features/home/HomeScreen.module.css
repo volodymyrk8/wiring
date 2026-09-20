@@ -20,7 +20,7 @@
   gap: 0;
   min-height: 0;
   padding-block: clamp(12px, 2.8vh, 28px);
-  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  padding-inline: max(var(--layout-gutter, 16px), env(safe-area-inset-left)) max(var(--layout-gutter, 16px), env(safe-area-inset-right));
   box-sizing: border-box;
 }
 

@@ -65,6 +65,7 @@ export type AppHeaderProps = {
   homeHref?: string;
   onHomeClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement>) => void;
   logoPosition?: "left" | "center";
+  brandPosition?: "left" | "center" | "right";
   showActions?: boolean;
   showBetaBadge?: boolean;
   showThemeSelect?: boolean;
@@ -75,7 +76,7 @@ export type AppHeaderProps = {
   showBack?: boolean;
   backHref?: string;
   backNav?: string;
-  backLabel?: ComponentChildren;
+  backLabel?: ComponentChildren | false;
   onBackClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   leftSlot?: ComponentChildren;
   rightSlot?: ComponentChildren;
@@ -89,6 +90,7 @@ export function AppHeader({
   homeHref = "/",
   onHomeClick,
   logoPosition = "left",
+  brandPosition = "right",
   showActions = true,
   showBetaBadge = true,
   sectionTitle,
@@ -101,7 +103,7 @@ export function AppHeader({
   showBack,
   backHref,
   backNav,
-  backLabel = "назад",
+  backLabel = false,
   onBackClick,
   leftSlot,
   rightSlot,
@@ -143,7 +145,7 @@ export function AppHeader({
 
   return (
     <header
-      class={`${styles.header}${isCenter ? ` ${styles.center}` : ""}${className ? ` ${className}` : ""}`}
+      class={`${styles.header}${isCenter ? ` ${styles.center}` : ""}${brandPosition === "right" ? ` ${styles.right}` : ""}${className ? ` ${className}` : ""}`}
       aria-label="шапка сайта"
       data-logo-position={logoPosition}
     >

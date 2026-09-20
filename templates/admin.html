@@ -36,6 +36,13 @@
         <label>токен<input name="token" type="password" required autocomplete="current-password"></label>
         <button class="solid" type="submit">войти</button>
       </form>
+      {% if local_admin_login %}
+      <form class="form" method="post" action="/admin">
+        <label>локальный логин<input name="login" type="text" value="{{ local_admin_login }}" autocomplete="username" required></label>
+        <label>локальный пароль<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="solid" type="submit">войти локально</button>
+      </form>
+      {% endif %}
     {% else %}
       <div class="admin-grid">
         <div class="prompt-card"><div class="q">живые</div><p>{{ s.users_real }}</p></div>

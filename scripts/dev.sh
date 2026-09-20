@@ -3,6 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+python3 scripts/ensure_local_admin.py
 if [[ -f .env ]]; then
   set -a
   # shellcheck disable=SC1091

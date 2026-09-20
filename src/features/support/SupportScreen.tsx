@@ -88,10 +88,12 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
               profileHref={host.hrefFor("profile")}
               consentsHref={host.hrefFor("consents")}
               plusHref={host.hrefFor("plus")}
+              notificationsHref={host.hrefFor("notifications")}
               supportHref={host.hrefFor("support")}
               onProfileClick={() => host.navigate("profile")}
               onConsentsClick={() => host.navigate("consents")}
               onPlusClick={() => host.navigate("plus")}
+              onNotificationsClick={() => host.navigate("notifications")}
               onSupportClick={() => host.navigate("support")}
               onLogout={host.onLogout}
             />

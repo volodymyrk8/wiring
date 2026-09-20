@@ -1332,6 +1332,7 @@ def index():
 @app.get("/p/<int:person_id>")
 @app.get("/r/<code>")
 @app.get("/support")
+@app.get("/notifications")
 def spa_app(**_kwargs):
     return _spa()
 
@@ -2940,12 +2941,31 @@ def api_notices_read():
     return jsonify({"ok": True})
 
 
-def _admin_token() -> str:
-    return (os.environ.get("ADMIN_TOKEN") or "").strip()
+def _admin_tokens() -> tuple[str, ...]:
+    raw = os.environ.get("ADMIN_TOKEN") or ""
+    return tuple(dict.fromkeys(token.strip() for token in raw.split(",") if token.strip()))
+
+
+def _local_admin_credentials() -> tuple[str, str]:
+    """Return opt-in local admin credentials, never enabled on non-local requests."""
+    login = (os.environ.get("LOCAL_ADMIN_LOGIN") or "").strip()
+    password = os.environ.get("LOCAL_ADMIN_PASSWORD") or ""
+    if not login or not password:
+        return "", ""
+    remote = (request.remote_addr or "").strip().lower()
+    host = request.host.split(":", 1)[0].strip("[]").lower()
+    debug = os.environ.get("FLASK_DEBUG") == "1" or app.debug or app.testing
+    if not debug or remote not in {"127.0.0.1", "::1", "localhost"} or host not in {"127.0.0.1", "::1", "localhost"}:
+        return "", ""
+    return login, password
+
+
+def _admin_auth_available() -> bool:
+    return bool(_admin_tokens() or _local_admin_credentials()[0])
 
 
 def _admin_ready() -> bool:
-    return bool(_admin_token() and session.get("admin"))
+    return bool(_admin_auth_available() and session.get("admin"))
 
 
 def _admin_tickets(conn: Connection) -> list[Row]:
@@ -2965,6 +2985,7 @@ def _admin_tasks(conn: Connection) -> list[Row]:
 
 def _admin_view(error: str | None = None, status: int = 200):
     conn = db()
+    local_login, _ = _local_admin_credentials()
     return (
         render_template(
             "admin.html",
@@ -2976,6 +2997,7 @@ def _admin_view(error: str | None = None, status: int = 200):
             task_counts=task_counts(conn),
             task_threshold=task_threshold(),
             error=error,
+            local_admin_login=local_login,
         ),
         status,
     )
@@ -2983,27 +3005,33 @@ def _admin_view(error: str | None = None, status: int = 200):
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin_page():
-    token = _admin_token()
-    if not token:
+    tokens = _admin_tokens()
+    local_login, local_password = _local_admin_credentials()
+    if not tokens and not local_login:
         abort(404)
     if request.args.get("out"):
         session.pop("admin", None)
         return redirect("/admin")
-    if _token_ok(str(request.args.get("token") or ""), token):
+    query_token = str(request.args.get("token") or "")
+    if any(_token_ok(query_token, candidate) for candidate in tokens):
         session["admin"] = True
     error = None
     status = 200
     if request.method == "POST":
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
         if too_many(f"admin:{ip}", 12, 3600):
-            return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error="подожди немного"), 429
-        if _token_ok(str(request.form.get("token") or ""), token):
+            return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error="подожди немного", local_admin_login=local_login), 429
+        submitted_token = str(request.form.get("token") or "")
+        token_ok = any(_token_ok(submitted_token, token) for token in tokens)
+        local_ok = bool(local_login and _token_ok(str(request.form.get("login") or ""), local_login)
+                        and _token_ok(str(request.form.get("password") or ""), local_password))
+        if token_ok or local_ok:
             session["admin"] = True
         else:
-            error = "не тот токен"
+            error = "не тот токен или логин/пароль"
             status = 403
     if not session.get("admin"):
-        return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error=error), status
+        return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error=error, local_admin_login=local_login), status
     return _admin_view()
 
 

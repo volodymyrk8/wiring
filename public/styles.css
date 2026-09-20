@@ -31,6 +31,7 @@ html[data-theme="mist"] {
   --container-app: 540px;
   --container-page: 720px;
   --container-admin: 960px;
+  --layout-gutter: 16px;
 }
 
 html[data-theme="pastel"] {
@@ -329,9 +330,14 @@ html[data-view="login"][data-tabs] .auth-shell {
   }
 }
 @media (min-width: 768px) {
+  :root { --layout-gutter: 24px; }
   .brand-section {
     font-size: 21px;
   }
+}
+
+@media (min-width: 1025px) {
+  :root { --layout-gutter: 28px; }
 }
 @media (min-width: 1025px) {
   .brand-section {

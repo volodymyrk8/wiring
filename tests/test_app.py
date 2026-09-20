@@ -876,6 +876,32 @@ class WiringTest(unittest.TestCase):
         self.assertIn("мэтчи", body)
         self.assertIn("популярные фильтры", body)
 
+    def test_local_admin_login_is_loopback_only(self):
+        with patch.dict(os.environ, {
+            "ADMIN_TOKEN": "",
+            "LOCAL_ADMIN_LOGIN": "LEX",
+            "LOCAL_ADMIN_PASSWORD": "local-only-test-password",
+            "FLASK_DEBUG": "0",
+        }, clear=False):
+            form = self.client.get("/admin")
+            self.assertEqual(form.status_code, 200)
+            self.assertIn("LEX", form.get_data(as_text=True))
+            denied = self.client.post("/admin", data={"login": "LEX", "password": "nope"})
+            self.assertEqual(denied.status_code, 403)
+            ok = self.client.post("/admin", data={"login": "LEX", "password": "local-only-test-password"})
+            self.assertEqual(ok.status_code, 200)
+            self.assertIn("живые", ok.get_data(as_text=True))
+            external = self.client.get("/admin", base_url="https://example.com")
+            self.assertEqual(external.status_code, 404)
+
+    def test_admin_accepts_multiple_configured_tokens(self):
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "old-local-token,new-local-token"}, clear=False):
+            for token in ("old-local-token", "new-local-token"):
+                client = app.test_client()
+                ok = client.post("/admin", data={"token": token})
+                self.assertEqual(ok.status_code, 200)
+                self.assertIn("живые", ok.get_data(as_text=True))
+
     def _plus(self):
         redeemed = self.client.post("/api/premium/redeem", json={"code": "WIRINGPLUS"})
         self.assertEqual(redeemed.status_code, 200, redeemed.get_data(as_text=True))

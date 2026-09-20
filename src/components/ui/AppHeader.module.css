@@ -20,7 +20,7 @@
   width: 100%;
   max-width: var(--container-app, 540px);
   margin: 0 auto;
-  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  padding-inline: max(var(--layout-gutter, 16px), env(safe-area-inset-left)) max(var(--layout-gutter, 16px), env(safe-area-inset-right));
   box-sizing: border-box;
   position: relative;
 }
@@ -32,6 +32,15 @@
 
 .center .brand {
   margin-inline: auto;
+}
+
+.right:not(.center) .brandGroup {
+  order: 2;
+  margin-left: 0;
+}
+
+.right:not(.center) .headerEnd {
+  order: 1;
 }
 
 .headerStart {
@@ -57,18 +66,18 @@
 }
 
 .backBtn {
-  width: auto !important;
+  width: 44px !important;
   min-width: 44px !important;
   height: 44px !important;
   min-height: 44px !important;
-  padding: 0 10px 0 6px !important;
+  padding: 0 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 0 !important;
-  border-radius: 999px !important;
-  background: transparent !important;
-  border: none !important;
+  border-radius: 50% !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: var(--ink) !important;
   line-height: 1 !important;
@@ -77,8 +86,8 @@
 }
 
 .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   color: var(--ink) !important;
   transform: translateY(-1px);
   box-shadow: none !important;
@@ -110,62 +119,62 @@
 }
 
 :global(html[data-theme="mist"]) .backBtn {
-  background: transparent !important;
-  border: none !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: #32344a !important;
 }
 :global(html[data-theme="mist"]) .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
 }
 
 :global(html[data-theme="pastel"]) .backBtn {
-  background: transparent !important;
-  border: none !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: #3f372f !important;
 }
 :global(html[data-theme="pastel"]) .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
 }
 
 :global(html[data-theme="night"]) .backBtn {
-  background: transparent !important;
-  border: none !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: #f4ead8 !important;
 }
 :global(html[data-theme="night"]) .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
 }
 
 :global(html[data-theme="slate"]) .backBtn {
-  background: transparent !important;
-  border: none !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: #d7e0ea !important;
 }
 :global(html[data-theme="slate"]) .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
 }
 
 :global(html[data-theme="dusk"]) .backBtn {
-  background: transparent !important;
-  border: none !important;
+  background: var(--card) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   color: #e4e6ef !important;
 }
 :global(html[data-theme="dusk"]) .backBtn:hover:not(:disabled) {
-  background: transparent !important;
-  border: none !important;
+  background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
+  border-color: var(--accent-line) !important;
   box-shadow: none !important;
 }
 
@@ -311,6 +320,7 @@
   gap: 8px;
   margin-left: auto;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .headerEnd :global(.avatar-slot),

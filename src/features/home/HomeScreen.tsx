@@ -48,6 +48,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
         onHomeClick={handleNav("home")}
         showThemeSelect
         onThemeSelect={onThemeSelect}
+        brandPosition="left"
         rightSlot={
           signed ? (
             <ProfileMenu
@@ -57,9 +58,11 @@ export function HomeScreen({ host }: HomeScreenProps) {
               profileHref={hrefFor("profile")}
               consentsHref={hrefFor("consents")}
               plusHref={hrefFor("plus")}
+              notificationsHref={hrefFor("notifications")}
               onProfileClick={handleNav("profile")}
               onConsentsClick={handleNav("consents")}
               onPlusClick={handleNav("plus")}
+              onNotificationsClick={handleNav("notifications")}
               onLogout={host.onLogout}
             />
           ) : (

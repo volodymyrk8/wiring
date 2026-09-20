@@ -2,6 +2,7 @@ import { render } from "preact";
 import { ProfileScreen } from "./ProfileScreen";
 import { ConsentScreen } from "./ConsentScreen";
 import { PlusScreen } from "./PlusScreen";
+import { NotificationSettingsScreen } from "./NotificationSettingsScreen";
 import type { ProfileHostBridge } from "./types";
 
 export function mountProfile(container: HTMLElement, host: ProfileHostBridge): () => void {
@@ -16,5 +17,10 @@ export function mountConsent(container: HTMLElement, host: ProfileHostBridge): (
 
 export function mountPlus(container: HTMLElement, host: ProfileHostBridge): () => void {
   render(<PlusScreen host={host} />, container);
+  return () => render(null, container);
+}
+
+export function mountNotifications(container: HTMLElement, host: ProfileHostBridge): () => void {
+  render(<NotificationSettingsScreen host={host} />, container);
   return () => render(null, container);
 }

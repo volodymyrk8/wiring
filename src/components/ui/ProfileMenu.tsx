@@ -13,10 +13,12 @@ export type ProfileMenuProps = {
   consentsHref?: string;
   plusHref?: string;
   supportHref?: string;
+  notificationsHref?: string;
   onProfileClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onConsentsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onPlusClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onSupportClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
+  onNotificationsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onLogout?: () => void;
   className?: string;
 };
@@ -29,10 +31,12 @@ export function ProfileMenu({
   consentsHref = "/consents",
   plusHref = "/plus",
   supportHref = "/support",
+  notificationsHref = "/notifications",
   onProfileClick,
   onConsentsClick,
   onPlusClick,
   onSupportClick,
+  onNotificationsClick,
   onLogout,
   className,
 }: ProfileMenuProps) {
@@ -175,6 +179,25 @@ export function ProfileMenu({
               </svg>
             </span>
             <span class={styles.itemText}>Поддержка</span>
+          </a>
+
+          <a
+            href={notificationsHref}
+            data-nav="notifications"
+            class={styles.menuItem}
+            onClick={(e) => {
+              setIsOpen(false);
+              onNotificationsClick?.(e);
+            }}
+            role="menuitem"
+          >
+            <span class={styles.itemIcon}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </span>
+            <span class={styles.itemText}>Уведомления</span>
           </a>
 
           <div class={styles.divider} />

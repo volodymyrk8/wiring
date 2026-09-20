@@ -33,7 +33,7 @@ src/
   features/person/   # public profile, photo gallery and safety actions
   features/deck/     # vertical feed, filters and explicit like/exclude actions
   features/account/  # invite, onboarding and delete-account flows
-  features/profile/  # profile, consents, and WIRING+ screens
+  features/profile/  # profile, notification settings, consents, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js
   entries/router.ts  # → public/dist/router.js (URL ↔ view)
@@ -88,6 +88,8 @@ cp .env.example .env
 **Ещё 10 тестовых профилей** (`alma@wiring.test` … `jura@wiring.test`, пароль везде `wiring-dev`) — заполненные анкеты для ленты и фильтров. У **Дева** автоматически **7 чатов** с первыми семью из них, в каждом **10 сообщений** (фиктивные переписки для проверки UI).
 
 `./scripts/dev.sh` перед стартом создаёт всё это. Повторно: `python3 scripts/ensure_dev_user.py` или только соц-часть: `python3 scripts/seed_test_social.py` (нужен уже созданный Дев).
+
+Для локальной админки `./scripts/dev.sh` также один раз создаёт в `.env` отдельный логин `LEX` и случайный пароль. Пароль не выводится в терминал: он остаётся в локальном `.env` с правами `0600`. Чтобы безопасно сбросить его, удалите строку `LOCAL_ADMIN_PASSWORD` из `.env` и перезапустите dev-сервер; скрипт создаст новый. Этот вход работает только на loopback в debug/test и не влияет на production; токен `ADMIN_TOKEN` продолжает работать отдельно.
 
 **Исключения:** сценарии «гость» (`POST /api/demo`), регистрация и почтовое подтверждение — отдельные проверки со своими шагами.
 

@@ -17,6 +17,7 @@ export const SPA_PATHS = {
   onboard: "/onboard",
   deleteAccount: "/delete-account",
   support: "/support",
+  notifications: "/notifications",
 } as const satisfies Record<string, string>;
 
 export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
@@ -37,6 +38,7 @@ export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
   [SPA_PATHS.onboard]: "onboard",
   [SPA_PATHS.deleteAccount]: "delete-account",
   [SPA_PATHS.support]: "support",
+  [SPA_PATHS.notifications]: "notifications",
 };
 
 /** Views that need no session (hydrate allows direct URL). */

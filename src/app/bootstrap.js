@@ -813,7 +813,7 @@ import { createInboxController } from "./inbox";
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus"].includes(next)) {
+    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -843,7 +843,7 @@ import { createInboxController } from "./inbox";
       await loadLikes();
       await refreshMe();
     }
-    if (["profile", "consents", "plus"].includes(state.view) && state.user) await refreshMe();
+    if (["profile", "consents", "plus", "notifications"].includes(state.view) && state.user) await refreshMe();
     render();
   };
 
@@ -919,6 +919,8 @@ import { createInboxController } from "./inbox";
         ? mod.mountConsent(mountEl, profileHost)
         : view === "plus"
           ? mod.mountPlus(mountEl, profileHost)
+          : view === "notifications"
+            ? mod.mountNotifications(mountEl, profileHost)
           : mod.mountProfile(mountEl, profileHost);
       bindDataNavLinks();
       syncUrl();
@@ -1069,7 +1071,7 @@ import { createInboxController } from "./inbox";
       homeFeatureUnmount?.();
       homeFeatureUnmount = null;
     }
-    if (!["profile", "consents", "plus"].includes(state.view)) {
+    if (!["profile", "consents", "plus", "notifications"].includes(state.view)) {
       profileFeatureUnmount?.();
       profileFeatureUnmount = null;
     }
@@ -1166,7 +1168,7 @@ import { createInboxController } from "./inbox";
       void renderAccountFeature(state.view);
       return;
     }
-    else if (["profile", "consents", "plus"].includes(state.view)) {
+    else if (["profile", "consents", "plus", "notifications"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
     }
@@ -1271,7 +1273,7 @@ import { createInboxController } from "./inbox";
       state.matches = data.matches;
     }
     if (state.view === "likes" && state.user) await loadLikes();
-    if (state.view === "profile" || state.view === "consents" || state.view === "plus") await refreshMe();
+    if (state.view === "profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications") await refreshMe();
     render();
   };
 

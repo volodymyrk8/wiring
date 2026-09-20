@@ -50,8 +50,8 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
     homeHref={host.hrefFor("home")}
     onHomeClick={navigate("home")}
     className={styles.header}
-    logoPosition="center"
-    hideBrand
+    logoPosition="left"
+    brandPosition="right"
     themePosition="start"
     showBetaBadge={false}
     showThemeSwatches

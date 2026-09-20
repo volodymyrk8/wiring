@@ -32,7 +32,7 @@ flowchart LR
 
 1. Почти все «страницы» (`/`, `/login`, `/feed`, `/chats/...`) — один **`templates/index.html`**: пустой `#app` + подключение собранного shell `public/dist/app.js`.
 2. **`src/app/bootstrap.js` — coordinator shell**: ходит в **`/api/*`**, хранит session state в памяти, синхронизирует URL через history API и передаёт typed host bridges в feature bundles. Общий API-клиент вынесен в `src/app/api.ts`, inbox-lifecycle — в `src/app/inbox.ts`, lazy-загрузка feature-бандлов — в `src/app/features.ts`; пользовательские экраны живут в Preact.
-3. Отдельные **серверные шаблоны**: `templates/admin.html`, `templates/legal.html` (правила, privacy). Экран `/support` вынесен в отдельный Preact-модуль `src/features/support`.
+3. Отдельные **серверные шаблоны**: `templates/admin.html`, `templates/legal.html` (правила, privacy). Экраны `/support` и `/notifications` вынесены в отдельные Preact-модули; настройки уведомлений живут рядом с профилем.
 4. Доменная логика вынесена из монолита в модули рядом с `app.py`: `catalog`, `notify`, `premium`, `media`, `matchmaker`, и т.д.
 
 ## Оценка текущей архитектуры
@@ -50,7 +50,7 @@ flowchart LR
 - **`src/app/bootstrap.js` всё ещё заметный** — в нём остаются routing, session state, API orchestration и host bridges; экранная разметка туда больше не добавляется.
 - **Нет отдельного API-контракта** (OpenAPI) — ок для одной команды и одного клиента.
 - **UI-граница** — новые экраны и feature-specific handlers добавляются только в `src/features/*`; `bootstrap.js` остаётся orchestration-слоем.
-- **Мигрированы в Preact** — auth, home, profile, consents, WIRING+, likes, person, deck, account и chats. Старые screen renderers и связанные global styles удалены.
+- **Мигрированы в Preact** — auth, home, profile, notification settings, consents, WIRING+, likes, person, deck, account и chats. Старые screen renderers и связанные global styles удалены.
 
 Итого: архитектура **простая и уместная** для WIRING; главный риск — рост двух монолитов (`app.py`, `src/app/bootstrap.js`), его гасим **KISS** и точечным выносом, а не новым стеком.
 
