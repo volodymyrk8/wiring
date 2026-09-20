@@ -36,6 +36,8 @@ export type ProfileUser = {
   ref_url?: string;
   ref_days?: number;
   ref_count?: number;
+  notify_enabled?: boolean;
+  notify_push?: boolean;
   [key: string]: unknown;
 };
 

@@ -109,6 +109,8 @@ export function createInboxController({
       seenNotices.add(note.id);
       const inChat = state.view === "chat" && state.chatId === Number(note.from_id) && note.kind === "message";
       if (inChat || !announce) continue;
+      const noticesOn = state.user?.notify_enabled !== false;
+      if (!noticesOn) continue;
       toast(note.body || "новое уведомление", noticeAction(note));
       pingBrowser(note.body || "новое уведомление");
       shown.push(note.id);

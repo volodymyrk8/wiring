@@ -407,6 +407,8 @@ def init_db() -> None:
         "premium_until": "INTEGER NOT NULL DEFAULT 0",
         "incognito": "INTEGER NOT NULL DEFAULT 0",
         "paused": "INTEGER NOT NULL DEFAULT 0",
+        "notify_enabled": "INTEGER NOT NULL DEFAULT 1",
+        "notify_push": "INTEGER NOT NULL DEFAULT 1",
         "referral_code": "TEXT",
         "privacy_accepted_at": "INTEGER",
         "special_data_consent_at": "INTEGER",
@@ -718,6 +720,8 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         payload["plus_until"] = plus_until(row)
         payload["incognito"] = bool(int(row["incognito"] or 0)) if "incognito" in keys else False
         payload["paused"] = bool(int(row["paused"] or 0)) if "paused" in keys else False
+        payload["notify_enabled"] = bool(int(row["notify_enabled"] if "notify_enabled" in keys else 1))
+        payload["notify_push"] = bool(int(row["notify_push"] if "notify_push" in keys else 1))
         code = str(row["referral_code"] or "") if "referral_code" in keys else ""
         if code and not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
             payload["ref"] = code
@@ -1104,7 +1108,12 @@ def discovery_allows(owner: Row, viewer: Row) -> bool:
 
 
 def _notifiable(row: Row) -> bool:
-    return is_live_profile(row)
+    if not is_live_profile(row):
+        return False
+    keys = set(row.keys())
+    if "notify_enabled" in keys and not int(row["notify_enabled"] or 0):
+        return False
+    return True
 
 
 def maybe_finish_onboard(conn: Connection, uid: int) -> None:
@@ -1781,6 +1790,30 @@ def api_patch_me():
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True), "draft": draft})
+
+
+@app.patch("/api/notifications")
+@login_required
+def api_patch_notifications():
+    data = request.get_json(silent=True) or {}
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row:
+        return jsonify({"ok": False, "error": "нет профиля"}), 401
+    keys = set(row.keys())
+    enabled = int(row["notify_enabled"] or 1) if "notify_enabled" in keys else 1
+    push = int(row["notify_push"] or 1) if "notify_push" in keys else 1
+    if "enabled" in data:
+        enabled = 1 if data.get("enabled") else 0
+    if "push" in data:
+        push = 1 if data.get("push") else 0
+    if not enabled:
+        push = 0
+    conn.execute("UPDATE users SET notify_enabled = ?, notify_push = ? WHERE id = ?", (enabled, push, uid))
+    conn.commit()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True)})
 
 
 def _eligible_card(

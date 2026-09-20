@@ -779,6 +779,17 @@ class WiringTest(unittest.TestCase):
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
         self.assertNotIn(ada["id"], ids)
 
+    def test_notification_preferences(self):
+        self._register()
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertTrue(me.get("notify_enabled", True))
+        off = self.client.patch("/api/notifications", json={"enabled": False})
+        self.assertTrue(off.get_json()["ok"])
+        self.assertFalse(off.get_json()["user"]["notify_enabled"])
+        on = self.client.patch("/api/notifications", json={"enabled": True, "push": True})
+        self.assertTrue(on.get_json()["user"]["notify_enabled"])
+        self.assertTrue(on.get_json()["user"]["notify_push"])
+
     def test_plus_snooze(self):
         self._register()
         self._peers(2)

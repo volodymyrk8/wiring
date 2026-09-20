@@ -425,6 +425,7 @@ import { createInboxController } from "./inbox";
   };
 
   const pingBrowser = (text) => {
+    if (state.user?.notify_enabled === false || state.user?.notify_push === false) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted" || !text) return;
     try {
       const note = new Notification("WIRING", {
