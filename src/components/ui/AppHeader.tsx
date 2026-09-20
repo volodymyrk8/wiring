@@ -80,6 +80,7 @@ export type AppHeaderProps = {
   leftSlot?: ComponentChildren;
   rightSlot?: ComponentChildren;
   sectionTitle?: ComponentChildren;
+  hideBrand?: boolean;
   children?: ComponentChildren;
   className?: string;
 };
@@ -91,6 +92,7 @@ export function AppHeader({
   showActions = true,
   showBetaBadge = true,
   sectionTitle,
+  hideBrand,
   showThemeSelect,
   showThemeSwatches,
   currentTheme,
@@ -178,7 +180,7 @@ export function AppHeader({
           <div class={styles.headerStart}>{themePosition === "start" && themeControl}{leftSlot}</div>
         ) : null}
 
-        <div class={styles.brandGroup}>
+        {!hideBrand && <div class={styles.brandGroup}>
           <a
             class={styles.brand}
             href={homeHref}
@@ -205,7 +207,7 @@ export function AppHeader({
               </span>
             </>
           )}
-        </div>
+        </div>}
 
         {showActions && (
           <div class={styles.headerEnd}>
@@ -218,4 +220,3 @@ export function AppHeader({
     </header>
   );
 }
-
