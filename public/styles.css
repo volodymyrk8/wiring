@@ -304,7 +304,7 @@ html[data-view="login"][data-tabs] .auth-shell {
 .topbar,
 .app-head {
   width: 100%;
-  border-bottom: none;
+  border-bottom: 1px solid var(--line);
   background: transparent;
   margin-bottom: 12px;
   flex-shrink: 0;
@@ -2303,6 +2303,7 @@ body.support-page .legal,
 }
 
 .btn.solid {
+  background: var(--lime);
   background: linear-gradient(135deg, var(--lime), color-mix(in srgb, var(--lime) 75%, var(--coral)));
   color: var(--on-accent);
   box-shadow: 0 4px 16px var(--accent-soft), 0 1px 2px rgba(0, 0, 0, 0.08);
@@ -2340,6 +2341,7 @@ html[data-theme="night"] .btn.solid span {
 
 .btn.danger,
 .btn.solid.danger {
+  background: var(--coral, #e11d48);
   background: linear-gradient(135deg, var(--coral, #e11d48), color-mix(in srgb, var(--coral, #e11d48) 75%, #000));
   color: #ffffff;
   box-shadow: 0 4px 16px rgba(225, 29, 72, 0.28);
@@ -2354,6 +2356,7 @@ html[data-theme="night"] .btn.solid span {
 }
 
 .btn.ghost {
+  background: var(--card);
   background: color-mix(in srgb, var(--card) 60%, transparent);
   border-color: var(--line);
   color: var(--ink);
@@ -2361,6 +2364,7 @@ html[data-theme="night"] .btn.solid span {
 }
 
 .btn.ghost:hover:not(:disabled) {
+  background: var(--card);
   background: color-mix(in srgb, var(--line) 40%, var(--card));
   border-color: var(--accent-line);
   color: var(--ink);
