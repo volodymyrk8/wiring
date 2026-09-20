@@ -233,6 +233,71 @@ class WiringTest(unittest.TestCase):
         response = self.client.get("/api/feed?limit=2").get_json()
         self.assertEqual(len(response["cards"]), 2)
 
+    def test_feed_reset_requires_current_premium(self):
+        import time
+        me = self._register()
+        self._peers(1)
+        self._login("ada@example.com")
+        page = self.client.get("/api/feed").get_json()
+        payload = {"generation": page["generation"], "plus": True}
+        self.assertEqual(self.client.post("/api/feed/reset", json=payload).status_code, 403)
+        with app.app_context():
+            db().execute("UPDATE users SET premium_until = ? WHERE id = ?", (int(time.time()) - 1, me["id"]))
+            db().commit()
+        self.assertEqual(self.client.post("/api/feed/reset", json=payload).status_code, 403)
+        self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
+        self._logout()
+        self.assertEqual(self.client.post("/api/feed/reset", json=payload).status_code, 401)
+
+    def test_feed_reset_preserves_exclusions_likes_messages_and_other_viewers(self):
+        from premium import grant_premium
+        import time
+        me = self._register()
+        self._peers(4)
+        self._login("ada@example.com")
+        page = self.client.get("/api/feed").get_json()
+        liked, excluded, *repeat = [card["id"] for card in page["cards"]]
+        self.client.post("/api/swipe", json={"target_id": liked, "direction": "like"})
+        self.client.post("/api/swipe", json={"target_id": excluded, "direction": "pass"})
+        with app.app_context():
+            conn = db()
+            grant_premium(conn, me["id"], 1)
+            conn.execute("INSERT INTO messages (from_id, to_id, body, created_at) VALUES (?, ?, ?, ?)", (me["id"], liked, "keep", int(time.time())))
+            conn.execute("INSERT INTO feed_history (user_id, other_id, delivered_at) VALUES (?, ?, ?)", (liked, me["id"], int(time.time())))
+            conn.commit()
+        result = self.client.post("/api/feed/reset", json={"generation": page["generation"], "user_id": liked})
+        self.assertEqual(result.status_code, 200)
+        self.assertTrue(result.get_json()["reset"])
+        again = self.client.get("/api/feed").get_json()
+        self.assertEqual({card["id"] for card in again["cards"]}, set(repeat))
+        with app.app_context():
+            conn = db()
+            self.assertIsNotNone(conn.execute("SELECT excluded_at FROM feed_history WHERE user_id = ? AND other_id = ?", (me["id"], excluded)).fetchone()["excluded_at"])
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM swipes WHERE from_id = ?", (me["id"],)).fetchone()["n"], 2)
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM messages WHERE from_id = ?", (me["id"],)).fetchone()["n"], 1)
+            self.assertIsNotNone(conn.execute("SELECT 1 FROM feed_history WHERE user_id = ? AND other_id = ?", (liked, me["id"])).fetchone())
+
+    def test_feed_reset_retry_does_not_clear_new_delivery(self):
+        from premium import grant_premium
+        me = self._register()
+        self._peers(2)
+        self._login("ada@example.com")
+        page = self.client.get("/api/feed").get_json()
+        with app.app_context():
+            grant_premium(db(), me["id"], 1)
+            db().commit()
+        for invalid in ({}, {"generation": -1}, {"generation": True}, {"generation": "0"}, []):
+            self.assertEqual(self.client.post("/api/feed/reset", json=invalid).status_code, 400)
+        payload = {"generation": page["generation"]}
+        first = self.client.post("/api/feed/reset", json=payload).get_json()
+        self.assertTrue(first["reset"])
+        again = self.client.get("/api/feed").get_json()
+        self.assertEqual(len(again["cards"]), 2)
+        retry = self.client.post("/api/feed/reset", json=payload).get_json()
+        self.assertFalse(retry["reset"])
+        self.assertEqual(retry["generation"], first["generation"])
+        self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
+
     def test_reject_underage(self):
         self.client.post(
             "/api/register",

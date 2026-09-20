@@ -13,6 +13,8 @@ type ButtonProps = {
   onClick?: (e: any) => void;
   className?: string;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
+  title?: string;
   form?: string;
   children: ComponentChildren;
 };
@@ -30,6 +32,8 @@ export function Button({
   onClick,
   className,
   ariaLabel,
+  ariaDescribedBy,
+  title,
   form,
   children,
 }: ButtonProps) {
@@ -52,6 +56,8 @@ export function Button({
         onClick={onClick}
         aria-disabled={disabled || loading ? "true" : undefined}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        title={title}
       >
         <span>{children}</span>
       </a>
@@ -66,6 +72,8 @@ export function Button({
       aria-busy={loading || undefined}
       onClick={onClick}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      title={title}
       form={form}
     >
       {loading && (

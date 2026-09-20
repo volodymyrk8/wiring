@@ -5,10 +5,11 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from database import Connection, Row
+from database import Connection, Row, ensure_column
 
 
 def ensure_feed_history(conn: Connection) -> None:
+    ensure_column(conn, "users", "feed_generation", "INTEGER NOT NULL DEFAULT 0")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS feed_history (
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -32,14 +33,14 @@ def ensure_feed_history(conn: Connection) -> None:
 def claim_feed(
     conn: Connection, user_id: int, *, min_age: int, max_age: int, city: str,
     limit: int, eligible: Callable[[Row], dict[str, Any] | None],
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[list[dict[str, Any]], bool, int]:
     """Reserve a random page atomically; the caller must commit before sending it.
 
     Lock the viewer, not candidates: different viewers discover independently.
     At READ COMMITTED the SELECT after the lock sees the previous request's claims.
     Delivery is reserved before response, so retries/tabs cannot deliver duplicates.
     """
-    conn.execute("SELECT id FROM users WHERE id = ? FOR UPDATE", (user_id,)).fetchone()
+    viewer = conn.execute("SELECT feed_generation FROM users WHERE id = ? FOR UPDATE", (user_id,)).fetchone()
     rows = conn.execute("""
         SELECT * FROM users
         WHERE id != ? AND COALESCE(deleted_at, 0) = 0
@@ -65,7 +66,21 @@ def claim_feed(
         """, (user_id, row["id"], now)).rowcount
         if inserted:
             cards.append(card)
-    return cards, has_more
+    return cards, has_more, int(viewer["feed_generation"])
+
+
+def reset_delivery(conn: Connection, viewer: Row, expected_generation: int) -> tuple[bool, int]:
+    """Caller holds the viewer lock and has checked premium entitlement.
+
+    Compare-and-increment prevents a retry from clearing newly delivered cards.
+    Permanent exclusions and every swipe/message remain untouched.
+    """
+    generation = int(viewer["feed_generation"])
+    if expected_generation != generation:
+        return False, generation
+    conn.execute("DELETE FROM feed_history WHERE user_id = ? AND excluded_at IS NULL", (viewer["id"],))
+    conn.execute("UPDATE users SET feed_generation = feed_generation + 1 WHERE id = ?", (viewer["id"],))
+    return True, generation + 1
 
 
 def mark_viewed(conn: Connection, user_id: int, other_id: int) -> bool:

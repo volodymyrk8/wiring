@@ -1,5 +1,5 @@
 import { applyTheme, themeNow } from "../lib/theme";
-import { fetchFeed } from "./feed";
+import { fetchFeed, resetFeed } from "./feed";
 import { createApi } from "./api";
 import { createFeatureLoader } from "./features";
 import { createInboxController } from "./inbox";
@@ -45,6 +45,7 @@ import { createInboxController } from "./inbox";
     view: "home",
     cards: [],
     feedHasMore: true,
+    feedGeneration: 0,
     index: 0,
     photoIndex: 0,
     matches: [],
@@ -501,6 +502,7 @@ import { createInboxController } from "./inbox";
     state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
     const data = await fetchFeed(api, state.filters);
     state.feedHasMore = !!data.has_more;
+    state.feedGeneration = data.generation;
     state.cards = data.cards || [];
     state.index = 0;
     state.photoIndex = 0;
@@ -642,6 +644,7 @@ import { createInboxController } from "./inbox";
     filters: state.filters,
     filtersOpen: state.filtersOpen,
     hasMore: state.feedHasMore,
+    generation: state.feedGeneration,
     basePath: BASE,
     hrefFor,
     navigate: (view, params = {}) => {
@@ -652,11 +655,13 @@ import { createInboxController } from "./inbox";
       void goToView(view);
     },
     loadFeed: (filters, signal) => fetchFeed(api, filters, signal),
-    onFeedChange: (cards, index, filters, hasMore) => {
+    resetFeed: (generation, signal) => resetFeed(api, generation, signal),
+    onFeedChange: (cards, index, filters, hasMore, generation) => {
       state.cards = cards;
       state.index = index;
       state.filters = filters;
       state.feedHasMore = hasMore;
+      state.feedGeneration = generation;
       persistFilters();
     },
     onMatch: (match) => {

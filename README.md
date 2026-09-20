@@ -131,4 +131,6 @@ Server documents mount the same Preact `AppHeader` via `src/entries/server-heade
 
 The `/feed` screen scrolls vertically without creating likes or passes. Like and permanent exclusion are explicit actions. Random delivery history is stored in PostgreSQL; see `docs/architecture.md` for reservation and prefetch semantics.
 
-Feed photos support horizontal swipes, numbered photo controls and Left/Right keys. The shared “Открыть профиль” button opens the full profile, whose gallery uses the same gesture handling.
+Feed photos support horizontal swipes, numbered photo controls and Left/Right keys. The shared “Профиль” button opens the full profile, whose gallery uses the same gesture handling.
+
+WIRING+ users can replay eligible profiles from the exhausted feed after confirmation. Permanent exclusions and likes are retained; free accounts see a disabled replay button. The server enforces entitlement and retry safety.

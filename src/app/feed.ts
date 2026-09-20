@@ -1,6 +1,10 @@
 import type { ApiClient } from "./api";
 import type { DeckFilters, FeedPage } from "@/features/deck/types";
 
+export function resetFeed(api: ApiClient, generation: number, signal?: AbortSignal): Promise<{ reset: boolean; generation: number }> {
+  return api("/api/feed/reset", { method: "POST", signal, body: JSON.stringify({ generation }) });
+}
+
 /** Small pages reserve only the current card and one upcoming card. */
 export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSignal): Promise<FeedPage> {
   const query = new URLSearchParams({ limit: "2" });

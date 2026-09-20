@@ -27,7 +27,7 @@ from database import (
     open_request_connection,
     table_names as _db_table_names,
 )
-from feed import claim_feed, ensure_feed_history, exclude_profile, mark_viewed
+from feed import claim_feed, ensure_feed_history, exclude_profile, mark_viewed, reset_delivery
 from catalog import (
     GENDER_IDS,
     INTENT_IDS,
@@ -1919,7 +1919,7 @@ def api_feed():
         return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
                               skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me)
 
-    cards, has_more = claim_feed(db(), int(me["id"]), min_age=min_age, max_age=max_age,
+    cards, has_more, generation = claim_feed(db(), int(me["id"]), min_age=min_age, max_age=max_age,
                                  city=city_q, limit=limit, eligible=eligible)
     liked = db().execute(
         "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
@@ -1935,6 +1935,7 @@ def api_feed():
             "ok": True,
             "cards": cards,
             "has_more": has_more,
+            "generation": generation,
             "recycled": False,
             "unseen": len(cards),
             "passed": int(passed_n),
@@ -1959,6 +1960,22 @@ def api_feed_view():
         return jsonify({"ok": False, "error": "анкета не выдавалась"}), 404
     db().commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/feed/reset")
+@login_required
+def api_feed_reset():
+    data = request.get_json(silent=True) or {}
+    generation = data.get("generation") if isinstance(data, dict) else None
+    if type(generation) is not int or generation < 0:
+        return jsonify({"ok": False, "error": "неверная версия ленты"}), 400
+    conn = db()
+    viewer = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (session["uid"],)).fetchone()
+    if not is_premium(viewer):
+        return jsonify({"ok": False, "error": "доступно только с WIRING+"}), 403
+    reset, generation = reset_delivery(conn, viewer, generation)
+    conn.commit()
+    return jsonify({"ok": True, "reset": reset, "generation": generation})
 
 
 @app.post("/api/swipe")

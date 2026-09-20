@@ -39,6 +39,7 @@ export type DeckCatalog = {
 };
 
 export type FeedPage = {
+  generation: number;
   cards: DeckCard[];
   has_more: boolean;
   unseen?: number;
@@ -56,11 +57,13 @@ export type DeckHostBridge = {
   filters: DeckFilters;
   filtersOpen: boolean;
   hasMore: boolean;
+  generation: number;
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;
   navigate: (view: string, params?: Record<string, string | number>) => void;
   loadFeed: (filters: DeckFilters, signal?: AbortSignal) => Promise<FeedPage>;
-  onFeedChange: (cards: DeckCard[], index: number, filters: DeckFilters, hasMore: boolean) => void;
+  resetFeed: (generation: number, signal?: AbortSignal) => Promise<{ reset: boolean; generation: number }>;
+  onFeedChange: (cards: DeckCard[], index: number, filters: DeckFilters, hasMore: boolean, generation: number) => void;
   onMatch: (match: { id: number; name?: string }) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   toast: (message: string) => void;
