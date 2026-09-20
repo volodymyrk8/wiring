@@ -15,7 +15,8 @@ export type ViewId =
   | "plus"
   | "onboard"
   | "person"
-  | "delete-account";
+  | "delete-account"
+  | "support";
 
 export type MatchedRoute = {
   view: ViewId;

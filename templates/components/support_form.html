@@ -63,7 +63,7 @@
   </div>
 
   <div class="support-actions">
-    <button class="btn solid" type="submit" id="support-submit">
+    <button class="btn solid fullWidth" type="submit" id="support-submit">
       <span>Отправить сообщение</span>
     </button>
   </div>
@@ -78,6 +78,7 @@
     var submitBtn = document.getElementById("support-submit");
 
     if (bodyField && charCount) {
+      charCount.textContent = bodyField.value.length + " / 2000";
       bodyField.addEventListener("input", function () {
         charCount.textContent = bodyField.value.length + " / 2000";
       });
@@ -90,6 +91,7 @@
         var bodyVal = (bodyField ? bodyField.value : "").trim();
         if (bodyVal.length < 8) {
           statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>напиши чуть подробнее (минимум 8 символов)</p></div></div>';
+          if (bodyField) bodyField.focus();
           return;
         }
         if (submitBtn) {
@@ -107,6 +109,9 @@
           if (res.ok && data.ok) {
             form.remove();
             statusWrap.innerHTML = '<div class="card-status ok"><span class="status-icon">✓</span><div><h3>Сообщение отправлено</h3><p>' + (data.notice || 'отправили. ответим на почту, если её указал') + '</p></div></div>';
+            if (typeof statusWrap.scrollIntoView === "function") {
+              statusWrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
           } else {
             statusWrap.innerHTML = '<div class="card-status err" role="alert"><span class="status-icon">⚠️</span><div><p>' + (data.error || 'произошла ошибка, попробуй позже') + '</p></div></div>';
             if (submitBtn) {

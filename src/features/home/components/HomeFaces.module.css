@@ -4,7 +4,7 @@
   column-gap: 10px;
   width: 100%;
   margin: clamp(4px, 1vh, 12px) 0;
-  height: clamp(72px, 22vw, 108px);
+  height: clamp(80px, 20vw, 116px);
 }
 
 .face {
@@ -15,6 +15,7 @@
   border-radius: 16px;
   overflow: hidden;
   background: var(--photo, #e5e5e5);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 
 .face img {
@@ -28,7 +29,7 @@
 @media (max-width: 420px) {
   .strip {
     column-gap: 8px;
-    height: clamp(88px, 28vw, 100px);
+    height: clamp(84px, 24vw, 100px);
   }
 
   .face {
@@ -39,13 +40,28 @@
 @media (min-width: 768px) {
   .strip {
     column-gap: 12px;
-    height: 125px;
+    height: 130px;
+  }
+
+  .face {
+    border-radius: 18px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .strip {
+    column-gap: 14px;
+    height: 144px;
+  }
+
+  .face {
+    border-radius: 20px;
   }
 }
 
 @media (max-height: 580px) {
   .strip {
-    height: 84px;
+    height: 80px;
     column-gap: 8px;
   }
 

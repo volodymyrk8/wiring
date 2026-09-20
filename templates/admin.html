@@ -2,26 +2,33 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <title>WIRING admin</title>
   <meta name="theme-color" content="#e9ebf3">
   <script>
     (function () {
-      var allowed = { mist: 1, pastel: 1, night: 1, slate: 1, dusk: 1 };
       var t = "";
       try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
-      document.documentElement.dataset.theme = allowed[t] ? t : "mist";
+      var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
+      var theme = ok[t] ? t : "mist";
+      document.documentElement.dataset.theme = theme;
+      var color = ok[theme];
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) { meta.setAttribute("content", color); meta.content = color; }
     })();
   </script>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WIRING">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/public/styles.css?v=81">
 </head>
 <body>
+  {% include "components/header.html" %}
   <main class="legal admin">
-    {% include "components/header.html" %}
     <h1>статистика</h1>
     {% if error %}<p class="err">{{ error }}</p>{% endif %}
     {% if not authed %}
@@ -252,11 +259,21 @@
   </main>
   <script>
     (function () {
+      var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
       document.querySelectorAll("[data-theme-set]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var next = btn.getAttribute("data-theme-set");
+          if (!ok[next]) next = "mist";
           document.documentElement.dataset.theme = next;
-          try { localStorage.setItem("wiring-theme", next); } catch (e) {}
+          try {
+            localStorage.setItem("wiring-theme", next);
+          } catch (e) {}
+          var color = ok[next];
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          metas.forEach(function (m) {
+            m.setAttribute("content", color);
+            m.content = color;
+          });
         });
       });
     })();

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && vite build --config vite.app.config.ts && vite build --config vite.home.config.ts && vite build --config vite.profile.config.ts && vite build --config vite.likes.config.ts && vite build --config vite.person.config.ts && vite build --config vite.deck.config.ts && vite build --config vite.account.config.ts && vite build --config vite.chat.config.ts && vite build --config vite.router.config.ts",
+    "build": "vite build && vite build --config vite.app.config.ts && vite build --config vite.home.config.ts && vite build --config vite.profile.config.ts && vite build --config vite.likes.config.ts && vite build --config vite.person.config.ts && vite build --config vite.deck.config.ts && vite build --config vite.account.config.ts && vite build --config vite.chat.config.ts && vite build --config vite.router.config.ts && vite build --config vite.support.config.ts",
     "typecheck": "tsc --noEmit",
     "dev:client": "vite build --watch",
     "test:router": "node tests/router.test.mjs"

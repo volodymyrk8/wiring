@@ -1,5 +1,5 @@
 .root { width: 100%; display: flex; flex-direction: column; flex: 1; min-height: 100%; }
-.content { display: grid; gap: 16px; width: 100%; }
+.content { display: grid; gap: 16px; width: 100%; max-width: var(--container-app, 540px); margin: 0 auto; padding-inline: 16px; box-sizing: border-box; }
 .heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 4px 2px 8px; }
 .eyebrow { display: block; margin-bottom: 7px; color: var(--lime); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .heading h1, .guestCard h1 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: clamp(28px, 6vw, 38px); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; }
@@ -44,10 +44,10 @@
 .plusLink > span:last-child { flex-shrink: 0; color: var(--lime); font-size: 12px; }
 .submitRow { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
 .submitRow > :first-child { flex: 1 1 100%; }
-.guestCard { width: 100%; margin: auto 0; padding: 26px 0; }
+.guestCard { width: 100%; max-width: var(--container-app, 540px); margin: auto auto; padding: 26px 16px; box-sizing: border-box; }
 .guestCard .actions { margin-top: 22px; }
 .actions { display: grid; gap: 10px; }
-.consentPage { width: 100%; margin: auto 0; }
+.consentPage { width: 100%; max-width: var(--container-app, 540px); margin: auto auto; padding-inline: 16px; box-sizing: border-box; }
 .consentPage h1 { margin: 0 0 22px; color: var(--ink); font-family: var(--serif); font-size: clamp(28px, 6vw, 38px); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; }
 .consentForm { display: grid; gap: 8px; max-width: 560px; }
 

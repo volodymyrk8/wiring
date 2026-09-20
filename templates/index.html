@@ -12,11 +12,15 @@
       var t = "";
       try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
       var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
-      document.documentElement.dataset.theme = ok[t] ? t : "mist";
-      document.querySelector('meta[name="theme-color"]').setAttribute("content", ok[t] || ok.mist);
+      var theme = ok[t] ? t : "mist";
+      document.documentElement.dataset.theme = theme;
+      var color = ok[theme];
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) { meta.setAttribute("content", color); meta.content = color; }
     })();
   </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="WIRING">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="ru_RU">

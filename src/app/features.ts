@@ -1,4 +1,4 @@
-type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "account" | "chat";
+type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "account" | "chat" | "support";
 
 const FEATURE_FILES: Record<FeatureName, string> = {
   auth: "auth.js?v=4",
@@ -9,6 +9,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
   deck: "deck.js?v=4",
   account: "account.js?v=2",
   chat: "chat.js?v=19",
+  support: "support.js?v=1",
 };
 
 /** Lazy, cached loaders for route-level feature bundles. */
@@ -32,5 +33,6 @@ export function createFeatureLoader(basePath = "") {
     deck: () => load("deck"),
     account: () => load("account"),
     chat: () => load("chat"),
+    support: () => load("support"),
   };
 }

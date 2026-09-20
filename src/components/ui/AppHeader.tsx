@@ -126,87 +126,89 @@ export function AppHeader({
       aria-label="шапка сайта"
       data-logo-position={logoPosition}
     >
-      {(showBack || backHref || onBackClick) ? (
-        <div class={styles.headerStart}>
-          <Button
-            variant="ghost"
-            slim
-            href={backHref || "/"}
-            nav={backNav || "back"}
-            onClick={onBackClick}
-            className={styles.backBtn}
-            ariaLabel="Вернуться назад"
-          >
-            <svg
-              class={styles.backArrow}
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+      <div class={styles.inner}>
+        {(showBack || backHref || onBackClick) ? (
+          <div class={styles.headerStart}>
+            <Button
+              variant="ghost"
+              slim
+              href={backHref || "/"}
+              nav={backNav || "back"}
+              onClick={onBackClick}
+              className={styles.backBtn}
+              ariaLabel="Вернуться назад"
             >
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </Button>
-        </div>
-      ) : leftSlot ? (
-        <div class={styles.headerStart}>{leftSlot}</div>
-      ) : null}
+              <svg
+                class={styles.backArrow}
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </Button>
+          </div>
+        ) : leftSlot ? (
+          <div class={styles.headerStart}>{leftSlot}</div>
+        ) : null}
 
-      <div class={styles.brandGroup}>
-        <a
-          class={styles.brand}
-          href={homeHref}
-          onClick={onHomeClick}
-          data-nav="home"
-        >
-          <span class={styles.brandName}>
-            WIR<span>ING</span>
-          </span>
-          {showBetaBadge && !sectionTitle && (
-            <Tooltip
-              className={styles.betaTooltipWrap}
-              content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
-            >
-              <span class={styles.betaLabel}>beta</span>
-            </Tooltip>
-          )}
-        </a>
-        {sectionTitle && (
-          <>
-            <span class={styles.brandDivider} aria-hidden="true">/</span>
-            <span class={styles.brandSection} aria-current="page">
-              {sectionTitle}
+        <div class={styles.brandGroup}>
+          <a
+            class={styles.brand}
+            href={homeHref}
+            onClick={onHomeClick}
+            data-nav="home"
+          >
+            <span class={styles.brandName}>
+              WIR<span>ING</span>
             </span>
-          </>
+            {showBetaBadge && !sectionTitle && (
+              <Tooltip
+                className={styles.betaTooltipWrap}
+                content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
+              >
+                <span class={styles.betaLabel}>beta</span>
+              </Tooltip>
+            )}
+          </a>
+          {sectionTitle && (
+            <>
+              <span class={styles.brandDivider} aria-hidden="true">/</span>
+              <span class={styles.brandSection} aria-current="page">
+                {sectionTitle}
+              </span>
+            </>
+          )}
+        </div>
+
+        {showActions && (
+          <div class={styles.headerEnd}>
+            {shouldShowThemeDropdown && onThemeSelect && (
+              <Select<ThemeName>
+                options={THEME_OPTIONS}
+                value={activeTheme}
+                onChange={(theme) => {
+                  setActiveTheme(theme);
+                  onThemeSelect(theme);
+                }}
+                showValue={false}
+                showChevron={false}
+                variant="iconOnly"
+                ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+                title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+              />
+            )}
+            {rightSlot}
+            {children}
+          </div>
         )}
       </div>
-
-      {showActions && (
-        <div class={styles.headerEnd}>
-          {shouldShowThemeDropdown && onThemeSelect && (
-            <Select<ThemeName>
-              options={THEME_OPTIONS}
-              value={activeTheme}
-              onChange={(theme) => {
-                setActiveTheme(theme);
-                onThemeSelect(theme);
-              }}
-              showValue={false}
-              showChevron={false}
-              variant="iconOnly"
-              ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
-              title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
-            />
-          )}
-          {rightSlot}
-          {children}
-        </div>
-      )}
     </header>
   );
 }

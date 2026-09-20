@@ -4,7 +4,7 @@
   "description": "Знакомства для нейроотличных",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#22243a",
+  "background_color": "#e9ebf3",
   "theme_color": "#e9ebf3",
   "lang": "ru",
   "icons": [

@@ -3,9 +3,10 @@ import styles from "./LegalFooter.module.css";
 type LegalFooterProps = {
   className?: string;
   showTopBorder?: boolean;
+  onSupportClick?: () => void;
 };
 
-export function LegalFooter({ className, showTopBorder = true }: LegalFooterProps = {}) {
+export function LegalFooter({ className, showTopBorder = true, onSupportClick }: LegalFooterProps = {}) {
   return (
     <footer
       class={`${styles.footer}${showTopBorder ? "" : ` ${styles.noTopBorder}`}${className ? ` ${className}` : ""}`}
@@ -18,7 +19,13 @@ export function LegalFooter({ className, showTopBorder = true }: LegalFooterProp
       <a class={styles.link} href="/privacy" draggable={false}>
         конфиденциальность
       </a>
-      <a class={styles.link} href="/support" draggable={false}>
+      <a
+        class={styles.link}
+        href="/support"
+        data-nav="support"
+        draggable={false}
+        onClick={onSupportClick ? (e) => { e.preventDefault(); onSupportClick(); } : undefined}
+      >
         поддержка
       </a>
     </footer>

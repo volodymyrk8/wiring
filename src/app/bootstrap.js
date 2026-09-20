@@ -208,8 +208,19 @@ import { createInboxController } from "./inbox";
     } catch {
       /* ignore */
     }
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", THEMES[next].chrome);
+    const color = THEMES[next].chrome;
+    const metas = document.querySelectorAll('meta[name="theme-color"]');
+    if (metas.length > 0) {
+      metas.forEach((m) => {
+        m.setAttribute("content", color);
+        m.content = color;
+      });
+    } else {
+      const meta = document.createElement("meta");
+      meta.name = "theme-color";
+      meta.content = color;
+      document.head.appendChild(meta);
+    }
 
     const openBtn = document.getElementById("theme-open");
     if (openBtn) {
@@ -620,18 +631,20 @@ import { createInboxController } from "./inbox";
       </div>`;
     return `
     <header class="app-head${centerClass}" data-logo-position="${logoPos}">
-      ${showBack ? `
-      <div class="app-head-start">
-        <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="${escapeAttr(backNav)}" aria-label="Вернуться назад" title="Назад">
-          <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-        </a>
-      </div>` : ""}
-      ${brandBlock}
-      ${showActions ? `
-      <div class="app-head-end">
-        ${themePicker()}
-        ${isAuth ? "" : profileSlot()}
-      </div>` : ""}
+      <div class="app-head-inner">
+        ${showBack ? `
+        <div class="app-head-start">
+          <a class="icon-btn app-head-back" href="${escapeAttr(backHref)}" data-nav="${escapeAttr(backNav)}" aria-label="Вернуться назад" title="Назад">
+            <svg class="app-head-back-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+          </a>
+        </div>` : ""}
+        ${brandBlock}
+        ${showActions ? `
+        <div class="app-head-end">
+          ${themePicker()}
+          ${isAuth ? "" : profileSlot()}
+        </div>` : ""}
+      </div>
     </header>`;
   };
 
@@ -855,6 +868,7 @@ import { createInboxController } from "./inbox";
   let personFeatureUnmount = null;
   let deckFeatureUnmount = null;
   let accountFeatureUnmount = null;
+  let supportFeatureUnmount = null;
   const ACCOUNT_FEATURE_VIEWS = new Set(["invite", "delete-account", "onboard"]);
   const CHAT_FEATURE_VIEWS = new Set(["matches", "chat"]);
   let chatFeatureUnmount = null;
@@ -1018,6 +1032,28 @@ import { createInboxController } from "./inbox";
       return state.user;
     },
     onUserUpdated: (user) => { state.user = user; },
+    onThemeSelect: (theme) => applyTheme(theme),
+    onLogout: logout,
+  });
+
+  const buildSupportHostBridge = () => ({
+    user: state.user,
+    basePath: BASE,
+    hrefFor,
+    navigate: (view, params = {}) => void goToView(view, params),
+    goBack: () => {
+      if (
+        window.history.length > 1 &&
+        (window.history.state?.view ||
+          (document.referrer && new URL(document.referrer, location.origin).origin === location.origin))
+      ) {
+        window.history.back();
+      } else {
+        void goToView("home");
+      }
+    },
+    api,
+    toast,
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
   });
@@ -1341,6 +1377,27 @@ import { createInboxController } from "./inbox";
     }
   };
 
+  const renderSupportFeature = async () => {
+    supportFeatureUnmount?.();
+    supportFeatureUnmount = null;
+    root.innerHTML = '<div id="support-feature-root"></div>';
+    bindDataNavLinks();
+    bindThemeControls();
+    const mountEl = root.querySelector("#support-feature-root");
+    if (!mountEl) return;
+    try {
+      const mod = await featureLoader.support();
+      if (state.view !== "support") return;
+      const supportHost = buildSupportHostBridge();
+      supportFeatureUnmount = mod.mountSupport(mountEl, supportHost);
+      bindDataNavLinks();
+      syncUrl();
+    } catch (err) {
+      root.innerHTML = `<p class="err">не загрузился модуль support (${escapeHtml(err.message)}). выполни npm run build</p>`;
+      toast(`не загрузился модуль support (${err.message}).`);
+    }
+  };
+
   const render = () => {
     document.documentElement.dataset.view = state.view;
     document.documentElement.toggleAttribute("data-tabs", showsTabbar());
@@ -1378,6 +1435,10 @@ import { createInboxController } from "./inbox";
       accountFeatureUnmount?.();
       accountFeatureUnmount = null;
     }
+    if (state.view !== "support") {
+      supportFeatureUnmount?.();
+      supportFeatureUnmount = null;
+    }
     if (!state.catalog) {
       root.innerHTML = `<p class="lede">загрузка…</p>`;
       return;
@@ -1400,6 +1461,10 @@ import { createInboxController } from "./inbox";
     }
     if (!state.user && state.view === "verify") {
       void renderAuthFeature("verify");
+      return;
+    }
+    else if (state.view === "support") {
+      void renderSupportFeature();
       return;
     }
     else if (state.view === "home") {

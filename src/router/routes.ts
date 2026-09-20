@@ -16,6 +16,7 @@ export const SPA_PATHS = {
   plus: "/plus",
   onboard: "/onboard",
   deleteAccount: "/delete-account",
+  support: "/support",
 } as const satisfies Record<string, string>;
 
 export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
@@ -35,7 +36,8 @@ export const STATIC_PATH_TO_VIEW: Record<string, ViewId> = {
   "/premium": "plus",
   [SPA_PATHS.onboard]: "onboard",
   [SPA_PATHS.deleteAccount]: "delete-account",
+  [SPA_PATHS.support]: "support",
 };
 
 /** Views that need no session (hydrate allows direct URL). */
-export const PUBLIC_VIEWS: ViewId[] = ["login", "register", "home", "forgot", "reset", "verify", "likes", "matches"];
+export const PUBLIC_VIEWS: ViewId[] = ["login", "register", "home", "forgot", "reset", "verify", "likes", "matches", "support"];

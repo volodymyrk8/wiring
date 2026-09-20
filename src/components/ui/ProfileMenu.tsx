@@ -15,6 +15,7 @@ export type ProfileMenuProps = {
   onProfileClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onConsentsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onPlusClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
+  onSupportClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onLogout?: () => void;
   className?: string;
 };
@@ -30,6 +31,7 @@ export function ProfileMenu({
   onProfileClick,
   onConsentsClick,
   onPlusClick,
+  onSupportClick,
   onLogout,
   className,
 }: ProfileMenuProps) {
@@ -157,8 +159,12 @@ export function ProfileMenu({
 
           <a
             href={supportHref}
+            data-nav="support"
             class={styles.menuItem}
-            onClick={() => setIsOpen(false)}
+            onClick={(e) => {
+              setIsOpen(false);
+              if (onSupportClick) onSupportClick(e);
+            }}
             role="menuitem"
           >
             <span class={styles.itemIcon}>

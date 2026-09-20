@@ -12,10 +12,16 @@
       var t = "";
       try { t = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
       var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
-      document.documentElement.dataset.theme = ok[t] ? t : "mist";
-      document.querySelector('meta[name="theme-color"]').setAttribute("content", ok[t] || ok.mist);
+      var theme = ok[t] ? t : "mist";
+      document.documentElement.dataset.theme = theme;
+      var color = ok[theme];
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) { meta.setAttribute("content", color); meta.content = color; }
     })();
   </script>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WIRING">
   <link rel="icon" href="/public/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/public/icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,32 +36,40 @@
   <script src="/public/analytics.js?v=2" defer></script>
   {% endif %}
 </head>
-<body class="legal-page">
-  <main class="legal">
-    {% set show_back = true %}
-    {% set back_href = '/' %}
-    {% set section_title = 'поддержка' if support_form else '' %}
-    {% include "components/header.html" %}
-    <h1>{{ title }}</h1>
-    {{ body | safe }}
+<body class="legal-page{% if support_form %} support-page{% endif %}">
+  {% set show_back = true %}
+  {% set back_href = '/' %}
+  {% set section_title = 'поддержка' if support_form else '' %}
+  {% include "components/header.html" %}
+  <main class="legal{% if support_form %} legal--support{% endif %}">
+    <h1{% if support_form %} class="support-title"{% endif %}>{{ title }}</h1>
     {% if support_form %}
+      <div class="support-intro">
+        {{ body | safe }}
+      </div>
       {% include "components/support_form.html" %}
+    {% else %}
+      {{ body | safe }}
     {% endif %}
   </main>
   {% include "components/footer.html" %}
   <script>
     (function () {
-      // Theme switching for all 5 themes
+      var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
       document.querySelectorAll("[data-theme-set]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var next = btn.getAttribute("data-theme-set");
+          if (!ok[next]) next = "mist";
           document.documentElement.dataset.theme = next;
           try {
             localStorage.setItem("wiring-theme", next);
-            var ok = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14" };
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta && ok[next]) meta.setAttribute("content", ok[next]);
           } catch (e) {}
+          var color = ok[next];
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          metas.forEach(function (m) {
+            m.setAttribute("content", color);
+            m.content = color;
+          });
         });
       });
     })();

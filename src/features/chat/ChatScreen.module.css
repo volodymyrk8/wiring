@@ -44,6 +44,9 @@
   justify-content: center;
   align-items: center;
   width: 100%;
+  max-width: var(--container-app, 540px);
+  margin: 0 auto;
+  padding-inline: 16px;
   min-height: 0;
   padding-top: clamp(12px, 4vh, 40px);
   padding-bottom: clamp(52px, 12vh, 88px);

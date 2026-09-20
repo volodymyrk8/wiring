@@ -28,6 +28,7 @@ assert.equal(hrefFor(BASE, "deck"), SPA_PATHS.deck);
 assert.equal(hrefFor(BASE, "chat", { id: 9 }), "/chats/9");
 assert.equal(hrefFor(BASE, "person", { id: 3 }), "/p/3");
 assert.equal(hrefFor(BASE, "delete-account"), SPA_PATHS.deleteAccount);
+assert.equal(hrefFor(BASE, "support"), SPA_PATHS.support);
 
 const guest = { loggedIn: false };
 const member = { loggedIn: true, isGuest: false };
@@ -65,5 +66,7 @@ assert.equal(planRoute({ view: "chat", id: 5 }, member, "/chats/5").kind, "chat"
 assert.equal(planRoute({ view: "person", id: 2 }, member, "/p/2").kind, "person");
 assert.equal(planRoute({ view: "matches" }, member, "/chats").kind, "show");
 assert.equal(planRoute({ view: "matches" }, guest, "/chats").kind, "show");
+assert.equal(planRoute({ view: "support" }, member, "/support").kind, "show");
+assert.equal(planRoute({ view: "support" }, guest, "/support").kind, "show");
 
 console.log("router.test.mjs ok");

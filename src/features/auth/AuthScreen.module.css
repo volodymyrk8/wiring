@@ -1,12 +1,13 @@
 .container {
   width: 100%;
-  max-width: var(--container-form, 440px);
+  max-width: var(--container-form, 390px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 100%;
   padding: 4px 0 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 768px) {

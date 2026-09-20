@@ -1,0 +1,175 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  max-width: var(--container-app, 540px);
+  margin: 0 auto;
+  padding-inline: 16px;
+  box-sizing: border-box;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: clamp(26px, 5.5vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--ink);
+  margin: clamp(12px, 3.5vw, 20px) 0 8px;
+}
+
+.intro {
+  margin: 0 0 clamp(18px, 4vw, 24px);
+}
+
+.intro p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.textareaField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 136px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+}
+
+.textarea:hover:not(:focus) {
+  border-color: var(--accent-line);
+}
+
+.textarea:focus {
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-2);
+}
+
+.textareaMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 4px 0;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.statusCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  margin: 16px 0;
+  animation: statusFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.statusIcon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.statusTitle {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.statusText {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.statusOk {
+  background: var(--bg-2);
+  border: 1px solid var(--accent-line);
+  color: var(--ink);
+}
+
+.statusOk .statusIcon {
+  color: var(--lime);
+}
+
+.statusErr {
+  background: rgba(201, 137, 154, 0.14);
+  background: color-mix(in srgb, var(--coral) 14%, transparent);
+  border: 1px solid rgba(201, 137, 154, 0.35);
+  border: 1px solid color-mix(in srgb, var(--coral) 38%, transparent);
+  color: var(--coral);
+}
+
+.statusErr .statusText {
+  color: var(--coral);
+}
+
+.anotherBtn {
+  margin-top: 12px;
+}
+
+@keyframes statusFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

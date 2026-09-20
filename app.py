@@ -1313,6 +1313,7 @@ def index():
 @app.get("/delete-account")
 @app.get("/p/<int:person_id>")
 @app.get("/r/<code>")
+@app.get("/support")
 def spa_app(**_kwargs):
     return _spa()
 
@@ -2990,50 +2991,49 @@ def glossary():
     )
 
 
-@app.route("/support", methods=["GET", "POST"])
+@app.post("/support")
 def support():
     me = current_user()
     notice = ""
     error = ""
-    if request.method == "POST":
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
-        data = request.get_json(silent=True) if request.is_json else request.form
-        if not data:
-            data = request.form
-        if too_many(f"support:{ip}", 5, 3600):
-            error = "слишком часто — подожди немного"
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    data = request.get_json(silent=True) if request.is_json else request.form
+    if not data:
+        data = request.form
+    if too_many(f"support:{ip}", 5, 3600):
+        error = "слишком часто — подожди немного"
+    else:
+        body = str(data.get("body") or "").strip()
+        name = str(data.get("name") or "").strip()
+        email = str(data.get("email") or "").strip()
+        if me:
+            name = name or str(me.get("name") or "")
+        if len(body) < 8:
+            error = "напиши чуть подробнее"
+        elif len(body) > 2000:
+            error = "слишком длинно"
+        elif email and not EMAIL_RE.match(email):
+            error = "почта странная"
         else:
-            body = str(data.get("body") or "").strip()
-            name = str(data.get("name") or "").strip()
-            email = str(data.get("email") or "").strip()
-            if me:
-                name = name or str(me.get("name") or "")
-            if len(body) < 8:
-                error = "напиши чуть подробнее"
-            elif len(body) > 2000:
-                error = "слишком длинно"
-            elif email and not EMAIL_RE.match(email):
-                error = "почта странная"
-            else:
-                uid = session.get("uid")
-                conn = db()
-                conn.execute(
-                    """
-                    INSERT INTO support_tickets (user_id, name, email, body, ip, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (uid, name[:80], email[:120], body[:2000], ip[:80], int(time.time())),
-                )
-                conn.commit()
-                who = name or (f"#{uid}" if uid else "гость")
-                contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
-                notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
-                notice = "отправили. ответим на почту, если её указал, или найдём тебя по аккаунту"
+            uid = session.get("uid")
+            conn = db()
+            conn.execute(
+                """
+                INSERT INTO support_tickets (user_id, name, email, body, ip, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (uid, name[:80], email[:120], body[:2000], ip[:80], int(time.time())),
+            )
+            conn.commit()
+            who = name or (f"#{uid}" if uid else "гость")
+            contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
+            notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
+            notice = "отправили. ответим на почту, если её указал, или найдём тебя по аккаунту"
 
-        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            if error:
-                return jsonify({"ok": False, "error": error}), 400
-            return jsonify({"ok": True, "notice": notice})
+    if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        return jsonify({"ok": True, "notice": notice})
 
     return render_template(
         "legal.html",

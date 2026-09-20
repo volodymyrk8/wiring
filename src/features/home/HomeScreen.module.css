@@ -8,16 +8,19 @@
 
 /* Vertical rhythm: hero → faces → CTA → slogan. */
 .home {
-  --home-gap: 20px;
+  --home-gap: 22px;
   --home-gap-tight: 10px;
   width: 100%;
+  max-width: var(--container-app, 540px);
+  margin: 0 auto;
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 0;
   min-height: 0;
-  padding-block: clamp(10px, 2.5vh, 24px);
+  padding-block: clamp(12px, 2.8vh, 28px);
+  padding-inline: 16px;
   box-sizing: border-box;
 }
 
@@ -41,23 +44,23 @@
 .title {
   margin: 0;
   font-family: var(--serif, "Fraunces", Georgia, serif);
-  font-weight: 500;
-  letter-spacing: -0.04em;
-  font-size: clamp(28px, 7.2vw, 36px);
-  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  font-size: clamp(32px, 7.6vw, 42px);
+  line-height: 1.08;
   text-wrap: balance;
   color: var(--ink, #111);
 }
 
 .titleAccent {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--lime, #7d82c4);
 }
 
 .sub {
   margin: 0;
   font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   line-height: 1.45;
   letter-spacing: -0.012em;
@@ -109,7 +112,7 @@
 .quiet {
   flex-shrink: 0;
   width: 100%;
-  max-width: 22rem;
+  max-width: 24rem;
   margin: clamp(24px, 5vh, 44px) auto 0;
   padding: clamp(18px, 3.5vh, 28px) 8px 0;
   text-align: center;
@@ -122,25 +125,28 @@
   color: color-mix(in srgb, var(--muted, #6d7084) 82%, var(--ink, #32344a));
 }
 
-/* Full-width legal bar: no extra horizontal inset; aligns with #app edges. */
+/* Full-width legal bar: aligns with content container. */
 .homeFooter {
   flex-shrink: 0;
-  padding: 12px 12px max(10px, env(safe-area-inset-bottom));
-  padding-inline: 0;
-  margin-inline: -16px;
-  width: calc(100% + 32px);
+  padding: 12px 16px max(10px, env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: var(--container-app, 540px);
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 @media (max-width: 420px) {
   .home {
     --home-gap: 16px;
+    --home-gap-tight: 10px;
+    padding-inline: 14px;
     padding-block: 8px;
   }
 
   .quiet {
-    margin-top: clamp(20px, 4vh, 32px);
-    padding-top: 16px;
-    font-size: 15px;
+    margin-top: clamp(18px, 3.5vh, 28px);
+    padding-top: 14px;
+    font-size: 14.5px;
   }
 
   .hero {
@@ -148,21 +154,37 @@
   }
 
   .title {
-    font-size: 28px;
+    font-size: clamp(28px, 8.2vw, 34px);
+    line-height: 1.1;
+  }
+
+  .sub {
+    font-size: 14px;
   }
 }
 
 @media (min-width: 768px) {
   .home {
-    --home-gap: 24px;
+    --home-gap: 26px;
     --home-gap-tight: 12px;
-    padding-block: clamp(16px, 3vh, 32px);
+    padding-block: clamp(18px, 3.5vh, 36px);
+  }
+
+  .title {
+    font-size: clamp(36px, 4.8vw, 42px);
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+
+  .sub {
+    font-size: 15.5px;
   }
 
   .quiet {
-    max-width: 24rem;
+    max-width: 26rem;
     margin-top: clamp(32px, 5vh, 52px);
     padding-top: clamp(22px, 4vh, 32px);
+    font-size: 16.5px;
   }
 
   .hero {
@@ -170,19 +192,34 @@
   }
 
   .homeFooter {
-    margin-inline: -28px;
-    width: calc(100% + 56px);
     padding-top: 16px;
   }
 }
 
-@media (min-width: 1080px) {
+@media (min-width: 1025px) {
   .home {
+    max-width: min(580px, 100%);
     --home-gap: 28px;
+    --home-gap-tight: 14px;
+    padding-block: clamp(24px, 4vh, 42px);
+  }
+
+  .homeFooter {
+    max-width: min(580px, 100%);
+  }
+
+  .title {
+    font-size: clamp(42px, 3.6vw, 48px);
+    line-height: 1.06;
+    letter-spacing: -0.038em;
+  }
+
+  .sub {
+    font-size: 16px;
   }
 
   .quiet {
-    font-size: 17px;
+    font-size: 17.5px;
   }
 }
 
@@ -198,7 +235,7 @@
   }
 
   .title {
-    font-size: clamp(26px, 7vw, 30px);
+    font-size: clamp(28px, 7vw, 32px);
   }
 
   .quiet {

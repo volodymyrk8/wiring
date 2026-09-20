@@ -27,8 +27,9 @@ src/router/
 | `/onboard` | onboard | |
 | `/p/:id` | person | Deep link |
 | `/r/:code` | register | Referral invite |
+| `/support` | support | Preact bundle |
 
-Legal/admin (`/rules`, `/admin`, …) are **server templates**, not this router.
+Legal/admin (`/rules`, `/privacy`, `/admin`, …) are **server templates**, not this router.
 
 ## Shell integration
 

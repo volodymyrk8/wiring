@@ -244,11 +244,6 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
     <div class={styles.root}>
       <ChatHeader host={host} />
       <main class={signedOut ? styles.guestMain : "chat-list-page"}>
-        {!signedOut ? (
-          <div class="chat-list-intro">
-            <p class="chat-list-lede">Здесь можно продолжить разговор без спешки — в своём ритме.</p>
-          </div>
-        ) : null}
         {signedOut ? (
           <section class={styles.empty} aria-label="Чаты">
             <span class={styles.emptyIcon} aria-hidden="true"><ChatIcon /></span>
