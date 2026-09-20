@@ -31,7 +31,7 @@
 .photoChoices { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .photoChoice.photoChoice { background: rgba(17,14,12,.6); color: white; --icon-button-size: 44px; font-size: 12px; }
 .photoChoice[aria-pressed="true"] { border-color: var(--lime); }
-.empty { width: 100%; max-width: 508px; display: grid; justify-items: center; align-content: center; height: 100%; box-sizing: border-box; padding: 28px 18px; border: 1px dashed var(--line); border-radius: 22px; text-align: center; }
+.empty { width: 100%; max-width: 508px; display: grid; justify-items: center; align-content: center; height: 100%; box-sizing: border-box; padding: 28px 18px; text-align: center; }
 .empty h2 { margin: 0 0 8px; color: var(--ink); font-family: var(--serif); font-size: 24px; font-weight: 500; }
 .empty p { max-width: 420px; margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .error { margin: 0; color: var(--coral); font-size: 13px; text-align: center; }
