@@ -2501,6 +2501,9 @@ html[data-view="deck"] #deck-feature-root {
     min-height: 46px;
     padding: 2px 0;
     gap: 3px;
+    transform-origin: center;
+    touch-action: manipulation;
+    transition: color 0.16s ease, transform 150ms cubic-bezier(.2, .8, .2, 1);
   }
 
   .tabbar a::before {
@@ -2514,6 +2517,26 @@ html[data-view="deck"] #deck-feature-root {
 
   .tabbar a.on::before {
     background: var(--accent-soft);
+  }
+
+  .tabbar a:active {
+    transform: scale(.93);
+  }
+
+  .tabbar a:active::before {
+    transform: scale(1.02);
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  .tabbar a,
+  .tabbar a::before {
+    transition: none;
+  }
+
+  .tabbar a:active,
+  .tabbar a:active::before {
+    transform: none;
   }
 }
 

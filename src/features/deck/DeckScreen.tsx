@@ -91,7 +91,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
   </Modal>;
 }
 
-function DeckCardView({ host, card, active, onVertical, actions, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; actions?: JSX.Element; heightLimit: number }) {
+function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
   const cardRef = useRef<HTMLElement>(null);
@@ -110,7 +110,7 @@ function DeckCardView({ host, card, active, onVertical, actions, heightLimit }: 
     ...(card.neuro || []).map((id) => ({ id: `neuro-${id}`, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
     ...(card.vibe || []).map((id) => ({ id: `vibe-${id}`, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),
   ];
-  return <><article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
+  return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); }
@@ -133,7 +133,7 @@ function DeckCardView({ host, card, active, onVertical, actions, heightLimit }: 
       {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
       {tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
-  </article>{actions}</>;
+  </article>;
 }
 
 export function DeckScreen({ host }: { host: DeckHostBridge }) {
@@ -149,6 +149,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [scrolling, setScrolling] = useState(false);
   const [error, setError] = useState("");
   const [cardHeight, setCardHeight] = useState(640);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -158,6 +159,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const indexRef = useRef(index);
   indexRef.current = index;
   const dragRef = useRef<{ y: number } | null>(null);
+  const scrollTimerRef = useRef<number | null>(null);
   const current = cards[index];
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99);
 
@@ -165,7 +167,13 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     host.onFeedChange(cards, index, filters, hasMore, generation);
   }, [cards, index, filters, hasMore, generation]);
 
-  useEffect(() => () => { requestRef.current?.abort(); actionRef.current?.abort(); }, []);
+  useEffect(() => () => { requestRef.current?.abort(); actionRef.current?.abort(); if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current); }, []);
+
+  const settleScroll = () => {
+    setScrolling(true);
+    if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = window.setTimeout(() => { scrollTimerRef.current = null; setScrolling(false); }, 140);
+  };
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -225,6 +233,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     if (!viewport || filtersOpen || excludeOpen || resetOpen) return;
     const last = cards.length; // Final slide can load new candidates or explain exhaustion.
     const next = Math.max(0, Math.min(last, indexRef.current + direction));
+    settleScroll();
     viewport.scrollTo({ top: next * viewport.clientHeight, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   };
 
@@ -306,7 +315,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
       </Modal>
       {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
       <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
-        onScroll={(event) => setIndex(Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight))))}
+        onScroll={(event) => { settleScroll(); setIndex(Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)))); }}
         onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("button, a, input")) return;
           if (["ArrowDown", "PageDown", " "].includes(event.key)) { event.preventDefault(); advance(1); }
@@ -315,17 +324,12 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         onPointerDown={(event) => {
           if (event.pointerType !== "mouse" || event.button !== 0 || (event.target as HTMLElement).closest("button, a, input")) return;
           dragRef.current = { y: event.clientY };
-          event.currentTarget.setPointerCapture(event.pointerId); setDragging(true); event.currentTarget.focus();
+          event.currentTarget.setPointerCapture(event.pointerId); setDragging(true); settleScroll(); event.currentTarget.focus();
         }}
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
-          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance}
-            actions={<div class={styles.controls}>{cardIndex === index ? <>
-              <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel="Скрыть — больше не показывать" title="Скрыть">{iconPass}</Button><span aria-hidden="true">Скрыть</span></div>
-              <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: card.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: card.id }); }} ariaLabel="Профиль" title="Профиль">{iconProfile}</Button><span aria-hidden="true">Профиль</span></div>
-              <div class={styles.actionControl}><Button className={`${styles.actionCircle} ${styles.like}`} disabled={busy || loading} onClick={() => void act("like")} ariaLabel="Лайк" title="Лайк">{iconLike}</Button><span aria-hidden="true">Лайк</span></div>
-            </> : null}</div>} />
+          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
@@ -340,6 +344,13 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
             </div> : null}
           </div>
         </section>
+      </div>
+      <div class={`${styles.controls} ${styles.actionPanel}${scrolling || !current ? ` ${styles.actionPanelHidden}` : ""}`} aria-hidden={scrolling || !current}>
+        {current ? <>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel="Скрыть — больше не показывать" title="Скрыть">{iconPass}</Button><span aria-hidden="true">Скрыть</span></div>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: current.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: current.id }); }} ariaLabel="Профиль" title="Профиль">{iconProfile}</Button><span aria-hidden="true">Профиль</span></div>
+          <div class={styles.actionControl}><Button className={`${styles.actionCircle} ${styles.like}`} disabled={busy || loading} onClick={() => void act("like")} ariaLabel="Лайк" title="Лайк">{iconLike}</Button><span aria-hidden="true">Лайк</span></div>
+        </> : null}
       </div>
       {error && !filtersOpen && !excludeOpen && !resetOpen ? <p class={styles.error} role="alert">{error}</p> : null}
     </main>
