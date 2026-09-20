@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import random
 import re
 import secrets
 import shutil
@@ -1327,6 +1328,45 @@ def health():
 @app.get("/api/catalog")
 def api_catalog():
     return jsonify({"ok": True, **catalog_payload()})
+
+
+def _home_face_photos(exclude_uid: int | None = None) -> list[str]:
+    """Random profile photos for the home hero strip (public, no swipe state)."""
+    conn = db()
+    params: list[Any] = []
+    sql = """
+        SELECT * FROM users
+        WHERE COALESCE(deleted_at, 0) = 0
+    """
+    if exclude_uid:
+        sql += " AND id != ?"
+        params.append(exclude_uid)
+    sql += """
+          AND (
+            EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id)
+            OR (photo IS NOT NULL AND photo != '')
+          )
+    """
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    photos: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not int(row["is_seed"] or 0) and not profile_complete(row):
+            continue
+        url = str(user_public(row).get("photo") or "").strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        photos.append(url)
+    random.shuffle(photos)
+    return photos[:4]
+
+
+@app.get("/api/home/faces")
+def api_home_faces():
+    exclude = session.get("uid")
+    exclude_uid = int(exclude) if exclude else None
+    return jsonify({"ok": True, "faces": _home_face_photos(exclude_uid)})
 
 
 @app.get("/api/me")

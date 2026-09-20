@@ -45,6 +45,16 @@ class WiringTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_home_faces_from_profiles(self):
+        self._register(email="faces-a@example.com", name="Аня")
+        self._register(email="faces-b@example.com", name="Борис")
+        payload = self.client.get("/api/home/faces").get_json()
+        self.assertTrue(payload["ok"])
+        self.assertGreaterEqual(len(payload["faces"]), 1)
+        self.assertLessEqual(len(payload["faces"]), 4)
+        for url in payload["faces"]:
+            self.assertTrue(url.startswith("/"))
+
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
         self.assertTrue(health["ok"])

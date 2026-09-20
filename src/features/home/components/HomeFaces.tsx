@@ -7,6 +7,12 @@ export type HomeFacesProps = {
   className?: string;
 };
 
+const faceImageSrc = (basePath: string, src: string) => {
+  if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) return src;
+  if (src.startsWith("/")) return `${basePath}${src}`;
+  return `${basePath}/public/${src}`;
+};
+
 export function HomeFaces({ faces, basePath = "", className }: HomeFacesProps) {
   const shown = faces.slice(0, 4);
 
@@ -24,9 +30,9 @@ export function HomeFaces({ faces, basePath = "", className }: HomeFacesProps) {
       role="group"
     >
       {shown.map((src, index) => (
-        <div key={src} class={styles.face}>
+        <div key={`${src}-${index}`} class={styles.face}>
           <img
-            src={`${basePath}/public/${src}`}
+            src={faceImageSrc(basePath, src)}
             alt=""
             width="96"
             height="120"

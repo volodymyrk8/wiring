@@ -1,3 +1,4 @@
+import { useEffect, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, LegalFooter, Button, ProfileMenu } from "@/components/ui";
 import { HomeFaces } from "./components/HomeFaces";
@@ -22,7 +23,18 @@ export type HomeScreenProps = {
 };
 
 export function HomeScreen({ host }: HomeScreenProps) {
-  const { signed, isPlus, basePath = "", homeFaces, profileAvatar, hrefFor, navigate, onThemeSelect } = host;
+  const { signed, isPlus, basePath = "", fetchHomeFaces, profileAvatar, hrefFor, navigate, onThemeSelect } = host;
+  const [homeFaces, setHomeFaces] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHomeFaces().then((faces) => {
+      if (!cancelled && faces.length) setHomeFaces(faces);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchHomeFaces]);
 
   const handleNav = (view: string) => (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     e.preventDefault();
@@ -73,7 +85,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
             <p class={styles.sub}>Знакомства для нейроотличных</p>
           </header>
 
-          <HomeFaces faces={homeFaces} basePath={basePath} />
+          {homeFaces.length ? <HomeFaces faces={homeFaces} basePath={basePath} /> : null}
 
           {signed ? (
             <Button

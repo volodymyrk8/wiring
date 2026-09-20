@@ -6,7 +6,7 @@ export type TraitChip = {
 export type HomeHostBridge = {
   signed: boolean;
   basePath?: string;
-  homeFaces: string[];
+  fetchHomeFaces: () => Promise<string[]>;
   userTraits?: TraitChip[];
   profileAvatar?: string;
   userName?: string;
