@@ -109,6 +109,99 @@
   outline-offset: 2px;
 }
 
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.aboutText {
+  margin: 0;
+  font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink, #111);
+  text-wrap: pretty;
+}
+
+.betaCard {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-2);
+  padding: 14px 16px;
+  isolation: isolate;
+}
+
+.betaGraphic {
+  position: absolute;
+  right: -32px;
+  bottom: -45px;
+  width: 170px;
+  height: 170px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.09;
+  color: var(--ink);
+  transform: rotate(-6deg) scale(1.35);
+  transform-origin: center center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.betaCard:hover .betaGraphic {
+  opacity: 0.14;
+  transform: rotate(-4deg) scale(1.4);
+}
+
+.betaSvg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.betaBody {
+  position: relative;
+  z-index: 1;
+}
+
+.betaText {
+  margin: 0;
+  font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--ink, #32344a) 78%, var(--muted, #6d7084) 22%);
+  text-wrap: pretty;
+}
+
+.betaLead {
+  font-weight: 600;
+  color: var(--ink, #111);
+}
+
+.betaLink {
+  color: var(--lime, #7d82c4);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2.5px;
+  border-radius: 4px;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.betaLink:hover {
+  opacity: 0.8;
+  color: var(--ink, #111);
+}
+
+.betaLink:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+
 .quiet {
   flex-shrink: 0;
   width: 100%;
@@ -140,6 +233,30 @@
     --home-gap: 16px;
     --home-gap-tight: 10px;
     padding-block: 8px;
+  }
+
+  .about {
+    gap: 10px;
+  }
+
+  .aboutText {
+    font-size: 14px;
+  }
+
+  .betaCard {
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+
+  .betaGraphic {
+    width: 140px;
+    height: 140px;
+    right: -26px;
+    bottom: -38px;
+  }
+
+  .betaText {
+    font-size: 13px;
   }
 
   .quiet {

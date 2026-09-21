@@ -124,12 +124,51 @@ export function HomeScreen({ host }: HomeScreenProps) {
               </div>
             </div>
           )}
+
+          <div class={styles.about}>
+            <p class={styles.aboutText}>
+              Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
+            </p>
+            <aside class={styles.betaCard} aria-label="информация о бета-версии">
+              <div class={styles.betaGraphic} aria-hidden="true">
+                <svg viewBox="0 0 200 200" fill="none" class={styles.betaSvg}>
+                  <defs>
+                    <linearGradient id="betaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="currentColor" stop-opacity="0.85" />
+                      <stop offset="100%" stop-color="currentColor" stop-opacity="0.25" />
+                    </linearGradient>
+                    <linearGradient id="curveGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="currentColor" stop-opacity="0.4" />
+                      <stop offset="100%" stop-color="currentColor" stop-opacity="0.05" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M-20,160 C30,120 70,180 140,130 C190,95 210,30 230,10" stroke="url(#curveGrad)" strokeWidth="3" strokeLinecap="round" fill="none" />
+                  <path d="M10,190 C60,150 110,190 170,140 C210,105 220,60 235,40" stroke="url(#curveGrad)" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                  <path d="M78,185 C78,155 77,95 78,50 C78,32 90,20 108,20 C124,20 138,30 138,47 C138,62 125,74 109,76 C130,78 145,93 145,113 C145,136 126,152 101,152 C91,152 83,148 78,143 M78,56 C85,50 95,46 105,46 C116,46 124,52 124,62 C124,72 115,77 103,77 C93,77 84,74 78,70 M78,92 C86,88 96,86 106,86 C119,86 129,94 129,108 C129,122 117,132 101,132 C91,132 83,127 78,121" fill="url(#betaGrad)" />
+                </svg>
+              </div>
+              <div class={styles.betaBody}>
+                <p class={styles.betaText}>
+                  <strong class={styles.betaLead}>Бета-версия.</strong> Сообщайте в{" "}
+                  <a
+                    class={styles.betaLink}
+                    href={hrefFor("support")}
+                    data-nav="support"
+                    onClick={handleNav("support")}
+                  >
+                    поддержку
+                  </a>{" "}
+                  о любых замечаниях, пожеланиях и улучшениях — мы быстро и внимательно обрабатываем обратную связь.
+                </p>
+              </div>
+            </aside>
+          </div>
         </div>
 
         <p class={styles.quiet}>Можно быть собой.</p>
       </section>
 
-      <LegalFooter showTopBorder={false} className={styles.homeFooter} />
+      <LegalFooter showTopBorder={false} className={styles.homeFooter} onSupportClick={() => navigate("support")} />
     </div>
   );
 }
