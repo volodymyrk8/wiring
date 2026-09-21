@@ -6,5 +6,6 @@ const container = document.getElementById("server-header");
 if (container) {
   render(<AppHeader homeHref="/" showBack={container.dataset.back === "true"}
     backHref={container.dataset.backHref || "/"} backLabel={false}
+    logoPosition={container.dataset.logoPosition === "center" ? "center" : "left"}
     sectionTitle={container.dataset.section || undefined} onThemeSelect={applyTheme} />, container);
 }

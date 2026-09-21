@@ -90,7 +90,7 @@ export function AppHeader({
   homeHref = "/",
   onHomeClick,
   logoPosition = "left",
-  brandPosition = "right",
+  brandPosition = "left",
   showActions = true,
   showBetaBadge = true,
   sectionTitle,

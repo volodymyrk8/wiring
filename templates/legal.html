@@ -40,6 +40,7 @@
   {% set show_back = true %}
   {% set back_href = '/' %}
   {% set section_title = 'поддержка' if support_form else '' %}
+  {% set logo_position = 'center' %}
   {% include "components/header.html" %}
   <main class="legal{% if support_form %} legal--support{% endif %}">
     <h1{% if support_form %} class="support-title"{% endif %}>{{ title }}</h1>
