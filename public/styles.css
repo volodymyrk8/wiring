@@ -188,6 +188,9 @@ html[data-tabs] #app {
   --tabbar-clearance: 88px;
   padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom));
 }
+html[data-view="home"][data-tabs] #app {
+  --tabbar-clearance: 62px;
+}
 html[data-view="chat"],
 html[data-view="chat"] body {
   height: 100%;
@@ -2484,6 +2487,9 @@ html[data-view="deck"] #deck-feature-root {
   html[data-tabs] #app {
     --tabbar-clearance: 78px;
   }
+  html[data-view="home"][data-tabs] #app {
+    --tabbar-clearance: 70px;
+  }
 
   .tabbar {
     left: 50%;
@@ -2549,6 +2555,9 @@ html[data-view="deck"] #deck-feature-root {
 @media (max-width: 360px) {
   html[data-tabs] #app {
     --tabbar-clearance: 74px;
+  }
+  html[data-view="home"][data-tabs] #app {
+    --tabbar-clearance: 66px;
   }
 
   .tabbar {

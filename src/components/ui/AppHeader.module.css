@@ -1,6 +1,5 @@
 .header {
   width: 100%;
-  border-bottom: 1px solid var(--line);
   background: transparent;
   margin-bottom: 16px;
   flex-shrink: 0;
@@ -8,7 +7,6 @@
   padding-top: env(safe-area-inset-top);
   position: relative;
   z-index: 50;
-  transition: border-color 0.2s ease;
 }
 
 .inner {
