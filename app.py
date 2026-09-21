@@ -2708,7 +2708,10 @@ def api_upload_photo():
             photo_at = int(time.time())
             conn.execute("UPDATE users SET photo_rights_consent_at = ? WHERE id = ?", (photo_at, uid))
         else:
-            return jsonify({"ok": False, "error": "сначала отметь в профиле, что загружаешь свои фото"}), 400
+            return jsonify({
+                "ok": False,
+                "error": "отметь галочку «Загружаю только свои фото» в блоке «Фото» и попробуй снова",
+            }), 400
     count = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
     if count >= MAX_PHOTOS:
         return jsonify({"ok": False, "error": f"не больше {MAX_PHOTOS} фото"}), 400

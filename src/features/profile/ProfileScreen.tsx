@@ -9,6 +9,7 @@ import {
   Select,
   TagPicker,
   Textarea,
+  Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
@@ -93,19 +94,42 @@ const photoSrc = (basePath: string, photo: unknown, name: string) => {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="hsl(${hue} 32% 28%)"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="#d8ff3c" font-size="26" font-family="Georgia">${initial}</text></svg>`)}`;
 };
 
-function PhotoManager({ host, user, consent, onChange }: { host: ProfileHostBridge; user: ProfileUser; consent: boolean; onChange: (user: ProfileUser) => void }) {
+const PHOTO_CONSENT_LABEL =
+  "Загружаю только свои фото и разрешаю показывать их участникам WIRING";
+
+function PhotoManager({
+  host,
+  user,
+  consent,
+  onConsentChange,
+  onChange,
+}: {
+  host: ProfileHostBridge;
+  user: ProfileUser;
+  consent: boolean;
+  onConsentChange: (value: boolean) => void;
+  onChange: (user: ProfileUser) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [consentError, setConsentError] = useState(false);
   const photos = allPhotos(user);
   const name = valueOf(user.name, "Профиль");
+  const needsPhotoConsent = Boolean(user.needs_photo_consent);
 
   const refresh = async () => onChange(await host.refreshUser());
   const upload = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const files = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
     if (!files.length) return;
+    if (needsPhotoConsent && !consent) {
+      setConsentError(true);
+      setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
+      return;
+    }
     setBusy(true);
     setError("");
+    setConsentError(false);
     try {
       for (const file of files) await host.uploadPhoto(file, consent);
       await refresh();
@@ -146,6 +170,24 @@ function PhotoManager({ host, user, consent, onChange }: { host: ProfileHostBrid
 
   return (
     <div class={styles.photosBlock}>
+      {needsPhotoConsent ? (
+        <div class={styles.photoConsent}>
+        <Checkbox
+          name="photo_rights_consent"
+          checked={consent}
+          error={consentError}
+          onChange={(checked) => {
+            onConsentChange(checked);
+            if (checked) {
+              setConsentError(false);
+              if (error.startsWith("Сначала отметь")) setError("");
+            }
+          }}
+        >
+          {PHOTO_CONSENT_LABEL}
+        </Checkbox>
+        </div>
+      ) : null}
       <div class={styles.photoGrid}>
         {photos.map((photo) => (
           <div key={photo.id} class={`${styles.photoCell}${photo.is_primary ? ` ${styles.primary}` : ""}`}>
@@ -379,7 +421,13 @@ export function ProfileScreen({ host }: Props) {
           <form class={styles.form} onSubmit={save} noValidate>
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Фото</h2></div>
-              <PhotoManager host={host} user={user} consent={draft.photoConsent} onChange={setUser} />
+              <PhotoManager
+                host={host}
+                user={user}
+                consent={draft.photoConsent}
+                onConsentChange={(value) => setField("photoConsent", value)}
+                onChange={setUser}
+              />
               {errors.photos && <p class={styles.error}>{errors.photos}</p>}
             </section>
 

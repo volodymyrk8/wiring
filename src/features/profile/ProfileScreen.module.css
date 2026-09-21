@@ -16,6 +16,7 @@
 .error, .serverError { margin: 0; color: var(--coral); font-size: 12.5px; line-height: 1.4; }
 .serverError { padding: 12px 14px; border: 1px solid var(--glow-2); border-radius: 13px; background: var(--glow-2); }
 .photosBlock { display: grid; gap: 12px; }
+.photoConsent { margin: 0 0 2px; }
 .subheading h3 { margin: 0; color: var(--ink); font-size: 15px; font-weight: 600; }
 .subheading span { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .photoGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

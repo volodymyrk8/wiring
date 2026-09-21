@@ -1689,7 +1689,7 @@ body.support-page .legal,
   min-height: 52px;
   padding: 14px 24px;
   border-radius: 999px;
-  font-family: inherit;
+  font-family: var(--sans);
   font-size: 15.5px;
   font-weight: 600;
   text-decoration: none;

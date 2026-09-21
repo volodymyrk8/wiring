@@ -53,6 +53,37 @@
   text-wrap: balance;
 }
 
+.registerIntro {
+  display: grid;
+  gap: 10px;
+  margin: -4px 0 clamp(20px, 4.5vw, 28px);
+  text-align: left;
+}
+
+.mission {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.registerIntro strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.registerIntro a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Badges / Callouts */
 .badgeCard {
   display: flex;

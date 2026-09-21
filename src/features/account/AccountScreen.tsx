@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, LegalFooter, ProfileMenu } from "@/components/ui";
+import { AppHeader, Button, Checkbox, LegalFooter, ProfileMenu } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { AccountHostBridge } from "./types";
@@ -166,11 +166,17 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
   const [previews, setPreviews] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [photoConsent, setPhotoConsent] = useState(!host.user.needs_photo_consent);
+  const needsPhotoConsent = Boolean(host.user.needs_photo_consent);
   const cities = (host.catalog.places || []).flatMap((place) => place.cities).filter((value, index, list) => list.indexOf(value) === index);
   const existingPhotos = photosOf(user);
   const addFiles = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const next = Array.from(event.currentTarget.files || []);
     if (!next.length) return;
+    if (needsPhotoConsent && !photoConsent) {
+      setError("Сначала отметь галочку про свои фото — ниже, над кнопкой «+».");
+      return;
+    }
     setFiles((current) => [...current, ...next]);
     setPreviews((current) => [...current, ...next.map((file) => URL.createObjectURL(file))]);
     event.currentTarget.value = "";
@@ -183,10 +189,14 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
   const submit = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     event.preventDefault();
     if (!city) { setError("выбери город"); return; }
+    if (files.length && needsPhotoConsent && !photoConsent) {
+      setError("Сначала отметь галочку про свои фото.");
+      return;
+    }
     if (busy) return;
     setBusy(true); setError("");
     try {
-      for (const file of files) await host.uploadPhoto(file);
+      for (const file of files) await host.uploadPhoto(file, photoConsent);
       const response = await host.api("/api/me", { method: "PATCH", body: JSON.stringify({
         name: user.name,
         age: user.age,
@@ -213,7 +223,15 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
       <h1>Ещё чуть-чуть</h1>
       <p class={styles.lede}>Два фото и один промпт сильно лучше пустой анкеты. Можно пропустить, но тогда тебя труднее узнать.</p>
       <form class={styles.onboard} onSubmit={submit}>
-        <div><p class={styles.subtle}>фото — хотя бы ещё одно</p><div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy} onChange={addFiles} /></label></div></div>
+        <div>
+          <p class={styles.subtle}>фото — хотя бы ещё одно</p>
+          {needsPhotoConsent ? (
+            <Checkbox name="photo_rights_consent" checked={photoConsent} onChange={setPhotoConsent}>
+              Загружаю только свои фото и разрешаю показывать их участникам WIRING
+            </Checkbox>
+          ) : null}
+          <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy} onChange={addFiles} /></label></div>
+        </div>
         <label>город<select value={city} required onChange={(event) => setCity(event.currentTarget.value)}><option value="">выбери город</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label>как тебе писать<textarea maxlength={280} placeholder="сразу по делу, голосовые ок / нет" value={communication} onInput={(event) => setCommunication(event.currentTarget.value)} /></label>
         <label>{host.catalog.prompts?.find((item) => item.id === promptId)?.label || "один промпт"}<textarea maxlength={280} placeholder="расскажи что-то важное о себе" value={promptAnswer} onInput={(event) => setPromptAnswer(event.currentTarget.value)} /></label>

@@ -345,6 +345,22 @@ export function AuthScreen({ host }: AuthScreenProps) {
         </h2>
 
       {!isLogin && (
+        <div class={styles.registerIntro}>
+          <p class={styles.mission}>
+            Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и
+            комфортного общения.
+          </p>
+          <p class={styles.mission}>
+            <strong>Бета-версия.</strong> Сообщай в{" "}
+            <a href={hrefFor("support")} data-nav="support" onClick={(e) => { e.preventDefault(); host.navigate("support"); }}>
+              поддержку
+            </a>{" "}
+            о любых замечаниях, пожеланиях и улучшениях — мы быстро и внимательно обрабатываем обратную связь.
+          </p>
+        </div>
+      )}
+
+      {!isLogin && (
         <>
           {host.inviteLede && (
             <div class={styles.badgeCard}>

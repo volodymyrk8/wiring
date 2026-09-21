@@ -79,26 +79,16 @@ export function ProfileMenu({
         onClick={toggleOpen}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        aria-label={isPlus ? "Меню профиля · WIRING+" : "Меню профиля"}
-        title={isPlus ? "Меню профиля · WIRING+" : "Меню профиля"}
+        aria-label="Меню профиля"
+        title="Меню профиля"
       >
-        <span class={`avatar-link${isPlus ? " plus" : ""}`}>
+        <span class="avatar-link">
           {avatarUrl ? (
             <img src={avatarUrl} alt="" />
           ) : (
             <ProfileAvatarIcon />
           )}
         </span>
-        {isPlus && (
-          <span class="plus-mark" title="WIRING+" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M6 3h12l4 7-10 11L2 10l4-7z" />
-              <path d="M2 10h20" />
-              <path d="m7.5 3 4.5 7 4.5-7" />
-              <path d="M12 21 7.5 10 12 3l4.5 7L12 21z" />
-            </svg>
-          </span>
-        )}
       </IconButton>
 
       {isOpen && (
@@ -117,11 +107,9 @@ export function ProfileMenu({
             onClick={handlePlusClick}
             role="menuitem"
           >
-            <span class={styles.plusBadgeGem} aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 3h12l4 6-10 13L2 9Z" />
-                <path d="M11 3 8 9l4 13 4-13-3-6" />
-                <path d="M2 9h20" />
+            <span class={styles.itemIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2 15 9l7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-7z" />
               </svg>
             </span>
             <span class={styles.itemText}>WIRING+</span>

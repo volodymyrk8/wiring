@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { WiringPlusIcon } from "@/components/ui/WiringPlusIcon";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
 import styles from "./DeckScreen.module.css";
@@ -340,8 +339,8 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
             {!loading && index >= cards.length ? <div class={styles.emptyActions}>
               <Button variant="ghost" disabled={busy} onClick={() => void loadPage()}>{error ? "Повторить" : "Проверить новые"}</Button>
               {!hasMore ? <>
-                <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}><WiringPlusIcon />Показать анкеты ещё раз</Button>
-                {!host.user.plus ? <p id="feed-plus-hint">Доступно только с WIRING+.</p> : null}
+                <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}>Показать анкеты ещё раз</Button>
+                {!host.user.plus ? <p id="feed-plus-hint">Можно включить в профиле.</p> : null}
               </> : null}
             </div> : null}
           </div>
