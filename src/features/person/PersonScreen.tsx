@@ -130,7 +130,8 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const looking = labelsFor(host.catalog, "looking_for", person.looking_for);
   const intents = labelsFor(host.catalog, "intents", person.intents?.length ? person.intents : person.intent);
   const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...gender].filter(Boolean).join(" · ");
-  const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), ...intents].join(" · ");
+  const intentLine = intents.length ? `открыта к: ${intents.join(", ")}` : "";
+  const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
   const tags = [
     ...(person.neuro || []).map((id) => ({ id, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
     ...(person.vibe || []).map((id) => ({ id, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),

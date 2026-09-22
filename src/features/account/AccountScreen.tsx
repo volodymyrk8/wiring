@@ -232,7 +232,7 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
           ) : null}
           <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy} onChange={addFiles} /></label></div>
         </div>
-        <label>город<select value={city} required onChange={(event) => setCity(event.currentTarget.value)}><option value="">выбери город</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label>город <span class={styles.subtle}>(необязательно)</span><select value={city} onChange={(event) => setCity(event.currentTarget.value)}><option value="">не указывать</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label>как тебе писать<textarea maxlength={280} placeholder="сразу по делу, голосовые ок / нет" value={communication} onInput={(event) => setCommunication(event.currentTarget.value)} /></label>
         <label>{host.catalog.prompts?.find((item) => item.id === promptId)?.label || "один промпт"}<textarea maxlength={280} placeholder="расскажи что-то важное о себе" value={promptAnswer} onInput={(event) => setPromptAnswer(event.currentTarget.value)} /></label>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}

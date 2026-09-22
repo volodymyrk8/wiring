@@ -577,21 +577,14 @@ def _consent_yes(value: Any) -> bool:
     return value is True or value in (1, "1", "true", "True", "yes", "on")
 
 
-def _soft_intents_only(intents: list[str]) -> bool:
-    """Friendship / chat only — location is optional for discovery."""
-    return bool(intents) and all(item in ("friends", "chat") for item in intents)
-
-
 def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
-    """Ready to appear in the feed: city, age, neuro, photo, consents."""
+    """Ready to appear in the feed: age, neuro, photo, consents (city optional)."""
     if int(row["is_seed"] or 0) or is_guest_email(str(row["email"] or "")):
         return True
     tags = tags if tags is not None else tags_for(row["id"])
     if photos is None:
         photos = photos_for(row["id"])
     if int(row["age"] or 0) < 18:
-        return False
-    if not str(row["city"] or "").strip() and not _soft_intents_only(intents_of(row)):
         return False
     if str(row["gender"] or "") not in GENDER_IDS:
         return False
@@ -720,7 +713,7 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         complete = profile_complete(row, tags, photos)
         payload["needs_profile"] = not complete and not payload["guest"]
         payload["needs_onboard"] = payload["needs_profile"]
-        payload["needs_city"] = not bool(str(row["city"] or "").strip()) and not _soft_intents_only(intents_of(row))
+        payload["needs_city"] = False
         payload["needs_special_consent"] = not bool(row["special_data_consent_at"] if "special_data_consent_at" in keys else True)
         payload["needs_photo_consent"] = not bool(row["photo_rights_consent_at"] if "photo_rights_consent_at" in keys else True)
         payload["plus"] = is_premium(row)
@@ -926,7 +919,6 @@ def parse_profile(
     intents = parse_intents(data.get("intents") if data.get("intents") is not None else data.get("intent"))
     if not intents:
         intents = ["dating"]
-    city_optional = _soft_intents_only(intents)
     try:
         age = int(data.get("age"))
     except (TypeError, ValueError):
@@ -944,10 +936,7 @@ def parse_profile(
         return None, "имя: 2–32 символа"
     if not (18 <= age <= 99):
         return None, "только 18+"
-    if not city:
-        if not city_optional and not draft:
-            return None, "город: 2–48 символов"
-    elif len(city) < 2 or len(city) > 48:
+    if city and (len(city) < 2 or len(city) > 48):
         if draft:
             city = "—"
         else:

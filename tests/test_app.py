@@ -909,7 +909,7 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(cleared.status_code, 200, cleared.get_data(as_text=True))
         self.assertEqual(cleared.get_json()["user"]["city"], "")
 
-    def test_dating_intent_still_needs_city(self):
+    def test_dating_intent_allows_empty_city(self):
         self._register()
         self._login("ada@example.com")
         body = {
@@ -920,13 +920,17 @@ class WiringTest(unittest.TestCase):
             "looking_for": "everyone",
             "bio": "ищу",
             "neuro": ["asd"],
-            "intents": ["dating"],
+            "intents": ["dating", "chat", "friends"],
             "special_data_consent": True,
             "photo_rights_consent": True,
             "photo": "portraits/p01.jpg",
         }
         patched = self.client.patch("/api/me", json=body)
-        self.assertEqual(patched.status_code, 400)
+        self.assertEqual(patched.status_code, 200, patched.get_data(as_text=True))
+        user = patched.get_json()["user"]
+        self.assertFalse(user["needs_profile"])
+        self.assertFalse(user["needs_city"])
+        self.assertEqual(user["city"], "")
 
     def test_admin_stats_matches_and_chats(self):
         from admin import collect_stats

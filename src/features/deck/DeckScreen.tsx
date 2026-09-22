@@ -106,7 +106,8 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const gesture = usePhotoSwipe(changePhoto, onVertical);
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...labels(host.catalog, "genders", card.gender)].filter(Boolean).join(" · ");
-  const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), ...labelsIntent].join(" · ");
+  const intentLine = labelsIntent.length ? `открыта к: ${labelsIntent.join(", ")}` : "";
+  const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
   const tags = [
     ...(card.neuro || []).map((id) => ({ id: `neuro-${id}`, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
     ...(card.vibe || []).map((id) => ({ id: `vibe-${id}`, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),

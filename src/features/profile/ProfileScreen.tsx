@@ -12,7 +12,6 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { softIntentsOnly } from "@/lib/intents";
 import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
@@ -330,13 +329,10 @@ export function ProfileScreen({ host }: Props) {
     setServerError("");
   };
 
-  const cityOptional = softIntentsOnly(draft.intents);
-
   const validate = () => {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
     if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
-    if (!draft.city.trim() && !cityOptional) next.city = "Укажи город, чтобы попасть в ленту";
     if (!draft.neuro.length) next.neuro = "Отметь хотя бы одну особенность";
     if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
     setErrors(next);
@@ -458,7 +454,7 @@ export function ProfileScreen({ host }: Props) {
 
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
-              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото, город и хотя бы одна особенность.
+              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото и хотя бы одна особенность. Город необязателен.
             </p>
           ) : null}
 
@@ -503,11 +499,7 @@ export function ProfileScreen({ host }: Props) {
                   label="Город"
                   id="profile-city"
                   placeholder="Не указан"
-                  hint={
-                    cityOptional
-                      ? "необязательно для «дружба» и «просто писать»"
-                      : "необязательно · при выборе города страна подставится сама"
-                  }
+                  hint="необязательно · можно общаться и встречаться на расстоянии; при выборе города страна подставится сама"
                   options={[{ value: "", label: "Не указан" }, ...cityOptions.map((city) => ({ value: city, label: city }))]}
                   value={draft.city}
                   error={errors.city}
@@ -526,7 +518,7 @@ export function ProfileScreen({ host }: Props) {
               <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Диагнозы и особенности" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
               <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Вайб анкеты — как с тобой лучше быть" tone="vibe" />
-              <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько" />
+              <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
             </section>
 
             <section class={styles.section}>
@@ -546,7 +538,7 @@ export function ProfileScreen({ host }: Props) {
             <section class={`${styles.section} ${styles.plusSection}`}>
               <div class={styles.sectionTitle}><h2>Кто может тебя находить</h2></div>
               <div class={styles.gridTwo}><Input label="От" name="seek_min_age" type="number" value={draft.seekMinAge} onInput={(event) => setField("seekMinAge", event.currentTarget.value)} /><Input label="До" name="seek_max_age" type="number" value={draft.seekMaxAge} onInput={(event) => setField("seekMaxAge", event.currentTarget.value)} /></div>
-              <Select className={styles.selectControl} label="Место" id="profile-seek-place" options={[{ value: "", label: "Везде" }, ...(draft.city ? [{ value: draft.city, label: `Только ${draft.city}` }] : []), ...places.map((place) => ({ value: place.country, label: place.country }))]} value={draft.seekPlace} onChange={(value) => setField("seekPlace", value)} ariaLabel="Место" />
+              <Select className={styles.selectControl} label="Место" id="profile-seek-place" hint="по умолчанию «Везде» — тебя видят из любого города; сужай только если сам хочешь" options={[{ value: "", label: "Везде" }, ...(draft.city ? [{ value: draft.city, label: `Только ${draft.city}` }] : []), ...places.map((place) => ({ value: place.country, label: place.country }))]} value={draft.seekPlace} onChange={(value) => setField("seekPlace", value)} ariaLabel="Место" />
               <TagPicker options={host.catalog.neuro || []} selected={draft.hideNeuro} onChange={(value) => setField("hideNeuro", value)} label="Не показывать, если у человека есть:" />
               <TagPicker options={host.catalog.vibe || []} selected={draft.hideVibe} onChange={(value) => setField("hideVibe", value)} label="Не показывать, если у человека такой вайб:" tone="vibe" />
             </section>
