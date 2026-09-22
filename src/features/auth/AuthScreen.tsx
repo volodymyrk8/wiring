@@ -355,7 +355,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
             <a href={hrefFor("support")} data-nav="support" onClick={(e) => { e.preventDefault(); host.navigate("support"); }}>
               поддержку
             </a>{" "}
-            о любых замечаниях, пожеланиях и улучшениях — мы быстро и внимательно обрабатываем обратную связь.
+            о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
           </p>
         </div>
       )}

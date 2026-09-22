@@ -863,6 +863,49 @@ class WiringTest(unittest.TestCase):
             )
         self.assertEqual(blocked.status_code, 400)
 
+    def test_chat_intent_allows_profile_without_city(self):
+        self._register()
+        self._login("ada@example.com")
+        body = {
+            "name": "Ада",
+            "age": 29,
+            "city": "",
+            "gender": "woman",
+            "looking_for": "everyone",
+            "bio": "пишу без привязки к городу",
+            "neuro": ["asd"],
+            "vibe": ["nonsmalltalk"],
+            "intents": ["chat"],
+            "special_data_consent": True,
+            "photo_rights_consent": True,
+            "photo": "portraits/p01.jpg",
+            "job": "",
+        }
+        patched = self.client.patch("/api/me", json=body)
+        self.assertEqual(patched.status_code, 200, patched.get_data(as_text=True))
+        user = patched.get_json()["user"]
+        self.assertFalse(user["needs_profile"])
+        self.assertFalse(user["needs_city"])
+
+    def test_dating_intent_still_needs_city(self):
+        self._register()
+        self._login("ada@example.com")
+        body = {
+            "name": "Ада",
+            "age": 29,
+            "city": "",
+            "gender": "woman",
+            "looking_for": "everyone",
+            "bio": "ищу",
+            "neuro": ["asd"],
+            "intents": ["dating"],
+            "special_data_consent": True,
+            "photo_rights_consent": True,
+            "photo": "portraits/p01.jpg",
+        }
+        patched = self.client.patch("/api/me", json=body)
+        self.assertEqual(patched.status_code, 400)
+
     def test_admin_stats_matches_and_chats(self):
         from admin import collect_stats
 

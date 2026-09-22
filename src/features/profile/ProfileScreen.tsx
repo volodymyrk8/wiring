@@ -12,6 +12,7 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { softIntentsOnly } from "@/lib/intents";
 import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
@@ -326,11 +327,13 @@ export function ProfileScreen({ host }: Props) {
     setServerError("");
   };
 
+  const cityOptional = softIntentsOnly(draft.intents);
+
   const validate = () => {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
     if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
-    if (!draft.city.trim()) next.city = "Укажи город, чтобы попасть в ленту";
+    if (!draft.city.trim() && !cityOptional) next.city = "Укажи город, чтобы попасть в ленту";
     if (!draft.neuro.length) next.neuro = "Отметь хотя бы одну особенность";
     if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
     setErrors(next);
@@ -497,7 +500,11 @@ export function ProfileScreen({ host }: Props) {
                   label="Город"
                   id="profile-city"
                   placeholder="Не указан"
-                  hint="необязательно · при выборе города страна подставится сама"
+                  hint={
+                    cityOptional
+                      ? "необязательно для «дружба» и «просто писать»"
+                      : "необязательно · при выборе города страна подставится сама"
+                  }
                   options={[{ value: "", label: "Не указан" }, ...cityOptions.map((city) => ({ value: city, label: city }))]}
                   value={draft.city}
                   error={errors.city}
