@@ -298,7 +298,9 @@ export function ProfileScreen({ host }: Props) {
   const setCity = (nextCity: string) => {
     const trimmed = nextCity.trim();
     if (!trimmed) {
-      setField("city", "");
+      setDraft((current) => ({ ...current, city: "", country: "" }));
+      setErrors((current) => ({ ...current, city: "" }));
+      setServerError("");
       return;
     }
     const nextCountry = countryForCity(trimmed, places);
@@ -313,9 +315,10 @@ export function ProfileScreen({ host }: Props) {
 
   const setCountry = (nextCountry: string) => {
     setDraft((current) => {
-      const citiesInCountry = nextCountry
-        ? places.find((place) => place.country === nextCountry)?.cities || []
-        : catalogCities(places);
+      if (!nextCountry) {
+        return { ...current, country: "", city: "" };
+      }
+      const citiesInCountry = places.find((place) => place.country === nextCountry)?.cities || [];
       const cityOk = !current.city || citiesInCountry.includes(current.city);
       return {
         ...current,

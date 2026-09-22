@@ -913,8 +913,11 @@ def parse_profile(
     data: dict[str, Any], *, require_password: bool, require_neuro: bool = True, draft: bool = False
 ) -> tuple[dict[str, Any] | None, str | None]:
     name = str(data.get("name") or "").strip()
-    city_raw = str(data.get("city") or "").strip()
-    city = normalize_city(city_raw)
+    if "city" in data and not str(data.get("city") or "").strip():
+        city = ""
+    else:
+        city_raw = str(data.get("city") or "").strip()
+        city = normalize_city(city_raw) if city_raw else ""
     bio = str(data.get("bio") or "").strip()
     gender = str(data.get("gender") or "").strip()
     looking_for = str(data.get("looking_for") or "").strip()
@@ -941,14 +944,15 @@ def parse_profile(
         return None, "имя: 2–32 символа"
     if not (18 <= age <= 99):
         return None, "только 18+"
-    if not city or len(city) < 2 or len(city) > 48:
-        if city_optional and not draft:
-            city = ""
-        elif not draft:
+    if not city:
+        if not city_optional and not draft:
             return None, "город: 2–48 символов"
+    elif len(city) < 2 or len(city) > 48:
+        if draft:
+            city = "—"
         else:
-            city = str(data.get("city") or "").strip() or "—"
-    elif city and not is_catalog_city(city):
+            return None, "город: 2–48 символов"
+    elif not is_catalog_city(city):
         if draft and len(city) >= 2:
             pass
         else:
@@ -1688,7 +1692,7 @@ def _merge_me_for_draft(me: Row, data: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": data.get("name", me["name"]),
         "age": data.get("age", me["age"]),
-        "city": data.get("city", me["city"]),
+        "city": me["city"] if "city" not in data else data.get("city"),
         "gender": data.get("gender", me["gender"]),
         "looking_for": data.get("looking_for", me["looking_for"]),
         "bio": data.get("bio", me["bio"]),

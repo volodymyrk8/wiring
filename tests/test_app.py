@@ -887,6 +887,28 @@ class WiringTest(unittest.TestCase):
         self.assertFalse(user["needs_profile"])
         self.assertFalse(user["needs_city"])
 
+    def test_profile_can_clear_city_on_save(self):
+        self._register()
+        self._login("ada@example.com")
+        cleared = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "",
+                "gender": "woman",
+                "looking_for": "everyone",
+                "bio": "пишу",
+                "neuro": ["asd"],
+                "intents": ["chat"],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+            },
+        )
+        self.assertEqual(cleared.status_code, 200, cleared.get_data(as_text=True))
+        self.assertEqual(cleared.get_json()["user"]["city"], "")
+
     def test_dating_intent_still_needs_city(self):
         self._register()
         self._login("ada@example.com")
