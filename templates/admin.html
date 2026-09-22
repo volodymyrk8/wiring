@@ -50,7 +50,8 @@
         <div class="prompt-card"><div class="q">сиды</div><p>{{ s.users_seed }}</p></div>
         <div class="prompt-card"><div class="q">свайпы сегодня</div><p>{{ s.swipes_today }} <span class="hint">вчера {{ s.swipes_yesterday }}</span></p></div>
         <div class="prompt-card"><div class="q">лайки / пропуски</div><p>{{ s.likes }} / {{ s.passes }}</p></div>
-        <div class="prompt-card"><div class="q">мэтчи живые / сиды</div><p>{{ s.matches_real }} / {{ s.matches_seed }}</p></div>
+        <div class="prompt-card"><div class="q">мэтчи</div><p>{{ s.matches_total }} <span class="hint">живые {{ s.matches_real }} · с сидами {{ s.matches_seed }}</span></p></div>
+        <div class="prompt-card"><div class="q">разговоры после мэтча</div><p>{{ s.match_chats }} <span class="hint">живые {{ s.match_chats_real }} · из {{ s.matches_total }} мэтчей</span></p></div>
         <div class="prompt-card"><div class="q">сообщения</div><p>{{ s.messages }}</p></div>
         <div class="prompt-card"><div class="q">жалобы / блоки</div><p>{{ s.reports }} / {{ s.blocks }}</p></div>
         <div class="prompt-card"><div class="q">WIRING+</div><p>{{ s.users_plus }}</p></div>

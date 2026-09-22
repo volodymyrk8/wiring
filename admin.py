@@ -19,6 +19,10 @@ def _is_real(row) -> bool:
     return not row["is_seed"] and not _is_guest(str(row["email"]))
 
 
+def _pair_key(a: int, b: int) -> tuple[int, int]:
+    return (a, b) if a < b else (b, a)
+
+
 _LABELS: dict[str, dict[str, str]] = {
     "neuro": {item["id"]: item["label"] for item in NEURO},
     "vibe": {item["id"]: item["label"] for item in VIBE},
@@ -215,6 +219,18 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
             pairs.add((a, b))
     real_real = sum(1 for a, b in pairs if a in real_ids and b in real_ids)
     real_seed = sum(1 for a, b in pairs if (a in real_ids and b in seed_ids) or (b in real_ids and a in seed_ids))
+    matches_total = len(pairs)
+
+    message_rows = conn.execute(
+        "SELECT from_id, to_id, created_at FROM messages WHERE COALESCE(deleted_at, 0) = 0"
+    ).fetchall()
+    msg_pairs: set[tuple[int, int]] = set()
+    for row in message_rows:
+        msg_pairs.add(_pair_key(int(row["from_id"]), int(row["to_id"])))
+    match_chats = sum(1 for pair in pairs if pair in msg_pairs)
+    match_chats_real = sum(
+        1 for pair in pairs if pair in msg_pairs and pair[0] in real_ids and pair[1] in real_ids
+    )
 
     messages = conn.execute("SELECT from_id, to_id, created_at FROM messages").fetchall()
     reports = conn.execute("SELECT COUNT(*) AS n FROM reports").fetchone()["n"]
@@ -269,8 +285,11 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "passes": len(passes),
         "swipes_today": len(today_swipes),
         "swipes_yesterday": len(yday_swipes),
+        "matches_total": matches_total,
         "matches_real": real_real,
         "matches_seed": real_seed,
+        "match_chats": match_chats,
+        "match_chats_real": match_chats_real,
         "messages": len(messages),
         "reports": reports,
         "blocks": blocks,

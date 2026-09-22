@@ -863,6 +863,36 @@ class WiringTest(unittest.TestCase):
             )
         self.assertEqual(blocked.status_code, 400)
 
+    def test_admin_stats_matches_and_chats(self):
+        from admin import collect_stats
+
+        first = self._register()
+        self.client.post("/api/logout")
+        second = self._register(
+            email="stats-chat@example.com",
+            name="Стат",
+            gender="man",
+            photo="portraits/p02.jpg",
+        )
+        self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
+        self.client.post("/api/logout")
+        self._login("ada@example.com")
+        matched = self.client.post("/api/swipe", json={"target_id": second["id"], "direction": "like"})
+        self.assertTrue(matched.get_json()["matched"])
+
+        conn = db()
+        before = collect_stats(conn)
+        self.assertGreaterEqual(before["matches_total"], 1)
+        self.assertGreaterEqual(before["matches_real"], 1)
+        self.assertEqual(before["match_chats"], 0)
+        self.assertEqual(before["match_chats_real"], 0)
+
+        sent = self.client.post("/api/messages", json={"to_id": second["id"], "body": "привет"})
+        self.assertEqual(sent.status_code, 200)
+        after = collect_stats(conn)
+        self.assertGreaterEqual(after["match_chats"], 1)
+        self.assertGreaterEqual(after["match_chats_real"], 1)
+
     def test_admin_requires_token(self):
         denied = self.client.post("/admin", data={"token": "nope"})
         self.assertEqual(denied.status_code, 403)
