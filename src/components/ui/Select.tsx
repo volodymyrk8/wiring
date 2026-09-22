@@ -89,7 +89,12 @@ export function Select<T extends string = string>({
       if (!wrap || !menu) return;
       const rect = wrap.getBoundingClientRect();
       const menuHeight = Math.min(menu.scrollHeight, 320);
-      const below = window.innerHeight - rect.bottom - 12;
+      const tabbarClearance = Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--tabbar-clearance") || "0",
+      );
+      const tabbarReserve =
+        tabbarClearance > 0 && rect.bottom > window.innerHeight - tabbarClearance - 24 ? tabbarClearance : 0;
+      const below = window.innerHeight - rect.bottom - 12 - tabbarReserve;
       const above = rect.top - 12;
       const nextPlacement = below < menuHeight && above > below ? "up" : "down";
       const available = Math.max(48, nextPlacement === "up" ? above : below);

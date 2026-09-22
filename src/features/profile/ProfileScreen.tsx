@@ -12,6 +12,7 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
@@ -55,7 +56,7 @@ const allPhotos = (user: ProfileUser): ProfilePhoto[] => {
 function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Draft {
   const city = valueOf(user.city);
   const places = catalog.places || [];
-  const country = places.find((place) => place.cities.includes(city))?.country || places[0]?.country || "";
+  const country = countryForCity(city, places);
   const hidden = idsOf(user.hide_tags);
   const intents = idsOf(user.intents, user.intent ? [user.intent] : ["dating"]);
   return {
@@ -289,14 +290,47 @@ export function ProfileScreen({ host }: Props) {
   };
   const inputValue = (key: keyof Draft) => String(draft[key]);
   const places = host.catalog.places || [];
-  const cities = places.find((place) => place.country === draft.country)?.cities || [];
+  const cityOptions = catalogCities(places, draft.country || undefined);
+  const countryOptions = [{ value: "", label: "Не указана" }, ...places.map((place) => ({ value: place.country, label: place.country }))];
   const primaryPhoto = allPhotos(user).find((photo) => photo.is_primary) || allPhotos(user)[0];
+
+  const setCity = (nextCity: string) => {
+    const trimmed = nextCity.trim();
+    if (!trimmed) {
+      setField("city", "");
+      return;
+    }
+    const nextCountry = countryForCity(trimmed, places);
+    setDraft((current) => ({
+      ...current,
+      city: trimmed,
+      country: nextCountry || current.country,
+    }));
+    setErrors((current) => ({ ...current, city: "" }));
+    setServerError("");
+  };
+
+  const setCountry = (nextCountry: string) => {
+    setDraft((current) => {
+      const citiesInCountry = nextCountry
+        ? places.find((place) => place.country === nextCountry)?.cities || []
+        : catalogCities(places);
+      const cityOk = !current.city || citiesInCountry.includes(current.city);
+      return {
+        ...current,
+        country: nextCountry,
+        city: cityOk ? current.city : "",
+      };
+    });
+    setErrors((current) => ({ ...current, city: "" }));
+    setServerError("");
+  };
 
   const validate = () => {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
     if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
-    if (!draft.city.trim()) next.city = "Выбери город";
+    if (!draft.city.trim()) next.city = "Укажи город, чтобы попасть в ленту";
     if (!draft.neuro.length) next.neuro = "Отметь хотя бы одну особенность";
     if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
     setErrors(next);
@@ -376,6 +410,10 @@ export function ProfileScreen({ host }: Props) {
       <AppHeader
         homeHref={host.hrefFor("home")}
         onHomeClick={handleNav("home")}
+        showBack
+        backHref={host.hrefFor("deck")}
+        backNav="deck"
+        onBackClick={handleNav("deck")}
         sectionTitle="Профиль"
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
@@ -442,9 +480,30 @@ export function ProfileScreen({ host }: Props) {
                 <Select className={styles.selectControl} label="Кого ищешь" id="profile-looking-for" options={optionList(host.catalog.looking_for)} value={draft.lookingFor} onChange={(value) => setField("lookingFor", value)} ariaLabel="Кого ищешь" />
               </div>
               <div class={styles.fieldGroup}>
-                <Select className={styles.selectControl} label="Страна" id="profile-country" options={places.map((place) => ({ value: place.country, label: place.country }))} value={draft.country} onChange={(value) => setField("country", value)} ariaLabel="Страна" />
-                <Input label="Город" name="city" id="profile-city" list="profile-city-list" required value={draft.city} error={errors.city} onInput={(event) => setField("city", event.currentTarget.value)} />
-                <datalist id="profile-city-list">{cities.map((city) => <option key={city} value={city} />)}</datalist>
+                <Select
+                  className={styles.selectControl}
+                  label="Страна"
+                  id="profile-country"
+                  placeholder="Не указана"
+                  hint="необязательно"
+                  options={countryOptions}
+                  value={draft.country}
+                  onChange={setCountry}
+                  ariaLabel="Страна"
+                />
+                <Select
+                  className={styles.selectControl}
+                  menuClassName={styles.citySelectMenu}
+                  label="Город"
+                  id="profile-city"
+                  placeholder="Не указан"
+                  hint="необязательно · при выборе города страна подставится сама"
+                  options={[{ value: "", label: "Не указан" }, ...cityOptions.map((city) => ({ value: city, label: city }))]}
+                  value={draft.city}
+                  error={errors.city}
+                  onChange={setCity}
+                  ariaLabel="Город"
+                />
               </div>
               <div class={styles.fieldGroup}>
                 <Input label="Рост, см" name="height" type="number" value={draft.height} hint="необязательно" onInput={(event) => setField("height", event.currentTarget.value)} />

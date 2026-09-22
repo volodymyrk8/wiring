@@ -11,8 +11,13 @@
 .sectionTitle { display: flex; align-items: center; }
 .sectionTitle h2 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -.025em; line-height: 1.1; }
 .gridTwo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.fieldGroup { display: grid; gap: 10px; }
+.fieldGroup { display: grid; gap: 10px; overflow: visible; }
 .selectControl { width: 100%; }
+.citySelectMenu {
+  z-index: 10050;
+  max-height: min(320px, calc(100dvh - var(--tabbar-clearance, 88px) - env(safe-area-inset-bottom) - 96px)) !important;
+}
+.content { padding-bottom: calc(var(--tabbar-clearance, 88px) + 12px); }
 .error, .serverError { margin: 0; color: var(--coral); font-size: 12.5px; line-height: 1.4; }
 .serverError { padding: 12px 14px; border: 1px solid var(--glow-2); border-radius: 13px; background: var(--glow-2); }
 .photosBlock { display: grid; gap: 12px; }
