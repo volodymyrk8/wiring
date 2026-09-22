@@ -880,18 +880,21 @@ class WiringTest(unittest.TestCase):
         matched = self.client.post("/api/swipe", json={"target_id": second["id"], "direction": "like"})
         self.assertTrue(matched.get_json()["matched"])
 
-        conn = db()
-        before = collect_stats(conn)
-        self.assertGreaterEqual(before["matches_total"], 1)
-        self.assertGreaterEqual(before["matches_real"], 1)
-        self.assertEqual(before["match_chats"], 0)
-        self.assertEqual(before["match_chats_real"], 0)
+        conn = open_request_connection()
+        try:
+            before = collect_stats(conn)
+            self.assertGreaterEqual(before["matches_total"], 1)
+            self.assertGreaterEqual(before["matches_real"], 1)
+            self.assertEqual(before["match_chats"], 0)
+            self.assertEqual(before["match_chats_real"], 0)
 
-        sent = self.client.post("/api/messages", json={"to_id": second["id"], "body": "привет"})
-        self.assertEqual(sent.status_code, 200)
-        after = collect_stats(conn)
-        self.assertGreaterEqual(after["match_chats"], 1)
-        self.assertGreaterEqual(after["match_chats_real"], 1)
+            sent = self.client.post("/api/messages", json={"to_id": second["id"], "body": "привет"})
+            self.assertEqual(sent.status_code, 200)
+            after = collect_stats(conn)
+            self.assertGreaterEqual(after["match_chats"], 1)
+            self.assertGreaterEqual(after["match_chats_real"], 1)
+        finally:
+            conn.close()
 
     def test_admin_requires_token(self):
         denied = self.client.post("/admin", data={"token": "nope"})
