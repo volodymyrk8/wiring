@@ -13,8 +13,9 @@ SNOOZE_DAYS = 7
 DEFAULT_CODE = "WIRINGPLUS"
 DEFAULT_DAYS = 90
 REFERRAL_DAYS = 30
-BETA_PLUS_GIFT_DAYS = 365
+BETA_PLUS_GIFT_DAYS = 90
 BETA_PLUS_GIFT_MIGRATION = "beta_plus_gift_existing_users_2026_09"
+BETA_PLUS_GIFT_3MO_MIGRATION = "beta_plus_gift_3mo_all_2026_09"
 
 
 def is_premium(row: Any, now: float | None = None) -> bool:
@@ -77,20 +78,40 @@ def ensure_beta_plus_gift(conn: Connection) -> int:
         return 0
     now = int(time.time())
     granted = 0
-    for row in conn.execute(
-        """
-        SELECT id FROM users
-        WHERE COALESCE(deleted_at, 0) = 0
-          AND COALESCE(is_seed, 0) = 0
-          AND LOWER(email) NOT LIKE '%@wiring.guest'
-          AND LOWER(email) != 'demo@wiring.app'
-        """
-    ):
+    for row in conn.execute(_beta_plus_gift_eligible_sql()):
         grant_premium(conn, int(row["id"]), BETA_PLUS_GIFT_DAYS)
         granted += 1
     conn.execute(
         "INSERT INTO app_migrations (id, applied_at) VALUES (?, ?)",
         (BETA_PLUS_GIFT_MIGRATION, now),
+    )
+    return granted
+
+
+def _beta_plus_gift_eligible_sql() -> str:
+    return """
+        SELECT id FROM users
+        WHERE COALESCE(deleted_at, 0) = 0
+          AND COALESCE(is_seed, 0) = 0
+          AND LOWER(email) NOT LIKE '%@wiring.guest'
+          AND LOWER(email) != 'demo@wiring.app'
+    """
+
+
+def ensure_beta_plus_three_months(conn: Connection) -> int:
+    """Set WIRING+ until 90 days from deploy for every eligible account (beta thank-you)."""
+    ensure_app_migrations(conn)
+    if conn.execute("SELECT 1 FROM app_migrations WHERE id = ?", (BETA_PLUS_GIFT_3MO_MIGRATION,)).fetchone():
+        return 0
+    now = int(time.time())
+    until = now + BETA_PLUS_GIFT_DAYS * DAY
+    granted = 0
+    for row in conn.execute(_beta_plus_gift_eligible_sql()):
+        conn.execute("UPDATE users SET premium_until = ? WHERE id = ?", (until, int(row["id"])))
+        granted += 1
+    conn.execute(
+        "INSERT INTO app_migrations (id, applied_at) VALUES (?, ?)",
+        (BETA_PLUS_GIFT_3MO_MIGRATION, now),
     )
     return granted
 

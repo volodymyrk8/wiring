@@ -49,27 +49,35 @@ class WiringTest(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_beta_plus_gift_grants_once(self):
-        from premium import BETA_PLUS_GIFT_MIGRATION, ensure_beta_plus_gift, is_premium, plus_until
+    def test_beta_plus_three_months_gift(self):
+        import time
+
+        from premium import (
+            BETA_PLUS_GIFT_3MO_MIGRATION,
+            DAY,
+            ensure_beta_plus_three_months,
+            is_premium,
+            plus_until,
+        )
 
         self._register()
-        self._login("ada@example.com")
         conn = open_request_connection()
         try:
-            n = ensure_beta_plus_gift(conn)
+            now = int(time.time())
+            n = ensure_beta_plus_three_months(conn)
             conn.commit()
             self.assertGreaterEqual(n, 1)
             row = conn.execute("SELECT * FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
             self.assertTrue(is_premium(row))
-            until_first = plus_until(row)
-            n2 = ensure_beta_plus_gift(conn)
+            until = plus_until(row)
+            self.assertGreaterEqual(until, now + 89 * DAY)
+            self.assertLessEqual(until, now + 91 * DAY)
+            n2 = ensure_beta_plus_three_months(conn)
             conn.commit()
             self.assertEqual(n2, 0)
-            row2 = conn.execute("SELECT * FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
-            self.assertEqual(plus_until(row2), until_first)
             applied = conn.execute(
                 "SELECT 1 FROM app_migrations WHERE id = ?",
-                (BETA_PLUS_GIFT_MIGRATION,),
+                (BETA_PLUS_GIFT_3MO_MIGRATION,),
             ).fetchone()
             self.assertTrue(applied)
         finally:

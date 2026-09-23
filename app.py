@@ -53,6 +53,7 @@ from premium import (
     add_code,
     apply_referral,
     ensure_beta_plus_gift,
+    ensure_beta_plus_three_months,
     ensure_default_code,
     ensure_referral_code,
     grant_premium,
@@ -480,6 +481,7 @@ def init_db() -> None:
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
     ensure_default_code(conn)
     ensure_beta_plus_gift(conn)
+    ensure_beta_plus_three_months(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
