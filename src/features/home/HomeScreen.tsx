@@ -111,6 +111,24 @@ export function HomeScreen({ host }: HomeScreenProps) {
           )}
 
           <div class={styles.about}>
+            <aside class={styles.plusGiftCard} aria-label="подарок WIRING+">
+              <p class={styles.plusGiftText}>
+                <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы продлили премиум на год
+                каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.{" "}
+                {signed ? (
+                  <a
+                    class={styles.plusGiftLink}
+                    href={hrefFor("plus")}
+                    data-nav="plus"
+                    onClick={handleNav("plus")}
+                  >
+                    Посмотреть в профиле
+                  </a>
+                ) : (
+                  <span class={styles.plusGiftNote}>После входа статус будет в разделе WIRING+.</span>
+                )}
+              </p>
+            </aside>
             <p class={styles.aboutText}>
               Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
             </p>

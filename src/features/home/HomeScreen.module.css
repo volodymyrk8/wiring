@@ -125,6 +125,44 @@
   text-wrap: pretty;
 }
 
+.plusGiftCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--lime) 45%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--lime) 6%, transparent);
+  padding: 12px 16px;
+}
+
+.plusGiftText {
+  margin: 0;
+  font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.plusGiftLead {
+  font-weight: 600;
+  color: var(--lime);
+}
+
+.plusGiftLink {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2.5px;
+}
+
+.plusGiftLink:hover {
+  color: var(--lime);
+}
+
+.plusGiftNote {
+  color: var(--muted);
+}
+
 .betaCard {
   position: relative;
   display: flex;

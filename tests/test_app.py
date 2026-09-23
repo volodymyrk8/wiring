@@ -49,6 +49,32 @@ class WiringTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_beta_plus_gift_grants_once(self):
+        from premium import BETA_PLUS_GIFT_MIGRATION, ensure_beta_plus_gift, is_premium, plus_until
+
+        self._register()
+        self._login("ada@example.com")
+        conn = open_request_connection()
+        try:
+            n = ensure_beta_plus_gift(conn)
+            conn.commit()
+            self.assertGreaterEqual(n, 1)
+            row = conn.execute("SELECT * FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
+            self.assertTrue(is_premium(row))
+            until_first = plus_until(row)
+            n2 = ensure_beta_plus_gift(conn)
+            conn.commit()
+            self.assertEqual(n2, 0)
+            row2 = conn.execute("SELECT * FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
+            self.assertEqual(plus_until(row2), until_first)
+            applied = conn.execute(
+                "SELECT 1 FROM app_migrations WHERE id = ?",
+                (BETA_PLUS_GIFT_MIGRATION,),
+            ).fetchone()
+            self.assertTrue(applied)
+        finally:
+            conn.close()
+
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
         self.assertTrue(health["ok"])

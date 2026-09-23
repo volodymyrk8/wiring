@@ -13,6 +13,8 @@ SNOOZE_DAYS = 7
 DEFAULT_CODE = "WIRINGPLUS"
 DEFAULT_DAYS = 90
 REFERRAL_DAYS = 30
+BETA_PLUS_GIFT_DAYS = 365
+BETA_PLUS_GIFT_MIGRATION = "beta_plus_gift_existing_users_2026_09"
 
 
 def is_premium(row: Any, now: float | None = None) -> bool:
@@ -55,6 +57,42 @@ def ensure_default_code(conn: Connection) -> None:
         "INSERT INTO promo_codes (code, days, max_uses, uses) VALUES (?, ?, 0, 0)",
         (DEFAULT_CODE, DEFAULT_DAYS),
     )
+
+
+def ensure_app_migrations(conn: Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_migrations (
+            id TEXT PRIMARY KEY,
+            applied_at INTEGER NOT NULL
+        )
+        """
+    )
+
+
+def ensure_beta_plus_gift(conn: Connection) -> int:
+    """One-time WIRING+ grant for accounts that existed before this migration."""
+    ensure_app_migrations(conn)
+    if conn.execute("SELECT 1 FROM app_migrations WHERE id = ?", (BETA_PLUS_GIFT_MIGRATION,)).fetchone():
+        return 0
+    now = int(time.time())
+    granted = 0
+    for row in conn.execute(
+        """
+        SELECT id FROM users
+        WHERE COALESCE(deleted_at, 0) = 0
+          AND COALESCE(is_seed, 0) = 0
+          AND LOWER(email) NOT LIKE '%@wiring.guest'
+          AND LOWER(email) != 'demo@wiring.app'
+        """
+    ):
+        grant_premium(conn, int(row["id"]), BETA_PLUS_GIFT_DAYS)
+        granted += 1
+    conn.execute(
+        "INSERT INTO app_migrations (id, applied_at) VALUES (?, ?)",
+        (BETA_PLUS_GIFT_MIGRATION, now),
+    )
+    return granted
 
 
 def list_codes(conn: Connection) -> list[dict[str, Any]]:

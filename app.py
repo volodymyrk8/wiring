@@ -51,6 +51,7 @@ from premium import (
     REFERRAL_DAYS,
     add_code,
     apply_referral,
+    ensure_beta_plus_gift,
     ensure_default_code,
     ensure_referral_code,
     grant_premium,
@@ -448,6 +449,7 @@ def init_db() -> None:
             conn.execute("UPDATE users SET city = ? WHERE id = ?", (resolved, row["id"]))
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
     ensure_default_code(conn)
+    ensure_beta_plus_gift(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
