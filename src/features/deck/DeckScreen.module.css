@@ -23,7 +23,6 @@
 .tag { padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.18); color: var(--on-photo); font-size: 11px; }
 .tagVibe { color: #eaffb1; background: rgba(210,255,100,.18); }
 .controls { display: flex; flex: 0 0 64px; width: 100%; max-width: 508px; align-items: start; justify-content: center; gap: 18px; }
-.like.like { background: var(--lime); color: var(--on-accent); border-color: var(--lime); }
 .reels { flex: 1; min-height: 240px; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; overflow-anchor: none; overscroll-behavior-y: contain; scrollbar-width: none; touch-action: pan-y; cursor: grab; }
 .reels::-webkit-scrollbar { display: none; }
 .reels:focus { outline: none; }

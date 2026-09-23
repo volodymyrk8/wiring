@@ -360,7 +360,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         {current ? <>
           <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel="Скрыть — больше не показывать" title="Скрыть">{iconPass}</Button><span aria-hidden="true">Скрыть</span></div>
           <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: current.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: current.id }); }} ariaLabel="Профиль" title="Профиль">{iconProfile}</Button><span aria-hidden="true">Профиль</span></div>
-          <div class={styles.actionControl}><Button className={`${styles.actionCircle} ${styles.like}`} disabled={busy || loading} onClick={() => void act("like")} ariaLabel="Лайк" title="Лайк">{iconLike}</Button><span aria-hidden="true">Лайк</span></div>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => void act("like")} ariaLabel="Лайк" title="Лайк">{iconLike}</Button><span aria-hidden="true">Лайк</span></div>
         </> : null}
       </div>
       {error && !filtersOpen && !excludeOpen && !resetOpen ? <p class={styles.error} role="alert">{error}</p> : null}
