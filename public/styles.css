@@ -175,6 +175,9 @@ html[data-view="home"] #app {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  height: 100dvh;
+  min-height: 100dvh;
+  max-height: 100dvh;
   overflow: hidden;
 }
 html[data-view="home"] #home-feature-root {
