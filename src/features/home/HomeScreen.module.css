@@ -28,15 +28,18 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  align-items: stretch;
   justify-content: center;
   gap: var(--home-gap);
   width: 100%;
   min-height: 0;
+  text-align: center;
 }
 
 .hero {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
   width: 100%;
 }
@@ -114,6 +117,7 @@
   gap: 12px;
   width: 100%;
   margin-top: 2px;
+  text-align: center;
 }
 
 .aboutText {
@@ -122,7 +126,6 @@
   font-size: 14.5px;
   line-height: 1.5;
   color: var(--ink, #111);
-  text-align: center;
   text-wrap: pretty;
 }
 
@@ -132,7 +135,6 @@
   font-size: 14.5px;
   line-height: 1.5;
   color: var(--ink);
-  text-align: center;
   text-wrap: pretty;
 }
 
@@ -162,7 +164,6 @@
   font-size: 14px;
   line-height: 1.5;
   color: var(--muted);
-  text-align: left;
   text-wrap: pretty;
 }
 
@@ -194,9 +195,8 @@
 .quiet {
   flex-shrink: 0;
   width: 100%;
-  max-width: 24rem;
-  margin: clamp(14px, 2.5vh, 24px) auto 0;
-  padding: clamp(8px, 1.5vh, 14px) 8px 0;
+  margin: clamp(14px, 2.5vh, 24px) 0 0;
+  padding: clamp(8px, 1.5vh, 14px) 0 0;
   text-align: center;
   font-family: var(--serif, "Fraunces", Georgia, serif);
   font-size: clamp(14px, 3.2vw, 16px);
@@ -274,7 +274,6 @@
   }
 
   .quiet {
-    max-width: 26rem;
     margin-top: clamp(18px, 3vh, 28px);
     padding-top: clamp(10px, 2vh, 16px);
     font-size: 15.5px;
