@@ -122,24 +122,17 @@
   font-size: 14.5px;
   line-height: 1.5;
   color: var(--ink, #111);
+  text-align: center;
   text-wrap: pretty;
-}
-
-.plusGiftCard {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--lime) 45%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--lime) 6%, transparent);
-  padding: 12px 16px;
 }
 
 .plusGiftText {
   margin: 0;
   font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
-  font-size: 13.5px;
+  font-size: 14.5px;
   line-height: 1.5;
   color: var(--ink);
+  text-align: center;
   text-wrap: pretty;
 }
 
@@ -163,29 +156,13 @@
   color: var(--muted);
 }
 
-.betaCard {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: transparent;
-  padding: 12px 16px;
-  transition: border-color 0.2s ease;
-}
-
-.betaCard:hover {
-  border-color: color-mix(in srgb, var(--line) 60%, var(--lime) 40%);
-}
-
 .betaText {
-  position: relative;
-  z-index: 1;
   margin: 0;
   font-family: var(--sans, "IBM Plex Sans", system-ui, sans-serif);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.5;
-  color: var(--ink);
+  color: var(--muted);
+  text-align: left;
   text-wrap: pretty;
 }
 
@@ -254,12 +231,6 @@
   .aboutText {
     font-size: 14px;
   }
-
-  .betaCard {
-    padding: 13px 15px;
-    border-radius: 14px;
-  }
-
 
   .betaText {
     font-size: 13px;

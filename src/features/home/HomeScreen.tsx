@@ -111,8 +111,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
           )}
 
           <div class={styles.about}>
-            <aside class={styles.plusGiftCard} aria-label="подарок WIRING+">
-              <p class={styles.plusGiftText}>
+            <p class={styles.plusGiftText} aria-label="подарок WIRING+">
                 <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы продлили премиум на год
                 каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.{" "}
                 {signed ? (
@@ -127,25 +126,22 @@ export function HomeScreen({ host }: HomeScreenProps) {
                 ) : (
                   <span class={styles.plusGiftNote}>После входа статус будет в разделе WIRING+.</span>
                 )}
-              </p>
-            </aside>
+            </p>
             <p class={styles.aboutText}>
               Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
             </p>
-            <aside class={styles.betaCard} aria-label="информация о бета-версии">
-              <p class={styles.betaText}>
-                <span class={styles.betaLead}>Бета-версия.</span> Сообщайте в{" "}
-                <a
-                  class={styles.betaLink}
-                  href={hrefFor("support")}
-                  data-nav="support"
-                  onClick={handleNav("support")}
-                >
-                  поддержку
-                </a>{" "}
-                о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
-              </p>
-            </aside>
+            <p class={styles.betaText} aria-label="информация о бета-версии">
+              <span class={styles.betaLead}>Бета-версия.</span> Сообщайте в{" "}
+              <a
+                class={styles.betaLink}
+                href={hrefFor("support")}
+                data-nav="support"
+                onClick={handleNav("support")}
+              >
+                поддержку
+              </a>{" "}
+              о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
+            </p>
           </div>
         </div>
 
