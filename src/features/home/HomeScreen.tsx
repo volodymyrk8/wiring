@@ -67,51 +67,51 @@ export function HomeScreen({ host }: HomeScreenProps) {
       />
 
       <section class={styles.home} aria-label="главная">
-        <div class={styles.stack}>
-          <div class={styles.stackIntro}>
-            <header class={styles.hero}>
-              <h1 class={styles.title}>
-                <span class={styles.titleAccent}>Отличные</span> люди рядом
-              </h1>
-              <p class={styles.sub}>Знакомства для нейроотличных</p>
-            </header>
+        <div class={styles.homeTop}>
+          <header class={styles.hero}>
+            <h1 class={styles.title}>
+              <span class={styles.titleAccent}>Отличные</span> люди рядом
+            </h1>
+            <p class={styles.sub}>Знакомства для нейроотличных</p>
+          </header>
 
-            {signed ? (
+          {signed ? (
+            <Button
+              variant="solid"
+              fullWidth
+              href={hrefFor("deck")}
+              nav="deck"
+              onClick={handleNav("deck")}
+            >
+              Показать ленту <ArrowIcon />
+            </Button>
+          ) : (
+            <div class={styles.guestCta}>
               <Button
                 variant="solid"
                 fullWidth
-                href={hrefFor("deck")}
-                nav="deck"
-                onClick={handleNav("deck")}
+                href={hrefFor("register")}
+                nav="register"
+                onClick={handleNav("register")}
               >
-                Показать ленту <ArrowIcon />
+                Создать профиль
               </Button>
-            ) : (
-              <div class={styles.guestCta}>
-                <Button
-                  variant="solid"
-                  fullWidth
-                  href={hrefFor("register")}
-                  nav="register"
-                  onClick={handleNav("register")}
+              <div class={styles.switchRow}>
+                <span class={styles.switchPrompt}>Уже есть профиль?</span>
+                <a
+                  class={styles.switchLink}
+                  href={hrefFor("login")}
+                  data-nav="login"
+                  onClick={handleNav("login")}
                 >
-                  Создать профиль
-                </Button>
-                <div class={styles.switchRow}>
-                  <span class={styles.switchPrompt}>Уже есть профиль?</span>
-                  <a
-                    class={styles.switchLink}
-                    href={hrefFor("login")}
-                    data-nav="login"
-                    onClick={handleNav("login")}
-                  >
-                    Войти
-                  </a>
-                </div>
+                  Войти
+                </a>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
+        <div class={styles.homeLower}>
           <div class={styles.about}>
             <div class={styles.aboutFrame}>
               <p class={styles.plusGiftText} aria-label="подарок WIRING+">
@@ -151,9 +151,8 @@ export function HomeScreen({ host }: HomeScreenProps) {
               )}
             </div>
           </div>
+          <p class={styles.quiet}>Можно быть собой.</p>
         </div>
-
-        <p class={styles.quiet}>Можно быть собой.</p>
       </section>
 
       <LegalFooter showTopBorder={false} className={styles.homeFooter} onSupportClick={() => navigate("support")} />
