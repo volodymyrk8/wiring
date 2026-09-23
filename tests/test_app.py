@@ -115,7 +115,7 @@ class WiringTest(unittest.TestCase):
         self.assertGreaterEqual(health["users"], 0)
         catalog = self.client.get("/api/catalog").get_json()
         self.assertTrue(any(item["id"] == "adhd" for item in catalog["neuro"]))
-        self.assertTrue(any(item["id"] == "neurospicy" for item in catalog["vibe"]))
+        self.assertTrue(any(item["id"] == "selfdx" for item in catalog["vibe"]))
         adhd = next(item for item in catalog["neuro"] if item["id"] == "adhd")
         self.assertIn("СДВГ", adhd["expand"])
         self.assertTrue(adhd["tip"])

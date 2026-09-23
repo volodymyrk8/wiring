@@ -129,7 +129,8 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const gender = labelsFor(host.catalog, "genders", person.gender);
   const looking = labelsFor(host.catalog, "looking_for", person.looking_for);
   const intents = labelsFor(host.catalog, "intents", person.intents?.length ? person.intents : person.intent);
-  const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...gender].filter(Boolean).join(" · ");
+  const showGender = person.gender && person.gender !== "hidden" && person.gender !== "other";
+  const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...(showGender ? gender : [])].filter(Boolean).join(" · ");
   const intentLine = intents.length ? `открыта к: ${intents.join(", ")}` : "";
   const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
   const tags = [

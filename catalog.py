@@ -23,32 +23,45 @@ NEURO: list[dict[str, str]] = [
 LEGACY_NEURO_IDS = frozenset({"pda", "rsd", "hsp", "2e"})
 
 VIBE: list[dict[str, str]] = [
-    {"id": "neurospicy", "label": "neurospicy", "hint": "слово 2024+, смысл размыт"},
-    {"id": "selfdx", "label": "self-dx friendly", "hint": "диагноз из треда тоже считается"},
-    {"id": "prodx", "label": "есть официальный диагноз", "hint": "бумага от врача"},
-    {"id": "latedx", "label": "late-diagnosed", "hint": "узнал(а) о себе после 20"},
-    {"id": "masking", "label": "masking exhaustion", "hint": "после людей нужен темноты день"},
-    {"id": "infodump", "label": "info-dump welcome", "hint": "специальный интерес = сексуально"},
-    {"id": "routines", "label": "routines or death", "hint": "сломали план — сломали человека"},
-    {"id": "parallel", "label": "parallel play date", "hint": "молчать в одной комнате — интим"},
-    {"id": "bodydouble", "label": "body doubling buddy", "hint": "рядом молча, каждый за своим"},
-    {"id": "nonsmalltalk", "label": "no small talk", "hint": "сразу про смерть и нейромедиаторы"},
-    {"id": "overstim", "label": "overstimulation warning", "hint": "бары и open space — нет"},
-    {"id": "spoons", "label": "spoon theory", "hint": "сегодня три ложки, не трать"},
-    {"id": "anxious-att", "label": "тревожная привязанность", "hint": "тишина в чате = тревога, нужна ясность"},
-    {"id": "avoidant-att", "label": "избегающая привязанность", "hint": "сближение = побег"},
-    {"id": "disorg-att", "label": "дезорганизованная", "hint": "подойди / отойди / подойди"},
-    {"id": "ace", "label": "ace / demi / aro", "hint": "секс не обязательный DLC"},
-    {"id": "enby", "label": "non-binary / they", "hint": "пол — настройка, не судьба"},
-    {"id": "empath", "label": "эмпат", "hint": "чувствую комнату раньше людей"},
-    {"id": "terminally-online", "label": "terminally online", "hint": "референсы быстрее, чем речь"},
-    {"id": "softlaunch", "label": "soft launch only", "hint": "никаких парных сторис"},
-    {"id": "healing", "label": "healing era", "hint": "терапия как хобби"},
-    {"id": "trauma-informed", "label": "trauma-informed", "hint": "триггеры проговариваем заранее"},
-    {"id": "hyperfix", "label": "hyperfixation buddy", "hint": "три недели одна тема, потом новая"},
-    {"id": "voicenotes", "label": "только голосовые", "hint": "текст — это работа"},
-    {"id": "just-a-little", "label": "just a little autistic", "hint": "современная классика"},
+    {"id": "selfdx", "label": "самодиагностика", "hint": "самостоятельно разбираюсь со своей психикой"},
+    {"id": "prodx", "label": "диагноз от психиатра", "hint": "диагноз подтвержден врачом"},
+    {"id": "latedx", "label": "поздняя диагностика", "hint": "путь к диагнозу был долгим"},
+    {"id": "neurotraits", "label": "нейроотличные черты", "hint": "особенности выражены не ярко"},
+    {"id": "intherapy", "label": "в терапии", "hint": "хожу к психологу/психотерапевту"},
+    {"id": "burnout", "label": "выгорание", "hint": "усталость от жизни среди нейротипиков"},
+    {"id": "empath", "label": "высокая эмпатия", "hint": "тонкая настройка на чувства и эмоции"},
+    {"id": "infodump", "label": "люблю инфодампы", "hint": "расскажем друг другу о специнтересах и гиперфиксах"},
+    {"id": "bodydouble", "label": "боди-даблинг партнёр", "hint": "ищу, с кем вместе делать дела"},
+    {"id": "anxious-att", "label": "тревожная привязанность", "hint": "переживаю за отношения больше, чем за себя"},
+    {"id": "avoidant-att", "label": "избегающая привязанность", "hint": "сближение — угроза, дистанция — безопасность"},
+    {"id": "disorg-att", "label": "дезорганизованная привязанность", "hint": "тяжело и сближение, и дистанция"},
+    {"id": "secure-att", "label": "надежная привязанность", "hint": "стабильность в отношениях"},
+    {"id": "online-only", "label": "только онлайн", "hint": "хочу общаться только в интернете"},
+    {"id": "offline-ok", "label": "возможен оффлайн", "hint": "не против встретиться лично"},
+    {"id": "nonsmalltalk", "label": "без смолл-тока", "hint": "никаких «как дела, как погода»"},
+    {"id": "no-voice", "label": "без голосовых", "hint": "только текстом"},
+    {"id": "voice-ok", "label": "с голосовыми", "hint": "люблю говорить и слушать"},
 ]
+
+LEGACY_VIBE_IDS = frozenset(
+    {
+        "neurospicy",
+        "masking",
+        "routines",
+        "parallel",
+        "overstim",
+        "spoons",
+        "ace",
+        "enby",
+        "terminally-online",
+        "softlaunch",
+        "healing",
+        "trauma-informed",
+        "hyperfix",
+        "voicenotes",
+        "just-a-little",
+    }
+)
 
 LOOKING_FOR = [
     {"id": "women", "label": "женщин"},
@@ -61,8 +74,10 @@ GENDERS = [
     {"id": "woman", "label": "женщина"},
     {"id": "man", "label": "мужчина"},
     {"id": "nb", "label": "небинарно"},
-    {"id": "other", "label": "по-другому"},
+    {"id": "hidden", "label": "скрыто"},
 ]
+
+LEGACY_GENDER_IDS = frozenset({"other"})
 
 INTENTS = [
     {"id": "relationship", "label": "отношения"},
@@ -97,9 +112,9 @@ REPORT_REASONS = [
 DEFAULT_ALBUMS = ["я", "жизнь", "special interest", "звери"]
 
 NEURO_IDS = {item["id"] for item in NEURO} | LEGACY_NEURO_IDS
-VIBE_IDS = {item["id"] for item in VIBE}
+VIBE_IDS = {item["id"] for item in VIBE} | LEGACY_VIBE_IDS
 LOOKING_IDS = {item["id"] for item in LOOKING_FOR}
-GENDER_IDS = {item["id"] for item in GENDERS}
+GENDER_IDS = {item["id"] for item in GENDERS} | LEGACY_GENDER_IDS
 INTENT_IDS = {item["id"] for item in INTENTS}
 PROMPT_IDS = {item["id"] for item in PROMPTS}
 REPORT_IDS = {item["id"] for item in REPORT_REASONS}

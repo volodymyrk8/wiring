@@ -21,6 +21,7 @@ class LogicTest(unittest.TestCase):
         self.assertTrue(_mutual_looking_ok("everyone", "man", "everyone", "man"))
         self.assertTrue(_mutual_looking_ok("women", "man", "everyone", "woman"))
         self.assertFalse(_mutual_looking_ok("women", "man", "everyone", "man"))
+        self.assertTrue(_mutual_looking_ok("women", "man", "men", "hidden"))
 
     def test_cities(self):
         self.assertEqual(normalize_city("Pscov"), "Псков")

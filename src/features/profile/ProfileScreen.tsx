@@ -333,7 +333,6 @@ export function ProfileScreen({ host }: Props) {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
     if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
-    if (!draft.neuro.length) next.neuro = "Отметь хотя бы одну особенность";
     if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -454,7 +453,7 @@ export function ProfileScreen({ host }: Props) {
 
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
-              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото и хотя бы одна особенность. Город необязателен.
+              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.
             </p>
           ) : null}
 
@@ -478,7 +477,7 @@ export function ProfileScreen({ host }: Props) {
                 <Input label="Возраст" name="age" type="number" required value={draft.age} error={errors.age} onInput={(event) => setField("age", event.currentTarget.value)} />
               </div>
               <div class={styles.gridTwo}>
-                <Select className={styles.selectControl} label="Кто ты" id="profile-gender" options={optionList(host.catalog.genders)} value={draft.gender} onChange={(value) => setField("gender", value)} ariaLabel="Кто ты" />
+                <Select className={styles.selectControl} label="Пол" id="profile-gender" options={optionList(host.catalog.genders)} value={draft.gender} onChange={(value) => setField("gender", value)} ariaLabel="Пол" />
                 <Select className={styles.selectControl} label="Кого ищешь" id="profile-looking-for" options={optionList(host.catalog.looking_for)} value={draft.lookingFor} onChange={(value) => setField("lookingFor", value)} ariaLabel="Кого ищешь" />
               </div>
               <div class={styles.fieldGroup}>
@@ -514,10 +513,10 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Твоя схема</h2></div>
-              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Диагнозы и особенности" />
+              <div class={styles.sectionTitle}><h2>Детали и предпочтения</h2><span>по желанию</span></div>
+              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
+              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Диагнозы из списка — если хочешь указать явно" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
-              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Вайб анкеты — как с тобой лучше быть" tone="vibe" />
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
             </section>
 

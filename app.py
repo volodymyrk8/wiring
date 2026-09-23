@@ -478,6 +478,7 @@ def init_db() -> None:
         resolved = catalog_city(str(row["city"] or ""))
         if resolved and resolved != row["city"]:
             conn.execute("UPDATE users SET city = ? WHERE id = ?", (resolved, row["id"]))
+    conn.execute("UPDATE users SET gender = 'hidden' WHERE gender = 'other'")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
     ensure_default_code(conn)
     ensure_beta_plus_gift(conn)
@@ -621,8 +622,6 @@ def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos:
     if int(row["age"] or 0) < 18:
         return False
     if str(row["gender"] or "") not in GENDER_IDS:
-        return False
-    if not tags.get("neuro"):
         return False
     if not photos and not str(row["photo"] or "").strip():
         return False
@@ -1082,6 +1081,8 @@ def replace_tags(conn: Connection, user_id: int, neuro: list[str], vibe: list[st
 
 def looking_matches(viewer_looking: str, candidate_gender: str) -> bool:
     if viewer_looking in {"everyone", "friends"}:
+        return True
+    if candidate_gender in {"hidden", "other"}:
         return True
     if viewer_looking == "women":
         return candidate_gender == "woman"
@@ -1713,7 +1714,7 @@ def api_patch_me():
     parsed, err = parse_profile(
         {**payload_in, "email": "x@y.zz", "password": "ignore1"},
         require_password=False,
-        require_neuro=not draft,
+        require_neuro=False,
         draft=draft,
     )
     if err or parsed is None:
