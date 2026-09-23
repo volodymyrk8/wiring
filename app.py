@@ -936,16 +936,17 @@ def parse_profile(
         return None, "имя: 2–32 символа"
     if not (18 <= age <= 99):
         return None, "только 18+"
-    if city and (len(city) < 2 or len(city) > 48):
-        if draft:
-            city = "—"
-        else:
-            return None, "город: 2–48 символов"
-    elif not is_catalog_city(city):
-        if draft and len(city) >= 2:
-            pass
-        else:
-            return None, "выбери город из списка"
+    if city:
+        if len(city) < 2 or len(city) > 48:
+            if draft:
+                city = "—"
+            else:
+                return None, "город: 2–48 символов"
+        elif not is_catalog_city(city):
+            if draft and len(city) >= 2:
+                pass
+            else:
+                return None, "выбери город из списка"
     if len(bio) > 1200:
         return None, "био до 1200 символов"
     if len(job) > 60:
