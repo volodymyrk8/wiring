@@ -68,47 +68,49 @@ export function HomeScreen({ host }: HomeScreenProps) {
 
       <section class={styles.home} aria-label="главная">
         <div class={styles.stack}>
-          <header class={styles.hero}>
-            <h1 class={styles.title}>
-              <span class={styles.titleAccent}>Отличные</span> люди рядом
-            </h1>
-            <p class={styles.sub}>Знакомства для нейроотличных</p>
-          </header>
+          <div class={styles.stackIntro}>
+            <header class={styles.hero}>
+              <h1 class={styles.title}>
+                <span class={styles.titleAccent}>Отличные</span> люди рядом
+              </h1>
+              <p class={styles.sub}>Знакомства для нейроотличных</p>
+            </header>
 
-          {signed ? (
-            <Button
-              variant="solid"
-              fullWidth
-              href={hrefFor("deck")}
-              nav="deck"
-              onClick={handleNav("deck")}
-            >
-              Показать ленту <ArrowIcon />
-            </Button>
-          ) : (
-            <div class={styles.guestCta}>
+            {signed ? (
               <Button
                 variant="solid"
                 fullWidth
-                href={hrefFor("register")}
-                nav="register"
-                onClick={handleNav("register")}
+                href={hrefFor("deck")}
+                nav="deck"
+                onClick={handleNav("deck")}
               >
-                Создать профиль
+                Показать ленту <ArrowIcon />
               </Button>
-              <div class={styles.switchRow}>
-                <span class={styles.switchPrompt}>Уже есть профиль?</span>
-                <a
-                  class={styles.switchLink}
-                  href={hrefFor("login")}
-                  data-nav="login"
-                  onClick={handleNav("login")}
+            ) : (
+              <div class={styles.guestCta}>
+                <Button
+                  variant="solid"
+                  fullWidth
+                  href={hrefFor("register")}
+                  nav="register"
+                  onClick={handleNav("register")}
                 >
-                  Войти
-                </a>
+                  Создать профиль
+                </Button>
+                <div class={styles.switchRow}>
+                  <span class={styles.switchPrompt}>Уже есть профиль?</span>
+                  <a
+                    class={styles.switchLink}
+                    href={hrefFor("login")}
+                    data-nav="login"
+                    onClick={handleNav("login")}
+                  >
+                    Войти
+                  </a>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div class={styles.about}>
             <div class={styles.aboutFrame}>
