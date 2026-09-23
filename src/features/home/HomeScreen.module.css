@@ -35,13 +35,17 @@
 
 .homeLower {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: clamp(12px, 2.5vh, 20px);
   min-height: 0;
   width: 100%;
-  margin-top: auto;
   padding-top: clamp(8px, 2vh, 16px);
-  flex-shrink: 0;
+}
+
+.homeLowerSpacer {
+  flex: 1 1 auto;
+  min-height: clamp(16px, 4vh, 48px);
 }
 
 .hero {
@@ -140,7 +144,7 @@
 }
 
 .plusGiftAction {
-  margin: 4px 0 0;
+  margin: 0;
   padding-top: 4px;
   border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }

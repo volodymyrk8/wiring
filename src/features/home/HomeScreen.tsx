@@ -114,10 +114,6 @@ export function HomeScreen({ host }: HomeScreenProps) {
         <div class={styles.homeLower}>
           <div class={styles.about}>
             <div class={styles.aboutFrame}>
-              <p class={styles.plusGiftText} aria-label="подарок WIRING+">
-                <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы дарим премиум на{" "}
-                <strong>3 месяца</strong> каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.
-              </p>
               <p class={styles.aboutText}>
                 Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
               </p>
@@ -132,6 +128,17 @@ export function HomeScreen({ host }: HomeScreenProps) {
                   поддержку
                 </a>{" "}
                 о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
+              </p>
+            </div>
+          </div>
+
+          <div class={styles.homeLowerSpacer} aria-hidden="true" />
+
+          <div class={styles.about}>
+            <div class={styles.aboutFrame}>
+              <p class={styles.plusGiftText} aria-label="подарок WIRING+">
+                <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы дарим премиум на{" "}
+                <strong>3 месяца</strong> каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.
               </p>
               {signed ? (
                 <p class={styles.plusGiftAction}>
