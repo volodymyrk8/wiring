@@ -111,11 +111,28 @@ export function HomeScreen({ host }: HomeScreenProps) {
           )}
 
           <div class={styles.about}>
-            <p class={styles.plusGiftText} aria-label="подарок WIRING+">
+            <div class={styles.aboutFrame}>
+              <p class={styles.plusGiftText} aria-label="подарок WIRING+">
                 <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы дарим премиум на{" "}
-                <strong>3 месяца</strong> каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать
-                бета.{" "}
-                {signed ? (
+                <strong>3 месяца</strong> каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.
+              </p>
+              <p class={styles.aboutText}>
+                Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
+              </p>
+              <p class={styles.betaText} aria-label="информация о бета-версии">
+                <span class={styles.betaLead}>Бета-версия.</span> Сообщайте в{" "}
+                <a
+                  class={styles.betaLink}
+                  href={hrefFor("support")}
+                  data-nav="support"
+                  onClick={handleNav("support")}
+                >
+                  поддержку
+                </a>{" "}
+                о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
+              </p>
+              {signed ? (
+                <p class={styles.plusGiftAction}>
                   <a
                     class={styles.plusGiftLink}
                     href={hrefFor("plus")}
@@ -124,25 +141,13 @@ export function HomeScreen({ host }: HomeScreenProps) {
                   >
                     Посмотреть в профиле
                   </a>
-                ) : (
+                </p>
+              ) : (
+                <p class={styles.plusGiftAction}>
                   <span class={styles.plusGiftNote}>После входа статус будет в разделе WIRING+.</span>
-                )}
-            </p>
-            <p class={styles.aboutText}>
-              Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.
-            </p>
-            <p class={styles.betaText} aria-label="информация о бета-версии">
-              <span class={styles.betaLead}>Бета-версия.</span> Сообщайте в{" "}
-              <a
-                class={styles.betaLink}
-                href={hrefFor("support")}
-                data-nav="support"
-                onClick={handleNav("support")}
-              >
-                поддержку
-              </a>{" "}
-              о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
-            </p>
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
