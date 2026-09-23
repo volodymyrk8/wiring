@@ -14,6 +14,8 @@ from cities import normalize_city
 def _looking_ok(looking: str, gender: str) -> bool:
     if looking in {"everyone", "friends"}:
         return True
+    if gender in {"hidden", "other"}:
+        return True
     if looking == "women":
         return gender == "woman"
     if looking == "men":
