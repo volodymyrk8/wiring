@@ -12,6 +12,7 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
 import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
@@ -59,6 +60,9 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
   const country = countryForCity(city, places);
   const hidden = idsOf(user.hide_tags);
   const intents = idsOf(user.intents, user.intent ? [user.intent] : ["dating"]);
+  const tags = splitCatalogTags(idsOf(user.neuro), idsOf(user.vibe), catalog);
+  const vibeIds = catalogIdSet(catalog.vibe);
+  const neuroIds = catalogIdSet(catalog.neuro);
   return {
     name: valueOf(user.name),
     age: valueOf(user.age),
@@ -70,14 +74,14 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
     job: valueOf(user.job),
     bio: valueOf(user.bio),
     communication: valueOf(user.communication),
-    neuro: idsOf(user.neuro),
-    vibe: idsOf(user.vibe),
+    neuro: tags.neuro,
+    vibe: tags.vibe,
     intents,
     seekMinAge: valueOf(user.seek_min_age, "18"),
     seekMaxAge: valueOf(user.seek_max_age, "99"),
     seekPlace: valueOf(user.seek_place),
-    hideNeuro: hidden.filter((id) => (catalog.neuro || []).some((item) => item.id === id)),
-    hideVibe: hidden.filter((id) => (catalog.vibe || []).some((item) => item.id === id)),
+    hideNeuro: hidden.filter((id) => neuroIds.has(id)),
+    hideVibe: hidden.filter((id) => vibeIds.has(id)),
     prompts: (Array.isArray(user.prompts) ? user.prompts : []).map((prompt) => ({ id: String(prompt.id), answer: String(prompt.answer || "") })),
     photoConsent: !user.needs_photo_consent,
   };
@@ -253,7 +257,11 @@ export function ProfileScreen({ host }: Props) {
       const raw = localStorage.getItem(draftStorageKey(userId));
       if (!raw) return;
       const stored = JSON.parse(raw) as Draft;
-      setDraft((current) => ({ ...current, ...stored }));
+      setDraft((current) => {
+        const merged = { ...current, ...stored };
+        const tags = splitCatalogTags(merged.neuro, merged.vibe, host.catalog);
+        return { ...merged, neuro: tags.neuro, vibe: tags.vibe };
+      });
     } catch {
       /* ignore corrupt draft */
     }

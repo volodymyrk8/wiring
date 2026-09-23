@@ -112,7 +112,8 @@ REPORT_REASONS = [
 DEFAULT_ALBUMS = ["я", "жизнь", "special interest", "звери"]
 
 NEURO_IDS = {item["id"] for item in NEURO} | LEGACY_NEURO_IDS
-VIBE_IDS = {item["id"] for item in VIBE} | LEGACY_VIBE_IDS
+# Legacy vibe ids remain in DB until cleanup; new saves accept only the current catalog.
+VIBE_IDS = {item["id"] for item in VIBE}
 LOOKING_IDS = {item["id"] for item in LOOKING_FOR}
 GENDER_IDS = {item["id"] for item in GENDERS} | LEGACY_GENDER_IDS
 INTENT_IDS = {item["id"] for item in INTENTS}

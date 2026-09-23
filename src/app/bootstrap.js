@@ -537,8 +537,13 @@ import { createInboxController } from "./inbox";
 
   const buildHomeHostBridge = () => {
     const signed = Boolean(state.user && !state.user.guest);
-    const neuro = state.user?.neuro || [];
-    const vibe = state.user?.vibe || [];
+    const neuroIds = new Set((state.catalog?.neuro || []).map((x) => x.id));
+    const vibeIds = new Set((state.catalog?.vibe || []).map((x) => x.id));
+    const neuro = (state.user?.neuro || []).filter((id) => neuroIds.has(id));
+    const vibe = (state.user?.vibe || []).filter((id) => vibeIds.has(id));
+    for (const id of state.user?.vibe || []) {
+      if (neuroIds.has(id) && !neuro.includes(id)) neuro.push(id);
+    }
     const userTraits = [
       ...neuro.map((id) => ({ label: labelOf("neuro", id) })),
       ...vibe.map((id) => ({ label: labelOf("vibe", id), vibe: true })),

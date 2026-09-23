@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
+import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
@@ -109,9 +110,16 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
   const intentLine = labelsIntent.length ? `открыта к: ${labelsIntent.join(", ")}` : "";
   const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
+  const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
   const tags = [
-    ...(card.neuro || []).map((id) => ({ id: `neuro-${id}`, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
-    ...(card.vibe || []).map((id) => ({ id: `vibe-${id}`, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),
+    ...split.neuro.flatMap((id) => {
+      const label = labelForTag("neuro", id, host.catalog);
+      return label ? [{ id: `neuro-${id}`, label, vibe: false as const }] : [];
+    }),
+    ...split.vibe.flatMap((id) => {
+      const label = labelForTag("vibe", id, host.catalog);
+      return label ? [{ id: `vibe-${id}`, label, vibe: true as const }] : [];
+    }),
   ];
   return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
     onKeyDown={(event) => {

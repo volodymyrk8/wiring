@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
+import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
@@ -133,9 +134,16 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...(showGender ? gender : [])].filter(Boolean).join(" · ");
   const intentLine = intents.length ? `открыта к: ${intents.join(", ")}` : "";
   const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
+  const split = splitCatalogTags(person.neuro, person.vibe, host.catalog);
   const tags = [
-    ...(person.neuro || []).map((id) => ({ id, label: host.catalog.neuro?.find((item) => item.id === id)?.label || id, vibe: false })),
-    ...(person.vibe || []).map((id) => ({ id, label: host.catalog.vibe?.find((item) => item.id === id)?.label || id, vibe: true })),
+    ...split.neuro.flatMap((id) => {
+      const label = labelForTag("neuro", id, host.catalog);
+      return label ? [{ id, label, vibe: false as const }] : [];
+    }),
+    ...split.vibe.flatMap((id) => {
+      const label = labelForTag("vibe", id, host.catalog);
+      return label ? [{ id, label, vibe: true as const }] : [];
+    }),
   ];
   const reportReasons = host.catalog.report_reasons || [];
 

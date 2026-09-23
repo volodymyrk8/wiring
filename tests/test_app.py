@@ -790,9 +790,9 @@ class WiringTest(unittest.TestCase):
         self.assertIn("списка", bad.get_json()["error"])
 
     def test_tags_survive_bio_edit(self):
-        user = self._register(neuro=["asd", "anxiety"], vibe=["neurospicy", "nonsmalltalk"])
+        user = self._register(neuro=["asd", "anxiety"], vibe=["intherapy", "nonsmalltalk"])
         self.assertIn("asd", user["neuro"])
-        self.assertIn("neurospicy", user["vibe"])
+        self.assertIn("nonsmalltalk", user["vibe"])
         patched = self.client.patch(
             "/api/me",
             json={
@@ -803,7 +803,7 @@ class WiringTest(unittest.TestCase):
                 "looking_for": "everyone",
                 "bio": "первая строка\n\nвторая строка",
                 "neuro": ["asd", "anxiety"],
-                "vibe": ["neurospicy", "nonsmalltalk"],
+                "vibe": ["intherapy", "nonsmalltalk"],
                 "special_data_consent": True,
                 "photo_rights_consent": True,
                 "photo": "portraits/p01.jpg",
@@ -814,8 +814,27 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(patched.status_code, 200, patched.get_data(as_text=True))
         again = patched.get_json()["user"]
         self.assertEqual(set(again["neuro"]), {"asd", "anxiety"})
-        self.assertEqual(set(again["vibe"]), {"neurospicy", "nonsmalltalk"})
+        self.assertEqual(set(again["vibe"]), {"intherapy", "nonsmalltalk"})
         self.assertIn("\n", again["bio"])
+
+    def test_legacy_vibes_stripped_from_profile(self):
+        user = self._register(neuro=["asd"], vibe=["nonsmalltalk"])
+        uid = user["id"]
+        conn = open_request_connection()
+        conn.execute(
+            "INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'vibe', ?)",
+            (uid, "neurospicy"),
+        )
+        conn.execute(
+            "INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'vibe', ?)",
+            (uid, "masking"),
+        )
+        conn.commit()
+        conn.close()
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertNotIn("neurospicy", me["vibe"])
+        self.assertNotIn("masking", me["vibe"])
+        self.assertIn("nonsmalltalk", me["vibe"])
 
     def test_profanity_blocked_in_profile(self):
         self._register()

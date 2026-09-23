@@ -483,6 +483,9 @@ def init_db() -> None:
     ensure_default_code(conn)
     ensure_beta_plus_gift(conn)
     ensure_beta_plus_three_months(conn)
+    from user_tags import ensure_legacy_vibe_cleanup
+
+    ensure_legacy_vibe_cleanup(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
@@ -642,6 +645,8 @@ def media_url(path: str) -> str:
 
 
 def tags_for(user_id: int) -> dict[str, list[str]]:
+    from user_tags import normalize_user_tags
+
     neuro: list[str] = []
     vibe: list[str] = []
     for row in db().execute("SELECT kind, tag FROM user_tags WHERE user_id = ? ORDER BY tag", (user_id,)):
@@ -649,6 +654,7 @@ def tags_for(user_id: int) -> dict[str, list[str]]:
             neuro.append(row["tag"])
         elif row["kind"] == "vibe":
             vibe.append(row["tag"])
+    neuro, vibe = normalize_user_tags(neuro, vibe)
     return {"neuro": neuro, "vibe": vibe}
 
 
@@ -1096,18 +1102,13 @@ def mutual_looking_ok(a_looking: str, a_gender: str, b_looking: str, b_gender: s
 
 
 def parse_hide_tags(raw: Any) -> list[str]:
+    from user_tags import filter_hide_tags
+
     if isinstance(raw, list):
-        items = [str(x).strip() for x in raw]
+        items = [str(x).strip() for x in raw if str(x).strip()]
     else:
-        items = [p.strip() for p in str(raw or "").split(",")]
-    allowed = NEURO_IDS | VIBE_IDS
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in items:
-        if item in allowed and item not in seen:
-            seen.add(item)
-            out.append(item)
-    return out
+        items = [p.strip() for p in str(raw or "").split(",") if p.strip()]
+    return filter_hide_tags(items)
 
 
 def hide_tags_of(row: Row | dict[str, Any] | None) -> list[str]:
