@@ -6,7 +6,7 @@
   min-height: 0;
 }
 
-/* Vertical rhythm: hero → faces → CTA → slogan. */
+/* Vertical rhythm: hero → CTA → about → slogan. */
 .home {
   --home-gap: 22px;
   --home-gap-tight: 10px;

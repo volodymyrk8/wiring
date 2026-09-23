@@ -548,7 +548,6 @@ import { createInboxController } from "./inbox";
       signed,
       isPlus: Boolean(state.user?.plus),
       basePath: BASE,
-      fetchHomeFaces: () => api("/api/home/faces").then((data) => data.faces || []).catch(() => []),
       userTraits,
       profileAvatar:
         state.user && photoRef(state.user.photo) ? avatarUrl(state.user.photo, state.user.name) : undefined,
