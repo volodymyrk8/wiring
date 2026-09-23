@@ -40,6 +40,7 @@ from catalog import (
     catalog_payload,
 )
 from cities import PLACES, catalog_city, country_of_city, is_catalog_city, normalize_city
+from devices import ensure_device_tables, track_device_visit, visitor_key_from_request
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from glossary import glossary_html
 from legal_pages import PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
@@ -131,6 +132,34 @@ def _close_db(_exc: BaseException | None) -> None:
     conn = getattr(g, "_db", None)
     if conn is not None:
         conn.close()
+
+
+_DEVICE_SKIP_PREFIXES = ("/public/", "/media/", "/health", "/admin")
+
+
+@app.before_request
+def _log_device_visit() -> None:
+    path = request.path or "/"
+    if BASE_PATH and path.startswith(BASE_PATH):
+        path = path[len(BASE_PATH) :] or "/"
+    if any(path.startswith(prefix) for prefix in _DEVICE_SKIP_PREFIXES):
+        return
+    if request.method == "OPTIONS":
+        return
+    ua = str(request.headers.get("User-Agent") or "").strip()
+    if not ua:
+        return
+    uid = session.get("uid")
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    visitor_key = "" if uid else visitor_key_from_request(ip, ua)
+    conn = db()
+    if track_device_visit(
+        conn,
+        user_id=int(uid) if uid else None,
+        ua=ua,
+        visitor_key=visitor_key,
+    ):
+        conn.commit()
 
 
 def _columns(conn: Connection, table: str) -> set[str]:
@@ -392,6 +421,7 @@ def init_db() -> None:
     )
     ensure_feed_history(conn)
     ensure_filter_tables(conn)
+    ensure_device_tables(conn)
     ensure_task_tables(conn)
     ensure_opener_table(conn)
     conn.execute(

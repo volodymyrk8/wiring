@@ -75,6 +75,32 @@ class WiringTest(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_device_visit_tracking_and_stats(self):
+        from admin import collect_stats
+        from devices import classify_user_agent, track_device_visit
+
+        self.assertEqual(classify_user_agent("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")[0], "mobile")
+        self.assertEqual(classify_user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")[0], "desktop")
+
+        iphone = (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        )
+        self.client.get("/", headers={"User-Agent": iphone})
+        stats = collect_stats(open_request_connection())
+        self.assertGreaterEqual(stats["device_visits_7d"], 1)
+        self.assertTrue(any(row["value"] == "mobile" for row in stats["devices_7d"]))
+
+        self._register()
+        conn = open_request_connection()
+        try:
+            row = conn.execute("SELECT id FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
+            self.assertTrue(track_device_visit(conn, user_id=int(row["id"]), ua=iphone))
+            self.assertFalse(track_device_visit(conn, user_id=int(row["id"]), ua=iphone))
+            conn.commit()
+        finally:
+            conn.close()
+
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
         self.assertTrue(health["ok"])

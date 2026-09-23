@@ -59,6 +59,48 @@
         <div class="prompt-card"><div class="q">фильтры 30д</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }} чел.</span></p></div>
       </div>
 
+      <h2>устройства</h2>
+      <p class="hint">User-Agent с визитов на сайт и API. Один и тот же человек и тип устройства — не чаще раза в полчаса.</p>
+      <div class="admin-grid">
+        <div class="prompt-card"><div class="q">визиты 7д</div><p>{{ s.device_visits_7d }}</p></div>
+        <div class="prompt-card"><div class="q">визиты 30д</div><p>{{ s.device_visits_30d }}</p></div>
+      </div>
+      <div class="admin-grid">
+        <div>
+          <h3>тип · 30 дней</h3>
+          <table class="admin-table">
+            <tr><th>устройство</th><th>визиты</th><th>уник.</th></tr>
+            {% for row in s.devices_30d %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>тип · 7 дней</h3>
+          <table class="admin-table">
+            <tr><th>устройство</th><th>визиты</th><th>уник.</th></tr>
+            {% for row in s.devices_7d %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div>
+          <h3>ОС · 30 дней</h3>
+          <table class="admin-table">
+            <tr><th>система</th><th>визиты</th><th>уник.</th></tr>
+            {% for row in s.device_os_30d %}
+            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            {% else %}
+            <tr><td colspan="3">пока пусто</td></tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+
       <h2>популярные фильтры</h2>
       <p class="hint">Считаем применения в ленте и «кто лайкнул». Одинаковый набор от одного человека — не чаще раза в полчаса.</p>
       <div class="admin-grid">

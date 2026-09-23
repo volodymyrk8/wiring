@@ -9,6 +9,7 @@ from database import Connection
 from typing import Any, Iterable
 
 from catalog import INTENTS, NEURO, VIBE
+from devices import device_usage_stats
 
 
 def _is_guest(email: str) -> bool:
@@ -298,4 +299,5 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "recent": recent,
     }
     payload.update(filter_usage_stats(conn))
+    payload.update(device_usage_stats(conn))
     return payload
