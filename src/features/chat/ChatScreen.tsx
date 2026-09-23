@@ -71,13 +71,6 @@ const CloseIcon = () => (
   </svg>
 );
 
-const BrokenHeartIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M16.5 5.5c-1.8-1.8-4.7-1.8-6.5 0-.9.9-1.4 2-1.5 3.1-.1-1.1-.6-2.2-1.5-3.1-1.8-1.8-4.7-1.8-6.5 0-2.2 2.2-2.2 5.8 0 8.1L12 21l11.5-7.4c2.2-2.3 2.2-5.9 0-8.1Z" />
-    <path d="M12 21V11" />
-  </svg>
-);
-
 const photoUrl = (basePath: string, photo: unknown, name = "?") => {
   let value = photo;
   if (Array.isArray(value)) value = value[0];
@@ -180,8 +173,8 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
         </div>
         {hasUnread ? <span class="unread">{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
       </a>
-      <button type="button" class="match-remove" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(); }} aria-label="размэтчить" title="размэтчить">
-        <BrokenHeartIcon />
+      <button type="button" class="match-remove" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(); }} aria-label="Убрать чат" title="Убрать чат">
+        <TrashIcon />
       </button>
     </div>
   );

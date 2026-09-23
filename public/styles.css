@@ -2756,7 +2756,20 @@ html[data-view="matches"] #app {
   background: var(--bg-2);
   color: var(--coral);
 }
-.match-remove svg { display: block; margin: auto; }
+.match-remove svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  flex-shrink: 0;
+}
+@media (hover: none), (pointer: coarse) {
+  .match-remove {
+    opacity: 0.78;
+    border-color: var(--line);
+    background: color-mix(in srgb, var(--bg) 88%, var(--bg-2));
+  }
+}
 .chat-empty,
 .chat-no-results {
   display: grid;
