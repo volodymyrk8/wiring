@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
+import { openToIntentsLine } from "@/lib/open-to-intents";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
@@ -132,7 +133,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const intents = labelsFor(host.catalog, "intents", person.intents?.length ? person.intents : person.intent);
   const showGender = person.gender && person.gender !== "hidden" && person.gender !== "other";
   const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...(showGender ? gender : [])].filter(Boolean).join(" · ");
-  const intentLine = intents.length ? `открыта к: ${intents.join(", ")}` : "";
+  const intentLine = openToIntentsLine(person.gender, intents);
   const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
   const split = splitCatalogTags(person.neuro, person.vibe, host.catalog);
   const tags = [
