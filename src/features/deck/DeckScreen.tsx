@@ -142,12 +142,13 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
     <div class={styles.body}>
       <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2></div>
       {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <br /> : null}{secondary}</p> : null}
-      {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
       {typeof card.jev_match_pct === "number" ? (
-        <div class={styles.jevMatch} aria-label={`Оценка Jev: ${card.jev_match_pct} процентов`}>
+        <div class={styles.jevMatch} aria-label={`Оценка совместимости: ${card.jev_match_pct} процентов`}>
           <div class={styles.jevMatchHead}>
             <span class={styles.jevPct}>{card.jev_match_pct}%</span>
-            <span class={styles.jevMatchLabel}>вероятность взаимного интереса · Jev</span>
+            <span class={styles.jevMatchLabel}>
+              {card.jev_match_source === "api" ? "вероятность взаимного интереса · Jev" : "ориентир по анкетам · WIRING"}
+            </span>
           </div>
           {card.jev_match_reasons?.length ? (
             <ul class={styles.jevReasons}>
@@ -158,6 +159,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
           ) : null}
         </div>
       ) : null}
+      {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
       {tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
   </article>;
@@ -328,7 +330,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
 
   return <div class={styles.root}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
-    {host.user.jev_feed_enabled ? <p class={styles.jevNotice}>Jev: порядок анкет и проценты на карточках — эксперимент. В TypeSafe уходят только id диагнозов, вайба, город, возраст и цели; без имён, фото и текстов. Это не гарантия мэтча.</p> : null}
+    {host.user.jev_feed_enabled ? <p class={styles.jevNotice}>Эксперимент: под фото — процент и причины. Если Jev на сервере недоступен, показываем ориентир WIRING по тем же отметкам. Не гарантия мэтча.</p> : null}
     {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value) => void loadPage(value, true)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>

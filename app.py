@@ -42,7 +42,7 @@ from catalog import (
 from cities import PLACES, catalog_city, country_of_city, is_catalog_city, normalize_city
 from devices import ensure_device_tables, track_device_visit, visitor_key_from_request
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
-from jev_ranker import jev_access, rank_profiles
+from jev_ranker import jev_access, prepare_jev_feed
 from glossary import glossary_html
 from legal_pages import PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
@@ -1949,17 +1949,18 @@ def api_feed():
     cards, has_more, generation = claim_feed(db(), int(me["id"]), min_age=min_age, max_age=max_age,
                                  city=city_q, limit=limit, eligible=eligible)
     jev_ranked = False
+    jev_scores = "none"
     jev_allowed, jev_configured = jev_access(int(me["id"]))
     if (
         jev_allowed
-        and jev_configured
         and not is_guest_email(str(me["email"]))
         and not int(me["is_seed"] or 0)
         and int(me["jev_feed_enabled"] or 0)
-        and len(cards) > 1
+        and cards
     ):
         viewer_tags = tags_for(int(me["id"]))
         viewer_for_jev = {
+            "id": int(me["id"]),
             "age": me["age"],
             "city": me["city"],
             "intent": me["intent"] if "intent" in set(me.keys()) else "dating",
@@ -1967,10 +1968,7 @@ def api_feed():
             "neuro": viewer_tags["neuro"],
             "vibe": viewer_tags["vibe"],
         }
-        ranked_cards = rank_profiles(viewer_for_jev, cards)
-        if ranked_cards is not None:
-            cards = ranked_cards
-            jev_ranked = True
+        cards, jev_ranked, jev_scores = prepare_jev_feed(viewer_for_jev, cards)
     liked = db().execute(
         "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
         (me["id"],),
@@ -1988,6 +1986,7 @@ def api_feed():
             "generation": generation,
             "recycled": False,
             "jev_ranked": jev_ranked,
+            "jev_scores": jev_scores,
             "unseen": len(cards),
             "passed": int(passed_n),
             "liked": int(liked),

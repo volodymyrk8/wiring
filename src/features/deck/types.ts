@@ -30,6 +30,7 @@ export type DeckCard = {
   /** Present when Jev ranking succeeded for this page (experiment). */
   jev_match_pct?: number;
   jev_match_reasons?: string[];
+  jev_match_source?: "api" | "local";
 };
 
 export type DeckCatalog = {
@@ -50,6 +51,8 @@ export type FeedPage = {
   liked?: number;
   likes_in?: number;
   unread?: number;
+  jev_ranked?: boolean;
+  jev_scores?: "api" | "local" | "none";
 };
 
 export type DeckHostBridge = {

@@ -116,17 +116,65 @@ def match_reasons(viewer: Any, candidate: Any, *, max_items: int = 3) -> list[st
     return reasons[:max_items]
 
 
-def _attach_jev_fields(card: dict[str, Any], probability: float, viewer: Any) -> dict[str, Any]:
+def _attach_jev_fields(
+    card: dict[str, Any],
+    probability: float,
+    viewer: Any,
+    *,
+    source: str = "local",
+) -> dict[str, Any]:
     enriched = dict(card)
     enriched["jev_match_pct"] = max(0, min(100, int(round(probability * 100))))
     enriched["jev_match_reasons"] = match_reasons(viewer, card)
+    enriched["jev_match_source"] = source
     return enriched
+
+
+def local_match_probability(viewer: Any, candidate: Any) -> float:
+    """Fallback 0–1 score from the same structured signals when Jev API is unavailable."""
+    signals = _pair_signals(viewer, candidate)
+    probability = 0.48
+    probability += 0.1 * min(3, len(signals["shared_neuro"]))
+    probability += 0.05 * min(4, len(signals["shared_vibe"]))
+    if signals["same_city"]:
+        probability += 0.07
+    if signals["age_gap_band"] == "0-2":
+        probability += 0.06
+    elif signals["age_gap_band"] == "3-5":
+        probability += 0.04
+    elif signals["age_gap_band"] == "11+":
+        probability -= 0.04
+    if signals["shared_intents_count"] >= 2:
+        probability += 0.06
+    elif signals["shared_intents_count"] == 1:
+        probability += 0.03
+    pair_key = f"{viewer.get('id', '')}:{candidate.get('id', '')}"
+    probability += (hash(pair_key) % 9) * 0.008 - 0.032
+    return max(0.35, min(0.92, probability))
+
+
+def prepare_jev_feed(
+    viewer: Any,
+    cards: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], bool, str]:
+    """Attach match % + reasons; reorder when Jev API succeeds. scores_source: api | local."""
+    if not cards:
+        return [], False, "none"
+    ranked = rank_profiles(viewer, cards) if len(cards) >= 2 else None
+    if ranked is not None:
+        return ranked, True, "api"
+    local_cards = [
+        _attach_jev_fields(card, local_match_probability(viewer, card), viewer, source="local")
+        for card in cards
+    ]
+    local_cards.sort(key=lambda item: (-int(item.get("jev_match_pct") or 0), int(item.get("id") or 0)))
+    return local_cards, False, "local"
 
 
 def rank_profiles(viewer: Any, cards: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
     """Rank one delivered page; return None on any provider or response failure."""
     if len(cards) < 2:
-        return cards
+        return None
     api_key = (os.environ.get("JEV_API_KEY") or "").strip()
     if not api_key:
         return None
@@ -187,7 +235,7 @@ def rank_profiles(viewer: Any, cards: list[dict[str, Any]]) -> list[dict[str, An
             score = float(probability)
             if not math.isfinite(score) or not 0 <= score <= 1:
                 return None
-            scored.append((score, index, _attach_jev_fields(card, score, viewer)))
+            scored.append((score, index, _attach_jev_fields(card, score, viewer, source="api")))
         scored.sort(key=lambda item: (-item[0], item[1]))
         return [card for _, _, card in scored]
     except Exception:
