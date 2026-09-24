@@ -312,6 +312,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
 
   return <div class={styles.root}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
+    {host.user.jev_feed_enabled ? <p class={styles.jevNotice}>Тестовый режим Jev включён: он может менять порядок анкет. Если сервис недоступен, лента продолжит работать в обычном порядке. Оценки пока не являются проверенной вероятностью мэтча.</p> : null}
     {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value) => void loadPage(value, true)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>

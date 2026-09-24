@@ -222,6 +222,8 @@ export function ProfileScreen({ host }: Props) {
   const [draft, setDraft] = useState(() => makeDraft(host.user, host.catalog));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
+  const [jevError, setJevError] = useState("");
+  const [jevBusy, setJevBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const draftTimerRef = useRef<number | null>(null);
   const draftSyncRef = useRef(false);
@@ -367,6 +369,26 @@ export function ProfileScreen({ host }: Props) {
       setServerError(getErrorMessage(caught));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const setJevFeedEnabled = async (enabled: boolean) => {
+    setJevError("");
+    setJevBusy(true);
+    try {
+      const response = await host.api("/api/me/jev-feed", {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      });
+      const nextUser = response.user as ProfileUser;
+      setUser(nextUser);
+      host.onUserUpdated(nextUser);
+      await host.refreshFeed?.();
+      host.toast(enabled ? "экспериментальная лента Jev включена" : "обычная лента включена");
+    } catch (caught) {
+      setJevError(getErrorMessage(caught));
+    } finally {
+      setJevBusy(false);
     }
   };
 
@@ -555,6 +577,25 @@ export function ProfileScreen({ host }: Props) {
               <a class={styles.plusLink} href={host.hrefFor("plus")} data-nav="plus" onClick={handleNav("plus")}><span><strong>WIRING+</strong><small>{user.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</small></span><span>настроить ↗</span></a>
               {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>WIRING+ на {user.ref_days || 30} дней вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
             </section>
+
+            {user.jev_feed_beta ? (
+              <section class={styles.section}>
+                <div class={styles.sectionTitle}><h2>Экспериментальная лента</h2></div>
+                <Checkbox
+                  name="jev_feed_enabled"
+                  checked={Boolean(user.jev_feed_enabled)}
+                  disabled={jevBusy || (!user.jev_feed_available && !user.jev_feed_enabled)}
+                  onChange={(enabled) => void setJevFeedEnabled(enabled)}
+                >
+                  Ранжировать анкеты с Jev
+                </Checkbox>
+                <p class={styles.experimentalHint}>
+                  Jev оценивает вероятность взаимного интереса и меняет только порядок анкет. WIRING отправляет TypeSafe только свернутые сигналы пары: совпадает ли город, диапазон разницы в возрасте и число общих целей знакомства. Сами анкеты, имена, ID, фото, диагнозы, тексты и переписки не передаются; лайки и мэтчи остаются за тобой.
+                </p>
+                {!user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.experimentalHint}>Эксперимент заработает после настройки серверного ключа Jev.</p> : null}
+                {jevError && <p class={styles.error} role="alert">{jevError}</p>}
+              </section>
+            ) : null}
 
             {(serverError || errors.photos) && <div class={styles.serverError} role="alert">{serverError || errors.photos}</div>}
             <div class={styles.submitRow}>

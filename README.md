@@ -62,6 +62,12 @@ Optional `.env` for local overrides (never commit secrets):
 cp .env.example .env
 ```
 
+### Jev feed experiment
+
+The Jev-ranked feed is an opt-in experiment, disabled unless `JEV_BETA_USER_ID` is set to exactly one account's numeric `users.id`. For the signed-in account, that ID is the `user.id` field in the authenticated `GET /api/me` response; do not identify the account by display name. Set `JEV_API_KEY` alongside it; the key is read only by Flask and is never sent to the browser. Locally, add both to the ignored `.env` file. For production, add them to `/etc/wiring.env` and restart the `wiring` service. Leave `JEV_BETA_USER_ID` blank until the intended account ID is confirmed. `JEV_MODEL` defaults to `jev-latest`.
+
+The profile toggle is visible only to the allowlisted account. Jev receives only coarse pair signals computed inside WIRING (same-city flag, age-gap band and shared dating-intent count); profile fields, account IDs, names, photos, free text, messages and diagnosis tags are excluded. Jev only orders the feed; people still make every like and match.
+
 ### Тестирование сайта: вход
 
 При **ручной** проверке WIRING в браузере (локально, в Cursor, QA, демо фич) **всегда** авторизуемся одним и тем же тестовым аккаунтом — не регистрируем новых людей «на глаз» и не используем реальные прод-логины.

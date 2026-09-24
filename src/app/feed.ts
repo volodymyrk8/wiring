@@ -5,9 +5,9 @@ export function resetFeed(api: ApiClient, generation: number, signal?: AbortSign
   return api("/api/feed/reset", { method: "POST", signal, body: JSON.stringify({ generation }) });
 }
 
-/** Small pages reserve only the current card and one upcoming card. */
-export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSignal): Promise<FeedPage> {
-  const query = new URLSearchParams({ limit: "2" });
+/** Normal pages reserve the current card and one upcoming card; Jev's opt-in experiment ranks a wider sample. */
+export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSignal, limit = 2): Promise<FeedPage> {
+  const query = new URLSearchParams({ limit: String(limit) });
   if (filters.neuro.length) query.set("neuro", filters.neuro.join(","));
   if (filters.vibe.length) query.set("vibe", filters.vibe.join(","));
   if (filters.intents.length) query.set("intent", filters.intents.join(","));

@@ -500,7 +500,7 @@ import { createInboxController } from "./inbox";
 
   const loadFeed = async (filters = state.filters) => {
     state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
-    const data = await fetchFeed(api, state.filters);
+    const data = await fetchFeed(api, state.filters, undefined, state.user?.jev_feed_enabled ? 10 : 2);
     state.feedHasMore = !!data.has_more;
     state.feedGeneration = data.generation;
     state.cards = data.cards || [];
@@ -588,6 +588,13 @@ import { createInboxController } from "./inbox";
     onUserUpdated: (user) => {
       state.user = user;
     },
+    refreshFeed: async () => {
+      state.cards = [];
+      state.index = 0;
+      state.photoIndex = 0;
+      state.feedHasMore = true;
+      await loadFeed();
+    },
     onLogout: logout,
     onThemeSelect: (theme) => applyTheme(theme),
   });
@@ -658,7 +665,7 @@ import { createInboxController } from "./inbox";
       }
       void goToView(view);
     },
-    loadFeed: (filters, signal) => fetchFeed(api, filters, signal),
+    loadFeed: (filters, signal) => fetchFeed(api, filters, signal, state.user?.jev_feed_enabled ? 10 : 2),
     resetFeed: (generation, signal) => resetFeed(api, generation, signal),
     onFeedChange: (cards, index, filters, hasMore, generation) => {
       state.cards = cards;

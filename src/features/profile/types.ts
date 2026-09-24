@@ -38,6 +38,9 @@ export type ProfileUser = {
   ref_count?: number;
   notify_enabled?: boolean;
   notify_push?: boolean;
+  jev_feed_beta?: boolean;
+  jev_feed_available?: boolean;
+  jev_feed_enabled?: boolean;
   [key: string]: unknown;
 };
 
@@ -69,4 +72,5 @@ export type ProfileHostBridge = {
   onUserUpdated: (user: ProfileUser) => void;
   onLogout: () => void;
   onThemeSelect?: (theme: string) => void;
+  refreshFeed?: () => Promise<unknown>;
 };
