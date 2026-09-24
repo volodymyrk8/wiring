@@ -232,7 +232,28 @@ html.keyboard[data-view="chat"] #app {
 html[data-view="profile"] #app,
 html[data-view="onboard"] #app,
 html[data-view="person"] #app {
-  /* Inherit width: 100% */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-view="profile"][data-tabs] #app {
+  --tabbar-clearance: 92px;
+  padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom) + 12px);
+}
+
+html[data-view="profile"] #profile-feature-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: clip;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-top: calc(env(safe-area-inset-top) + 56px);
+  scroll-padding-bottom: calc(var(--tabbar-clearance, 92px) + env(safe-area-inset-bottom) + 16px);
 }
 
 /* Auth: one page scroll (body), footer pinned on short viewports via flex + margin-top: auto */
@@ -2492,6 +2513,9 @@ html[data-view="deck"] #deck-feature-root {
   }
   html[data-view="home"][data-tabs] #app {
     --tabbar-clearance: 70px;
+  }
+  html[data-view="profile"][data-tabs] #app {
+    --tabbar-clearance: 108px;
   }
 
   .tabbar {
