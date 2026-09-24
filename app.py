@@ -3185,7 +3185,7 @@ def rules():
     return render_template(
         "legal.html",
         title="Правила",
-        description="Правила сообщества WIRING. 18+.",
+        description="Правила сообщества WIRING. 18+. Ограничения по законодательству РФ.",
         path="/rules",
         site_url=SITE_URL,
         body=RULES_HTML,

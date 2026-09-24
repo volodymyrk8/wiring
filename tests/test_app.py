@@ -444,7 +444,12 @@ class WiringTest(unittest.TestCase):
     def test_legal_and_sitemap(self):
         self.assertEqual(self.client.get("/privacy").status_code, 200)
         self.assertEqual(self.client.get("/rules").status_code, 200)
-        self.assertIn("чувствительные сведения", self.client.get("/privacy").get_data(as_text=True))
+        rules_text = self.client.get("/rules").get_data(as_text=True)
+        self.assertIn("Законодательство Российской Федерации", rules_text)
+        self.assertIn("не преследует цель пропаганды", rules_text)
+        privacy_text = self.client.get("/privacy").get_data(as_text=True)
+        self.assertIn("чувствительные сведения", privacy_text)
+        self.assertIn("Законодательство РФ", privacy_text)
         self.assertIn("/support", self.client.get("/privacy").get_data(as_text=True))
         self.assertIn("Маркетинговые письма", self.client.get("/privacy").get_data(as_text=True))
         glossary = self.client.get("/glossary")
