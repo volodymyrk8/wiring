@@ -7,7 +7,8 @@
     "postbuild": "chmod -R a+rX public/dist 2>/dev/null || true",
     "typecheck": "tsc --noEmit",
     "dev:client": "vite build --watch",
-    "test:router": "node tests/router.test.mjs"
+    "test:router": "node tests/router.test.mjs",
+    "test:profile": "node --test tests/profile-autosave.test.mjs"
   },
   "dependencies": {
     "preact": "^10.26.4"

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import {
   AppHeader,
@@ -17,6 +17,7 @@ import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
+import { createDraftAutosave, type SaveState } from "./draft-autosave";
 
 type Prompt = { id: string; answer: string };
 type Draft = {
@@ -217,82 +218,98 @@ function optionList(items: CatalogItem[] | undefined) {
   return (items || []).map((item) => ({ value: item.id, label: item.label }));
 }
 
+const profilePayload = (draft: Draft) => ({
+  name: draft.name.trim(),
+  age: draft.age ? Number(draft.age) : null,
+  city: draft.city.trim(),
+  gender: draft.gender,
+  looking_for: draft.lookingFor,
+  height: draft.height ? Number(draft.height) : null,
+  job: draft.job.trim(),
+  bio: draft.bio,
+  communication: draft.communication,
+  neuro: draft.neuro,
+  vibe: draft.vibe,
+  intents: draft.intents,
+  seek_min_age: Number(draft.seekMinAge || 18),
+  seek_max_age: Number(draft.seekMaxAge || 99),
+  seek_place: draft.seekPlace,
+  hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
+  prompts: draft.prompts,
+  special_data_consent: draft.neuro.length ? true : undefined,
+  photo_rights_consent: draft.photoConsent ? true : undefined,
+});
+
+function restoreDraft(host: ProfileHostBridge): { value: Draft; restored: boolean } {
+  const initial = makeDraft(host.user, host.catalog);
+  if (!host.user.id || host.user.guest) return { value: initial, restored: false };
+  try {
+    const raw = localStorage.getItem(draftStorageKey(host.user.id));
+    if (!raw) return { value: initial, restored: false };
+    const stored = JSON.parse(raw);
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return { value: initial, restored: false };
+    const entries = Object.entries(initial).map(([key, fallback]) => {
+      const candidate = stored[key];
+      const valid = key === "prompts"
+        ? Array.isArray(candidate) && candidate.every((item: unknown) => item && typeof item === "object" && "id" in item && typeof item.id === "string" && "answer" in item && typeof item.answer === "string")
+        : Array.isArray(fallback)
+          ? Array.isArray(candidate) && candidate.every((item: unknown) => typeof item === "string")
+          : typeof candidate === typeof fallback;
+      return [key, valid ? candidate : fallback];
+    });
+    const merged = Object.fromEntries(entries) as Draft;
+    const tags = splitCatalogTags(merged.neuro, merged.vibe, host.catalog);
+    const value = { ...merged, neuro: tags.neuro, vibe: tags.vibe };
+    return { value, restored: JSON.stringify(value) !== JSON.stringify(initial) };
+  } catch {
+    return { value: initial, restored: false };
+  }
+}
+
 export function ProfileScreen({ host }: Props) {
   const [user, setUser] = useState(host.user);
-  const [draft, setDraft] = useState(() => makeDraft(host.user, host.catalog));
+  const [initialDraft] = useState(() => restoreDraft(host));
+  const [draft, setRenderedDraft] = useState(initialDraft.value);
+  const [saveState, setSaveState] = useState<SaveState>({
+    phase: initialDraft.restored ? "waiting" : "idle", local: initialDraft.restored, error: "",
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
   const [jevError, setJevError] = useState("");
   const [jevBusy, setJevBusy] = useState(false);
   const [busy, setBusy] = useState(false);
-  const draftTimerRef = useRef<number | null>(null);
-  const draftSyncRef = useRef(false);
-
   const signed = !user.guest;
-  const profilePayload = () => ({
-    name: draft.name.trim(),
-    age: Number(draft.age) || undefined,
-    city: draft.city.trim(),
-    gender: draft.gender,
-    looking_for: draft.lookingFor,
-    height: draft.height ? Number(draft.height) : null,
-    job: draft.job.trim(),
-    bio: draft.bio,
-    communication: draft.communication,
-    neuro: draft.neuro,
-    vibe: draft.vibe,
-    intents: draft.intents,
-    seek_min_age: Number(draft.seekMinAge || 18),
-    seek_max_age: Number(draft.seekMaxAge || 99),
-    seek_place: draft.seekPlace,
-    hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
-    prompts: draft.prompts.filter((prompt) => prompt.answer.trim().length >= 4),
-    special_data_consent: draft.neuro.length ? true : undefined,
-    photo_rights_consent: draft.photoConsent ? true : undefined,
-  });
-
-  const userId = Number(user.id || 0);
-
+  const [autosave] = useState(() => createDraftAutosave<Draft, { user: ProfileUser }>({
+    key: draftStorageKey(Number(host.user.id || 0)),
+    initial: initialDraft.value,
+    restored: initialDraft.restored,
+    storage: () => localStorage,
+    save: (value, publish) => host.api("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify({ ...profilePayload(value), draft: !publish }),
+    }),
+    onSaved: (response) => {
+      setServerError("");
+      setUser(response.user);
+      host.onUserUpdated(response.user);
+    },
+    onState: setSaveState,
+  }));
+  const setDraft = (update: Draft | ((current: Draft) => Draft)) => {
+    const next = typeof update === "function" ? update(autosave.value) : update;
+    if (signed && host.user.id) autosave.update(next);
+    setRenderedDraft(next);
+  };
   useEffect(() => {
-    if (!signed || !userId) return;
-    try {
-      const raw = localStorage.getItem(draftStorageKey(userId));
-      if (!raw) return;
-      const stored = JSON.parse(raw) as Draft;
-      setDraft((current) => {
-        const merged = { ...current, ...stored };
-        const tags = splitCatalogTags(merged.neuro, merged.vibe, host.catalog);
-        return { ...merged, neuro: tags.neuro, vibe: tags.vibe };
-      });
-    } catch {
-      /* ignore corrupt draft */
-    }
-  }, [signed, userId]);
-
-  useEffect(() => {
-    if (!signed || !userId || draftSyncRef.current) return;
-    if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = window.setTimeout(() => {
-      try {
-        localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft));
-      } catch {
-        /* ignore quota */
-      }
-      void (async () => {
-        try {
-          await host.api("/api/me", {
-            method: "PATCH",
-            body: JSON.stringify({ ...profilePayload(), draft: true }),
-          });
-        } catch {
-          /* offline or validation — local copy still kept */
-        }
-      })();
-    }, 1400);
+    if (!signed || !host.user.id) return;
+    autosave.start();
+    const retry = () => { void autosave.save().catch(() => {}); };
+    window.addEventListener("online", retry);
     return () => {
-      if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+      window.removeEventListener("online", retry);
+      autosave.dispose();
     };
-  }, [draft, signed, userId]);
+  }, [autosave, signed]);
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setErrors((current) => ({ ...current, [key]: "" }));
@@ -352,19 +369,8 @@ export function ProfileScreen({ host }: Props) {
     setServerError("");
     setBusy(true);
     try {
-      const response = await host.api("/api/me", {
-        method: "PATCH",
-        body: JSON.stringify({ ...profilePayload(), draft: true }),
-      });
-      const nextUser = response.user as ProfileUser;
-      setUser(nextUser);
-      host.onUserUpdated(nextUser);
-      try {
-        localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft));
-      } catch {
-        /* ignore */
-      }
-      host.toast(user.needs_profile ? "черновик сохранён · анкета ещё не в ленте" : "черновик сохранён");
+      await autosave.save();
+      host.toast(user.needs_profile ? "черновик сохранён · анкета ещё не в ленте" : "сохранено");
     } catch (caught) {
       setServerError(getErrorMessage(caught));
     } finally {
@@ -401,22 +407,8 @@ export function ProfileScreen({ host }: Props) {
     }
     setBusy(true);
     try {
-      const response = await host.api("/api/me", {
-        method: "PATCH",
-        body: JSON.stringify(profilePayload()),
-      });
-      const nextUser = response.user as ProfileUser;
-      draftSyncRef.current = true;
-      setUser(nextUser);
-      setDraft(makeDraft(nextUser, host.catalog));
-      try {
-        localStorage.removeItem(draftStorageKey(userId));
-      } catch {
-        /* ignore */
-      }
-      host.onUserUpdated(nextUser);
+      await autosave.save(true);
       host.toast("сохранено");
-      draftSyncRef.current = false;
     } catch (caught) {
       setServerError(getErrorMessage(caught));
     } finally {
@@ -483,9 +475,23 @@ export function ProfileScreen({ host }: Props) {
 
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
-              Анкета пока не в ленте — можно сохранить черновик и вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.
+              Анкета пока не в ленте — черновик сохраняется автоматически, можно вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.
             </p>
           ) : null}
+
+          <div class={styles.saveStatus}>
+            <p role="status" aria-live="polite" aria-atomic="true">
+              {saveState.phase === "idle" ? "Изменения сохраняются автоматически" :
+                saveState.phase === "saved" ? "Все изменения сохранены" :
+                saveState.phase === "saving" ? "Сохраняем…" :
+                saveState.phase === "waiting" ? (saveState.local ? "Изменения на устройстве · ждём сохранения на сервере" : "Изменения ещё не сохранены") :
+                saveState.local ? "Черновик на этом устройстве · на сервере не сохранён" : "Изменения не сохранены — оставь страницу открытой"}
+            </p>
+            {saveState.phase === "error" ? <>
+              <p class={styles.error}>{saveState.error}</p>
+              <Button variant="ghost" slim type="button" disabled={busy} onClick={() => void autosave.save().catch(() => {})}>Повторить сохранение</Button>
+            </> : null}
+          </div>
 
           <form class={styles.form} onSubmit={save} noValidate>
             <section class={styles.section}>

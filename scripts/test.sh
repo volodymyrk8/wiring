@@ -22,6 +22,7 @@ if [[ -f package.json ]]; then
   npm run typecheck
   npm run build
   npm run test:router
+  npm run test:profile
 fi
 
 if [[ -x .venv/bin/python ]]; then

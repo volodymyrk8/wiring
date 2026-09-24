@@ -41,7 +41,9 @@ src/
   lib/               # small helpers
 ```
 
-After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run typecheck` for the TypeScript contract check and `npm run test:router` to smoke-test routes.
+After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run typecheck` for the TypeScript contract check, `npm run test:router` to smoke-test routes, and `npm run test:profile` for profile autosave recovery and request ordering.
+
+Profile edits are written to local storage immediately and saved to the server after a pause in typing. The screen distinguishes confirmed saves from device-only drafts and offers retry after a failure; reconnecting also retries. Invalid or unfinished fields remain in the local draft until corrected. Pending saves and publication are serialized within the current app session. Concurrent editing in separate tabs or devices does not have a conflict-resolution protocol.
 
 **Database:** PostgreSQL 16 is the only supported database engine. Local dev uses **PostgreSQL 16** in Docker (`docker compose up -d postgres`). `./scripts/dev.sh` starts postgres, waits until ready, seeds test users, and boots the dev server.
 
