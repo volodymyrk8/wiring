@@ -256,6 +256,22 @@ html[data-view="profile"] #profile-feature-root {
   scroll-padding-bottom: calc(var(--tabbar-clearance, 92px) + env(safe-area-inset-bottom) + 16px);
 }
 
+html[data-view="support"] #app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+html[data-view="support"] #support-feature-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Auth: one page scroll (body), footer pinned on short viewports via flex + margin-top: auto */
 html[data-view="login"] #app,
 html[data-view="register"] #app,

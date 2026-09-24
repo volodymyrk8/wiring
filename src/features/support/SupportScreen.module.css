@@ -2,7 +2,9 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   width: 100%;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -10,11 +12,21 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: var(--container-page, 720px);
   margin: 0 auto;
   padding: 32px max(16px, env(safe-area-inset-left)) max(32px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
   box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.content::-webkit-scrollbar {
+  display: none;
 }
 
 .title {
@@ -71,7 +83,11 @@
   font-size: 16px;
   line-height: 1.45;
   box-sizing: border-box;
-  resize: vertical;
+  resize: none;
+  max-height: min(40vh, 280px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   outline: none;
   -webkit-appearance: none;
   appearance: none;
@@ -93,6 +109,10 @@
   background: var(--bg-2);
 }
 
+.textarea::-webkit-scrollbar {
+  display: none;
+}
+
 .textareaMeta {
   display: flex;
   justify-content: space-between;
@@ -108,6 +128,10 @@
   gap: 12px;
   margin-top: 6px;
   width: 100%;
+}
+
+.actions :global(.btn) {
+  touch-action: manipulation;
 }
 
 .statusCard {
@@ -176,5 +200,10 @@
 @media (min-width: 768px) {
   .content {
     padding: 44px 16px 48px;
+  }
+
+  .textarea {
+    resize: vertical;
+    max-height: none;
   }
 }

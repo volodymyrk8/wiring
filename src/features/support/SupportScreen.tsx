@@ -1,17 +1,13 @@
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { ProfileMenu } from "@/components/ui/ProfileMenu";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { LegalFooter } from "@/components/ui/LegalFooter";
+import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { SupportHostBridge } from "./types";
 import styles from "./SupportScreen.module.css";
-
-function profileMenuAvatarUrl(basePath: string, photo?: string | null): string | undefined {
-  if (!photo) return undefined;
-  return `${basePath}/content/photos/${photo}`;
-}
 
 export function SupportScreen({ host }: { host: SupportHostBridge }) {
   const [name, setName] = useState(host.user?.name || "");
@@ -20,15 +16,17 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const sendingRef = useRef(false);
 
-  const handleSubmit = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
-    e.preventDefault();
+  const sendMessage = async () => {
+    if (sendingRef.current) return;
     const trimmed = body.trim();
     if (trimmed.length < 8) {
       setError("напиши чуть подробнее (минимум 8 символов)");
       return;
     }
     setError("");
+    sendingRef.current = true;
     setBusy(true);
 
     try {
@@ -36,7 +34,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -45,17 +43,20 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
         }),
       });
 
-      if (res && res.ok) {
-        setNotice(res.notice || "отправили. ответим на почту, если её указал");
-        setBody("");
-      } else {
-        setError(res?.error || "произошла ошибка, попробуй позже");
-      }
-    } catch (err: any) {
-      setError(err?.message || "произошла ошибка, попробуй позже");
+      setNotice(res.notice || "отправили. ответим на почту, если её указал");
+      setBody("");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "произошла ошибка, попробуй позже";
+      setError(message);
     } finally {
+      sendingRef.current = false;
       setBusy(false);
     }
+  };
+
+  const handleSubmit = (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
+    e.preventDefault();
+    void sendMessage();
   };
 
   const handleBack = (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
@@ -179,7 +180,19 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
             </div>
 
             <div class={styles.actions}>
-              <Button variant="solid" fullWidth type="submit" loading={busy} disabled={busy}>
+              <Button
+                variant="solid"
+                fullWidth
+                type="button"
+                loading={busy}
+                disabled={busy}
+                onClick={() => void sendMessage()}
+                onPointerDown={(e) => {
+                  if (e.pointerType !== "touch" || busy) return;
+                  e.preventDefault();
+                  void sendMessage();
+                }}
+              >
                 <span>{busy ? "Отправляем…" : "Отправить сообщение"}</span>
               </Button>
             </div>

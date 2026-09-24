@@ -11,6 +11,7 @@ type ButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   onClick?: (e: any) => void;
+  onPointerDown?: (e: any) => void;
   className?: string;
   ariaLabel?: string;
   ariaDescribedBy?: string;
@@ -30,6 +31,7 @@ export function Button({
   disabled,
   loading,
   onClick,
+  onPointerDown,
   className,
   ariaLabel,
   ariaDescribedBy,
@@ -71,6 +73,7 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
       title={title}

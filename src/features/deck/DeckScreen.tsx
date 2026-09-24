@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
-import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
@@ -113,17 +112,6 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
   const jevReasons = (card.jev_match_reasons || []).slice(0, 2);
   const showJev = typeof card.jev_match_pct === "number";
-  const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
-  const tags = [
-    ...split.neuro.flatMap((id) => {
-      const label = labelForTag("neuro", id, host.catalog);
-      return label ? [{ id: `neuro-${id}`, label, vibe: false as const }] : [];
-    }),
-    ...split.vibe.flatMap((id) => {
-      const label = labelForTag("vibe", id, host.catalog);
-      return label ? [{ id: `vibe-${id}`, label, vibe: true as const }] : [];
-    }),
-  ];
   return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -162,7 +150,6 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
         </div>
       ) : null}
       {card.bio ? <p class={`${styles.bio}${showJev ? ` ${styles.bioCompact}` : ""}`}>{card.bio}</p> : null}
-      {!showJev && tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
   </article>;
 }
