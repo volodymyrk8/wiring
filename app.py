@@ -1958,7 +1958,16 @@ def api_feed():
         and int(me["jev_feed_enabled"] or 0)
         and len(cards) > 1
     ):
-        ranked_cards = rank_profiles(me, cards)
+        viewer_tags = tags_for(int(me["id"]))
+        viewer_for_jev = {
+            "age": me["age"],
+            "city": me["city"],
+            "intent": me["intent"] if "intent" in set(me.keys()) else "dating",
+            "intents": intents_of(me),
+            "neuro": viewer_tags["neuro"],
+            "vibe": viewer_tags["vibe"],
+        }
+        ranked_cards = rank_profiles(viewer_for_jev, cards)
         if ranked_cards is not None:
             cards = ranked_cards
             jev_ranked = True

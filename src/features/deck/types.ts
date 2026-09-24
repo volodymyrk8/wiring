@@ -27,6 +27,9 @@ export type DeckCard = {
   neuro?: string[];
   vibe?: string[];
   online?: boolean;
+  /** Present when Jev ranking succeeded for this page (experiment). */
+  jev_match_pct?: number;
+  jev_match_reasons?: string[];
 };
 
 export type DeckCatalog = {
