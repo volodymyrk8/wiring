@@ -2492,7 +2492,11 @@ html[data-view="deck"] #app {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--tabbar-clearance, 88px) + env(safe-area-inset-bottom) + 8px);
+}
+
+html[data-view="deck"][data-tabs] #app {
+  --tabbar-clearance: 96px;
 }
 html[data-view="deck"] #deck-feature-root {
   flex: 1;
@@ -2516,6 +2520,10 @@ html[data-view="deck"] #deck-feature-root {
   }
   html[data-view="profile"][data-tabs] #app {
     --tabbar-clearance: 108px;
+  }
+  html[data-view="deck"][data-tabs] #app {
+    --tabbar-clearance: 112px;
+    padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom) + 4px);
   }
 
   .tabbar {

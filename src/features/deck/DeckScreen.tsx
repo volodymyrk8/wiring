@@ -111,6 +111,8 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
   const intentLine = openToIntentsLine(card.gender, labelsIntent);
   const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
+  const jevReasons = (card.jev_match_reasons || []).slice(0, 2);
+  const showJev = typeof card.jev_match_pct === "number";
   const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
   const tags = [
     ...split.neuro.flatMap((id) => {
@@ -142,25 +144,25 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
     <div class={styles.body}>
       <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2></div>
       {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <br /> : null}{secondary}</p> : null}
-      {typeof card.jev_match_pct === "number" ? (
+      {showJev ? (
         <div class={styles.jevMatch} aria-label={`Оценка совместимости: ${card.jev_match_pct} процентов`}>
           <div class={styles.jevMatchHead}>
             <span class={styles.jevPct}>{card.jev_match_pct}%</span>
             <span class={styles.jevMatchLabel}>
-              {card.jev_match_source === "api" ? "вероятность взаимного интереса · Jev" : "ориентир по анкетам · WIRING"}
+              {card.jev_match_source === "api" ? "взаимный интерес · Jev" : "ориентир · WIRING"}
             </span>
           </div>
-          {card.jev_match_reasons?.length ? (
+          {jevReasons.length ? (
             <ul class={styles.jevReasons}>
-              {card.jev_match_reasons.map((reason) => (
+              {jevReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
               ))}
             </ul>
           ) : null}
         </div>
       ) : null}
-      {card.bio ? <p class={styles.bio}>{card.bio}</p> : null}
-      {tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
+      {card.bio ? <p class={`${styles.bio}${showJev ? ` ${styles.bioCompact}` : ""}`}>{card.bio}</p> : null}
+      {!showJev && tags.length ? <div class={styles.tags}>{tags.slice(0, 3).map((tag) => <span class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}`} key={tag.id}>{tag.label}</span>)}</div> : null}
     </div>
   </article>;
 }
@@ -208,7 +210,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     const viewport = viewportRef.current;
     if (!viewport) return;
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - 90));
+      setCardHeight(Math.max(120, viewport.clientHeight - 128));
       viewport.scrollTop = indexRef.current * viewport.clientHeight;
     };
     align();
@@ -330,7 +332,6 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
 
   return <div class={styles.root}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
-    {host.user.jev_feed_enabled ? <p class={styles.jevNotice}>Эксперимент: под фото — процент и причины. Если Jev на сервере недоступен, показываем ориентир WIRING по тем же отметкам. Не гарантия мэтча.</p> : null}
     {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value) => void loadPage(value, true)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>
