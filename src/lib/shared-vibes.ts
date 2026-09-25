@@ -16,3 +16,17 @@ export function sharedVibeIdSet(
   }
   return shared;
 }
+
+/** Neuro tag ids that both profiles have (current catalog only). */
+export function sharedNeuroIdSet(
+  mine: string[] | undefined,
+  theirs: string[] | undefined,
+  catalog: TagCatalog,
+): Set<string> {
+  const myNeuro = new Set(splitCatalogTags(mine, [], catalog).neuro);
+  const shared = new Set<string>();
+  for (const id of splitCatalogTags(theirs, [], catalog).neuro) {
+    if (myNeuro.has(id)) shared.add(id);
+  }
+  return shared;
+}

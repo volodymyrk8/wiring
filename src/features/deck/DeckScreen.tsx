@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
+import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
+import { sharedNeuroIdSet, sharedVibeIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
@@ -112,6 +114,19 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
   const jevReasons = (card.jev_match_reasons || []).slice(0, 2);
   const showJev = typeof card.jev_match_pct === "number";
+  const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
+  const sharedNeuro = sharedNeuroIdSet(host.user.neuro, card.neuro, host.catalog);
+  const sharedVibe = sharedVibeIdSet(host.user.vibe, card.vibe, host.catalog);
+  const previewTags = [
+    ...split.neuro.slice(0, 2).flatMap((id) => {
+      const label = labelForTag("neuro", id, host.catalog);
+      return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id), vibe: false as const }] : [];
+    }),
+    ...[...sharedVibe].slice(0, 2).flatMap((id) => {
+      const label = labelForTag("vibe", id, host.catalog);
+      return label ? [{ id: `vibe-${id}`, label, shared: true, vibe: true as const }] : [];
+    }),
+  ];
   return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -150,6 +165,18 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
         </div>
       ) : null}
       {card.bio ? <p class={`${styles.bio}${showJev ? ` ${styles.bioCompact}` : ""}`}>{card.bio}</p> : null}
+      {previewTags.length ? (
+        <div class={styles.tags}>
+          {previewTags.map((tag) => (
+            <span
+              key={tag.id}
+              class={`${styles.tag}${tag.vibe ? ` ${styles.tagVibe}` : ""}${tag.shared ? ` ${styles.tagShared}` : ""}`}
+            >
+              {tag.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   </article>;
 }
