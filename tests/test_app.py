@@ -450,7 +450,7 @@ class WiringTest(unittest.TestCase):
         self.assertIn("не преследует цель пропаганды", rules_text)
         self.assertIn("Пользовательское соглашение", rules_text)
         privacy_text = self.client.get("/privacy").get_data(as_text=True)
-        self.assertIn("чувствительные сведения", privacy_text)
+        self.assertIn("Чувствительные сведения", privacy_text)
         self.assertIn("Законодательство РФ", privacy_text)
         self.assertIn("персональные данные", privacy_text.lower())
         marketing_text = self.client.get("/marketing").get_data(as_text=True)
