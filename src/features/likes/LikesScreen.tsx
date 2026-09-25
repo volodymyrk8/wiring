@@ -4,6 +4,7 @@ import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/com
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
+import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
 import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
 import styles from "./LikesScreen.module.css";
@@ -89,6 +90,12 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
     const tag = host.catalog.neuro?.find((option) => option.id === id);
     return tag ? <span class={styles.likeTag} key={`neuro-${id}`}>{tag.label}</span> : null;
   });
+  const sharedVibes = sharedVibeIdSet(host.user?.vibe, item.vibe, host.catalog);
+  const vibeTags = [...sharedVibes].slice(0, 2).map((id) => {
+    const tag = host.catalog.vibe?.find((option) => option.id === id);
+    return tag ? <span class={`${styles.likeTag} ${styles.likeTagShared}`} key={`vibe-${id}`}>{tag.label}</span> : null;
+  });
+  const hasTags = Boolean(item.neuro?.length || vibeTags.length);
   const bio = String(item.bio || item.communication || "").trim();
   const intentIds = item.intents?.length ? item.intents : item.intent ? [item.intent] : [];
   const intent = intentIds.map((id) => host.catalog.intents?.find((option) => option.id === id)?.label || id).join(", ");
@@ -98,7 +105,7 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
       <span class={styles.body}>
         <span class={styles.head}><strong>{item.name}, {item.age}</strong>{item.city ? <span class={styles.city}>{item.city}</span> : null}</span>
         <span class={styles.meta}>{[item.city, intent].filter(Boolean).join(" · ")}</span>
-        {item.neuro?.length ? <span class={styles.tags}>{neuroTags}</span> : null}
+        {hasTags ? <span class={styles.tags}>{neuroTags}{vibeTags}</span> : null}
         {bio ? <span class={styles.bio}>{bio}</span> : null}
         <span class={styles.cta}>Смотреть анкету →</span>
       </span>

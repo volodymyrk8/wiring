@@ -2,6 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
+import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -136,9 +137,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const intentLine = openToIntentsLine(person.gender, intents);
   const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
   const split = splitCatalogTags(person.neuro, person.vibe, host.catalog);
-  const myVibeIds = new Set(
-    isSelf ? [] : splitCatalogTags([], host.user.vibe, host.catalog).vibe,
-  );
+  const sharedVibes = isSelf ? new Set<string>() : sharedVibeIdSet(host.user.vibe, person.vibe, host.catalog);
   const tags = [
     ...split.neuro.flatMap((id) => {
       const label = labelForTag("neuro", id, host.catalog);
@@ -146,7 +145,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     }),
     ...split.vibe.flatMap((id) => {
       const label = labelForTag("vibe", id, host.catalog);
-      return label ? [{ id, label, vibe: true as const, shared: myVibeIds.has(id) }] : [];
+      return label ? [{ id, label, vibe: true as const, shared: sharedVibes.has(id) }] : [];
     }),
   ];
   const hasSharedVibes = tags.some((tag) => tag.shared);
