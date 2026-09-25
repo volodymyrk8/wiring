@@ -473,7 +473,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
             <p class={styles.legalDisclaimer}>
               Нажимая «Создать аккаунт», ты подтверждаешь возраст 18+ и принимаешь{" "}
               <a href="/rules" target="_blank" rel="noopener noreferrer">
-                правила сервиса
+                пользовательское соглашение
               </a>{" "}
               и{" "}
               <a href="/privacy" target="_blank" rel="noopener noreferrer">

@@ -44,7 +44,7 @@ from devices import ensure_device_tables, track_device_visit, visitor_key_from_r
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access, prepare_jev_feed
 from glossary import glossary_html
-from legal_pages import PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
+from legal_pages import MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
@@ -3223,8 +3223,8 @@ def admin_task_decision(task_id: int):
 def privacy():
     return render_template(
         "legal.html",
-        title="Конфиденциальность",
-        description="Какие данные хранит WIRING и как их удалить.",
+        title="Политика конфиденциальности",
+        description="Какие персональные данные обрабатывает WIRING и какие у вас есть права.",
         path="/privacy",
         site_url=SITE_URL,
         body=PRIVACY_HTML,
@@ -3235,11 +3235,23 @@ def privacy():
 def rules():
     return render_template(
         "legal.html",
-        title="Правила",
-        description="Правила сообщества WIRING. 18+. Ограничения по законодательству РФ.",
+        title="Пользовательское соглашение",
+        description="Условия использования WIRING. 18+. Ограничения по законодательству РФ.",
         path="/rules",
         site_url=SITE_URL,
         body=RULES_HTML,
+    )
+
+
+@app.get("/marketing")
+def marketing_consent():
+    return render_template(
+        "legal.html",
+        title="Согласие на рассылку",
+        description="Отдельное согласие на рекламные сообщения WIRING. Для знакомств не обязательно.",
+        path="/marketing",
+        site_url=SITE_URL,
+        body=MARKETING_HTML,
     )
 
 
@@ -3321,7 +3333,7 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
-    urls = ["/", "/rules", "/privacy", "/support"]
+    urls = ["/", "/rules", "/privacy", "/marketing", "/support"]
     items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype="application/xml")

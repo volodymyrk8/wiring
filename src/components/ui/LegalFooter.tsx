@@ -14,10 +14,13 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
     >
       <span class={styles.badge18}>18+</span>
       <a class={styles.link} href="/rules" draggable={false}>
-        правила
+        соглашение
       </a>
       <a class={styles.link} href="/privacy" draggable={false}>
         конфиденциальность
+      </a>
+      <a class={styles.link} href="/marketing" draggable={false}>
+        рассылка
       </a>
       <a
         class={styles.link}
