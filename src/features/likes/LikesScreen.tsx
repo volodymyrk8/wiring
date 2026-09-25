@@ -1,10 +1,11 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
-import type { LikeCard, LikesFilters, LikesHostBridge } from "./types";
+import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
+import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
 import styles from "./LikesScreen.module.css";
 
 const avatarUrl = (basePath: string, photo: unknown, name = "?") => {
@@ -20,6 +21,7 @@ const avatarUrl = (basePath: string, photo: unknown, name = "?") => {
 };
 
 const iconFilter = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>;
+const iconSort = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 6h12M8 12h8M8 18h4" /><path d="m4 6 2 2 2-2M4 12l2 2 2-2M4 18l2 2 2-2" /></svg>;
 const iconLike = "♡";
 
 const activeFilters = (filters: LikesFilters) => Boolean(
@@ -83,9 +85,9 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
       </button>
     );
   }
-  const labels = (ids: string[] | undefined, kind: "neuro" | "vibe") => (ids || []).slice(0, 2).map((id) => {
-    const item = host.catalog[kind]?.find((option) => option.id === id);
-    return item ? <span class={`${styles.likeTag}${kind === "vibe" ? ` ${styles.likeTagVibe}` : ""}`} key={`${kind}-${id}`}>{item.label}</span> : null;
+  const neuroTags = (item.neuro || []).slice(0, 2).map((id) => {
+    const tag = host.catalog.neuro?.find((option) => option.id === id);
+    return tag ? <span class={styles.likeTag} key={`neuro-${id}`}>{tag.label}</span> : null;
   });
   const bio = String(item.bio || item.communication || "").trim();
   const intentIds = item.intents?.length ? item.intents : item.intent ? [item.intent] : [];
@@ -96,7 +98,7 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
       <span class={styles.body}>
         <span class={styles.head}><strong>{item.name}, {item.age}</strong>{item.city ? <span class={styles.city}>{item.city}</span> : null}</span>
         <span class={styles.meta}>{[item.city, intent].filter(Boolean).join(" · ")}</span>
-        {(item.neuro?.length || item.vibe?.length) ? <span class={styles.tags}>{labels(item.neuro, "neuro")}{labels(item.vibe, "vibe")}</span> : null}
+        {item.neuro?.length ? <span class={styles.tags}>{neuroTags}</span> : null}
         {bio ? <span class={styles.bio}>{bio}</span> : null}
         <span class={styles.cta}>Смотреть анкету →</span>
       </span>
@@ -108,11 +110,19 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
   const [likes, setLikes] = useState(host.likes);
   const [filters, setFilters] = useState(host.filters);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [sort, setSort] = useState<LikesSort>(() => readLikesSort());
   const [promoOpen, setPromoOpen] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const hasFilters = activeFilters(filters);
+  const sortedLikes = useMemo(() => sortLikeCards(likes, sort), [likes, sort]);
+  const sortLabel = LIKES_SORT_OPTIONS.find((option) => option.id === sort)?.label || "Сначала новые";
+
+  useEffect(() => {
+    storeLikesSort(sort);
+  }, [sort]);
 
   const navigate = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
@@ -184,7 +194,53 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
       />
       <main class={`${styles.content}${signedOut ? ` ${styles.contentCentered}` : ""}`}>
         {host.user?.needs_profile && !host.user.guest ? <aside class={styles.nudge}><div><strong>Анкета ещё пустая</strong><p>Добавь фото, город и особенности, чтобы тебя находили.</p></div><Button slim href={host.hrefFor("profile")} nav="profile" onClick={navigate("profile")}>дозаполнить</Button></aside> : null}
-        {!signedOut && (likes.length || hasFilters || filtersOpen) ? <div class={styles.toolbar}><Button variant="ghost" slim className={`${styles.filterButton}${hasFilters ? ` ${styles.filterButtonActive}` : ""}`} onClick={() => setFiltersOpen((open) => !open)}>{iconFilter}<span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span>{hasFilters ? <span class={styles.filterDot} /> : null}</Button></div> : null}
+        {!signedOut && (likes.length || hasFilters || filtersOpen || sortOpen) ? (
+          <div class={styles.toolbar}>
+            <Button
+              variant="ghost"
+              slim
+              className={`${styles.toolButton}${sortOpen ? ` ${styles.toolButtonOpen}` : ""}`}
+              aria-expanded={sortOpen}
+              onClick={() => {
+                setSortOpen((open) => !open);
+                if (!sortOpen) setFiltersOpen(false);
+              }}
+            >
+              {iconSort}
+              <span>{sortOpen ? "скрыть сортировку" : "сортировка"}</span>
+              {!sortOpen ? <span class={styles.sortHint}>{sortLabel}</span> : null}
+            </Button>
+            <Button
+              variant="ghost"
+              slim
+              className={`${styles.toolButton}${hasFilters ? ` ${styles.toolButtonActive}` : ""}`}
+              aria-expanded={filtersOpen}
+              onClick={() => {
+                setFiltersOpen((open) => !open);
+                if (!filtersOpen) setSortOpen(false);
+              }}
+            >
+              {iconFilter}
+              <span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span>
+              {hasFilters ? <span class={styles.filterDot} /> : null}
+            </Button>
+          </div>
+        ) : null}
+        {sortOpen ? (
+          <div class={styles.sortPanel} role="group" aria-label="Сортировка лайков">
+            {LIKES_SORT_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                class={`${styles.sortOption}${sort === option.id ? ` ${styles.sortOptionActive}` : ""}`}
+                aria-pressed={sort === option.id}
+                onClick={() => setSort(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {host.user && !host.user.plus && likes.length ? (
           <section class={styles.gate}>
             <div class={styles.gateTop}><span class={styles.gateBadge}>{isGuest ? "гость" : "WIRING+"}</span><div class={styles.gateInfo}><strong>{isGuest ? "Создай свой профиль" : "Узнай, кто тебя лайкнул"}</strong><p>{isGuest ? "Чтобы видеть, кто проявил интерес, и начинать диалоги." : "С WIRING+ входящие симпатии открыты сразу."}</p></div></div>
@@ -193,7 +249,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
           </section>
         ) : null}
         {filtersOpen ? <FilterPanel host={host} filters={filters} onApply={(next) => void apply(next)} onClear={clear} /> : null}
-        {likes.length ? <div class={styles.cards}>{likes.map((item, index) => <LikeCardView key={`${item.id || "hidden"}-${index}`} host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />)}</div> : (
+        {likes.length ? <div class={styles.cards}>{sortedLikes.map((item, index) => <LikeCardView key={`${item.id || "hidden"}-${index}`} host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />)}</div> : (
           <section class={styles.empty}>
             <span class={styles.emptyIcon}>{emptyFiltered ? iconFilter : iconLike}</span>
             <h2>

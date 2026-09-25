@@ -22,7 +22,10 @@ export type LikeCard = {
   intents?: string[];
   neuro?: string[];
   vibe?: string[];
+  liked_at?: number;
 };
+
+export type LikesSort = "newest" | "oldest" | "name" | "age_asc" | "age_desc";
 
 export type LikesCatalog = {
   neuro?: CatalogItem[];

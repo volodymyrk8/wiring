@@ -2250,7 +2250,7 @@ def api_likes():
     # Only unanswered inbound likes. Mutual → Чаты; pass → gone from likes.
     rows = conn.execute(
         """
-        SELECT u.* FROM users u
+        SELECT u.*, s.created_at AS liked_at FROM users u
         JOIN swipes s ON s.from_id = u.id AND s.to_id = ? AND s.direction = 'like'
         WHERE u.age BETWEEN ? AND ?
           AND (? = '' OR u.city = ?)
@@ -2281,6 +2281,7 @@ def api_likes():
         if plus:
             item = user_public(row, detail=True)
             item["matched"] = False
+            item["liked_at"] = int(row["liked_at"] or 0)
             people.append(item)
         else:
             people.append({"hidden": True, "matched": False})

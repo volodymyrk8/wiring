@@ -28,9 +28,18 @@
 .prompt { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-2); }
 .prompt strong { color: var(--lime); font-size: 12px; font-weight: 600; }
 .prompt p { margin: 0; color: var(--ink); line-height: 1.45; }
+.tagBlock { display: grid; gap: 6px; }
+.tagLegend { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; }
-.tag { padding: 6px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 12px; }
-.tagVibe { color: var(--lime); }
+.tag { padding: 6px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 12px; }
+.tagVibe { color: color-mix(in srgb, var(--lime) 82%, var(--ink)); }
+.tagVibeShared {
+  border-color: color-mix(in srgb, var(--lime) 62%, transparent);
+  background: color-mix(in srgb, var(--lime) 24%, var(--accent-soft));
+  color: var(--lime);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lime) 18%, transparent);
+}
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
 .actionIcon { display: inline-grid; width: 48px; height: 48px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--bg-2); color: var(--ink); cursor: pointer; }
 .actionIcon svg { width: 21px; height: 21px; }
