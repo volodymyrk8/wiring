@@ -118,11 +118,12 @@
 .tags { display: flex; flex-wrap: wrap; gap: 6px; max-height: 72px; overflow: hidden; margin-top: 2px; }
 .tag { padding: 5px 8px; border: 1px solid transparent; border-radius: 999px; background: rgba(255,255,255,.18); color: var(--on-photo); font-size: 11px; line-height: 1.2; text-shadow: 0 1px 6px rgba(0,0,0,.65); }
 .tagVibe { color: color-mix(in srgb, var(--lime) 75%, var(--on-photo)); }
-.tagShared {
-  border-color: color-mix(in srgb, var(--lime) 75%, transparent);
-  background: color-mix(in srgb, var(--lime) 28%, rgba(0,0,0,.35));
-  color: #f2ffb8;
-  font-weight: 600;
+.tag.tagShared {
+  border-color: transparent;
+  background: var(--lime);
+  color: #16180f;
+  font-weight: 700;
+  text-shadow: none;
 }
 
 .controls {

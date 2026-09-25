@@ -61,11 +61,11 @@
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .likeTag { padding: 4px 7px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 10px; }
 .likeTagVibe { color: color-mix(in srgb, var(--lime) 78%, var(--muted)); }
-.likeTagShared {
-  border-color: var(--lime);
-  background: color-mix(in srgb, var(--lime) 32%, var(--bg-2));
-  color: var(--lime);
-  font-weight: 600;
+.likeTag.likeTagShared {
+  border-color: transparent;
+  background: var(--lime);
+  color: #16180f;
+  font-weight: 700;
 }
 .cta { align-self: end; margin-top: auto; color: var(--lime); font-size: 12px; font-weight: 600; }
 .locked { display: grid; grid-template-columns: 112px minmax(0, 1fr); width: 100%; padding: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--bg-2); color: inherit; text-align: left; cursor: pointer; }

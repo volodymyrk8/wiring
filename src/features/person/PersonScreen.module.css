@@ -32,13 +32,13 @@
 .tagLegend { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; }
 .tag { padding: 6px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 12px; }
-.tagVibe { color: color-mix(in srgb, var(--lime) 70%, var(--muted)); background: color-mix(in srgb, var(--muted) 8%, var(--accent-soft)); }
-.tagShared {
-  border-color: var(--lime);
-  background: color-mix(in srgb, var(--lime) 34%, var(--bg-2));
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lime) 45%, transparent);
+.tagVibe { color: var(--ink); background: var(--accent-soft); }
+.tag.tagShared {
+  border-color: transparent;
+  background: var(--lime);
+  color: #16180f;
+  font-weight: 700;
+  box-shadow: none;
 }
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
 .actionIcon { display: inline-grid; width: 48px; height: 48px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--bg-2); color: var(--ink); cursor: pointer; }
