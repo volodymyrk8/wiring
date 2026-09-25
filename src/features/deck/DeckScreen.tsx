@@ -3,7 +3,7 @@ import type { JSX } from "preact";
 import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
-import { sharedNeuroIdSet, sharedVibeIdSet } from "@/lib/shared-vibes";
+import { sharedNeuroIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
@@ -116,17 +116,10 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const showJev = typeof card.jev_match_pct === "number";
   const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
   const sharedNeuro = sharedNeuroIdSet(host.user.neuro, card.neuro, host.catalog);
-  const sharedVibe = sharedVibeIdSet(host.user.vibe, card.vibe, host.catalog);
-  const previewTags = [
-    ...split.neuro.slice(0, 2).flatMap((id) => {
-      const label = labelForTag("neuro", id, host.catalog);
-      return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id), vibe: false as const }] : [];
-    }),
-    ...split.vibe.flatMap((id) => {
-      const label = labelForTag("vibe", id, host.catalog);
-      return label ? [{ id: `vibe-${id}`, label, shared: sharedVibe.has(id), vibe: true as const }] : [];
-    }),
-  ];
+  const previewTags = split.neuro.slice(0, 2).flatMap((id) => {
+    const label = labelForTag("neuro", id, host.catalog);
+    return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
+  });
   return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -170,7 +163,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
           {previewTags.map((tag) => (
             <span
               key={tag.id}
-              class={`${styles.tag}${tag.vibe ? ` ${styles.tagVibe}` : ""}${tag.shared ? ` ${styles.tagShared}` : ""}`}
+              class={`${styles.tag}${tag.shared ? ` ${styles.tagShared}` : ""}`}
             >
               {tag.label}
             </span>
