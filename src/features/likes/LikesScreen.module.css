@@ -60,6 +60,7 @@
 .bio { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .likeTag { padding: 4px 7px; border: 1px solid transparent; border-radius: 999px; background: var(--accent-soft); color: var(--ink); font-size: 10px; }
+.likeTagVibe { color: color-mix(in srgb, var(--lime) 78%, var(--muted)); }
 .likeTagShared {
   border-color: var(--lime);
   background: color-mix(in srgb, var(--lime) 32%, var(--bg-2));

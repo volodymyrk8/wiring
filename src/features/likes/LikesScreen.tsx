@@ -4,6 +4,7 @@ import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/com
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
+import { splitCatalogTags } from "@/lib/catalog-tags";
 import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
 import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
@@ -86,16 +87,25 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
       </button>
     );
   }
-  const neuroTags = (item.neuro || []).slice(0, 2).map((id) => {
+  const split = splitCatalogTags(item.neuro, item.vibe, host.catalog);
+  const sharedVibes = sharedVibeIdSet(host.user?.vibe, item.vibe, host.catalog);
+  const neuroTags = split.neuro.slice(0, 2).map((id) => {
     const tag = host.catalog.neuro?.find((option) => option.id === id);
     return tag ? <span class={styles.likeTag} key={`neuro-${id}`}>{tag.label}</span> : null;
   });
-  const sharedVibes = sharedVibeIdSet(host.user?.vibe, item.vibe, host.catalog);
-  const vibeTags = [...sharedVibes].slice(0, 2).map((id) => {
+  const vibeTags = split.vibe.map((id) => {
     const tag = host.catalog.vibe?.find((option) => option.id === id);
-    return tag ? <span class={`${styles.likeTag} ${styles.likeTagShared}`} key={`vibe-${id}`}>{tag.label}</span> : null;
+    const shared = sharedVibes.has(id);
+    return tag ? (
+      <span
+        class={`${styles.likeTag} ${styles.likeTagVibe}${shared ? ` ${styles.likeTagShared}` : ""}`}
+        key={`vibe-${id}`}
+      >
+        {tag.label}
+      </span>
+    ) : null;
   });
-  const hasTags = Boolean(item.neuro?.length || vibeTags.length);
+  const hasTags = Boolean(split.neuro.length || split.vibe.length);
   const bio = String(item.bio || item.communication || "").trim();
   const intentIds = item.intents?.length ? item.intents : item.intent ? [item.intent] : [];
   const intent = intentIds.map((id) => host.catalog.intents?.find((option) => option.id === id)?.label || id).join(", ");

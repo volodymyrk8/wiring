@@ -122,9 +122,9 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
       const label = labelForTag("neuro", id, host.catalog);
       return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id), vibe: false as const }] : [];
     }),
-    ...[...sharedVibe].slice(0, 2).flatMap((id) => {
+    ...split.vibe.flatMap((id) => {
       const label = labelForTag("vibe", id, host.catalog);
-      return label ? [{ id: `vibe-${id}`, label, shared: true, vibe: true as const }] : [];
+      return label ? [{ id: `vibe-${id}`, label, shared: sharedVibe.has(id), vibe: true as const }] : [];
     }),
   ];
   return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
