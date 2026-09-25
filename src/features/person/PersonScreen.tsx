@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
-import { sharedVibeIdSet } from "@/lib/shared-vibes";
+import { sharedNeuroIdSet, sharedVibeIdSet } from "@/lib/shared-vibes";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -137,18 +137,19 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const intentLine = openToIntentsLine(person.gender, intents);
   const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
   const split = splitCatalogTags(person.neuro, person.vibe, host.catalog);
+  const sharedNeuro = isSelf ? new Set<string>() : sharedNeuroIdSet(host.user.neuro, person.neuro, host.catalog);
   const sharedVibes = isSelf ? new Set<string>() : sharedVibeIdSet(host.user.vibe, person.vibe, host.catalog);
   const tags = [
     ...split.neuro.flatMap((id) => {
       const label = labelForTag("neuro", id, host.catalog);
-      return label ? [{ id, label, vibe: false as const, shared: false }] : [];
+      return label ? [{ id, label, vibe: false as const, shared: sharedNeuro.has(id) }] : [];
     }),
     ...split.vibe.flatMap((id) => {
       const label = labelForTag("vibe", id, host.catalog);
       return label ? [{ id, label, vibe: true as const, shared: sharedVibes.has(id) }] : [];
     }),
   ];
-  const hasSharedVibes = tags.some((tag) => tag.shared);
+  const hasShared = tags.some((tag) => tag.shared);
   const reportReasons = host.catalog.report_reasons || [];
 
   return <div class={styles.root}>
@@ -172,13 +173,13 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         {person.communication ? <div class={styles.prompt}><strong>как тебе писать</strong><p>{person.communication}</p></div> : null}
         {tags.length ? (
           <div class={styles.tagBlock}>
-            {hasSharedVibes ? <p class={styles.tagLegend}>Яркие — общий вайб с тобой</p> : null}
+            {hasShared ? <p class={styles.tagLegend}>Яркие — совпадает с твоей анкетой</p> : null}
             <div class={styles.tags}>
               {tags.map((tag) => (
                 <span
                   key={`${tag.vibe ? "vibe" : "neuro"}-${tag.id}`}
-                  class={`${styles.tag} ${tag.vibe ? styles.tagVibe : ""}${tag.shared ? ` ${styles.tagVibeShared}` : ""}`}
-                  title={tag.shared ? "Совпадает с твоим вайбом" : undefined}
+                  class={`${styles.tag}${tag.vibe ? ` ${styles.tagVibe}` : ""}${tag.shared ? ` ${styles.tagShared}` : ""}`}
+                  title={tag.shared ? (tag.vibe ? "Совпадает с твоим вайбом" : "Совпадает с твоим диагнозом") : undefined}
                 >
                   {tag.label}
                 </span>
