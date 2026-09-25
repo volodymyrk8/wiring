@@ -49,6 +49,7 @@ from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
+from push import delete_subscription, delete_user_subscriptions, ensure_push_tables, public_key, save_subscription
 from premium import (
     REFERRAL_DAYS,
     add_code,
@@ -488,6 +489,7 @@ def init_db() -> None:
     from user_tags import ensure_legacy_vibe_cleanup
 
     ensure_legacy_vibe_cleanup(conn)
+    ensure_push_tables(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
@@ -1251,6 +1253,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
+    delete_user_subscriptions(conn, uid)
     folder = os.path.join(UPLOAD_DIR, str(uid))
     if os.path.isdir(folder):
         shutil.rmtree(folder, ignore_errors=True)
@@ -1840,10 +1843,49 @@ def api_patch_notifications():
         push = 1 if data.get("push") else 0
     if not enabled:
         push = 0
+    if not push:
+        delete_user_subscriptions(conn, uid)
     conn.execute("UPDATE users SET notify_enabled = ?, notify_push = ? WHERE id = ?", (enabled, push, uid))
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     return jsonify({"ok": True, "user": user_public(row, include_email=True, detail=True)})
+
+
+@app.get("/api/push/public-key")
+@login_required
+def api_push_public_key():
+    try:
+        key = public_key(db())
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify({"ok": True, "publicKey": key})
+
+
+@app.post("/api/push/subscribe")
+@login_required
+def api_push_subscribe():
+    data = request.get_json(silent=True) or {}
+    uid = session["uid"]
+    conn = db()
+    row = conn.execute("SELECT notify_enabled, notify_push FROM users WHERE id = ?", (uid,)).fetchone()
+    if not row or not int(row["notify_enabled"] or 0) or not int(row["notify_push"] or 0):
+        return jsonify({"ok": False, "error": "сначала включи пуш в уведомлениях"}), 403
+    try:
+        save_subscription(conn, uid, data)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/push/unsubscribe")
+@login_required
+def api_push_unsubscribe():
+    data = request.get_json(silent=True) or {}
+    conn = db()
+    delete_subscription(conn, session["uid"], str(data.get("endpoint") or ""))
+    conn.commit()
+    return jsonify({"ok": True})
 
 
 def _eligible_card(
@@ -2893,6 +2935,14 @@ def media_files(filename: str):
     _safe_media_path(UPLOAD_DIR, filename)
     response = send_from_directory(UPLOAD_DIR, filename)
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
+
+@app.get("/sw.js")
+def service_worker():
+    response = send_from_directory(PUBLIC_DIR, "sw.js")
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Service-Worker-Allowed"] = "/"
     return response
 
 

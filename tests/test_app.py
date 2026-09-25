@@ -1143,6 +1143,40 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(on.get_json()["user"]["notify_enabled"])
         self.assertTrue(on.get_json()["user"]["notify_push"])
 
+    def test_web_push_like_when_site_is_closed(self):
+        first = self._register(email="push-a@wiring.test")
+        key = self.client.get("/api/push/public-key")
+        self.assertEqual(key.status_code, 200)
+        self.assertGreater(len(key.get_json()["publicKey"]), 20)
+        saved = self.client.post(
+            "/api/push/subscribe",
+            json={"endpoint": "https://push.example/ada", "keys": {"p256dh": "pad", "auth": "auth"}},
+        )
+        self.assertEqual(saved.status_code, 200)
+        self.client.post("/api/logout")
+        conn = open_request_connection()
+        conn.execute("UPDATE users SET last_seen = 0 WHERE email = ?", ("push-a@wiring.test",))
+        conn.commit()
+        conn.close()
+        self._register(email="push-b@wiring.test", name="Лео", gender="man", photo="portraits/p03.jpg")
+        with patch("push._deliver", return_value="ok") as deliver:
+            self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
+        self.assertEqual(deliver.call_count, 1)
+        payload = deliver.call_args.args[1]
+        self.assertIn("лайкнул", payload)
+        self.assertIn("/likes", payload)
+        self.client.post("/api/logout")
+        self.client.post("/api/login", json={"email": "push-a@wiring.test", "password": "secret1"})
+        self.client.patch("/api/notifications", json={"push": False})
+        self.client.post("/api/logout")
+        self.client.post("/api/login", json={"email": "push-b@wiring.test", "password": "secret1"})
+        with patch("push._deliver", return_value="ok") as quiet:
+            self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
+        self.assertFalse(quiet.called)
+        worker = self.client.get("/sw.js")
+        self.assertEqual(worker.status_code, 200)
+        self.assertIn(b"showNotification", worker.data)
+
     def test_plus_snooze(self):
         self._register()
         self._peers(2)

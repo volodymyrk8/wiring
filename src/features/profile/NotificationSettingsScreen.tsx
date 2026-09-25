@@ -3,6 +3,7 @@ import type { JSX } from "preact";
 import { AppHeader, LegalFooter, ProfileMenu, Switch } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
+import { iosNeedsHomeScreen, syncWebPush, webPushSupported } from "@/lib/web-push";
 import type { ProfileHostBridge, ProfileUser } from "./types";
 import styles from "./NotificationSettingsScreen.module.css";
 
@@ -45,6 +46,14 @@ export function NotificationSettingsScreen({ host }: { host: ProfileHostBridge }
       const nextUser = response.user as ProfileUser;
       setUser(nextUser);
       host.onUserUpdated(nextUser);
+      if (nextUser.notify_push && nextUser.notify_enabled !== false && Notification.permission === "granted") {
+        const pushState = await syncWebPush(host.api, true);
+        if (pushState === "unsupported") {
+          host.toast("в этом браузере пуш при закрытом сайте недоступен — останутся уведомления, пока вкладка открыта");
+        }
+      } else if (patch.push === false || nextUser.notify_push === false || nextUser.notify_enabled === false) {
+        await syncWebPush(host.api, false);
+      }
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -89,11 +98,13 @@ export function NotificationSettingsScreen({ host }: { host: ProfileHostBridge }
               уведомления о лайках и сообщениях — подсказки на сайте
             </Switch>
             <Switch name="notify-push" checked={push && permission === "granted"} disabled={busy || !enabled || permission === "unsupported"} loading={busy} onChange={(checked) => void patchNotifications({ push: checked })}>
-              системные уведомления — когда вкладка в фоне
+              пуш о лайках и сообщениях — и когда сайт закрыт
             </Switch>
           </div>
-          {enabled && permission === "denied" ? <p class={styles.hint}>Браузер запретил системные уведомления. Их можно включить в настройках сайта в Safari или Chrome.</p> : null}
+          {enabled && permission === "denied" ? <p class={styles.hint}>Браузер запретил уведомления. Их можно включить в настройках сайта в Safari или Chrome.</p> : null}
           {enabled && permission === "unsupported" ? <p class={styles.hint}>Этот браузер не показывает системные уведомления — останутся подсказки на сайте и счётчики в меню.</p> : null}
+          {enabled && permission !== "unsupported" && !webPushSupported() ? <p class={styles.hint}>Закрытый сайт этот браузер не будит. Уведомления останутся, пока вкладка WIRING открыта.</p> : null}
+          {enabled && webPushSupported() && iosNeedsHomeScreen() ? <p class={styles.hint}>На iPhone пуш при закрытом Safari приходит, если добавить WIRING на экран «Домой». В обычной вкладке уведомления работают, пока сайт открыт.</p> : null}
           {error ? <p class={styles.error} role="alert">{error}</p> : null}
         </section>
       </main>

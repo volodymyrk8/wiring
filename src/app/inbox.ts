@@ -1,3 +1,4 @@
+import { syncWebPushIfGranted } from "@/lib/web-push";
 import type { ApiClient } from "./api";
 
 type Notice = {
@@ -145,6 +146,7 @@ export function createInboxController({
   const start = () => {
     clearInterval(timer);
     if (!state.user) return;
+    syncWebPushIfGranted(api, state.user);
     timer = window.setInterval(pollInbox, 20000);
   };
 

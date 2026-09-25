@@ -70,6 +70,12 @@ The Jev-ranked feed is an opt-in experiment, disabled unless `JEV_BETA_USER_ID` 
 
 The profile toggle is visible only to the allowlisted account. Jev receives structured pair signals: full lists of catalog neuro and vibe tag ids for viewer and candidate, shared tags, same-city flag, age-gap band and shared intent ids. Names, account IDs, photos, bio, prompts and messages are not sent. The API may attach an experimental match percentage and short reasons on each card; Jev only orders the feed — people still make every like and match.
 
+### Web Push
+
+Likes, matches, and messages can wake a closed browser. The existing notification toggles stay voluntary: nothing asks for permission during registration. Turning on «пуш» in notification settings requests browser permission and stores a push subscription. Turning it off deletes that subscription. If the site tab is open, the usual in-app notice is enough and a second push is skipped.
+
+The server creates a VAPID key pair in `push_vapid` on first use. To pin a key across restores, set `WEB_PUSH_VAPID_PRIVATE_KEY` (PEM) and optional `WEB_PUSH_VAPID_SUBJECT` in `.env` or `/etc/wiring.env`. iPhone delivers these pushes after the site is added to the Home Screen.
+
 ### Тестирование сайта: вход
 
 При **ручной** проверке WIRING в браузере (локально, в Cursor, QA, демо фич) **всегда** авторизуемся одним и тем же тестовым аккаунтом — не регистрируем новых людей «на глаз» и не используем реальные прод-логины.

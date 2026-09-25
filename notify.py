@@ -8,6 +8,7 @@ import smtplib
 import time
 
 from database import Connection
+from push import push_target, send_user_push
 import urllib.error
 import urllib.request
 from email.message import EmailMessage
@@ -164,12 +165,28 @@ def notify_event(
                 "UPDATE notifications SET body = ?, created_at = ? WHERE id = ?",
                 (body[:280], int(time.time()), existing["id"]),
             )
+            send_user_push(
+                conn,
+                user_id,
+                body=body,
+                url=push_target(kind, from_id),
+                tag=f"{kind}-{from_id}",
+                last_seen=last_seen,
+            )
             return
     else:
         body = f"взаимно с {from_name}"
         subject = "Мэтч на WIRING"
         mail = f"Взаимно с {from_name}. Можно писать: https://wiring.date/"
     add_notice(conn, user_id, kind, from_id, body)
+    send_user_push(
+        conn,
+        user_id,
+        body=body,
+        url=push_target(kind, from_id),
+        tag=f"{kind}-{from_id}",
+        last_seen=last_seen,
+    )
     mail_on = (os.environ.get("MAIL_USER_NOTIFY") or "").strip().lower() in {"1", "true", "yes"}
     online = bool(last_seen and time.time() - int(last_seen) < 120)
     if mail_on and not is_guest and not online:

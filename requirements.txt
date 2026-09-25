@@ -3,4 +3,5 @@ werkzeug>=3.0
 gunicorn>=22.0
 pillow>=10.0
 psycopg[binary]>=3.2
+pywebpush>=2.0
 telethon>=1.36,<2
