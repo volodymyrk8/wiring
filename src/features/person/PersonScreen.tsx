@@ -83,6 +83,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState<"block" | "unmatch" | null>(null);
+  const [passOpen, setPassOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(host.catalog.report_reasons?.[0]?.id || "");
   const [reportDetails, setReportDetails] = useState("");
@@ -193,7 +194,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
             <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
           ) : null}
           {!isSelf && (host.personFrom === "deck" || host.personFrom === "likes") ? <>
-            <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => performSwipe("pass")} aria-label="пропустить" title="пропустить">{iconPass}</button>
+            <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => setPassOpen(true)} aria-label="Скрыть — больше не показывать" title="Скрыть">{iconPass}</button>
             {host.user.plus ? <button type="button" class={`${styles.actionIcon} ${styles.snooze}`} disabled={busy} onClick={() => performSwipe("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconClock}</button> : null}
             <button type="button" class={`${styles.actionIcon} ${styles.like}`} disabled={busy} onClick={() => performSwipe("like")} aria-label="лайк" title="лайк">{iconLike}</button>
           </> : null}
@@ -207,6 +208,9 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </div>
     </main>
+    <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title="Больше не показывать?" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>Отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>Исключить</Button></>}>
+      <p class={styles.modalHint}>Эта анкета больше не появится в твоей ленте. Чтобы просто вернуться, нажми «назад».</p>
+    </Modal>
     <Modal isOpen={confirm !== null} onClose={() => !busy && setConfirm(null)} title={confirm === "unmatch" ? "Убрать чат?" : "Скрыть человека?"} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setConfirm(null)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={confirmAction}>{confirm === "unmatch" ? "убрать чат" : "скрыть"}</Button></>}>
       <p class={styles.modalHint}>{confirm === "unmatch" ? "Переписка сохранится, но чат исчезнет из списка." : "Человек исчезнет из ленты и чатов."}</p>
     </Modal>

@@ -404,37 +404,14 @@ import { createInboxController } from "./inbox";
       state.index = Math.min(state.index, state.cards.length);
       state.photoIndex = 0;
       if (data.matched && data.match?.id) {
-        toast(`взаимно с ${data.match.name}`);
-        // Drop the card now so a second gesture can't pass over the mutual like.
-        if (state.view === "person") {
-          state.person = null;
-        } else {
-          state.cards = state.cards.filter((c) => c.id !== targetId);
-          if (state.index >= state.cards.length) state.index = Math.max(0, state.cards.length - 1);
-          state.photoIndex = 0;
-        }
-        try {
-          await openChat(data.match.id);
-        } catch (err) {
-          toast(err.message);
-          state.view = "matches";
-          const matches = await api("/api/matches");
-          state.matches = matches.matches || [];
-          render();
-        }
-        state.busy = false;
-        return;
+        toast(`взаимно с ${data.match.name}. Чат в разделе «Чаты».`);
       }
       if (direction === "snooze") toast("отложено на неделю");
     } catch (err) {
       if (err?.payload?.matched && err.payload?.match?.id) {
-        toast(err.message);
-        try {
-          await openChat(err.payload.match.id);
-        } catch (openErr) {
-          toast(openErr.message);
-        }
+        toast(`${err.message} Чат в разделе «Чаты».`);
         state.busy = false;
+        render();
         return;
       }
       toast(err.message);
@@ -676,8 +653,7 @@ import { createInboxController } from "./inbox";
       persistFilters();
     },
     onMatch: (match) => {
-      toast(`взаимно с ${match.name || "тобой"}`);
-      void openChat(match.id);
+      toast(`взаимно с ${match.name || "тобой"}. Чат в разделе «Чаты».`);
     },
     api,
     toast,
