@@ -642,7 +642,7 @@ import { createInboxController } from "./inbox";
       }
       void goToView(view);
     },
-    loadFeed: (filters, signal) => fetchFeed(api, filters, signal, state.user?.jev_feed_enabled ? 10 : 2),
+    loadFeed: (filters, signal, skipIds) => fetchFeed(api, filters, signal, state.user?.jev_feed_enabled ? 10 : 2, skipIds || []),
     resetFeed: (generation, signal) => resetFeed(api, generation, signal),
     onFeedChange: (cards, index, filters, hasMore, generation) => {
       state.cards = cards;

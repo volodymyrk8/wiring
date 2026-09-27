@@ -143,6 +143,19 @@ echo 'DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring' | sudo tee
 sudo systemctl restart wiring
 ```
 
+### Backups (production)
+`wiring-backup.timer` runs `deploy/wiring-backup.sh` (installed as `/usr/local/sbin/wiring-backup`) daily at 03:40 UTC. It writes a verified `pg_dump` custom-format archive to `/var/backups/wiring/db` (kept 30 days) and a tar of `/var/lib/wiring/uploads` to `/var/backups/wiring/uploads` (kept 7 days). Off-site copy: a developer Mac pulls them every 4 hours with `scripts/pull-prod-backups.sh` (launchd agent `deploy/date.wiring.backup-pull.plist`) into `~/Backups/wiring` — all dumps for 90 days, the 2 newest uploads snapshots; it shows a macOS notification if the newest dump is older than 3 days. The pull uses a dedicated key `~/.ssh/wiring-backup-pull` bound on the server to `command="/usr/local/sbin/wiring-backup-serve",restrict` (`deploy/wiring-backup-serve.sh`), which only allows `list` and `get <backup file>`. Log: `~/Library/Logs/wiring-backup-pull.log`.
+
+```sh
+sudo install -m 750 deploy/wiring-backup.sh /usr/local/sbin/wiring-backup
+sudo cp deploy/wiring-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now wiring-backup.timer
+sudo systemctl start wiring-backup.service   # run once now
+# restore
+sudo -u postgres pg_restore --clean --if-exists -d wiring < /var/backups/wiring/db/wiring-<stamp>.dump
+sudo tar -xf /var/backups/wiring/uploads/uploads-<stamp>.tar -C /
+```
+
 Server documents mount the same Preact `AppHeader` via `src/entries/server-header.tsx` → `public/dist/server-header.js`. Theme choice uses the shared `src/lib/theme.ts` helper.
 
 The `/feed` screen scrolls vertically without creating likes or passes. Like and permanent exclusion are explicit actions. Random delivery history is stored in PostgreSQL; see `docs/architecture.md` for reservation and prefetch semantics.
@@ -150,3 +163,5 @@ The `/feed` screen scrolls vertically without creating likes or passes. Like and
 Feed photos support horizontal swipes, numbered photo controls and Left/Right keys. The shared “Профиль” button opens the full profile, whose gallery uses the same gesture handling.
 
 WIRING+ users can replay eligible profiles from the exhausted feed after confirmation. Permanent exclusions and likes are retained; free accounts see a disabled replay button. The server enforces entitlement and retry safety.
+
+While the signup gift is on, every real account receives 90 days of WIRING+. A one-time backfill raises existing accounts to at least 90 days from deploy without shortening a longer grant. Set `WIRING_SIGNUP_PLUS=0` in the server environment and restart to stop granting it to new registrations. Guests, seed, and demo accounts are excluded.

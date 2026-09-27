@@ -24,6 +24,7 @@
 .photoThumb.active { border-color: var(--lime); }
 .photoThumb img { display: block; width: 70px; height: 92px; object-fit: cover; }
 .body { display: grid; gap: 14px; }
+.disclaimer { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 .bio { margin: 0; color: var(--ink); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-2); }
 .prompt strong { color: var(--lime); font-size: 12px; font-weight: 600; }

@@ -33,6 +33,7 @@ def ensure_feed_history(conn: Connection) -> None:
 def claim_feed(
     conn: Connection, user_id: int, *, min_age: int, max_age: int, city: str,
     limit: int, eligible: Callable[[Row], dict[str, Any] | None],
+    skip_ids: set[int] | None = None, include_delivered: bool = False,
 ) -> tuple[list[dict[str, Any]], bool, int]:
     """Reserve a random page atomically; the caller must commit before sending it.
 
@@ -41,15 +42,27 @@ def claim_feed(
     Delivery is reserved before response, so retries/tabs cannot deliver duplicates.
     """
     viewer = conn.execute("SELECT feed_generation FROM users WHERE id = ? FOR UPDATE", (user_id,)).fetchone()
-    rows = conn.execute("""
+    skipped = sorted(int(item) for item in (skip_ids or set()))
+    history_sql = (
+        "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id AND h.excluded_at IS NOT NULL)"
+        if include_delivered
+        else "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id)"
+    )
+    skip_sql = ""
+    params: list[Any] = [user_id, min_age, max_age, city, city, user_id, user_id]
+    if skipped:
+        skip_sql = f"AND users.id NOT IN ({', '.join('?' for _ in skipped)})"
+        params.extend(skipped)
+    rows = conn.execute(f"""
         SELECT * FROM users
         WHERE id != ? AND COALESCE(deleted_at, 0) = 0
           AND age BETWEEN ? AND ? AND (? = '' OR city = ?)
           AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_id = ? AND s.to_id = users.id)
-          AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id)
+          {history_sql}
+          {skip_sql}
           AND (EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id) OR COALESCE(photo, '') != '')
         ORDER BY random()
-    """, (user_id, min_age, max_age, city, city, user_id, user_id)).fetchall()
+    """, tuple(params)).fetchall()
     cards = []
     has_more = False
     now = int(time.time())
@@ -64,7 +77,7 @@ def claim_feed(
             INSERT INTO feed_history (user_id, other_id, delivered_at)
             VALUES (?, ?, ?) ON CONFLICT (user_id, other_id) DO NOTHING
         """, (user_id, row["id"], now)).rowcount
-        if inserted:
+        if inserted or include_delivered:
             cards.append(card)
     return cards, has_more, int(viewer["feed_generation"])
 

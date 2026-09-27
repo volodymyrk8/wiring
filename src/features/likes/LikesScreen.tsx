@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, GuestFlowSteps, ProfileMenu, TagPicker } from "@/components/ui";
+import { AppHeader, Button, GuestFlowSteps, ProfileMenu, Select, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
@@ -58,13 +58,7 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
         <label>от<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
         <label>до<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
       </div>
-      <label class={styles.filterGroup}>
-        <span class={styles.filterLabel}>город</span>
-        <select class={styles.citySelect} value={draft.city} onChange={(event) => update("city", event.currentTarget.value)}>
-          <option value="">неважно</option>
-          {cities.map((city) => <option key={city} value={city}>{city}</option>)}
-        </select>
-      </label>
+      <Select className={styles.cityField} label="Город" id="likes-city" placeholder="неважно" searchable searchPlaceholder="Город" options={[{ value: "", label: "неважно" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город" />
       <div class={styles.filterFooter}>
         <Button variant="ghost" slim onClick={onClear}>сбросить</Button>
         <Button variant="solid" slim onClick={() => onApply(draft)}>применить</Button>

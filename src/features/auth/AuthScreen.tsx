@@ -351,6 +351,9 @@ export function AuthScreen({ host }: AuthScreenProps) {
             комфортного общения.
           </p>
           <p class={styles.mission}>
+            После регистрации WIRING+ включён на 3 месяца.
+          </p>
+          <p class={styles.mission}>
             <strong>Бета-версия.</strong> Сообщай в{" "}
             <a href={hrefFor("support")} data-nav="support" onClick={(e) => { e.preventDefault(); host.navigate("support"); }}>
               поддержку
@@ -368,7 +371,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
               <div class={styles.badgeContent}>
                 <span class={styles.badgeTitle}>Тебе доступен подарок!</span>
                 <span class={styles.badgeDesc}>
-                  Ты по приглашению. После регистрации WIRING+ на 30 дней активируется у тебя и у друга.
+                  Ты по приглашению. После регистрации WIRING+ на 3 месяца, и ещё 30 дней вам обоим за приглашение.
                 </span>
               </div>
             </div>

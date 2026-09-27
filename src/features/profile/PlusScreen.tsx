@@ -184,7 +184,7 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         {user.ref_url ? (
           <section class={styles.panel}>
             <h2 class={styles.panelTitle}>Пригласи своих</h2>
-            <p class={styles.hint}>По ссылке зарегистрируется человек — WIRING+ на {user.ref_days || 30} дней вам обоим. Уже привели: {user.ref_count || 0}</p>
+            <p class={styles.hint}>По ссылке зарегистрируется человек — ещё {user.ref_days || 30} дней WIRING+ вам обоим. Уже привели: {user.ref_count || 0}</p>
             <div class={styles.refRow}>
               <input readOnly value={String(user.ref_url)} aria-label="Реферальная ссылка" />
               <Button type="button" variant="ghost" slim onClick={() => void copyReferral()}>копировать</Button>

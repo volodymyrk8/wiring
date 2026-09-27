@@ -67,7 +67,7 @@ export type DeckHostBridge = {
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;
   navigate: (view: string, params?: Record<string, string | number>) => void;
-  loadFeed: (filters: DeckFilters, signal?: AbortSignal) => Promise<FeedPage>;
+  loadFeed: (filters: DeckFilters, signal?: AbortSignal, skipIds?: number[]) => Promise<FeedPage>;
   resetFeed: (generation: number, signal?: AbortSignal) => Promise<{ reset: boolean; generation: number }>;
   onFeedChange: (cards: DeckCard[], index: number, filters: DeckFilters, hasMore: boolean, generation: number) => void;
   onMatch: (match: { id: number; name?: string }) => void;

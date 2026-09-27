@@ -170,6 +170,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       </section>
       {photos.length > 1 ? <div class={styles.photoStrip} aria-label="Фотографии анкеты">{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-pressed={index === photoIndex} aria-label={`Фото ${index + 1} из ${photos.length}`}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
       <div class={styles.body}>
+        <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим враньё — можем забанить.</p>
         {person.bio ? <p class={styles.bio}>{person.bio}</p> : null}
         {person.communication ? <div class={styles.prompt}><strong>как тебе писать</strong><p>{person.communication}</p></div> : null}
         {tags.length ? (

@@ -1,13 +1,13 @@
 type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "account" | "chat" | "support";
 
 const FEATURE_FILES: Record<FeatureName, string> = {
-  auth: "auth.js?v=9",
-  home: "home.js?v=68",
-  profile: "profile.js?v=21",
-  likes: "likes.js?v=25",
-  person: "person.js?v=13",
-  deck: "deck.js?v=18",
-  account: "account.js?v=5",
+  auth: "auth.js?v=10",
+  home: "home.js?v=69",
+  profile: "profile.js?v=23",
+  likes: "likes.js?v=26",
+  person: "person.js?v=14",
+  deck: "deck.js?v=19",
+  account: "account.js?v=6",
   chat: "chat.js?v=22",
   support: "support.js?v=5",
 };

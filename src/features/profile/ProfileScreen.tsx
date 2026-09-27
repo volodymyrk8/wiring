@@ -361,6 +361,7 @@ export function ProfileScreen({ host }: Props) {
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
     if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
     if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
+    if (!draft.neuro.length) next.neuro = "Укажи хотя бы одну особенность";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -522,7 +523,6 @@ export function ProfileScreen({ host }: Props) {
                   label="Страна"
                   id="profile-country"
                   placeholder="Не указана"
-                  hint="необязательно"
                   options={countryOptions}
                   value={draft.country}
                   onChange={setCountry}
@@ -534,7 +534,8 @@ export function ProfileScreen({ host }: Props) {
                   label="Город"
                   id="profile-city"
                   placeholder="Не указан"
-                  hint="необязательно · можно общаться и встречаться на расстоянии; при выборе города страна подставится сама"
+                  searchable
+                  searchPlaceholder="Город"
                   options={[{ value: "", label: "Не указан" }, ...cityOptions.map((city) => ({ value: city, label: city }))]}
                   value={draft.city}
                   error={errors.city}
@@ -551,8 +552,9 @@ export function ProfileScreen({ host }: Props) {
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Детали и предпочтения</h2><span>по желанию</span></div>
               <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
-              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Диагнозы из списка — если хочешь указать явно" />
+              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
+              <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим враньё — можем забанить.</p>
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
             </section>
 
@@ -570,18 +572,10 @@ export function ProfileScreen({ host }: Props) {
               </div>
             </section>
 
-            <section class={`${styles.section} ${styles.plusSection}`}>
-              <div class={styles.sectionTitle}><h2>Кто может тебя находить</h2></div>
-              <div class={styles.gridTwo}><Input label="От" name="seek_min_age" type="number" value={draft.seekMinAge} onInput={(event) => setField("seekMinAge", event.currentTarget.value)} /><Input label="До" name="seek_max_age" type="number" value={draft.seekMaxAge} onInput={(event) => setField("seekMaxAge", event.currentTarget.value)} /></div>
-              <Select className={styles.selectControl} label="Место" id="profile-seek-place" hint="по умолчанию «Везде» — тебя видят из любого города; сужай только если сам хочешь" options={[{ value: "", label: "Везде" }, ...(draft.city ? [{ value: draft.city, label: `Только ${draft.city}` }] : []), ...places.map((place) => ({ value: place.country, label: place.country }))]} value={draft.seekPlace} onChange={(value) => setField("seekPlace", value)} ariaLabel="Место" />
-              <TagPicker options={host.catalog.neuro || []} selected={draft.hideNeuro} onChange={(value) => setField("hideNeuro", value)} label="Не показывать, если у человека есть:" />
-              <TagPicker options={host.catalog.vibe || []} selected={draft.hideVibe} onChange={(value) => setField("hideVibe", value)} label="Не показывать, если у человека такой вайб:" tone="vibe" />
-            </section>
-
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>WIRING+</h2></div>
               <a class={styles.plusLink} href={host.hrefFor("plus")} data-nav="plus" onClick={handleNav("plus")}><span><strong>WIRING+</strong><small>{user.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</small></span><span>настроить ↗</span></a>
-              {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>WIRING+ на {user.ref_days || 30} дней вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
+              {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>Ещё {user.ref_days || 30} дней WIRING+ вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
             </section>
 
             {user.jev_feed_beta ? (

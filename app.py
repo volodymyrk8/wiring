@@ -58,7 +58,9 @@ from premium import (
     ensure_beta_plus_three_months,
     ensure_default_code,
     ensure_referral_code,
+    ensure_signup_plus_backfill,
     grant_premium,
+    grant_signup_plus,
     is_premium,
     last_snooze,
     list_codes,
@@ -486,6 +488,7 @@ def init_db() -> None:
     ensure_default_code(conn)
     ensure_beta_plus_gift(conn)
     ensure_beta_plus_three_months(conn)
+    ensure_signup_plus_backfill(conn)
     from user_tags import ensure_legacy_vibe_cleanup
 
     ensure_legacy_vibe_cleanup(conn)
@@ -636,6 +639,8 @@ def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos:
     if "special_data_consent_at" in keys and not row["special_data_consent_at"]:
         return False
     if "photo_rights_consent_at" in keys and not row["photo_rights_consent_at"]:
+        return False
+    if not (tags.get("neuro") or []):
         return False
     return True
 
@@ -882,7 +887,7 @@ def parse_tags(raw: Any, allowed: set[str], *, required: bool) -> tuple[list[str
         if item not in cleaned:
             cleaned.append(item)
     if required and not cleaned:
-        return None, "выбери хотя бы один нейротип"
+        return None, "укажи хотя бы одну особенность"
     return cleaned, None
 
 
@@ -1470,6 +1475,7 @@ def api_register():
         ),
     )
     uid = int(cur.lastrowid)
+    grant_signup_plus(conn, uid)
     ensure_referral_code(conn, uid)
     referrer_id = apply_referral(conn, uid, str(data.get("ref") or data.get("referral") or ""))
     if referrer_id:
@@ -1478,7 +1484,7 @@ def api_register():
             referrer_id,
             "referral",
             0,
-            f"по твоей ссылке зарегистрировались — WIRING+ на {REFERRAL_DAYS} дней",
+            f"по твоей ссылке зарегистрировались — ещё {REFERRAL_DAYS} дней WIRING+",
         )
     if need_verify:
         issue_email_verification(conn, uid, email)
@@ -1744,7 +1750,7 @@ def api_patch_me():
     parsed, err = parse_profile(
         {**payload_in, "email": "x@y.zz", "password": "ignore1"},
         require_password=False,
-        require_neuro=False,
+        require_neuro=not draft,
         draft=draft,
     )
     if err or parsed is None:
@@ -1950,8 +1956,14 @@ def api_feed():
     intent_filter = [t for t in request.args.get("intent", "").split(",") if t in INTENT_IDS]
     min_age = request.args.get("min_age", type=int) or 18
     max_age = request.args.get("max_age", type=int) or 99
-    city_q = normalize_city(str(request.args.get("city") or "").strip())
+    city_raw = str(request.args.get("city") or "").strip()
+    city_q = catalog_city(city_raw) or ""
+    if city_raw and not city_q:
+        city_q = "\x00"
     real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
+    skip_ids = {int(part) for part in str(request.args.get("skip") or "").split(",") if part.isdigit()}
+    if len(skip_ids) > 200:
+        skip_ids = set(list(skip_ids)[:200])
     min_age = max(18, min(99, min_age))
     max_age = max(18, min(99, max_age))
     if min_age > max_age:
@@ -1964,7 +1976,7 @@ def api_feed():
             neuro=neuro_filter,
             vibe=vibe_filter,
             intents=intent_filter,
-            city=city_q,
+            city="" if city_q == "\x00" else city_q,
             min_age=min_age,
             max_age=max_age,
             real_only=real_only,
@@ -1988,8 +2000,12 @@ def api_feed():
         return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
                               skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me)
 
-    cards, has_more, generation = claim_feed(db(), int(me["id"]), min_age=min_age, max_age=max_age,
-                                 city=city_q, limit=limit, eligible=eligible)
+    narrowed = bool(city_raw or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99)
+    cards, has_more, generation = claim_feed(
+        db(), int(me["id"]), min_age=min_age, max_age=max_age,
+        city=city_q, limit=limit, eligible=eligible,
+        skip_ids=skip_ids, include_delivered=narrowed,
+    )
     jev_ranked = False
     jev_scores = "none"
     jev_allowed, jev_configured = jev_access(int(me["id"]))
@@ -2271,7 +2287,10 @@ def api_likes():
     intent_filter = [t for t in request.args.get("intent", "").split(",") if t in INTENT_IDS]
     min_age = request.args.get("min_age", type=int) or 18
     max_age = request.args.get("max_age", type=int) or 99
-    city_q = normalize_city(str(request.args.get("city") or "").strip())
+    city_raw = str(request.args.get("city") or "").strip()
+    city_q = catalog_city(city_raw) or ""
+    if city_raw and not city_q:
+        city_q = "\x00"
     min_age = max(18, min(99, min_age))
     max_age = max(18, min(99, max_age))
     if min_age > max_age:
@@ -2285,7 +2304,7 @@ def api_likes():
             neuro=neuro_filter,
             vibe=vibe_filter,
             intents=intent_filter,
-            city=city_q,
+            city="" if city_q == "\x00" else city_q,
             min_age=min_age,
             max_age=max_age,
         )

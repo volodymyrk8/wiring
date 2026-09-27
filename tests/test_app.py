@@ -13,6 +13,7 @@ os.environ["UPLOAD_DIR"] = os.path.join(tempfile.gettempdir(), f"wiring-uploads-
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["WIRING_SEED_AI"] = "0"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
+os.environ["WIRING_SIGNUP_PLUS"] = "0"
 
 from PIL import Image
 
@@ -80,6 +81,48 @@ class WiringTest(unittest.TestCase):
                 (BETA_PLUS_GIFT_3MO_MIGRATION,),
             ).fetchone()
             self.assertTrue(applied)
+        finally:
+            conn.close()
+
+    def test_signup_plus_gift_and_backfill(self):
+        import time
+
+        from premium import DAY, ensure_signup_plus_backfill, is_premium, plus_until
+
+        self._register()
+        self.assertFalse(self.client.get("/api/me").get_json()["user"].get("plus"))
+        self.client.post("/api/demo")
+        with patch.dict(os.environ, {"WIRING_SIGNUP_PLUS": "1"}):
+            self._register(email="leo@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
+        leo = self.client.get("/api/me").get_json()["user"]
+        now = int(time.time())
+        self.assertTrue(leo["plus"])
+        self.assertGreaterEqual(leo["plus_until"], now + 89 * DAY)
+        self.assertLessEqual(leo["plus_until"], now + 91 * DAY)
+        conn = open_request_connection()
+        try:
+            guest = conn.execute(
+                "SELECT premium_until FROM users WHERE email LIKE '%@wiring.guest'"
+            ).fetchone()
+            self.assertEqual(int(guest["premium_until"] or 0), 0)
+            longer = now + 200 * DAY
+            conn.execute(
+                "UPDATE users SET premium_until = ? WHERE email = ?",
+                (longer, "leo@example.com"),
+            )
+            conn.commit()
+            n = ensure_signup_plus_backfill(conn)
+            conn.commit()
+            self.assertGreaterEqual(n, 1)
+            ada = conn.execute("SELECT * FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
+            self.assertTrue(is_premium(ada))
+            self.assertGreaterEqual(plus_until(ada), now + 89 * DAY)
+            kept = conn.execute(
+                "SELECT premium_until FROM users WHERE email = ?",
+                ("leo@example.com",),
+            ).fetchone()
+            self.assertEqual(int(kept["premium_until"]), longer)
+            self.assertEqual(ensure_signup_plus_backfill(conn), 0)
         finally:
             conn.close()
 
@@ -272,6 +315,46 @@ class WiringTest(unittest.TestCase):
             row = conn.execute("SELECT excluded_at FROM feed_history WHERE user_id = ? AND other_id = ?", (me["id"], target)).fetchone()
             self.assertIsNotNone(row["excluded_at"])
         self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
+
+    def test_publish_requires_a_diagnosis_and_hides_empty_profiles(self):
+        self._register()
+        denied = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "Нови-Сад",
+                "gender": "woman",
+                "looking_for": "everyone",
+                "bio": "без особенностей",
+                "neuro": [],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+            },
+        )
+        self.assertEqual(denied.status_code, 400)
+        self.assertIn("особен", denied.get_json()["error"])
+        peer = self._register(email="empty-dx@example.com", name="Пусто", gender="man", photo="portraits/p02.jpg")
+        conn = open_request_connection()
+        try:
+            conn.execute("DELETE FROM user_tags WHERE user_id = ?", (peer["id"],))
+            conn.commit()
+        finally:
+            conn.close()
+        self._login("ada@example.com")
+        ids = {card["id"] for card in self.client.get("/api/feed?limit=10").get_json()["cards"]}
+        self.assertNotIn(peer["id"], ids)
+
+    def test_city_filter_still_finds_already_seen_profiles(self):
+        self._register()
+        peer = self._register(email="city-peer@example.com", name="Град", gender="man", city="Белград", photo="portraits/p03.jpg")
+        self._login("ada@example.com")
+        first = self.client.get("/api/feed?limit=5").get_json()
+        self.assertTrue(any(card["id"] == peer["id"] for card in first["cards"]))
+        again = self.client.get("/api/feed?city=Белград&limit=5").get_json()
+        self.assertTrue(any(card["id"] == peer["id"] for card in again["cards"]))
+        self.assertTrue(all(card["city"] == "Белград" for card in again["cards"]))
 
     def test_feed_filter_misses_do_not_consume_candidates(self):
         self._register()

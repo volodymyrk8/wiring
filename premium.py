@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 import time
 
@@ -16,6 +17,7 @@ REFERRAL_DAYS = 30
 BETA_PLUS_GIFT_DAYS = 90
 BETA_PLUS_GIFT_MIGRATION = "beta_plus_gift_existing_users_2026_09"
 BETA_PLUS_GIFT_3MO_MIGRATION = "beta_plus_gift_3mo_all_2026_09"
+SIGNUP_PLUS_BACKFILL_MIGRATION = "signup_plus_backfill_2026_09_26"
 
 
 def is_premium(row: Any, now: float | None = None) -> bool:
@@ -96,6 +98,47 @@ def _beta_plus_gift_eligible_sql() -> str:
           AND LOWER(email) NOT LIKE '%@wiring.guest'
           AND LOWER(email) != 'demo@wiring.app'
     """
+
+
+def signup_plus_enabled() -> bool:
+    """New accounts get 90 days of WIRING+ until WIRING_SIGNUP_PLUS is set to 0."""
+    raw = (os.environ.get("WIRING_SIGNUP_PLUS") or "1").strip().lower()
+    return raw not in {"0", "off", "false", "no"}
+
+
+def grant_signup_plus(conn: Connection, uid: int) -> int:
+    if not signup_plus_enabled():
+        return 0
+    return grant_premium(conn, uid, BETA_PLUS_GIFT_DAYS)
+
+
+def ensure_signup_plus_backfill(conn: Connection) -> int:
+    """Raise every eligible account to at least 90 days of WIRING+ from this deploy."""
+    ensure_app_migrations(conn)
+    if conn.execute(
+        "SELECT 1 FROM app_migrations WHERE id = ?",
+        (SIGNUP_PLUS_BACKFILL_MIGRATION,),
+    ).fetchone():
+        return 0
+    now = int(time.time())
+    until = now + BETA_PLUS_GIFT_DAYS * DAY
+    cur = conn.execute(
+        """
+        UPDATE users
+        SET premium_until = ?
+        WHERE COALESCE(deleted_at, 0) = 0
+          AND COALESCE(is_seed, 0) = 0
+          AND LOWER(email) NOT LIKE '%@wiring.guest'
+          AND LOWER(email) != 'demo@wiring.app'
+          AND COALESCE(premium_until, 0) < ?
+        """,
+        (until, until),
+    )
+    conn.execute(
+        "INSERT INTO app_migrations (id, applied_at) VALUES (?, ?)",
+        (SIGNUP_PLUS_BACKFILL_MIGRATION, now),
+    )
+    return int(cur.rowcount or 0)
 
 
 def ensure_beta_plus_three_months(conn: Connection) -> int:

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, IconButton, Input, Modal, TagPicker } from "@/components/ui";
+import { AppHeader, Button, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
@@ -65,30 +65,70 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
 
 const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false });
 
-function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: DeckHostBridge; filters: DeckFilters; busy: boolean; error: string; onApply: (filters: DeckFilters) => void; onClose: () => void }) {
+type DiscoveryDraft = {
+  seekMinAge: string;
+  seekMaxAge: string;
+  seekPlace: string;
+  hideNeuro: string[];
+  hideVibe: string[];
+};
+
+function discoveryFromUser(host: DeckHostBridge): DiscoveryDraft {
+  const neuroIds = new Set((host.catalog.neuro || []).map((item) => item.id));
+  const hidden = host.user.hide_tags || [];
+  return {
+    seekMinAge: String(host.user.seek_min_age || 18),
+    seekMaxAge: String(host.user.seek_max_age || 99),
+    seekPlace: String(host.user.seek_place || ""),
+    hideNeuro: hidden.filter((id) => neuroIds.has(id)),
+    hideVibe: hidden.filter((id) => !neuroIds.has(id)),
+  };
+}
+
+function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: DeckHostBridge; filters: DeckFilters; busy: boolean; error: string; onApply: (filters: DeckFilters, discovery: DiscoveryDraft) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(filters);
   const [minAge, setMinAge] = useState(String(filters.min_age));
   const [maxAge, setMaxAge] = useState(String(filters.max_age));
-  const cities = [...new Set((host.catalog.places || []).flatMap((place) => place.cities))];
+  const [discovery, setDiscovery] = useState(() => discoveryFromUser(host));
+  const places = host.catalog.places || [];
+  const cities = [...new Set(places.flatMap((place) => place.cities))];
+  const placeOptions = [
+    { value: "", label: "Отовсюду" },
+    ...places.map((place) => ({ value: place.country, label: place.country })),
+    ...cities.map((city) => ({ value: city, label: city })),
+  ];
   const update = <K extends keyof DeckFilters>(key: K, value: DeckFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const reset = () => { setDraft(defaultFilters()); setMinAge("18"); setMaxAge("99"); };
-  return <Modal isOpen onClose={onClose} title="Фильтры ленты" responsiveSheet
+  const reset = () => {
+    setDraft(defaultFilters());
+    setMinAge("18");
+    setMaxAge("99");
+  };
+  return <Modal isOpen onClose={onClose} title="Фильтры" responsiveSheet
     footer={<><Button variant="ghost" disabled={busy} onClick={reset}>Сбросить</Button><Button type="submit" form="deck-filters" loading={busy}>Применить</Button></>}>
     <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
       event.preventDefault();
-      if (!busy) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) });
+      if (!busy) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
     }}>
-      <p class={styles.filterIntro}>Выбери, кого хочешь видеть. Изменения сохранятся после применения.</p>
       <fieldset class={styles.filterFields} disabled={busy}>
+        <h3 class={styles.filterSection}>Кого ищу я</h3>
+        <p class={styles.filterIntro}>Кого показывать в твоей ленте.</p>
         <div class={styles.range}>
           <Input label="Возраст от" name="deck-min-age" type="number" inputMode="numeric" required min={18} max={Number(maxAge) || 99} value={minAge} onInput={(event) => setMinAge(event.currentTarget.value)} />
           <Input label="Возраст до" name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
         </div>
-        <Input label="Город" name="deck-city" value={draft.city} list="deck-cities" autoComplete="off" hint="Оставь пустым, если город неважен." onInput={(event) => update("city", event.currentTarget.value)} />
-        <datalist id="deck-cities">{cities.map((city) => <option key={city} value={city} />)}</datalist>
+        <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
         <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
         <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
         <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
+        <h3 class={styles.filterSection}>Кто может искать меня</h3>
+        <p class={styles.filterIntro}>Кому ты сам виден. Это не то, кого видишь ты.</p>
+        <div class={styles.range}>
+          <Input label="Возраст от" name="seek-min-age" type="number" inputMode="numeric" required min={18} max={Number(discovery.seekMaxAge) || 99} value={discovery.seekMinAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMinAge: event.currentTarget.value }))} />
+          <Input label="Возраст до" name="seek-max-age" type="number" inputMode="numeric" required min={Number(discovery.seekMinAge) || 18} max={99} value={discovery.seekMaxAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMaxAge: event.currentTarget.value }))} />
+        </div>
+        <Select className={styles.citySelect} label="Откуда" id="deck-seek-place" searchable searchPlaceholder="Город или страна" options={placeOptions} value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel="Откуда могут искать" />
+        <TagPicker label="Не показывать меня людям с этими особенностями" options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: value }))} />
+        <TagPicker label="Не показывать меня людям с таким вайбом" options={host.catalog.vibe || []} selected={discovery.hideVibe} onChange={(value) => setDiscovery((current) => ({ ...current, hideVibe: value }))} tone="vibe" />
       </fieldset>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </form>
@@ -240,13 +280,52 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     return () => controller.abort();
   }, [current?.id]);
 
+  const saveDiscovery = async (discovery: DiscoveryDraft) => {
+    const user = host.user;
+    const response = await host.api("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: user.name,
+        age: Number(user.age),
+        city: user.city || "",
+        gender: user.gender,
+        looking_for: user.looking_for,
+        bio: user.bio || "",
+        job: user.job || "",
+        communication: user.communication || "",
+        intents: user.intents || [],
+        height: user.height || null,
+        neuro: user.neuro || [],
+        vibe: user.vibe || [],
+        prompts: user.prompts || [],
+        seek_min_age: Number(discovery.seekMinAge || 18),
+        seek_max_age: Number(discovery.seekMaxAge || 99),
+        seek_place: discovery.seekPlace,
+        hide_tags: [...discovery.hideNeuro, ...discovery.hideVibe],
+        draft: true,
+      }),
+    });
+    if (response.user) host.onUserUpdated(response.user);
+  };
+
+  const applyFilters = async (nextFilters: DeckFilters, discovery: DiscoveryDraft) => {
+    setError("");
+    try {
+      await saveDiscovery(discovery);
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+      return;
+    }
+    await loadPage(nextFilters, true);
+  };
+
   const loadPage = async (nextFilters = filters, replace = false) => {
     if (requestRef.current || actionRef.current) return;
     const controller = new AbortController();
     requestRef.current = controller;
     setLoading(true); setError("");
     try {
-      const response = await host.loadFeed(nextFilters, controller.signal);
+      const response = await host.loadFeed(nextFilters, controller.signal, replace ? [] : cards.map((card) => card.id));
       if (controller.signal.aborted) return;
       setHasMore(response.has_more);
       setGeneration(response.generation);
@@ -339,7 +418,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
 
   return <div class={styles.root}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
-    {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value) => void loadPage(value, true)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
+    {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>
       <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>

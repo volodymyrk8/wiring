@@ -35,8 +35,9 @@
 .tagVibe.tagActive { color: var(--lime); }
 .range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .range label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
-.range input, .citySelect { width: 100%; min-height: 42px; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); font: inherit; outline: none; }
-.range input:focus, .citySelect:focus { border-color: var(--lime); box-shadow: 0 0 0 3px var(--accent-soft); }
+.range input { width: 100%; min-height: 42px; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); font: inherit; outline: none; }
+.range input:focus { border-color: var(--lime); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cityField { width: 100%; }
 .filterFooter { display: flex; justify-content: flex-end; gap: 8px; }
 .gate { display: grid; gap: 14px; padding: 16px; border: 1px solid color-mix(in srgb, var(--lime) 35%, var(--line)); border-radius: 18px; background: color-mix(in srgb, var(--accent-soft) 52%, var(--bg-2)); }
 .gateTop { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }

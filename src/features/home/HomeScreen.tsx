@@ -137,8 +137,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
           <div class={styles.about}>
             <div class={styles.aboutFrame}>
               <p class={styles.plusGiftText} aria-label="подарок WIRING+">
-                <span class={styles.plusGiftLead}>WIRING+ всем, кто уже с нами.</span> Мы дарим премиум на{" "}
-                <strong>3 месяца</strong> каждому зарегистрированному аккаунту — спасибо, что помогаете тестировать бета.
+                <span class={styles.plusGiftLead}>WIRING+ на 3 месяца.</span> Каждому аккаунту — и тем, кто уже с нами, и всем, кто только регистрируется. Спасибо, что помогаете тестировать бета.
               </p>
               {signed ? (
                 <p class={styles.plusGiftAction}>

@@ -71,7 +71,7 @@ export function InviteScreen({ host }: { host: AccountHostBridge }) {
     <AccountHeader host={host} title="приглашение" />
     <main class={styles.content}><section class={styles.panel}>
       <h1>Анкета готова</h1>
-      <p class={styles.lede}>Пригласи друга по ссылке — WIRING+ на {days} дней будет и у тебя, и у него. Подарок за регистрацию, не за лайк.</p>
+      <p class={styles.lede}>Пригласи друга по ссылке — ещё {days} дней WIRING+ будет и у тебя, и у него. Подарок за регистрацию, не за лайк.</p>
       {host.user.ref_url ? <div class={styles.refBox}><p class={styles.refLabel}>твоя ссылка</p><div class={styles.refRow}><input id="invite-ref" readonly value={host.user.ref_url} /><Button variant="ghost" slim onClick={() => void copy()}>копировать</Button></div><p class={styles.hint}>ссылка всегда есть в профиле</p></div> : <p class={styles.hint}>ссылка для приглашений появится в профиле</p>}
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
       <div class={styles.actions}><Button variant="solid" slim disabled={busy} loading={busy} onClick={() => void continueToDeck()}>в ленту</Button></div>

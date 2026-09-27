@@ -44,6 +44,8 @@ export type SelectProps<T extends string = string> = {
   menuClassName?: string;
   ariaLabel?: string;
   title?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export function Select<T extends string = string>({
@@ -66,11 +68,16 @@ export function Select<T extends string = string>({
   menuClassName,
   ariaLabel,
   title,
+  searchable = false,
+  searchPlaceholder = "Найти…",
 }: SelectProps<T>) {
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? options[0]?.value);
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [placement, setPlacement] = useState<"down" | "up">("down");
   const [menuMaxHeight, setMenuMaxHeight] = useState(320);
+  const [menuBox, setMenuBox] = useState<JSX.CSSProperties>({});
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +86,21 @@ export function Select<T extends string = string>({
   const selectedOption = options.find((o) => o.value === selectedValue);
 
   useDismissibleLayer(wrapRef, isOpen, () => setIsOpen(false));
+
+  useEffect(() => {
+    if (!isOpen) {
+      setQuery("");
+      return;
+    }
+    if (!searchable) return;
+    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, searchable]);
+
+  const needle = query.trim().toLocaleLowerCase("ru");
+  const visibleOptions = searchable && needle
+    ? options.filter((option) => option.label.toLocaleLowerCase("ru").includes(needle))
+    : options;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -97,9 +119,21 @@ export function Select<T extends string = string>({
       const below = window.innerHeight - rect.bottom - 12 - tabbarReserve;
       const above = rect.top - 12;
       const nextPlacement = below < menuHeight && above > below ? "up" : "down";
-      const available = Math.max(48, nextPlacement === "up" ? above : below);
+      const available = Math.max(160, nextPlacement === "up" ? above : below);
+      const maxHeight = Math.min(320, available);
+      const width = Math.max(rect.width, 220);
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
       setPlacement(nextPlacement);
-      setMenuMaxHeight(Math.min(320, available));
+      setMenuMaxHeight(maxHeight);
+      setMenuBox({
+        position: "fixed",
+        left,
+        width,
+        right: "auto",
+        zIndex: 10000,
+        top: nextPlacement === "down" ? rect.bottom + 6 : "auto",
+        bottom: nextPlacement === "up" ? window.innerHeight - rect.top + 6 : "auto",
+      });
     };
 
     requestAnimationFrame(updatePlacement);
@@ -189,10 +223,29 @@ export function Select<T extends string = string>({
           ref={menuRef}
           role="listbox"
           tabIndex={-1}
-          style={{ maxHeight: `${menuMaxHeight}px` }}
+          style={{ ...menuBox, maxHeight: `${menuMaxHeight}px` }}
           class={`${styles.menu}${placement === "up" ? ` ${styles.menuUp}` : ""}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
         >
-          {options.map((option) => {
+          {searchable ? (
+            <div class={styles.searchRow}>
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                autoComplete="off"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+                  if (event.key === "Enter") event.preventDefault();
+                }}
+                onInput={(event) => setQuery(event.currentTarget.value)}
+              />
+            </div>
+          ) : null}
+          {searchable && needle && !visibleOptions.length ? <p class={styles.empty}>Ничего не нашлось</p> : null}
+          {visibleOptions.map((option) => {
             const isSelected = option.value === selectedValue;
             return (
               <button
