@@ -19,4 +19,5 @@ SPA_SHELL_PATHS: tuple[str, ...] = (
     "/p/1",
     "/r/testcode",
     "/notifications",
+    "/archive",
 )

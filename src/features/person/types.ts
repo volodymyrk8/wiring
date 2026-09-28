@@ -36,7 +36,7 @@ export type PersonCatalog = {
   report_reasons?: ReportReason[];
 };
 
-export type PersonOrigin = "deck" | "likes" | "matches" | "chat" | "profile";
+export type PersonOrigin = "deck" | "likes" | "matches" | "chat" | "profile" | "archive";
 
 export type PersonHostBridge = {
   user: ProfileUser;

@@ -602,6 +602,7 @@ export function ProfileScreen({ host }: Props) {
               <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Опубликовать в ленте"}</Button>
               <Button variant="ghost" type="button" fullWidth disabled={busy} onClick={() => void saveDraftNow()}>Сохранить черновик</Button>
               <Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button>
+              <Button variant="ghost" type="button" className={styles.archiveLink} onClick={() => host.navigate("archive")}>Лайки, дизлайки и блок</Button>
               <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button>
             </div>
           </form>

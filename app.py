@@ -1319,6 +1319,74 @@ def _is_match(conn: Connection, a: int, b: int) -> bool:
     return bool(left and right and left["direction"] == "like" and right["direction"] == "like")
 
 
+def _archive_card(row: Row, *, matched: bool = False) -> dict[str, Any]:
+    photos = photos_for(int(row["id"]))
+    urls = [item["url"] for item in photos]
+    primary = next(
+        (item["url"] for item in photos if item["is_primary"]),
+        urls[0] if urls else media_url(str(row["photo"] or "")),
+    )
+    return {
+        "id": int(row["id"]),
+        "name": row["name"],
+        "age": row["age"],
+        "city": row["city"] or "",
+        "photo": primary or "",
+        "matched": matched,
+    }
+
+
+def _archive_lists(conn: Connection, uid: int) -> dict[str, list[dict[str, Any]]]:
+    """Only decisions the viewer made. Someone else's block stays invisible."""
+    likes = [
+        _archive_card(row, matched=_is_match(conn, uid, int(row["id"])))
+        for row in conn.execute(
+            """
+            SELECT u.* FROM users u
+            JOIN swipes s ON s.to_id = u.id AND s.from_id = ? AND s.direction = 'like'
+            WHERE COALESCE(u.deleted_at, 0) = 0
+            ORDER BY s.created_at DESC, u.id DESC
+            LIMIT 200
+            """,
+            (uid,),
+        )
+    ]
+    passes = [
+        _archive_card(row)
+        for row in conn.execute(
+            """
+            SELECT u.* FROM users u
+            JOIN swipes s ON s.to_id = u.id AND s.from_id = ? AND s.direction = 'pass'
+            WHERE COALESCE(u.deleted_at, 0) = 0
+              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.from_id = ? AND b.to_id = u.id)
+            ORDER BY s.created_at DESC, u.id DESC
+            LIMIT 200
+            """,
+            (uid, uid),
+        )
+    ]
+    blocks = [
+        _archive_card(row)
+        for row in conn.execute(
+            """
+            SELECT u.* FROM users u
+            JOIN blocks b ON b.to_id = u.id AND b.from_id = ?
+            WHERE COALESCE(u.deleted_at, 0) = 0
+            ORDER BY b.created_at DESC, u.id DESC
+            LIMIT 200
+            """,
+            (uid,),
+        )
+    ]
+    return {"likes": likes, "passes": passes, "blocks": blocks}
+
+
+def _release_to_feed(conn: Connection, uid: int, other_id: int) -> None:
+    """Drop my swipe and delivery lock so this person can be shown again."""
+    _clear_pair(conn, uid, other_id)
+    conn.execute("DELETE FROM feed_history WHERE user_id = ? AND other_id = ?", (uid, other_id))
+
+
 def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
     """Hide chat: your side becomes a pass, their like is dropped.
 
@@ -1385,6 +1453,7 @@ def index():
 @app.get("/r/<code>")
 @app.get("/support")
 @app.get("/notifications")
+@app.get("/archive")
 def spa_app(**_kwargs):
     return _spa()
 
@@ -2715,6 +2784,66 @@ def api_block():
     _unmatch_pair(conn, uid, other_id)
     conn.commit()
     return jsonify({"ok": True})
+
+
+@app.get("/api/archive")
+@login_required
+def api_archive():
+    uid = session["uid"]
+    return jsonify({"ok": True, **_archive_lists(db(), uid)})
+
+
+@app.post("/api/archive")
+@login_required
+def api_archive_revise():
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    action = str(data.get("action") or "")
+    if action not in {"unlike", "restore", "unblock", "unmatch"}:
+        return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+    try:
+        other_id = int(data.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет человека"}), 400
+    if other_id == uid:
+        return jsonify({"ok": False, "error": "это ты"}), 400
+    conn = db()
+    target = conn.execute("SELECT id, deleted_at FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not target or ("deleted_at" in target.keys() and target["deleted_at"]):
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    if action == "unlike":
+        swipe = conn.execute(
+            "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
+            (uid, other_id),
+        ).fetchone()
+        if not swipe or swipe["direction"] != "like":
+            return jsonify({"ok": False, "error": "лайка нет"}), 404
+        if _is_match(conn, uid, other_id):
+            return jsonify({"ok": False, "error": "это взаимный лайк — убрать можно из чатов"}), 409
+        _release_to_feed(conn, uid, other_id)
+    elif action == "restore":
+        if conn.execute(
+            "SELECT 1 FROM blocks WHERE from_id = ? AND to_id = ?",
+            (uid, other_id),
+        ).fetchone():
+            return jsonify({"ok": False, "error": "сначала разблокируй"}), 409
+        swipe = conn.execute(
+            "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
+            (uid, other_id),
+        ).fetchone()
+        if not swipe or swipe["direction"] != "pass":
+            return jsonify({"ok": False, "error": "дизлайка нет"}), 404
+        _release_to_feed(conn, uid, other_id)
+    elif action == "unblock":
+        removed = conn.execute("DELETE FROM blocks WHERE from_id = ? AND to_id = ?", (uid, other_id))
+        if not removed.rowcount:
+            return jsonify({"ok": False, "error": "блока нет"}), 404
+    else:
+        if not _is_match(conn, uid, other_id):
+            return jsonify({"ok": False, "error": "взаимного лайка нет"}), 400
+        _unmatch_pair(conn, uid, other_id)
+    conn.commit()
+    return jsonify({"ok": True, **_archive_lists(conn, uid)})
 
 
 @app.post("/api/report")

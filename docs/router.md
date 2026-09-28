@@ -25,6 +25,7 @@ src/router/
 | `/chats/:id` | chat | Deep link |
 | `/me` | profile | |
 | `/notifications` | notifications | Preact profile bundle |
+| `/archive` | archive | Own likes, passes and blocks. Linked from the profile, not the tab bar |
 | `/onboard` | onboard | |
 | `/p/:id` | person | Deep link |
 | `/r/:code` | register | Referral invite |

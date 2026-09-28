@@ -3,6 +3,7 @@ import { ProfileScreen } from "./ProfileScreen";
 import { ConsentScreen } from "./ConsentScreen";
 import { PlusScreen } from "./PlusScreen";
 import { NotificationSettingsScreen } from "./NotificationSettingsScreen";
+import { DecisionsScreen } from "./DecisionsScreen";
 import type { ProfileHostBridge } from "./types";
 
 export function mountProfile(container: HTMLElement, host: ProfileHostBridge): () => void {
@@ -22,5 +23,10 @@ export function mountPlus(container: HTMLElement, host: ProfileHostBridge): () =
 
 export function mountNotifications(container: HTMLElement, host: ProfileHostBridge): () => void {
   render(<NotificationSettingsScreen host={host} />, container);
+  return () => render(null, container);
+}
+
+export function mountDecisions(container: HTMLElement, host: ProfileHostBridge): () => void {
+  render(<DecisionsScreen host={host} />, container);
   return () => render(null, container);
 }

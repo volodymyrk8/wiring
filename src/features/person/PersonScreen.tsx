@@ -89,7 +89,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [reportDetails, setReportDetails] = useState("");
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
 
-  const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
+  const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
   const go = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
     host.navigate(view, params);
@@ -210,7 +210,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       </div>
     </main>
     <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title="Больше не показывать?" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>Отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>Исключить</Button></>}>
-      <p class={styles.modalHint}>Эта анкета больше не появится в твоей ленте. Чтобы просто вернуться, нажми «назад».</p>
+      <p class={styles.modalHint}>Эта анкета больше не появится в ленте. Вернуть её можно из профиля, в списке дизлайков. Чтобы просто закрыть анкету, нажми «назад».</p>
     </Modal>
     <Modal isOpen={confirm !== null} onClose={() => !busy && setConfirm(null)} title={confirm === "unmatch" ? "Убрать чат?" : "Скрыть человека?"} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setConfirm(null)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={confirmAction}>{confirm === "unmatch" ? "убрать чат" : "скрыть"}</Button></>}>
       <p class={styles.modalHint}>{confirm === "unmatch" ? "Переписка сохранится, но чат исчезнет из списка." : "Человек исчезнет из ленты и чатов."}</p>

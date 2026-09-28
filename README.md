@@ -33,7 +33,7 @@ src/
   features/person/   # public profile, photo gallery and safety actions
   features/deck/     # vertical feed, filters and explicit like/exclude actions
   features/account/  # invite, onboarding and delete-account flows
-  features/profile/  # profile, notification settings, consents, and WIRING+ screens
+  features/profile/  # profile, notification settings, consents, decision archive, and WIRING+ screens
   entries/app.ts      # application shell → public/dist/app.js
   entries/auth.ts    # Vite entry → public/dist/auth.js
   entries/router.ts  # → public/dist/router.js (URL ↔ view)

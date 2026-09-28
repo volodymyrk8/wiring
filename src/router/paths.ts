@@ -27,6 +27,7 @@ const PATH_BY_VIEW: Record<ViewId, string | ((extra: { id?: number }) => string)
   "delete-account": SPA_PATHS.deleteAccount,
   support: SPA_PATHS.support,
   notifications: SPA_PATHS.notifications,
+  archive: SPA_PATHS.archive,
 };
 
 export function hrefFor(basePath: string, view: ViewId, extra: { id?: number } = {}): string {

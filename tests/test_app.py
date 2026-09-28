@@ -1556,6 +1556,80 @@ class WiringTest(unittest.TestCase):
         p = self.client.get(f"/api/people/{uid}")
         self.assertEqual(p.status_code, 404)
 
+    def test_archive_lists_and_revises_own_decisions(self):
+        self._register()
+        peers = self._peers(4)
+        liked, passed, banned, mutual = peers
+        self._login("ada@example.com")
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": liked["id"], "direction": "like"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": passed["id"], "direction": "pass"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/block", json={"user_id": banned["id"]}).status_code, 200)
+        self._logout()
+        self._login(mutual["email"])
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": self._me_id("ada@example.com"), "direction": "like"}).status_code, 200)
+        self._login("ada@example.com")
+        ada_id = self._me_id("ada@example.com")
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": mutual["id"], "direction": "like"}).status_code, 200)
+
+        listed = self.client.get("/api/archive")
+        self.assertEqual(listed.status_code, 200)
+        body = listed.get_json()
+        self.assertEqual({item["id"] for item in body["likes"]}, {mutual["id"], liked["id"]})
+        self.assertTrue(next(item for item in body["likes"] if item["id"] == mutual["id"])["matched"])
+        self.assertFalse(next(item for item in body["likes"] if item["id"] == liked["id"])["matched"])
+        self.assertEqual([item["id"] for item in body["passes"]], [passed["id"]])
+        self.assertEqual([item["id"] for item in body["blocks"]], [banned["id"]])
+
+        kept = self.client.post("/api/archive", json={"user_id": mutual["id"], "action": "unlike"})
+        self.assertEqual(kept.status_code, 409)
+
+        unmatched = self.client.post("/api/archive", json={"user_id": mutual["id"], "action": "unmatch"})
+        self.assertEqual(unmatched.status_code, 200)
+        self.assertEqual([item["id"] for item in unmatched.get_json()["likes"]], [liked["id"]])
+        self.assertIn(mutual["id"], [item["id"] for item in unmatched.get_json()["passes"]])
+
+        undone = self.client.post("/api/archive", json={"user_id": liked["id"], "action": "unlike"})
+        self.assertEqual(undone.status_code, 200)
+        restored = self.client.post("/api/archive", json={"user_id": passed["id"], "action": "restore"})
+        self.assertEqual(restored.status_code, 200)
+        unblocked = self.client.post("/api/archive", json={"user_id": banned["id"], "action": "unblock"})
+        self.assertEqual(unblocked.status_code, 200)
+        after = unblocked.get_json()
+        self.assertEqual(after["likes"], [])
+        self.assertEqual(after["blocks"], [])
+        self.assertEqual({item["id"] for item in after["passes"]}, {banned["id"], mutual["id"]})
+
+        conn = open_request_connection()
+        try:
+            gone = conn.execute(
+                "SELECT 1 FROM swipes WHERE from_id = ? AND to_id = ?",
+                (ada_id, liked["id"]),
+            ).fetchone()
+            self.assertIsNone(gone)
+            history = conn.execute(
+                "SELECT 1 FROM feed_history WHERE user_id = ? AND other_id = ?",
+                (ada_id, passed["id"]),
+            ).fetchone()
+            self.assertIsNone(history)
+            still_blocked = conn.execute(
+                "SELECT 1 FROM blocks WHERE from_id = ? AND to_id = ?",
+                (ada_id, banned["id"]),
+            ).fetchone()
+            self.assertIsNone(still_blocked)
+        finally:
+            conn.close()
+
+        brought_back = self.client.post("/api/archive", json={"user_id": banned["id"], "action": "restore"})
+        self.assertEqual(brought_back.status_code, 200)
+        self.assertEqual([item["id"] for item in brought_back.get_json()["passes"]], [mutual["id"]])
+
+    def _me_id(self, email):
+        conn = open_request_connection()
+        try:
+            return conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()["id"]
+        finally:
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

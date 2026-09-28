@@ -78,7 +78,7 @@ import { createInboxController } from "./inbox";
   let routing = null;
   const ensureRouting = () => {
     if (routing) return Promise.resolve(routing);
-    return import(`${BASE}/public/dist/router.js?v=4`).then((mod) => {
+    return import(`${BASE}/public/dist/router.js?v=5`).then((mod) => {
       routing = mod;
       return mod;
     });
@@ -330,6 +330,7 @@ import { createInboxController } from "./inbox";
       const isMe =
         state.view === "profile"
         || state.view === "plus"
+        || state.view === "archive"
         || state.view === "login"
         || (state.view === "person" && from === "profile");
       const dest = state.user ? "my-preview" : "login";
@@ -425,7 +426,7 @@ import { createInboxController } from "./inbox";
     }
     if (state.view === "person") {
       state.person = null;
-      state.view = state.personFrom === "likes" ? "likes" : "deck";
+      state.view = state.personFrom === "likes" ? "likes" : state.personFrom === "archive" ? "archive" : "deck";
       if (state.view === "likes") {
         await loadLikes();
         await refreshMe();
@@ -554,7 +555,11 @@ import { createInboxController } from "./inbox";
     catalog: state.catalog,
     basePath: BASE,
     hrefFor,
-    navigate: (view) => {
+    navigate: (view, params = {}) => {
+      if (view === "person" && params.id) {
+        void openPerson(Number(params.id), "archive");
+        return;
+      }
       void goToView(view);
     },
     api,
@@ -804,7 +809,7 @@ import { createInboxController } from "./inbox";
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications"].includes(next)) {
+    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -834,7 +839,7 @@ import { createInboxController } from "./inbox";
       await loadLikes();
       await refreshMe();
     }
-    if (["profile", "consents", "plus", "notifications"].includes(state.view) && state.user) await refreshMe();
+    if (["profile", "consents", "plus", "notifications", "archive"].includes(state.view) && state.user) await refreshMe();
     render();
   };
 
@@ -912,6 +917,8 @@ import { createInboxController } from "./inbox";
           ? mod.mountPlus(mountEl, profileHost)
           : view === "notifications"
             ? mod.mountNotifications(mountEl, profileHost)
+            : view === "archive"
+              ? mod.mountDecisions(mountEl, profileHost)
           : mod.mountProfile(mountEl, profileHost);
       bindDataNavLinks();
       syncUrl();
@@ -1062,7 +1069,7 @@ import { createInboxController } from "./inbox";
       homeFeatureUnmount?.();
       homeFeatureUnmount = null;
     }
-    if (!["profile", "consents", "plus", "notifications"].includes(state.view)) {
+    if (!["profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
       profileFeatureUnmount?.();
       profileFeatureUnmount = null;
     }
@@ -1159,7 +1166,7 @@ import { createInboxController } from "./inbox";
       void renderAccountFeature(state.view);
       return;
     }
-    else if (["profile", "consents", "plus", "notifications"].includes(state.view)) {
+    else if (["profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
     }
@@ -1264,7 +1271,7 @@ import { createInboxController } from "./inbox";
       state.matches = data.matches;
     }
     if (state.view === "likes" && state.user) await loadLikes();
-    if (state.view === "profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications") await refreshMe();
+    if (state.view === "profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications" || state.view === "archive") await refreshMe();
     render();
   };
 

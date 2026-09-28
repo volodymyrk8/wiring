@@ -62,7 +62,7 @@ export type ProfileHostBridge = {
   catalog: ProfileCatalog;
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;
-  navigate: (view: string) => void;
+  navigate: (view: string, params?: Record<string, string | number>) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   toast: (message: string) => void;
   uploadPhoto: (file: File, rightsConsent: boolean) => Promise<unknown>;
