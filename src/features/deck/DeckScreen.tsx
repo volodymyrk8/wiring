@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
+import { AppHeader, Button, Checkbox, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
@@ -63,7 +63,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
   />;
 }
 
-const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false });
+const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false, hide_undiagnosed: true });
 
 type DiscoveryDraft = {
   seekMinAge: string;
@@ -119,6 +119,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
         <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
         <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
         <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
+        <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>Скрыть анкеты без диагноза</Checkbox>
         <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
         <h3 class={styles.filterSection}>Кто может искать меня</h3>
         <p class={styles.filterIntro}>Кому ты сам виден. Это не то, кого видишь ты.</p>
@@ -239,7 +240,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const dragRef = useRef<{ y: number } | null>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const current = cards[index];
-  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99);
+  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
 
   useEffect(() => {
     host.onFeedChange(cards, index, filters, hasMore, generation);

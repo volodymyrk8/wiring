@@ -345,6 +345,8 @@ class WiringTest(unittest.TestCase):
         self._login("ada@example.com")
         ids = {card["id"] for card in self.client.get("/api/feed?limit=10").get_json()["cards"]}
         self.assertNotIn(peer["id"], ids)
+        shown = {card["id"] for card in self.client.get("/api/feed?hide_empty=0&limit=10").get_json()["cards"]}
+        self.assertIn(peer["id"], shown)
 
     def test_city_filter_still_finds_already_seen_profiles(self):
         self._register()

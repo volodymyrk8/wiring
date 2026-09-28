@@ -8,6 +8,8 @@ export type DeckFilters = {
   max_age: number;
   city: string;
   real_only?: boolean;
+  /** When true, profiles with no diagnosis stay out of the feed. Default on. */
+  hide_undiagnosed?: boolean;
 };
 
 export type DeckCard = {

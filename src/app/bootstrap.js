@@ -52,7 +52,11 @@ import { createInboxController } from "./inbox";
     likes: [],
     person: null,
     personFrom: "deck",
-    filters: { ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }), real_only: false },
+    filters: {
+      ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }),
+      hide_undiagnosed: !savedFilters || savedFilters.hide_undiagnosed !== false,
+      real_only: false,
+    },
     filtersOpen: false,
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
     resetToken: "",

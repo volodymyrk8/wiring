@@ -623,7 +623,7 @@ def _consent_yes(value: Any) -> bool:
 
 
 def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
-    """Ready to appear in the feed: age, neuro, photo, consents (city optional)."""
+    """Ready to appear in the feed: age, photo, consents (city optional). Diagnosis is a feed filter."""
     if int(row["is_seed"] or 0) or is_guest_email(str(row["email"] or "")):
         return True
     tags = tags if tags is not None else tags_for(row["id"])
@@ -636,11 +636,9 @@ def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos:
     if not photos and not str(row["photo"] or "").strip():
         return False
     keys = set(row.keys())
-    if "special_data_consent_at" in keys and not row["special_data_consent_at"]:
+    if (tags.get("neuro") or []) and "special_data_consent_at" in keys and not row["special_data_consent_at"]:
         return False
     if "photo_rights_consent_at" in keys and not row["photo_rights_consent_at"]:
-        return False
-    if not (tags.get("neuro") or []):
         return False
     return True
 
@@ -1904,6 +1902,7 @@ def _eligible_card(
     skip_seeds: bool = False,
     snoozed: set[int] | None = None,
     liked_me: set[int] | None = None,
+    hide_undiagnosed: bool = True,
 ) -> dict[str, Any] | None:
     if row["id"] in blocked:
         return None
@@ -1938,6 +1937,8 @@ def _eligible_card(
     if not photos_for(row["id"]) and not str(row["photo"] or "").strip():
         return None
     card = user_public(row)
+    if hide_undiagnosed and not (card.get("neuro") or []):
+        return None
     if neuro_filter and not set(neuro_filter) & set(card["neuro"]):
         return None
     if vibe_filter and not set(vibe_filter) & set(card["vibe"]):
@@ -1961,6 +1962,7 @@ def api_feed():
     if city_raw and not city_q:
         city_q = "\x00"
     real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
+    hide_undiagnosed = str(request.args.get("hide_empty", "1")).lower() not in {"0", "false", "no"}
     skip_ids = {int(part) for part in str(request.args.get("skip") or "").split(",") if part.isdigit()}
     if len(skip_ids) > 200:
         skip_ids = set(list(skip_ids)[:200])
@@ -1998,7 +2000,8 @@ def api_feed():
         if intent_filter and not any(i in intent_filter for i in intents_of(row)):
             return None
         return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
-                              skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me)
+                              skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me,
+                              hide_undiagnosed=hide_undiagnosed)
 
     narrowed = bool(city_raw or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99)
     cards, has_more, generation = claim_feed(

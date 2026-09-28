@@ -14,6 +14,7 @@ export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSi
   if (filters.min_age !== 18) query.set("min_age", String(filters.min_age));
   if (filters.max_age !== 99) query.set("max_age", String(filters.max_age));
   if (filters.city) query.set("city", filters.city);
+  query.set("hide_empty", filters.hide_undiagnosed === false ? "0" : "1");
   if (filters.real_only) query.set("real", "1");
   if (skipIds.length) query.set("skip", skipIds.slice(0, 200).join(","));
   return api<FeedPage>(`/api/feed?${query}`, { signal, cache: "no-store" });
