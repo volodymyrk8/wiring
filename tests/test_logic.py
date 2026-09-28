@@ -1,3 +1,4 @@
+import struct
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ from PIL import Image
 
 from media import MediaError, make_thumb
 from moderation import blocked_labels, moderate_photo
+from speech import audio_has_sound, audio_kind
 
 
 class LogicTest(unittest.TestCase):
@@ -133,6 +135,23 @@ class LogicTest(unittest.TestCase):
             with patch("moderation._ask_openai", return_value={"categories": {"sexual": True}}):
                 with self.assertRaises(MediaError):
                     moderate_photo(b"flagged")
+
+    def test_voice_container_needs_sound(self):
+        pcm = b"\x00\x10" * 800
+        wav = struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF", 36 + len(pcm), b"WAVE", b"fmt ", 16, 1, 1, 8000, 16000, 2, 16, b"data", len(pcm),
+        ) + pcm
+        self.assertEqual(audio_kind(wav, "audio/wav"), (".wav", "audio/wav"))
+        self.assertTrue(audio_has_sound(wav, ".wav"))
+        tiny = struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF", 36 + 20, b"WAVE", b"fmt ", 16, 1, 1, 8000, 16000, 2, 16, b"data", 20,
+        ) + (b"\x00" * 20)
+        self.assertFalse(audio_has_sound(tiny, ".wav"))
+        empty = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
+        self.assertEqual(audio_kind(empty, "audio/mp4")[0], ".m4a")
+        self.assertFalse(audio_has_sound(empty, ".m4a"))
 
 
 if __name__ == "__main__":

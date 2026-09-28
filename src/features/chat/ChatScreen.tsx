@@ -4,6 +4,7 @@ import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/compone
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
+import { canRecordWebm, openMediaRecorder, openWavRecorder, prepareAudioContext, type VoiceTake } from "./voice";
 
 const errorMessage = (caught: unknown, fallback: string) =>
   caught instanceof Error && caught.message ? caught.message : fallback;
@@ -350,7 +351,7 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const toggle = () => {
     const element = audioRef.current;
     if (!element) return;
-    if (element.paused) void element.play().catch(() => setPlaying(false));
+    if (element.paused) void element.play().catch(() => setFailed(true));
     else element.pause();
   };
 
@@ -358,7 +359,7 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const progress = total > 0 && (playing || time > 0) ? Math.min(100, (time / total) * 100) : 0;
   return (
     <div class="voice-note">
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={src} preload="auto" />
       <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? "пауза" : "слушать"}>{playing ? "❚❚" : "▶"}</button>
       <span class="voice-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <span class="voice-duration">{failed ? "не открывается" : clock(shown)}</span>
@@ -424,9 +425,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [error, setError] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  const stopRecRef = useRef<((discard: boolean) => void) | null>(null);
   const recTimerRef = useRef<number | null>(null);
   const discardRecRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -482,8 +481,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
 
   useEffect(() => () => {
     discardRecRef.current = true;
-    recorderRef.current?.state === "recording" && recorderRef.current.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    stopRecRef.current?.(true);
     if (recTimerRef.current) window.clearInterval(recTimerRef.current);
   }, []);
 
@@ -538,25 +536,8 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
   };
 
-  const stopRecording = (discard: boolean) => {
-    discardRecRef.current = discard;
-    if (recTimerRef.current) {
-      window.clearInterval(recTimerRef.current);
-      recTimerRef.current = null;
-    }
-    const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") recorder.stop();
-    else {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-      setRecording(false);
-    }
-  };
-
-  const sendVoiceBlob = async (blob: Blob, seconds: number) => {
+  const sendVoiceBlob = async (blob: Blob, seconds: number, ext: string) => {
     const form = new FormData();
-    const type = blob.type || "audio/webm";
-    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
     form.append("to_id", String(chatId));
     form.append("file", blob, `voice.${ext}`);
     form.append("duration", String(Math.max(1, Math.round(seconds))));
@@ -567,47 +548,87 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     await loadThread(true);
   };
 
+  const stopRecording = (discard: boolean) => {
+    discardRecRef.current = discard;
+    if (recTimerRef.current) {
+      window.clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    const stop = stopRecRef.current;
+    stopRecRef.current = null;
+    if (stop) stop(discard);
+    else setRecording(false);
+  };
+
   const startRecording = async () => {
     if (sending || recording || editing) return;
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    if (!navigator.mediaDevices?.getUserMedia) {
       host.toast("этот браузер не записывает голосовые");
       return;
     }
+    const preferWav = !canRecordWebm();
+    const audioCtx = preferWav ? prepareAudioContext() : null;
+    const wavReady = Boolean(audioCtx && typeof audioCtx.createScriptProcessor === "function");
+    if (preferWav && !wavReady && typeof MediaRecorder === "undefined") {
+      void audioCtx?.close();
+      host.toast("этот браузер не записывает голосовые");
+      return;
+    }
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
-      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      chunksRef.current = [];
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+        });
+      } catch (caught) {
+        if (!(caught instanceof DOMException) || caught.name !== "OverconstrainedError") throw caught;
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      if (audioCtx) await audioCtx.resume();
+      if (discardRecRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        void audioCtx?.close();
+        return;
+      }
       discardRecRef.current = false;
-      streamRef.current = stream;
-      recorderRef.current = recorder;
       const started = Date.now();
+      const capture = wavReady && audioCtx
+        ? openWavRecorder(stream, audioCtx)
+        : openMediaRecorder(stream);
+      if (!wavReady) void audioCtx?.close();
       setRecSeconds(0);
       setRecording(true);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
+      let settled = false;
+      stopRecRef.current = (discard: boolean) => {
+        if (settled) return;
+        settled = true;
+        stopRecRef.current = null;
         setRecording(false);
-        const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        chunksRef.current = [];
-        if (discardRecRef.current || blob.size < 800) return;
-        setSending(true);
-        void sendVoiceBlob(blob, seconds).catch((caught) => {
-          host.toast(errorMessage(caught, "не удалось отправить голосовое"));
-        }).finally(() => setSending(false));
+        void capture.stop().then((take: VoiceTake | null) => {
+          if (discard || discardRecRef.current) return;
+          if (!take) {
+            host.toast("запись пустая, попробуй ещё раз");
+            return;
+          }
+          const seconds = Math.max(1, Math.min(90, Math.round(take.seconds || (Date.now() - started) / 1000)));
+          setSending(true);
+          void sendVoiceBlob(take.blob, seconds, take.ext).catch((caught) => {
+            host.toast(errorMessage(caught, "не удалось отправить голосовое"));
+          }).finally(() => setSending(false));
+        }).catch(() => {
+          host.toast("не удалось сохранить запись");
+        });
       };
-      recorder.start();
       recTimerRef.current = window.setInterval(() => {
         const elapsed = Math.round((Date.now() - started) / 1000);
         setRecSeconds(elapsed);
         if (elapsed >= 90) stopRecording(false);
       }, 250);
-    } catch {
-      host.toast("разреши микрофон, чтобы записать голосовое");
+    } catch (caught) {
+      stream?.getTracks().forEach((track) => track.stop());
+      void audioCtx?.close();
+      const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "NotFoundError" || caught.name === "SecurityError");
+      host.toast(denied ? "разреши микрофон, чтобы записать голосовое" : "не удалось начать запись");
     }
   };
 
@@ -643,23 +664,35 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
   };
 
-  const sendPhoto = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
-    const file = event.currentTarget.files?.[0];
+  const sendPhotos = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
+    const picked = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
-    if (!file || sending || recording || editing) return;
+    if (!picked.length || sending || recording || editing) return;
+    const files = picked.slice(0, 10);
+    if (picked.length > 10) host.toast("за раз можно 10 фото");
     setSending(true);
+    let sent = 0;
     try {
-      const form = new FormData();
-      form.append("to_id", String(chatId));
-      form.append("file", file, file.name || "photo.jpg");
-      if (draft.trim()) form.append("body", draft.trim().slice(0, 500));
-      if (replyTo?.id) form.append("reply_to_id", String(replyTo.id));
-      await host.api("/api/messages/photo", { method: "POST", body: form });
+      for (const file of files) {
+        const form = new FormData();
+        form.append("to_id", String(chatId));
+        form.append("file", file, file.name || "photo.jpg");
+        if (sent === 0 && draft.trim()) form.append("body", draft.trim().slice(0, 500));
+        if (sent === 0 && replyTo?.id) form.append("reply_to_id", String(replyTo.id));
+        await host.api("/api/messages/photo", { method: "POST", body: form });
+        sent += 1;
+      }
       setDraft("");
       setReplyTo(null);
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
+      if (sent) {
+        setDraft("");
+        setReplyTo(null);
+        shouldScrollRef.current = true;
+        await loadThread(true);
+      }
       host.toast(errorMessage(caught, "не удалось отправить фото"));
     } finally {
       setSending(false);
@@ -728,14 +761,14 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 <button type="button" class="composer-send" onClick={() => stopRecording(false)} aria-label="Отправить голосовое">Отправить</button>
               </div>
             ) : (
-              <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
-                <label class="composer-attach" title="фото" aria-label="прикрепить фото">
+              <form class={`composer${sending ? " is-sending" : ""}${replyTo || editing ? " is-labeled" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
+                <label class="composer-attach" title="до 10 фото" aria-label="прикрепить фото, до 10">
                   <PhotoIcon />
-                  <input type="file" accept="image/*" hidden disabled={sending || Boolean(editing)} onChange={sendPhoto} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={sendPhotos} />
                 </label>
                 <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
                 <input ref={inputRef} name="body" maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" enterKeyHint="send" disabled={sending} />
-                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : "Отправить сообщение"} title={editing ? "Сохранить" : "Отправить"} disabled={sending || !draft.trim()}>{editing ? "OK" : <SendIcon />}</button>
+                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : replyTo ? "Ответить" : "Отправить сообщение"} title={editing ? "Сохранить" : replyTo ? "Ответить" : "Отправить"} disabled={sending || !draft.trim()}>{editing ? "OK" : replyTo ? "Ответить" : <SendIcon />}</button>
               </form>
             )}
           </div>

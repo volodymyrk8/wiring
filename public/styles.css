@@ -1168,43 +1168,6 @@ a.solid, a.ghost { display: inline-block; text-align: center; text-decoration: n
   color: var(--on-accent);
   opacity: 0.92;
 }
-.bubble-reply {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  vertical-align: middle;
-  margin-right: 4px;
-  opacity: 0.75;
-  transition: color 0.16s ease, opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
-}
-.bubble-reply svg {
-  width: 12px;
-  height: 12px;
-  display: block;
-}
-.bubble-reply:hover {
-  color: var(--lime);
-  opacity: 1;
-  transform: scale(1.15);
-  background: color-mix(in srgb, var(--lime) 15%, transparent);
-}
-.bubble.mine .bubble-reply {
-  color: color-mix(in srgb, var(--on-accent) 72%, transparent);
-  opacity: 0.85;
-}
-.bubble.mine .bubble-reply:hover {
-  color: var(--on-accent);
-  opacity: 1;
-  background: color-mix(in srgb, var(--on-accent) 18%, transparent);
-}
 .bubble-body { display: block; }
 
 .toast {
@@ -3043,10 +3006,6 @@ html[data-view="chat"] #app {
   white-space: nowrap;
 }
 .bubble.has-photo .time { margin: 8px 2px 0; }
-.bubble .bubble-reply {
-  flex: 0 0 auto;
-  margin: 0 1px 0 0;
-}
 .composer-dock {
   flex-shrink: 0;
   width: 100%;
@@ -3200,6 +3159,18 @@ html.keyboard .composer-dock { padding-bottom: 6px; }
 .composer-send:active {
   transform: scale(0.94);
 }
+.composer.is-labeled {
+  grid-template-columns: 42px 42px minmax(0, 1fr) auto;
+}
+.composer.is-labeled .composer-send {
+  width: auto;
+  min-width: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+}
 .composer.is-recording {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
@@ -3233,20 +3204,26 @@ button.bubble-quote {
 .bubble-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin: 0 4px;
+  gap: 6px;
+  margin: 0;
 }
 .bubble-action {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
   font-weight: 650;
+  line-height: 1.2;
   cursor: pointer;
 }
-.bubble-action:first-child { color: var(--lime); }
+.bubble-action:first-child {
+  border-color: color-mix(in srgb, var(--lime) 55%, var(--line));
+  color: var(--lime);
+}
 .bubble-action:disabled { opacity: 0.5; cursor: default; }
 .voice-note {
   display: flex;

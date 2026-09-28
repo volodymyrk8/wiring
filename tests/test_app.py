@@ -1663,6 +1663,13 @@ class WiringTest(unittest.TestCase):
             data={"to_id": str(peer["id"]), "duration": "2", "file": (BytesIO(wav), "voice.wav")},
         )
         self.assertEqual(voice.status_code, 200, voice.get_data(as_text=True))
+        empty = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32
+        rejected = self.client.post(
+            "/api/messages/voice",
+            data={"to_id": str(peer["id"]), "duration": "2", "file": (BytesIO(empty), "voice.m4a")},
+        )
+        self.assertEqual(rejected.status_code, 400, rejected.get_data(as_text=True))
+        self.assertIn("пуст", rejected.get_json()["error"])
         voice_id = voice.get_json()["id"]
         listed = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
         voice_row = next(item for item in listed if item["id"] == voice_id)
