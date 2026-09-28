@@ -2450,7 +2450,7 @@ def api_matches():
         matched_at = int(row["matched_at"] or 0)
         last = conn.execute(
             """
-            SELECT body, photo, audio, transcript, from_id, created_at, id FROM messages
+            SELECT body, photo, audio, from_id, created_at, id FROM messages
             WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
               AND COALESCE(deleted_at, 0) = 0
             ORDER BY id DESC LIMIT 1
@@ -2460,9 +2460,8 @@ def api_matches():
         body = str(last["body"] or "").strip() if last else ""
         has_photo = bool(last and str(last["photo"] or "").strip()) if last else False
         has_audio = bool(last and str(last["audio"] or "").strip()) if last else False
-        transcript = str(last["transcript"] or "").strip() if last else ""
         if last and has_audio:
-            preview = transcript or "голосовое"
+            preview = "голосовое"
         elif last and not body and has_photo:
             preview = "фото"
         else:
@@ -2487,11 +2486,11 @@ def api_matches():
 
 
 def _message_preview(body: str, photo: str = "", audio: str = "", transcript: str = "") -> str:
+    if str(audio or "").strip():
+        return "голосовое"
     text_body = str(body or "").strip() or str(transcript or "").strip()
     if text_body:
         return text_body[:160]
-    if str(audio or "").strip():
-        return "голосовое"
     if str(photo or "").strip():
         return "фото"
     return ""
@@ -2515,7 +2514,6 @@ def _message_payload(
     keys = set(row.keys())
     photo = str(row["photo"] or "") if "photo" in keys else ""
     audio = str(row["audio"] or "") if "audio" in keys else ""
-    transcript = str(row["transcript"] or "") if "transcript" in keys else ""
     body = str(row["body"] or "")
     reply_to = None
     reply_id = row["reply_to_id"] if "reply_to_id" in keys else None
@@ -2544,7 +2542,7 @@ def _message_payload(
         "photo_url": prefix(f"/api/messages/media/{row['id']}") if photo else "",
         "audio_url": prefix(f"/api/messages/media/{row['id']}") if audio else "",
         "audio_duration": duration,
-        "transcript": transcript,
+        "transcript": "",
         "edited": bool(row["edited_at"]) if "edited_at" in keys and row["edited_at"] else False,
         "created_at": row["created_at"],
         "read": row["from_id"] == uid and int(row["id"]) <= peer_read_id,

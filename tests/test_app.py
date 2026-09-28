@@ -1675,6 +1675,9 @@ class WiringTest(unittest.TestCase):
             done = self.client.post(f"/api/messages/{voice_id}/transcribe")
         self.assertEqual(done.status_code, 200, done.get_data(as_text=True))
         self.assertEqual(done.get_json()["transcript"], "привет голосом")
+        hidden = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
+        stored = next(item for item in hidden if item["id"] == voice_id)
+        self.assertFalse(stored["transcript"])
 
         removed = self.client.delete(f"/api/messages/{voice_id}")
         self.assertEqual(removed.status_code, 200, removed.get_data(as_text=True))

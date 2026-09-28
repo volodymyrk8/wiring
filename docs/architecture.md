@@ -97,7 +97,7 @@ The gesture viewport fills the available feed width and height, including space 
 
 `GET /api/feed` accepts `limit` (1–30, default 30), returns `cards` and `has_more`, and sends `Cache-Control: no-store`. `feed.py` reserves eligible candidates in random order in PostgreSQL `feed_history`, with a unique `(user_id, other_id)` pair. Locking the viewer row serializes concurrent page requests. Existing mutual preferences, filters, blocks and privacy checks apply before reservation. The additive `init_db` migration is idempotent and backfills historical passes.
 
-Chat messages can be answered, edited by the sender, or soft-deleted by the sender (`deleted_at`, media file removed). A voice note is an audio file on the message. «Расшифровать» calls OpenAI transcription once when `OPENAI_API_KEY` is set and stores `transcript` for both people. Replying switches the chat header to «Ответить».
+Chat messages can be answered, edited by the sender, or soft-deleted by the sender (`deleted_at`, media file removed). A voice note is an audio file on the message. «Расшифровать» calls OpenAI transcription once when `OPENAI_API_KEY` is set and stores `transcript`. The text is returned only to that request and is not included in the thread, so the other person still sees the voice note until they press the button. Replying switches the chat header to «Ответить».
 
 `/archive` lists only the viewer's own likes, passes and blocks, behind a profile button rather than the tab bar. Unlike and “вернуть в ленту” delete that swipe and the viewer's `feed_history` row so the person can be delivered again. Unblock removes only the viewer's block and leaves the pass. Unmatch still hides the chat and turns the like into a pass. A block made by the other person is not listed.
 

@@ -95,8 +95,8 @@ const chatTimeLabel = (timestamp?: number) => {
   return `${date.toLocaleDateString("ru", { day: "numeric", month: "short" })}, ${date.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`;
 };
 
-const replyText = (message: ChatMessage) => {
-  if (message.transcript) return message.transcript;
+const replyText = (message: ChatMessage, revealed = "") => {
+  if (revealed) return revealed;
   if (message.audio_url) return "голосовое";
   if (message.photo_url && !message.body) return "фото";
   return message.body || "сообщение";
@@ -375,6 +375,7 @@ function MessageBubble({
   onDelete,
   onTranscribe,
   onJump,
+  revealedTranscript = "",
 }: {
   message: ChatMessage;
   host: ChatHostBridge;
@@ -384,6 +385,7 @@ function MessageBubble({
   onDelete: () => void;
   onTranscribe: () => void;
   onJump: (id: number) => void;
+  revealedTranscript?: string;
 }) {
   const photo = message.photo_url ? photoUrl(host.basePath, message.photo_url) : "";
   const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
@@ -394,7 +396,7 @@ function MessageBubble({
         {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
         {photo ? <a class="bubble-photo" href={photo} target="_blank" rel="noopener"><img src={photo} alt="" decoding="async" /></a> : null}
         {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
-        {message.transcript ? <div class="bubble-transcript">{message.transcript}</div> : null}
+        {revealedTranscript ? <div class="bubble-transcript">{revealedTranscript}</div> : null}
         {message.body ? <div class="bubble-body">{message.body}</div> : null}
         <span class="time">
           {message.edited ? <span>изменено</span> : null}
@@ -404,7 +406,7 @@ function MessageBubble({
       </div>
       <div class="bubble-actions">
         <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>Ответить</button>
-        {audio && !message.transcript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
+        {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
         {message.mine && !audio ? <button type="button" class="bubble-action" disabled={busy} onClick={onEdit}>Изменить</button> : null}
         {message.mine ? <button type="button" class="bubble-action" disabled={busy} onClick={onDelete}>Удалить</button> : null}
       </div>
@@ -422,6 +424,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const [error, setError] = useState("");
+  const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -457,6 +460,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   useEffect(() => {
     let alive = true;
     setThread(null);
+    setRevealed({});
     setError("");
     shouldScrollRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
@@ -632,10 +636,8 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     setSending(true);
     try {
       const response = await host.api(`/api/messages/${message.id}/transcribe`, { method: "POST" });
-      setThread((current) => current ? {
-        ...current,
-        messages: current.messages.map((item) => item.id === message.id ? { ...item, transcript: response.transcript } : item),
-      } : current);
+      const text = String(response.transcript || "");
+      if (text) setRevealed((current) => ({ ...current, [message.id]: text }));
     } catch (caught) {
       host.toast(errorMessage(caught, "не удалось расшифровать"));
     } finally {
@@ -685,7 +687,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   };
 
   const modeTitle = editing ? "Изменить" : replyTo ? "Ответить" : "";
-  const modePreview = editing ? (editing.body || "") : replyTo ? replyText(replyTo) : "";
+  const modePreview = editing ? (editing.body || "") : replyTo ? replyText(replyTo, revealed[replyTo.id] || "") : "";
 
   return (
     <section class="chat-screen">
@@ -724,6 +726,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 onDelete={() => setPendingDelete(message)}
                 onTranscribe={() => void transcribe(message)}
                 onJump={jumpTo}
+                revealedTranscript={revealed[message.id] || ""}
               />
             )) : thread ? (
               <>
