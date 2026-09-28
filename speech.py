@@ -50,29 +50,6 @@ def audio_kind(data: bytes, content_type: str) -> tuple[str, str] | None:
     return ext, stored
 
 
-def audio_has_sound(data: bytes, ext: str) -> bool:
-    """Reject header-only containers that play as silence."""
-    if ext == ".wav":
-        index = data.find(b"data")
-        if index < 0 or index + 8 > len(data):
-            return False
-        size = int.from_bytes(data[index + 4 : index + 8], "little")
-        return 800 <= size <= len(data) - (index + 8)
-    if ext in {".m4a", ".mp4"}:
-        index = data.find(b"mdat")
-        if index < 4:
-            return False
-        size = int.from_bytes(data[index - 4 : index], "big")
-        if size == 0:
-            payload = len(data) - (index + 4)
-        elif size == 1 and index + 12 <= len(data):
-            payload = int.from_bytes(data[index + 4 : index + 12], "big") - 16
-        else:
-            payload = size - 8
-        return payload >= 800
-    return len(data) >= 800
-
-
 def transcribe_audio(data: bytes, filename: str, mime: str) -> str:
     key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not key:

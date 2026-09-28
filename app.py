@@ -48,7 +48,7 @@ from legal_pages import MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
-from speech import MAX_AUDIO_SECONDS, SpeechError, audio_has_sound, audio_kind, transcribe_audio
+from speech import MAX_AUDIO_SECONDS, SpeechError, audio_kind, transcribe_audio
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
 from push import delete_subscription, delete_user_subscriptions, ensure_push_tables, public_key, save_subscription
 from premium import (
@@ -2956,8 +2956,6 @@ def api_send_voice_message():
     if not kind:
         return jsonify({"ok": False, "error": "это не голосовое"}), 400
     ext, _mime = kind
-    if not audio_has_sound(data, ext):
-        return jsonify({"ok": False, "error": "пустая запись"}), 400
     try:
         duration = int(request.form.get("duration") or 0)
     except (TypeError, ValueError):

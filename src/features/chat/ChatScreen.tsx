@@ -4,7 +4,6 @@ import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/compone
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
-import { canRecordWebm, openMediaRecorder, openWavRecorder, prepareAudioContext, type VoiceTake } from "./voice";
 
 const errorMessage = (caught: unknown, fallback: string) =>
   caught instanceof Error && caught.message ? caught.message : fallback;
@@ -351,7 +350,7 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const toggle = () => {
     const element = audioRef.current;
     if (!element) return;
-    if (element.paused) void element.play().catch(() => setFailed(true));
+    if (element.paused) void element.play().catch(() => setPlaying(false));
     else element.pause();
   };
 
@@ -359,7 +358,7 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const progress = total > 0 && (playing || time > 0) ? Math.min(100, (time / total) * 100) : 0;
   return (
     <div class="voice-note">
-      <audio ref={audioRef} src={src} preload="auto" />
+      <audio ref={audioRef} src={src} preload="metadata" />
       <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? "пауза" : "слушать"}>{playing ? "❚❚" : "▶"}</button>
       <span class="voice-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <span class="voice-duration">{failed ? "не открывается" : clock(shown)}</span>
@@ -425,7 +424,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [error, setError] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
-  const stopRecRef = useRef<((discard: boolean) => void) | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const recTimerRef = useRef<number | null>(null);
   const discardRecRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -481,7 +482,8 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
 
   useEffect(() => () => {
     discardRecRef.current = true;
-    stopRecRef.current?.(true);
+    recorderRef.current?.state === "recording" && recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     if (recTimerRef.current) window.clearInterval(recTimerRef.current);
   }, []);
 
@@ -536,8 +538,25 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
   };
 
-  const sendVoiceBlob = async (blob: Blob, seconds: number, ext: string) => {
+  const stopRecording = (discard: boolean) => {
+    discardRecRef.current = discard;
+    if (recTimerRef.current) {
+      window.clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    else {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setRecording(false);
+    }
+  };
+
+  const sendVoiceBlob = async (blob: Blob, seconds: number) => {
     const form = new FormData();
+    const type = blob.type || "audio/webm";
+    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
     form.append("to_id", String(chatId));
     form.append("file", blob, `voice.${ext}`);
     form.append("duration", String(Math.max(1, Math.round(seconds))));
@@ -548,87 +567,47 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     await loadThread(true);
   };
 
-  const stopRecording = (discard: boolean) => {
-    discardRecRef.current = discard;
-    if (recTimerRef.current) {
-      window.clearInterval(recTimerRef.current);
-      recTimerRef.current = null;
-    }
-    const stop = stopRecRef.current;
-    stopRecRef.current = null;
-    if (stop) stop(discard);
-    else setRecording(false);
-  };
-
   const startRecording = async () => {
     if (sending || recording || editing) return;
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       host.toast("этот браузер не записывает голосовые");
       return;
     }
-    const preferWav = !canRecordWebm();
-    const audioCtx = preferWav ? prepareAudioContext() : null;
-    const wavReady = Boolean(audioCtx && typeof audioCtx.createScriptProcessor === "function");
-    if (preferWav && !wavReady && typeof MediaRecorder === "undefined") {
-      void audioCtx?.close();
-      host.toast("этот браузер не записывает голосовые");
-      return;
-    }
-    let stream: MediaStream | null = null;
     try {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-        });
-      } catch (caught) {
-        if (!(caught instanceof DOMException) || caught.name !== "OverconstrainedError") throw caught;
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      }
-      if (audioCtx) await audioCtx.resume();
-      if (discardRecRef.current) {
-        stream.getTracks().forEach((track) => track.stop());
-        void audioCtx?.close();
-        return;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
       discardRecRef.current = false;
+      streamRef.current = stream;
+      recorderRef.current = recorder;
       const started = Date.now();
-      const capture = wavReady && audioCtx
-        ? openWavRecorder(stream, audioCtx)
-        : openMediaRecorder(stream);
-      if (!wavReady) void audioCtx?.close();
       setRecSeconds(0);
       setRecording(true);
-      let settled = false;
-      stopRecRef.current = (discard: boolean) => {
-        if (settled) return;
-        settled = true;
-        stopRecRef.current = null;
-        setRecording(false);
-        void capture.stop().then((take: VoiceTake | null) => {
-          if (discard || discardRecRef.current) return;
-          if (!take) {
-            host.toast("запись пустая, попробуй ещё раз");
-            return;
-          }
-          const seconds = Math.max(1, Math.min(90, Math.round(take.seconds || (Date.now() - started) / 1000)));
-          setSending(true);
-          void sendVoiceBlob(take.blob, seconds, take.ext).catch((caught) => {
-            host.toast(errorMessage(caught, "не удалось отправить голосовое"));
-          }).finally(() => setSending(false));
-        }).catch(() => {
-          host.toast("не удалось сохранить запись");
-        });
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
       };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        setRecording(false);
+        const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        chunksRef.current = [];
+        if (discardRecRef.current || blob.size < 800) return;
+        setSending(true);
+        void sendVoiceBlob(blob, seconds).catch((caught) => {
+          host.toast(errorMessage(caught, "не удалось отправить голосовое"));
+        }).finally(() => setSending(false));
+      };
+      recorder.start();
       recTimerRef.current = window.setInterval(() => {
         const elapsed = Math.round((Date.now() - started) / 1000);
         setRecSeconds(elapsed);
         if (elapsed >= 90) stopRecording(false);
       }, 250);
-    } catch (caught) {
-      stream?.getTracks().forEach((track) => track.stop());
-      void audioCtx?.close();
-      const denied = caught instanceof DOMException && (caught.name === "NotAllowedError" || caught.name === "NotFoundError" || caught.name === "SecurityError");
-      host.toast(denied ? "разреши микрофон, чтобы записать голосовое" : "не удалось начать запись");
+    } catch {
+      host.toast("разреши микрофон, чтобы записать голосовое");
     }
   };
 
