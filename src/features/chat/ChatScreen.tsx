@@ -317,6 +317,55 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
   );
 }
 
+function VoiceNote({ src, duration }: { src: string; duration: number }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [time, setTime] = useState(0);
+  const total = Math.max(0, duration || 0);
+
+  useEffect(() => {
+    const element = audioRef.current;
+    if (!element) return;
+    const onTime = () => setTime(element.currentTime || 0);
+    const onEnd = () => { setPlaying(false); setTime(0); };
+    const onPause = () => setPlaying(false);
+    const onPlay = () => setPlaying(true);
+    const onError = () => setFailed(true);
+    element.addEventListener("timeupdate", onTime);
+    element.addEventListener("ended", onEnd);
+    element.addEventListener("pause", onPause);
+    element.addEventListener("play", onPlay);
+    element.addEventListener("error", onError);
+    return () => {
+      element.pause();
+      element.removeEventListener("timeupdate", onTime);
+      element.removeEventListener("ended", onEnd);
+      element.removeEventListener("pause", onPause);
+      element.removeEventListener("play", onPlay);
+      element.removeEventListener("error", onError);
+    };
+  }, [src]);
+
+  const toggle = () => {
+    const element = audioRef.current;
+    if (!element) return;
+    if (element.paused) void element.play().catch(() => setPlaying(false));
+    else element.pause();
+  };
+
+  const shown = playing || time > 0 ? time : total;
+  const progress = total > 0 && (playing || time > 0) ? Math.min(100, (time / total) * 100) : 0;
+  return (
+    <div class="voice-note">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? "пауза" : "слушать"}>{playing ? "❚❚" : "▶"}</button>
+      <span class="voice-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
+      <span class="voice-duration">{failed ? "не открывается" : clock(shown)}</span>
+    </div>
+  );
+}
+
 function MessageBubble({
   message,
   host,
@@ -340,28 +389,25 @@ function MessageBubble({
   const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
   const quote = message.reply_to?.body || (message.reply_to?.has_audio ? "голосовое" : message.reply_to?.has_photo ? "фото" : "");
   return (
-    <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`} data-msg={message.id}>
-      {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
-      {photo ? <a class="bubble-photo" href={photo} target="_blank" rel="noopener"><img src={photo} alt="" decoding="async" /></a> : null}
-      {audio ? (
-        <div class="voice-note">
-          <audio controls preload="none" src={audio} />
-          {message.audio_duration ? <span class="voice-duration">{clock(message.audio_duration)}</span> : null}
-        </div>
-      ) : null}
-      {message.transcript ? <div class="bubble-transcript">{message.transcript}</div> : null}
-      {message.body ? <div class="bubble-body">{message.body}</div> : null}
+    <div class={`bubble-wrap${message.mine ? " mine" : ""}`} data-msg={message.id}>
+      <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`}>
+        {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
+        {photo ? <a class="bubble-photo" href={photo} target="_blank" rel="noopener"><img src={photo} alt="" decoding="async" /></a> : null}
+        {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
+        {message.transcript ? <div class="bubble-transcript">{message.transcript}</div> : null}
+        {message.body ? <div class="bubble-body">{message.body}</div> : null}
+        <span class="time">
+          {message.edited ? <span>изменено</span> : null}
+          {chatTimeLabel(message.created_at)}
+          {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? "прочитано" : "отправлено"}>{message.read ? "✓✓" : "✓"}</i> : null}
+        </span>
+      </div>
       <div class="bubble-actions">
         <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>Ответить</button>
         {audio && !message.transcript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
         {message.mine && !audio ? <button type="button" class="bubble-action" disabled={busy} onClick={onEdit}>Изменить</button> : null}
         {message.mine ? <button type="button" class="bubble-action" disabled={busy} onClick={onDelete}>Удалить</button> : null}
       </div>
-      <span class="time">
-        {message.edited ? <span>изменено</span> : null}
-        {chatTimeLabel(message.created_at)}
-        {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? "прочитано" : "отправлено"}>{message.read ? "✓✓" : "✓"}</i> : null}
-      </span>
     </div>
   );
 }

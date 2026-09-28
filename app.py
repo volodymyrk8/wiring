@@ -2807,8 +2807,19 @@ def api_message_media(message_id: int):
     if photo and not audio and request.args.get("s") == "sm":
         return _send_thumb(UPLOAD_DIR, photo, "chat")
     _safe_media_path(UPLOAD_DIR, rel)
-    response = send_from_directory(UPLOAD_DIR, rel)
+    audio_types = {
+        ".webm": "audio/webm",
+        ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".aac": "audio/aac",
+    }
+    mime = audio_types.get(os.path.splitext(rel)[1].lower()) if audio else None
+    response = send_from_directory(UPLOAD_DIR, rel, conditional=True, **({"mimetype": mime} if mime else {}))
     response.headers["Cache-Control"] = "private, max-age=86400"
+    response.headers["Accept-Ranges"] = "bytes"
     return response
 
 
