@@ -19,6 +19,8 @@ export type ChatReply = {
   id: number;
   body?: string;
   has_photo?: boolean;
+  has_audio?: boolean;
+  gone?: boolean;
   mine?: boolean;
 };
 
@@ -28,6 +30,10 @@ export type ChatMessage = {
   mine?: boolean;
   body?: string;
   photo_url?: string;
+  audio_url?: string;
+  audio_duration?: number;
+  transcript?: string;
+  edited?: boolean;
   created_at: number;
   read?: boolean;
   reply_to?: ChatReply | null;

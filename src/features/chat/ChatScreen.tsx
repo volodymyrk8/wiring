@@ -43,13 +43,6 @@ const TrashIcon = () => (
   </svg>
 );
 
-const ReplyIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m9 17-5-5 5-5" />
-    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-  </svg>
-);
-
 const SendIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m21.5 3.5-19 7.3 7.3 2.7 2.7 7.5z" />
@@ -62,12 +55,6 @@ const PhotoIcon = () => (
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <circle cx="8.5" cy="9" r="1.4" />
     <path d="m4 17 4.5-4.5 3.5 3 2.5-2.5L20 18" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="m6 6 12 12M18 6 6 18" />
   </svg>
 );
 
@@ -108,7 +95,24 @@ const chatTimeLabel = (timestamp?: number) => {
   return `${date.toLocaleDateString("ru", { day: "numeric", month: "short" })}, ${date.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`;
 };
 
-const replyText = (message: ChatMessage) => (message.photo_url && !message.body ? "фото" : message.body || "фото");
+const replyText = (message: ChatMessage) => {
+  if (message.transcript) return message.transcript;
+  if (message.audio_url) return "голосовое";
+  if (message.photo_url && !message.body) return "фото";
+  return message.body || "сообщение";
+};
+
+const clock = (seconds: number) => {
+  const value = Math.max(0, Math.round(seconds));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
+};
+
+const MicIcon = () => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M6 11a6 6 0 0 0 12 0M12 17v4M8 21h8" />
+  </svg>
+);
 
 function ChatHeader({ host }: { host: ChatHostBridge }) {
   const navigate = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
@@ -313,15 +317,48 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
   );
 }
 
-function MessageBubble({ message, host, onReply }: { message: ChatMessage; host: ChatHostBridge; onReply: () => void }) {
+function MessageBubble({
+  message,
+  host,
+  busy,
+  onReply,
+  onEdit,
+  onDelete,
+  onTranscribe,
+  onJump,
+}: {
+  message: ChatMessage;
+  host: ChatHostBridge;
+  busy: boolean;
+  onReply: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onTranscribe: () => void;
+  onJump: (id: number) => void;
+}) {
   const photo = message.photo_url ? photoUrl(host.basePath, message.photo_url) : "";
+  const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
+  const quote = message.reply_to?.body || (message.reply_to?.has_audio ? "голосовое" : message.reply_to?.has_photo ? "фото" : "");
   return (
-    <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}`} data-msg={message.id}>
-      {message.reply_to ? <div class="bubble-quote">{message.reply_to.has_photo && !message.reply_to.body ? "фото" : message.reply_to.body || "фото"}</div> : null}
+    <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`} data-msg={message.id}>
+      {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
       {photo ? <a class="bubble-photo" href={photo} target="_blank" rel="noopener"><img src={photo} alt="" decoding="async" /></a> : null}
+      {audio ? (
+        <div class="voice-note">
+          <audio controls preload="none" src={audio} />
+          {message.audio_duration ? <span class="voice-duration">{clock(message.audio_duration)}</span> : null}
+        </div>
+      ) : null}
+      {message.transcript ? <div class="bubble-transcript">{message.transcript}</div> : null}
       {message.body ? <div class="bubble-body">{message.body}</div> : null}
+      <div class="bubble-actions">
+        <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>Ответить</button>
+        {audio && !message.transcript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
+        {message.mine && !audio ? <button type="button" class="bubble-action" disabled={busy} onClick={onEdit}>Изменить</button> : null}
+        {message.mine ? <button type="button" class="bubble-action" disabled={busy} onClick={onDelete}>Удалить</button> : null}
+      </div>
       <span class="time">
-        <button type="button" class="bubble-reply" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onReply(); }} title="ответить" aria-label="ответить"><ReplyIcon /></button>
+        {message.edited ? <span>изменено</span> : null}
         {chatTimeLabel(message.created_at)}
         {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? "прочитано" : "отправлено"}>{message.read ? "✓✓" : "✓"}</i> : null}
       </span>
@@ -333,10 +370,20 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ChatMessage | null>(null);
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
   const [error, setError] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recTimerRef = useRef<number | null>(null);
+  const discardRecRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToEnd = () => {
     requestAnimationFrame(() => {
@@ -387,22 +434,164 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
   }, [thread?.messages.length]);
 
+  useEffect(() => () => {
+    discardRecRef.current = true;
+    recorderRef.current?.state === "recording" && recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+  }, []);
+
+  const jumpTo = (id: number) => {
+    const node = threadRef.current?.querySelector(`[data-msg="${id}"]`);
+    if (!(node instanceof HTMLElement)) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  };
+
+  const beginReply = (message: ChatMessage) => {
+    setEditing(null);
+    setReplyTo(message);
+    inputRef.current?.focus();
+  };
+
+  const beginEdit = (message: ChatMessage) => {
+    setReplyTo(null);
+    setEditing(message);
+    setDraft(message.body || "");
+    inputRef.current?.focus();
+  };
+
+  const cancelComposeMode = () => {
+    setReplyTo(null);
+    setEditing(null);
+  };
+
   const sendMessage = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     event.preventDefault();
     const body = draft.trim();
-    if (!body || sending) return;
+    if (!body || sending || recording) return;
     setSending(true);
     try {
-      await host.api("/api/messages", {
-        method: "POST",
-        body: JSON.stringify({ to_id: chatId, body, ...(replyTo?.id ? { reply_to_id: replyTo.id } : {}) }),
-      });
+      if (editing) {
+        await host.api(`/api/messages/${editing.id}`, { method: "PATCH", body: JSON.stringify({ body }) });
+        setEditing(null);
+      } else {
+        await host.api("/api/messages", {
+          method: "POST",
+          body: JSON.stringify({ to_id: chatId, body, ...(replyTo?.id ? { reply_to_id: replyTo.id } : {}) }),
+        });
+        setReplyTo(null);
+      }
       setDraft("");
-      setReplyTo(null);
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
-      host.toast(errorMessage(caught, "не удалось отправить сообщение"));
+      host.toast(errorMessage(caught, editing ? "не удалось изменить сообщение" : "не удалось отправить сообщение"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const stopRecording = (discard: boolean) => {
+    discardRecRef.current = discard;
+    if (recTimerRef.current) {
+      window.clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    else {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setRecording(false);
+    }
+  };
+
+  const sendVoiceBlob = async (blob: Blob, seconds: number) => {
+    const form = new FormData();
+    const type = blob.type || "audio/webm";
+    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
+    form.append("to_id", String(chatId));
+    form.append("file", blob, `voice.${ext}`);
+    form.append("duration", String(Math.max(1, Math.round(seconds))));
+    if (replyTo?.id) form.append("reply_to_id", String(replyTo.id));
+    await host.api("/api/messages/voice", { method: "POST", body: form });
+    setReplyTo(null);
+    shouldScrollRef.current = true;
+    await loadThread(true);
+  };
+
+  const startRecording = async () => {
+    if (sending || recording || editing) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      host.toast("этот браузер не записывает голосовые");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      discardRecRef.current = false;
+      streamRef.current = stream;
+      recorderRef.current = recorder;
+      const started = Date.now();
+      setRecSeconds(0);
+      setRecording(true);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        setRecording(false);
+        const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        chunksRef.current = [];
+        if (discardRecRef.current || blob.size < 800) return;
+        setSending(true);
+        void sendVoiceBlob(blob, seconds).catch((caught) => {
+          host.toast(errorMessage(caught, "не удалось отправить голосовое"));
+        }).finally(() => setSending(false));
+      };
+      recorder.start();
+      recTimerRef.current = window.setInterval(() => {
+        const elapsed = Math.round((Date.now() - started) / 1000);
+        setRecSeconds(elapsed);
+        if (elapsed >= 90) stopRecording(false);
+      }, 250);
+    } catch {
+      host.toast("разреши микрофон, чтобы записать голосовое");
+    }
+  };
+
+  const removeMessage = async () => {
+    if (!pendingDelete || sending) return;
+    setSending(true);
+    try {
+      await host.api(`/api/messages/${pendingDelete.id}`, { method: "DELETE" });
+      if (editing?.id === pendingDelete.id) setEditing(null);
+      if (replyTo?.id === pendingDelete.id) setReplyTo(null);
+      setPendingDelete(null);
+      await loadThread();
+    } catch (caught) {
+      host.toast(errorMessage(caught, "не удалось удалить сообщение"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const transcribe = async (message: ChatMessage) => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const response = await host.api(`/api/messages/${message.id}/transcribe`, { method: "POST" });
+      setThread((current) => current ? {
+        ...current,
+        messages: current.messages.map((item) => item.id === message.id ? { ...item, transcript: response.transcript } : item),
+      } : current);
+    } catch (caught) {
+      host.toast(errorMessage(caught, "не удалось расшифровать"));
     } finally {
       setSending(false);
     }
@@ -411,7 +600,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const sendPhoto = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
-    if (!file || sending) return;
+    if (!file || sending || recording || editing) return;
     setSending(true);
     try {
       const form = new FormData();
@@ -437,26 +626,47 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     host.navigate(view, params);
   };
 
+  const modeTitle = editing ? "Изменить" : replyTo ? "Ответить" : "";
+  const modePreview = editing ? (editing.body || "") : replyTo ? replyText(replyTo) : "";
+
   return (
     <section class="chat-screen">
-      <header class="chat-topbar">
-        <a class="chat-back" href={host.hrefFor("matches")} onClick={navigate("matches")} aria-label="Вернуться к чатам" title="Чаты"><ArrowIcon /></a>
-        {peer ? (
+      <header class={`chat-topbar${modeTitle ? " is-compose" : ""}`}>
+        {modeTitle ? (
+          <button class="chat-back" type="button" onClick={cancelComposeMode} aria-label="Отменить" title="Отменить"><ArrowIcon /></button>
+        ) : (
+          <a class="chat-back" href={host.hrefFor("matches")} onClick={navigate("matches")} aria-label="Вернуться к чатам" title="Чаты"><ArrowIcon /></a>
+        )}
+        {modeTitle ? (
+          <div class="chat-peer">
+            <span class="chat-peer-copy"><strong>{modeTitle}</strong><small>{modePreview.slice(0, 80)}</small></span>
+          </div>
+        ) : peer ? (
           <a class="chat-peer" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })}>
             <img src={avatarUrl(host.basePath, peer.photo, peer.name)} alt="" />
             <span class="chat-peer-copy"><strong>{peer.name}</strong><small>взаимная симпатия</small></span>
           </a>
         ) : <div class="chat-peer"><span class="chat-peer-copy"><strong>Загрузка…</strong></span></div>}
         <div class="chat-top-actions">
-          {peer ? <a class="chat-top-action" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })} aria-label="Открыть анкету" title="Анкета"><UserIcon /></a> : null}
-          {peer ? <button class="chat-top-action chat-remove-action" type="button" onClick={() => onUnmatchRequest(peer.id)} aria-label="Убрать чат" title="Убрать чат"><TrashIcon /></button> : null}
+          {!modeTitle && peer ? <a class="chat-top-action" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })} aria-label="Открыть анкету" title="Анкета"><UserIcon /></a> : null}
+          {!modeTitle && peer ? <button class="chat-top-action chat-remove-action" type="button" onClick={() => onUnmatchRequest(peer.id)} aria-label="Убрать чат" title="Убрать чат"><TrashIcon /></button> : null}
         </div>
       </header>
       {error ? <p class={styles.error}>{error}</p> : (
         <>
           <div class="thread" ref={threadRef}>
             {thread?.messages?.length ? thread.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} host={host} onReply={() => { setReplyTo(message); }} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                host={host}
+                busy={sending || recording}
+                onReply={() => beginReply(message)}
+                onEdit={() => beginEdit(message)}
+                onDelete={() => setPendingDelete(message)}
+                onTranscribe={() => void transcribe(message)}
+                onJump={jumpTo}
+              />
             )) : thread ? (
               <>
                 <p class="hint">Напиши первым. Подсказки по анкете — ткни, отредактируй и отправь.</p>
@@ -465,16 +675,35 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
             ) : <p class="hint">загрузка…</p>}
           </div>
           <div class="composer-dock">
-            {replyTo ? <div class="reply-bar"><span><b>ответ на сообщение</b>{replyText(replyTo).slice(0, 90)}</span><button type="button" class="reply-cancel" onClick={() => setReplyTo(null)} aria-label="Отменить ответ"><CloseIcon /></button></div> : null}
-            <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
-              <label class="composer-attach" title="фото" aria-label="прикрепить фото">
-                <PhotoIcon />
-                <input type="file" accept="image/*" hidden disabled={sending} onChange={sendPhoto} />
-              </label>
-              <input name="body" maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder="написать сообщение" autocomplete="off" enterKeyHint="send" disabled={sending} />
-              <button class="composer-send" type="submit" aria-label="Отправить сообщение" title="Отправить" disabled={sending || !draft.trim()}><SendIcon /></button>
-            </form>
+            {recording ? (
+              <div class="composer is-recording" role="status">
+                <button type="button" class="composer-text" onClick={() => stopRecording(true)}>Отмена</button>
+                <span class="rec-time">запись {clock(recSeconds)}</span>
+                <button type="button" class="composer-send" onClick={() => stopRecording(false)} aria-label="Отправить голосовое">Отправить</button>
+              </div>
+            ) : (
+              <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
+                <label class="composer-attach" title="фото" aria-label="прикрепить фото">
+                  <PhotoIcon />
+                  <input type="file" accept="image/*" hidden disabled={sending || Boolean(editing)} onChange={sendPhoto} />
+                </label>
+                <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
+                <input ref={inputRef} name="body" maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" enterKeyHint="send" disabled={sending} />
+                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : "Отправить сообщение"} title={editing ? "Сохранить" : "Отправить"} disabled={sending || !draft.trim()}>{editing ? "OK" : <SendIcon />}</button>
+              </form>
+            )}
           </div>
+          <Modal
+            isOpen={pendingDelete !== null}
+            onClose={() => !sending && setPendingDelete(null)}
+            title="Удалить сообщение?"
+            footer={<>
+              <Button variant="ghost" slim disabled={sending} onClick={() => setPendingDelete(null)}>отмена</Button>
+              <Button variant="solid" slim disabled={sending} loading={sending} onClick={() => void removeMessage()}>Удалить</Button>
+            </>}
+          >
+            <p class={styles.modalHint}>Оно пропадёт из переписки у вас обоих. Голосовое при этом стирается.</p>
+          </Modal>
         </>
       )}
     </section>

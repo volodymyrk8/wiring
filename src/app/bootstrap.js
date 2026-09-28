@@ -681,7 +681,7 @@ import { createInboxController } from "./inbox";
     navigate: (view, params = {}) => void goToView(view, params),
     api,
     toast,
-    continueAfterInvite: goAfterInvite,
+    continueAfterInvite: () => goToView("deck"),
     onDeleted: async () => {
       state.user = null;
       stopInbox();

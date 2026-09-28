@@ -48,6 +48,7 @@ from legal_pages import MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
+from speech import MAX_AUDIO_SECONDS, SpeechError, audio_kind, transcribe_audio
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
 from push import delete_subscription, delete_user_subscriptions, ensure_push_tables, public_key, save_subscription
 from premium import (
@@ -476,6 +477,10 @@ def init_db() -> None:
         )
     _ensure_column(conn, "messages", "reply_to_id", "INTEGER")
     _ensure_column(conn, "messages", "photo", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "messages", "audio", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "messages", "audio_duration", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(conn, "messages", "transcript", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "messages", "edited_at", "INTEGER")
     _ensure_column(conn, "messages", "deleted_at", "INTEGER")
     _ensure_column(conn, "reads", "deleted_at", "INTEGER")
     # Map free-text cities onto the catalog when an alias/exact match exists.
@@ -2445,7 +2450,7 @@ def api_matches():
         matched_at = int(row["matched_at"] or 0)
         last = conn.execute(
             """
-            SELECT body, photo, from_id, created_at, id FROM messages
+            SELECT body, photo, audio, transcript, from_id, created_at, id FROM messages
             WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
               AND COALESCE(deleted_at, 0) = 0
             ORDER BY id DESC LIMIT 1
@@ -2454,10 +2459,12 @@ def api_matches():
         ).fetchone()
         body = str(last["body"] or "").strip() if last else ""
         has_photo = bool(last and str(last["photo"] or "").strip()) if last else False
-        if last and not body and has_photo:
+        has_audio = bool(last and str(last["audio"] or "").strip()) if last else False
+        transcript = str(last["transcript"] or "").strip() if last else ""
+        if last and has_audio:
+            preview = transcript or "голосовое"
+        elif last and not body and has_photo:
             preview = "фото"
-        elif last and body and has_photo:
-            preview = body
         else:
             preview = body
         item["last_message"] = preview
@@ -2479,13 +2486,24 @@ def api_matches():
 
 
 
-def _message_preview(body: str, photo: str = "") -> str:
-    text_body = str(body or "").strip()
+def _message_preview(body: str, photo: str = "", audio: str = "", transcript: str = "") -> str:
+    text_body = str(body or "").strip() or str(transcript or "").strip()
     if text_body:
         return text_body[:160]
+    if str(audio or "").strip():
+        return "голосовое"
     if str(photo or "").strip():
         return "фото"
     return ""
+
+
+def _unlink_upload(rel: str) -> None:
+    if not rel or ".." in rel or rel.startswith(("/", "\\")):
+        return
+    full = os.path.abspath(os.path.join(UPLOAD_DIR, rel))
+    root = os.path.abspath(UPLOAD_DIR)
+    if full.startswith(root + os.sep) and os.path.isfile(full):
+        os.remove(full)
 
 
 def _message_payload(
@@ -2496,19 +2514,27 @@ def _message_payload(
 ) -> dict[str, Any]:
     keys = set(row.keys())
     photo = str(row["photo"] or "") if "photo" in keys else ""
+    audio = str(row["audio"] or "") if "audio" in keys else ""
+    transcript = str(row["transcript"] or "") if "transcript" in keys else ""
     body = str(row["body"] or "")
     reply_to = None
     reply_id = row["reply_to_id"] if "reply_to_id" in keys else None
     if reply_id and by_id and int(reply_id) in by_id:
         src = by_id[int(reply_id)]
         src_keys = set(src.keys())
-        src_photo = str(src["photo"] or "") if "photo" in src_keys else ""
+        gone = bool(src["deleted_at"]) if "deleted_at" in src_keys and src["deleted_at"] else False
+        src_photo = "" if gone else (str(src["photo"] or "") if "photo" in src_keys else "")
+        src_audio = "" if gone else (str(src["audio"] or "") if "audio" in src_keys else "")
+        src_transcript = "" if gone else (str(src["transcript"] or "") if "transcript" in src_keys else "")
         reply_to = {
             "id": int(src["id"]),
-            "body": _message_preview(str(src["body"] or ""), src_photo),
+            "body": "сообщение удалено" if gone else _message_preview(str(src["body"] or ""), src_photo, src_audio, src_transcript),
             "mine": src["from_id"] == uid,
             "has_photo": bool(src_photo),
+            "has_audio": bool(src_audio),
+            "gone": gone,
         }
+    duration = int(row["audio_duration"] or 0) if "audio_duration" in keys else 0
     return {
         "id": row["id"],
         "from_id": row["from_id"],
@@ -2516,6 +2542,10 @@ def _message_payload(
         "body": body,
         "photo": photo,
         "photo_url": prefix(f"/api/messages/media/{row['id']}") if photo else "",
+        "audio_url": prefix(f"/api/messages/media/{row['id']}") if audio else "",
+        "audio_duration": duration,
+        "transcript": transcript,
+        "edited": bool(row["edited_at"]) if "edited_at" in keys and row["edited_at"] else False,
         "created_at": row["created_at"],
         "read": row["from_id"] == uid and int(row["id"]) <= peer_read_id,
         "reply_to": reply_to,
@@ -2529,16 +2559,49 @@ def _insert_message(
     other_id: int,
     body: str,
     photo: str = "",
+    audio: str = "",
+    audio_duration: int = 0,
     reply_to_id: int | None = None,
 ) -> int:
     cur = conn.execute(
         """
-        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (uid, other_id, body, int(time.time()), reply_to_id, photo or ""),
+        (uid, other_id, body, int(time.time()), reply_to_id, photo or "", audio or "", int(audio_duration or 0)),
     )
     return int(cur.lastrowid)
+
+
+def _message_columns() -> str:
+    return "id, from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, transcript, edited_at, deleted_at"
+
+
+def _attach_reply_sources(conn: Connection, rows: list[Row], by_id: dict[int, Row]) -> None:
+    missing = []
+    for row in rows:
+        reply_id = row["reply_to_id"] if "reply_to_id" in row.keys() else None
+        if reply_id and int(reply_id) not in by_id:
+            missing.append(int(reply_id))
+    if not missing:
+        return
+    marks = ", ".join("?" for _ in missing)
+    for src in conn.execute(f"SELECT {_message_columns()} FROM messages WHERE id IN ({marks})", tuple(missing)):
+        by_id[int(src["id"])] = src
+
+
+def _thread_message(conn: Connection, uid: int, message_id: int) -> Row | None:
+    row = conn.execute(f"SELECT {_message_columns()} FROM messages WHERE id = ?", (message_id,)).fetchone()
+    if not row or row["deleted_at"]:
+        return None
+    from_id = int(row["from_id"])
+    to_id = int(row["to_id"])
+    if uid not in {from_id, to_id}:
+        return None
+    other = to_id if uid == from_id else from_id
+    if other in blocked_ids(conn, uid) or not _is_match(conn, uid, other):
+        return None
+    return row
 
 
 @app.get("/api/messages/<int:other_id>")
@@ -2555,7 +2618,7 @@ def api_messages(other_id: int):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     rows = conn.execute(
         """
-        SELECT id, from_id, to_id, body, created_at, reply_to_id, photo FROM messages
+        SELECT id, from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, transcript, edited_at, deleted_at FROM messages
         WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
           AND COALESCE(deleted_at, 0) = 0
         ORDER BY id ASC
@@ -2574,6 +2637,7 @@ def api_messages(other_id: int):
     ).fetchone()
     peer_read_id = int(peer_read["last_read_id"]) if peer_read else 0
     by_id = {int(r["id"]): r for r in rows}
+    _attach_reply_sources(conn, rows, by_id)
     messages = [_message_payload(r, uid, peer_read_id, by_id) for r in rows]
     peer = user_public(other, detail=True)
     me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
@@ -2736,14 +2800,186 @@ def api_message_media(message_id: int):
     if other in blocked_ids(conn, uid):
         abort(403)
     photo = str(row["photo"] or "") if "photo" in row.keys() else ""
-    if not photo:
+    audio = str(row["audio"] or "") if "audio" in row.keys() else ""
+    rel = audio or photo
+    if not rel:
         abort(404)
-    if request.args.get("s") == "sm":
+    if photo and not audio and request.args.get("s") == "sm":
         return _send_thumb(UPLOAD_DIR, photo, "chat")
-    _safe_media_path(UPLOAD_DIR, photo)
-    response = send_from_directory(UPLOAD_DIR, photo)
+    _safe_media_path(UPLOAD_DIR, rel)
+    response = send_from_directory(UPLOAD_DIR, rel)
     response.headers["Cache-Control"] = "private, max-age=86400"
     return response
+
+
+def _reply_target(conn: Connection, uid: int, other_id: int, raw_reply: object) -> int | None:
+    if raw_reply in (None, "", 0, "0"):
+        return None
+    try:
+        reply_to_id = int(raw_reply)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError("некорректный ответ")
+    src = conn.execute(
+        """
+        SELECT id FROM messages
+        WHERE id = ? AND COALESCE(deleted_at, 0) = 0
+          AND ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+        """,
+        (reply_to_id, uid, other_id, other_id, uid),
+    ).fetchone()
+    if not src:
+        raise ValueError("сообщение для ответа не найдено")
+    return reply_to_id
+
+
+@app.patch("/api/messages/<int:message_id>")
+@login_required
+def api_edit_message(message_id: int):
+    uid = session["uid"]
+    data = request.get_json(silent=True) or {}
+    body = str(data.get("body") or "").strip()
+    if not (1 <= len(body) <= 1000):
+        return jsonify({"ok": False, "error": "сообщение: 1–1000 символов"}), 400
+    conn = db()
+    row = _thread_message(conn, uid, message_id)
+    if not row or int(row["from_id"]) != uid:
+        return jsonify({"ok": False, "error": "это сообщение нельзя изменить"}), 404
+    if str(row["audio"] or "").strip():
+        return jsonify({"ok": False, "error": "голосовое нельзя переписать текстом"}), 400
+    conn.execute(
+        "UPDATE messages SET body = ?, edited_at = ? WHERE id = ?",
+        (body, int(time.time()), message_id),
+    )
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/messages/<int:message_id>")
+@login_required
+def api_delete_message(message_id: int):
+    uid = session["uid"]
+    conn = db()
+    row = _thread_message(conn, uid, message_id)
+    if not row or int(row["from_id"]) != uid:
+        return jsonify({"ok": False, "error": "это сообщение нельзя удалить"}), 404
+    conn.execute("UPDATE messages SET deleted_at = ? WHERE id = ?", (int(time.time()), message_id))
+    _unlink_upload(str(row["photo"] or ""))
+    _unlink_upload(str(row["audio"] or ""))
+    conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/messages/<int:message_id>/transcribe")
+@login_required
+def api_transcribe_message(message_id: int):
+    uid = session["uid"]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"transcribe:{uid}", 30, 3600):
+        return jsonify({"ok": False, "error": "слишком много расшифровок, подожди"}), 429
+    if too_many(f"transcribeip:{ip}", 60, 3600):
+        return jsonify({"ok": False, "error": "слишком много расшифровок, подожди"}), 429
+    conn = db()
+    row = _thread_message(conn, uid, message_id)
+    if not row or not str(row["audio"] or "").strip():
+        return jsonify({"ok": False, "error": "голосовое не найдено"}), 404
+    existing = str(row["transcript"] or "").strip()
+    if existing:
+        return jsonify({"ok": True, "transcript": existing})
+    rel = str(row["audio"])
+    full = os.path.abspath(os.path.join(UPLOAD_DIR, rel))
+    root = os.path.abspath(UPLOAD_DIR)
+    if not full.startswith(root + os.sep) or not os.path.isfile(full):
+        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+    with open(full, "rb") as handle:
+        data = handle.read()
+    mime = "audio/webm"
+    if rel.endswith(".wav"):
+        mime = "audio/wav"
+    elif rel.endswith(".m4a") or rel.endswith(".mp4"):
+        mime = "audio/mp4"
+    elif rel.endswith(".ogg"):
+        mime = "audio/ogg"
+    elif rel.endswith(".mp3"):
+        mime = "audio/mpeg"
+    try:
+        text = transcribe_audio(data, os.path.basename(rel), mime)
+    except SpeechError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    conn.execute("UPDATE messages SET transcript = ? WHERE id = ?", (text, message_id))
+    conn.commit()
+    return jsonify({"ok": True, "transcript": text})
+
+
+@app.post("/api/messages/voice")
+@login_required
+@real_account_required
+def api_send_voice_message():
+    uid = session["uid"]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    if too_many(f"chatvoice:{uid}", 40, 3600):
+        return jsonify({"ok": False, "error": "слишком много голосовых, подожди"}), 429
+    try:
+        other_id = int(request.form.get("to_id") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "нет адресата"}), 400
+    if not other_id:
+        return jsonify({"ok": False, "error": "нет адресата"}), 400
+    conn = db()
+    if other_id in blocked_ids(conn, uid):
+        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+    if not _is_match(conn, uid, other_id):
+        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+    sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
+    if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    try:
+        reply_to_id = _reply_target(conn, uid, other_id, request.form.get("reply_to_id"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"ok": False, "error": "нет записи"}), 400
+    data = upload.read()
+    kind = audio_kind(data, str(upload.mimetype or ""))
+    if not kind:
+        return jsonify({"ok": False, "error": "это не голосовое"}), 400
+    ext, _mime = kind
+    try:
+        duration = int(request.form.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0
+    duration = max(1, min(MAX_AUDIO_SECONDS, duration or 1))
+    folder = os.path.join(UPLOAD_DIR, "chat", str(uid))
+    os.makedirs(folder, exist_ok=True)
+    filename = f"{secrets.token_hex(16)}{ext}"
+    rel = f"chat/{uid}/{filename}"
+    with open(os.path.join(folder, filename), "wb") as handle:
+        handle.write(data)
+    msg_id = _insert_message(
+        conn,
+        uid=uid,
+        other_id=other_id,
+        body="",
+        audio=rel,
+        audio_duration=duration,
+        reply_to_id=reply_to_id,
+    )
+    mark_read(conn, uid, other_id)
+    if sender and other and _notifiable(other):
+        notify_event(
+            conn,
+            user_id=other_id,
+            email=str(other["email"]),
+            is_guest=False,
+            kind="message",
+            from_id=uid,
+            from_name=str(sender["name"]),
+            preview="голосовое",
+            last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
+        )
+    conn.commit()
+    return jsonify({"ok": True, "id": msg_id})
 
 
 @app.post("/api/unmatch")

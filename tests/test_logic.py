@@ -29,6 +29,9 @@ class LogicTest(unittest.TestCase):
         self.assertEqual(normalize_city("Budva"), "Будва")
         self.assertEqual(normalize_city("novi sad"), "Нови-Сад")
         self.assertEqual(normalize_city("Kyiv"), "Киев")
+        self.assertEqual(normalize_city("Hanoi"), "Ханой")
+        self.assertEqual(normalize_city("Saigon"), "Хошимин")
+        self.assertEqual(normalize_city("Nha Trang"), "Нячанг")
 
     def test_profanity(self):
         self.assertTrue(has_profanity("хуй"))

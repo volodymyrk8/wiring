@@ -1623,6 +1623,69 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(brought_back.status_code, 200)
         self.assertEqual([item["id"] for item in brought_back.get_json()["passes"]], [mutual["id"]])
 
+    def test_message_reply_edit_delete_and_voice(self):
+        import struct
+        from unittest.mock import patch
+
+        self._register()
+        peer = self._peers(1)[0]
+        ada = self._me_id("ada@example.com")
+        self._login(peer["email"])
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": ada, "direction": "like"}).status_code, 200)
+        self._login("ada@example.com")
+        self.assertEqual(self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "like"}).status_code, 200)
+        sent = self.client.post("/api/messages", json={"to_id": peer["id"], "body": "первый"})
+        self.assertEqual(sent.status_code, 200, sent.get_data(as_text=True))
+        first_id = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"][0]["id"]
+
+        reply = self.client.post("/api/messages", json={"to_id": peer["id"], "body": "ок", "reply_to_id": first_id})
+        self.assertEqual(reply.status_code, 200, reply.get_data(as_text=True))
+        edited = self.client.patch(f"/api/messages/{first_id}", json={"body": "первый, поправила"})
+        self.assertEqual(edited.status_code, 200, edited.get_data(as_text=True))
+        thread = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
+        self.assertEqual(thread[0]["body"], "первый, поправила")
+        self.assertTrue(thread[0]["edited"])
+        self.assertEqual(thread[1]["reply_to"]["body"], "первый, поправила")
+
+        self._login(peer["email"])
+        denied = self.client.patch(f"/api/messages/{first_id}", json={"body": "чужое"})
+        self.assertEqual(denied.status_code, 404)
+
+        samples = 800
+        pcm = b"\x00\x00" * samples
+        wav = struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF", 36 + len(pcm), b"WAVE", b"fmt ", 16, 1, 1, 8000, 16000, 2, 16, b"data", len(pcm),
+        ) + pcm
+        self._login("ada@example.com")
+        voice = self.client.post(
+            "/api/messages/voice",
+            data={"to_id": str(peer["id"]), "duration": "2", "file": (BytesIO(wav), "voice.wav")},
+        )
+        self.assertEqual(voice.status_code, 200, voice.get_data(as_text=True))
+        voice_id = voice.get_json()["id"]
+        listed = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
+        voice_row = next(item for item in listed if item["id"] == voice_id)
+        self.assertTrue(voice_row["audio_url"])
+        self.assertEqual(voice_row["audio_duration"], 2)
+
+        missing = self.client.post(f"/api/messages/{voice_id}/transcribe")
+        self.assertEqual(missing.status_code, 503)
+        with patch("app.transcribe_audio", return_value="привет голосом"):
+            done = self.client.post(f"/api/messages/{voice_id}/transcribe")
+        self.assertEqual(done.status_code, 200, done.get_data(as_text=True))
+        self.assertEqual(done.get_json()["transcript"], "привет голосом")
+
+        removed = self.client.delete(f"/api/messages/{voice_id}")
+        self.assertEqual(removed.status_code, 200, removed.get_data(as_text=True))
+        after = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
+        self.assertFalse(any(item["id"] == voice_id for item in after))
+        quoted = next(item for item in after if item["reply_to"] and item["reply_to"]["id"] == first_id)
+        self.client.delete(f"/api/messages/{first_id}")
+        gone = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"]
+        quote = next(item for item in gone if item["id"] == quoted["id"])
+        self.assertEqual(quote["reply_to"]["body"], "сообщение удалено")
+
     def _me_id(self, email):
         conn = open_request_connection()
         try:
