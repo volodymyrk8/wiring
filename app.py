@@ -1959,8 +1959,7 @@ def api_feed():
     max_age = request.args.get("max_age", type=int) or 99
     city_raw = str(request.args.get("city") or "").strip()
     city_q = catalog_city(city_raw) or ""
-    if city_raw and not city_q:
-        city_q = "\x00"
+    unknown_city = bool(city_raw) and not city_q
     real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
     hide_undiagnosed = str(request.args.get("hide_empty", "1")).lower() not in {"0", "false", "no"}
     skip_ids = {int(part) for part in str(request.args.get("skip") or "").split(",") if part.isdigit()}
@@ -1978,7 +1977,7 @@ def api_feed():
             neuro=neuro_filter,
             vibe=vibe_filter,
             intents=intent_filter,
-            city="" if city_q == "\x00" else city_q,
+            city=city_q,
             min_age=min_age,
             max_age=max_age,
             real_only=real_only,
@@ -2007,7 +2006,7 @@ def api_feed():
     cards, has_more, generation = claim_feed(
         db(), int(me["id"]), min_age=min_age, max_age=max_age,
         city=city_q, limit=limit, eligible=eligible,
-        skip_ids=skip_ids, include_delivered=narrowed,
+        skip_ids=skip_ids, include_delivered=narrowed, match_none=unknown_city,
     )
     jev_ranked = False
     jev_scores = "none"
@@ -2292,8 +2291,7 @@ def api_likes():
     max_age = request.args.get("max_age", type=int) or 99
     city_raw = str(request.args.get("city") or "").strip()
     city_q = catalog_city(city_raw) or ""
-    if city_raw and not city_q:
-        city_q = "\x00"
+    unknown_city = bool(city_raw) and not city_q
     min_age = max(18, min(99, min_age))
     max_age = max(18, min(99, max_age))
     if min_age > max_age:
@@ -2307,7 +2305,7 @@ def api_likes():
             neuro=neuro_filter,
             vibe=vibe_filter,
             intents=intent_filter,
-            city="" if city_q == "\x00" else city_q,
+            city=city_q,
             min_age=min_age,
             max_age=max_age,
         )
@@ -2318,6 +2316,7 @@ def api_likes():
         JOIN swipes s ON s.from_id = u.id AND s.to_id = ? AND s.direction = 'like'
         WHERE u.age BETWEEN ? AND ?
           AND (? = '' OR u.city = ?)
+          AND (? = 0 OR FALSE)
           AND COALESCE(u.is_seed, 0) = 0
           AND COALESCE(u.deleted_at, 0) = 0
           AND u.id NOT IN (SELECT to_id FROM swipes WHERE from_id = ?)
@@ -2327,7 +2326,7 @@ def api_likes():
           )
         ORDER BY s.created_at DESC
         """,
-        (uid, min_age, max_age, city_q, city_q, uid),
+        (uid, min_age, max_age, city_q, city_q, int(unknown_city), uid),
     ).fetchall()
     plus = is_premium(me)
     people = []

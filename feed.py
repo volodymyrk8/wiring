@@ -34,6 +34,7 @@ def claim_feed(
     conn: Connection, user_id: int, *, min_age: int, max_age: int, city: str,
     limit: int, eligible: Callable[[Row], dict[str, Any] | None],
     skip_ids: set[int] | None = None, include_delivered: bool = False,
+    match_none: bool = False,
 ) -> tuple[list[dict[str, Any]], bool, int]:
     """Reserve a random page atomically; the caller must commit before sending it.
 
@@ -49,6 +50,7 @@ def claim_feed(
         else "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id)"
     )
     skip_sql = ""
+    none_sql = "AND FALSE" if match_none else ""
     params: list[Any] = [user_id, min_age, max_age, city, city, user_id, user_id]
     if skipped:
         skip_sql = f"AND users.id NOT IN ({', '.join('?' for _ in skipped)})"
@@ -60,6 +62,7 @@ def claim_feed(
           AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_id = ? AND s.to_id = users.id)
           {history_sql}
           {skip_sql}
+          {none_sql}
           AND (EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id) OR COALESCE(photo, '') != '')
         ORDER BY random()
     """, tuple(params)).fetchall()
