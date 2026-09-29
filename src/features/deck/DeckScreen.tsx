@@ -229,6 +229,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [scrolling, setScrolling] = useState(false);
+  const [panelHold, setPanelHold] = useState(false);
   const [error, setError] = useState("");
   const [cardHeight, setCardHeight] = useState(640);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -238,6 +239,8 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const indexRef = useRef(index);
   indexRef.current = index;
   const dragRef = useRef<{ y: number } | null>(null);
+  const panelDragRef = useRef<{ id: number; y: number; scroll: number; moved: boolean } | null>(null);
+  const panelMovedRef = useRef(false);
   const scrollTimerRef = useRef<number | null>(null);
   const current = cards[index];
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
@@ -409,6 +412,17 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     finally { if (!controller.signal.aborted) { actionRef.current = null; setBusy(false); } }
   };
 
+  const releasePanel = () => {
+    const start = panelDragRef.current;
+    panelDragRef.current = null;
+    const viewport = viewportRef.current;
+    if (start?.moved && viewport?.clientHeight) {
+      const nearest = Math.round(viewport.scrollTop / viewport.clientHeight);
+      viewport.scrollTo({ top: nearest * viewport.clientHeight, behavior: "auto" });
+    }
+    setPanelHold(false);
+  };
+
   const finishDrag = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
     const start = dragRef.current;
     if (!start) return;
@@ -432,7 +446,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </Modal>
       {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
-      <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
+      <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
         onScroll={(event) => { settleScroll(); setIndex(Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)))); }}
         onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -463,7 +477,39 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
           </div>
         </section>
       </div>
-      <div class={`${styles.controls} ${styles.actionPanel}${scrolling || !current ? ` ${styles.actionPanelHidden}` : ""}`} aria-hidden={scrolling || !current}>
+      <div
+        class={`${styles.controls} ${styles.actionPanel}${scrolling || !current ? ` ${styles.actionPanelHidden}` : ""}${panelHold ? ` ${styles.actionPanelHolding}` : ""}`}
+        aria-hidden={(scrolling || !current) && !panelHold}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          const viewport = viewportRef.current;
+          if (!viewport) return;
+          panelMovedRef.current = false;
+          panelDragRef.current = { id: event.pointerId, y: event.clientY, scroll: viewport.scrollTop, moved: false };
+        }}
+        onPointerMove={(event) => {
+          const start = panelDragRef.current;
+          const viewport = viewportRef.current;
+          if (!start || !viewport || event.pointerId !== start.id) return;
+          const dy = start.y - event.clientY;
+          if (!start.moved && Math.abs(dy) < 10) return;
+          if (!start.moved) {
+            start.moved = true;
+            panelMovedRef.current = true;
+            setPanelHold(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
+          viewport.scrollTop = start.scroll + dy;
+        }}
+        onPointerUp={releasePanel}
+        onPointerCancel={() => { panelDragRef.current = null; panelMovedRef.current = false; setPanelHold(false); }}
+        onClickCapture={(event) => {
+          if (!panelMovedRef.current) return;
+          panelMovedRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
         {current ? <>
           <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel="Скрыть — больше не показывать" title="Скрыть">{iconPass}</Button><span aria-hidden="true">Скрыть</span></div>
           <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: current.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: current.id }); }} ariaLabel="Профиль" title="Профиль">{iconProfile}</Button><span aria-hidden="true">Профиль</span></div>

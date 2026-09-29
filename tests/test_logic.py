@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from cities import normalize_city
+from cities import normalize_city, places_payload
 from icebreakers import openers_for
 from matchmaker import heuristic_like, _mutual_looking_ok
 from profanity import has_profanity
@@ -32,6 +32,13 @@ class LogicTest(unittest.TestCase):
         self.assertEqual(normalize_city("Hanoi"), "Ханой")
         self.assertEqual(normalize_city("Saigon"), "Хошимин")
         self.assertEqual(normalize_city("Nha Trang"), "Нячанг")
+
+    def test_countries_are_alphabetical(self):
+        names = [str(block["country"]) for block in places_payload()]
+        self.assertEqual(names[-1], "другое")
+        ordered = names[:-1]
+        self.assertEqual(ordered, sorted(ordered, key=str.casefold))
+        self.assertIn("Вьетнам", names)
 
     def test_profanity(self):
         self.assertTrue(has_profanity("хуй"))

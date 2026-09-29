@@ -139,11 +139,13 @@
   justify-content: center;
   gap: 18px;
   margin: 0 auto;
-  padding: 4px 0 6px;
+  padding: 10px 0 6px;
   box-sizing: border-box;
+  touch-action: none;
 }
 
 .reels { flex: 1; min-height: 180px; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; overflow-anchor: none; overscroll-behavior-y: contain; scrollbar-width: none; touch-action: pan-y; cursor: grab; }
+.freeScroll { scroll-snap-type: none; }
 .reels::-webkit-scrollbar { display: none; }
 .reels:focus { outline: none; }
 .dragging { cursor: grabbing; }
@@ -206,6 +208,7 @@
 .actionCircle.actionCircle:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .actionPanel { align-self: center; transition: opacity 140ms ease, transform 140ms ease; transform-origin: center; }
 .actionPanelHidden { opacity: 0; transform: translateY(8px) scale(.98); pointer-events: none; }
+.actionPanelHolding { opacity: 1; transform: none; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .actionPanel { transition: none; } }
 @media (min-width: 768px) { .controls { min-height: 72px; } .actionControl { min-width: 48px; } .actionCircle.actionCircle { width: 48px; min-width: 48px; height: 48px; min-height: 48px; } }
 @media (min-width: 1025px) { .controls { min-height: 74px; } .actionControl { min-width: 50px; } .actionCircle.actionCircle { width: 50px; min-width: 50px; height: 50px; min-height: 50px; } }

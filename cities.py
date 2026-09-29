@@ -503,13 +503,17 @@ def is_catalog_city(raw: str) -> bool:
 
 
 def places_payload() -> list[dict[str, object]]:
-    return [
+    rows = [
         {
             "country": b["country"],
             "cities": sorted((b["cities"] or []), key=lambda c: str(c).casefold()),  # type: ignore[index]
         }
         for b in PLACES
     ]
+    rest = [row for row in rows if row["country"] != "другое"]
+    other = [row for row in rows if row["country"] == "другое"]
+    rest.sort(key=lambda row: str(row["country"]).casefold())
+    return rest + other
 
 
 def country_of_city(raw: str) -> str:

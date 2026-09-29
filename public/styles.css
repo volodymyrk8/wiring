@@ -1201,6 +1201,8 @@ html[data-view="person"] .toast-stack {
   font-weight: 500;
   line-height: 1.35;
   text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
   pointer-events: auto;
 }
@@ -3010,8 +3012,11 @@ html[data-view="chat"] #app {
 .bubble.has-photo { max-width: min(330px, 78%); padding: 7px 7px 6px; }
 .bubble.has-photo .bubble-body { padding: 0 5px 2px; }
 .bubble-body {
+  min-width: 0;
+  max-width: 100%;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .bubble .time {
   display: flex;
