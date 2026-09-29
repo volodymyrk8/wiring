@@ -73,11 +73,10 @@ LOOKING_FOR = [
 GENDERS = [
     {"id": "woman", "label": "женщина"},
     {"id": "man", "label": "мужчина"},
-    {"id": "nb", "label": "небинарно"},
     {"id": "hidden", "label": "скрыто"},
 ]
 
-LEGACY_GENDER_IDS = frozenset({"other"})
+LEGACY_GENDER_IDS = frozenset({"other", "nb"})
 
 INTENTS = [
     {"id": "relationship", "label": "отношения"},

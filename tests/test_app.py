@@ -1073,6 +1073,30 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(cleared.status_code, 200, cleared.get_data(as_text=True))
         self.assertEqual(cleared.get_json()["user"]["city"], "")
 
+    def test_nonbinary_gender_is_stored_as_hidden(self):
+        self._register()
+        self._login("ada@example.com")
+        catalog = self.client.get("/api/catalog").get_json()["genders"]
+        self.assertFalse(any(item["id"] == "nb" for item in catalog))
+        patched = self.client.patch(
+            "/api/me",
+            json={
+                "name": "Ада",
+                "age": 29,
+                "city": "",
+                "gender": "nb",
+                "looking_for": "everyone",
+                "bio": "пишу",
+                "neuro": ["asd"],
+                "intents": ["chat"],
+                "special_data_consent": True,
+                "photo_rights_consent": True,
+                "photo": "portraits/p01.jpg",
+            },
+        )
+        self.assertEqual(patched.status_code, 200, patched.get_data(as_text=True))
+        self.assertEqual(patched.get_json()["user"]["gender"], "hidden")
+
     def test_dating_intent_allows_empty_city(self):
         self._register()
         self._login("ada@example.com")

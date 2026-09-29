@@ -86,7 +86,7 @@ EXTRA_USERS: list[dict] = [
         "email": "fox@wiring.test",
         "name": "Фокс",
         "age": 29,
-        "gender": "nb",
+        "gender": "hidden",
         "city": "Берлин",
         "bio": "they/она. BPD-friendly режим: честно и без пассивной агрессии.",
         "photo": "portraits/p08.jpg",

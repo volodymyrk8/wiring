@@ -216,12 +216,20 @@ import { createInboxController } from "./inbox";
   };
 
   const toast = (text, action) => {
+    let stack = document.getElementById("toasts");
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.id = "toasts";
+      stack.className = "toast-stack";
+      document.body.appendChild(stack);
+    }
     const el = document.createElement("div");
     el.className = action ? "toast tap" : "toast";
     el.textContent = text;
     if (action) el.addEventListener("click", () => action());
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), action ? 10000 : 2200);
+    stack.appendChild(el);
+    while (stack.children.length > 3) stack.firstElementChild?.remove();
+    setTimeout(() => el.remove(), action ? 8000 : 2400);
   };
 
   const pingBrowser = (text) => {

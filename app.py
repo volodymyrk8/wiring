@@ -488,7 +488,7 @@ def init_db() -> None:
         resolved = catalog_city(str(row["city"] or ""))
         if resolved and resolved != row["city"]:
             conn.execute("UPDATE users SET city = ? WHERE id = ?", (resolved, row["id"]))
-    conn.execute("UPDATE users SET gender = 'hidden' WHERE gender = 'other'")
+    conn.execute("UPDATE users SET gender = 'hidden' WHERE gender IN ('other', 'nb')")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral ON users(referral_code)")
     ensure_default_code(conn)
     ensure_beta_plus_gift(conn)
@@ -969,6 +969,8 @@ def parse_profile(
         city = normalize_city(city_raw) if city_raw else ""
     bio = str(data.get("bio") or "").strip()
     gender = str(data.get("gender") or "").strip()
+    if gender in {"nb", "other"}:
+        gender = "hidden"
     looking_for = str(data.get("looking_for") or "").strip()
     job = str(data.get("job") or "").strip()
     communication = str(data.get("communication") or "").strip()
@@ -1105,7 +1107,7 @@ def replace_tags(conn: Connection, user_id: int, neuro: list[str], vibe: list[st
 def looking_matches(viewer_looking: str, candidate_gender: str) -> bool:
     if viewer_looking in {"everyone", "friends"}:
         return True
-    if candidate_gender in {"hidden", "other"}:
+    if candidate_gender in {"hidden", "other", "nb"}:
         return True
     if viewer_looking == "women":
         return candidate_gender == "woman"

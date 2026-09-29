@@ -37,6 +37,15 @@ const UserIcon = () => (
   </svg>
 );
 
+const draftStorageKey = (id: number) => `wiring-chat-draft:${id}`;
+
+const PencilIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 20h4l10-10-4-4L4 16v4z" />
+    <path d="m13 7 4 4" />
+  </svg>
+);
+
 const TrashIcon = () => (
   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
@@ -407,8 +416,8 @@ function MessageBubble({
       <div class="bubble-actions">
         <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>Ответить</button>
         {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
-        {message.mine && !audio ? <button type="button" class="bubble-action" disabled={busy} onClick={onEdit}>Изменить</button> : null}
-        {message.mine ? <button type="button" class="bubble-action" disabled={busy} onClick={onDelete}>Удалить</button> : null}
+        {message.mine && !audio ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onEdit} aria-label="Изменить" title="Изменить"><PencilIcon /></button> : null}
+        {message.mine ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onDelete} aria-label="Удалить" title="Удалить"><TrashIcon /></button> : null}
       </div>
     </div>
   );
@@ -432,7 +441,8 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const streamRef = useRef<MediaStream | null>(null);
   const recTimerRef = useRef<number | null>(null);
   const discardRecRef = useRef(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const draftReadyRef = useRef(false);
 
   const scrollToEnd = () => {
     requestAnimationFrame(() => {
@@ -456,6 +466,34 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       setError(errorMessage(caught, "не удалось загрузить переписку"));
     }
   };
+
+  useEffect(() => {
+    draftReadyRef.current = false;
+    try {
+      setDraft(localStorage.getItem(draftStorageKey(chatId)) || "");
+    } catch {
+      setDraft("");
+    }
+    draftReadyRef.current = true;
+  }, [chatId]);
+
+  useEffect(() => {
+    if (!draftReadyRef.current || editing) return;
+    try {
+      const key = draftStorageKey(chatId);
+      if (draft) localStorage.setItem(key, draft);
+      else localStorage.removeItem(key);
+    } catch {
+      /* private mode */
+    }
+  }, [draft, chatId, editing]);
+
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight, 128)}px`;
+  }, [draft]);
 
   useEffect(() => {
     let alive = true;
@@ -498,9 +536,19 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     node.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
   };
 
+  const restoreDraft = () => {
+    try {
+      setDraft(localStorage.getItem(draftStorageKey(chatId)) || "");
+    } catch {
+      setDraft("");
+    }
+  };
+
   const beginReply = (message: ChatMessage) => {
+    const wasEditing = Boolean(editing);
     setEditing(null);
     setReplyTo(message);
+    if (wasEditing) restoreDraft();
     inputRef.current?.focus();
   };
 
@@ -512,8 +560,10 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   };
 
   const cancelComposeMode = () => {
+    const wasEditing = Boolean(editing);
     setReplyTo(null);
     setEditing(null);
+    if (wasEditing) restoreDraft();
   };
 
   const sendMessage = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
@@ -525,14 +575,15 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       if (editing) {
         await host.api(`/api/messages/${editing.id}`, { method: "PATCH", body: JSON.stringify({ body }) });
         setEditing(null);
+        restoreDraft();
       } else {
         await host.api("/api/messages", {
           method: "POST",
           body: JSON.stringify({ to_id: chatId, body, ...(replyTo?.id ? { reply_to_id: replyTo.id } : {}) }),
         });
         setReplyTo(null);
+        setDraft("");
       }
-      setDraft("");
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
@@ -699,7 +750,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         )}
         {modeTitle ? (
           <div class="chat-peer">
-            <span class="chat-peer-copy"><strong>{modeTitle}</strong><small>{modePreview.slice(0, 80)}</small></span>
+            <span class="chat-peer-copy"><strong>{modeTitle}</strong><small>{modePreview}</small></span>
           </div>
         ) : peer ? (
           <a class="chat-peer" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })}>
@@ -736,6 +787,15 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
             ) : <p class="hint">загрузка…</p>}
           </div>
           <div class="composer-dock">
+            {replyTo || editing ? (
+              <div class="reply-bar">
+                <span>
+                  <b>{editing ? "изменяешь сообщение" : "ответ на сообщение"}</b>
+                  <em>{modePreview}</em>
+                </span>
+                <button type="button" class="reply-cancel" onClick={cancelComposeMode} aria-label="Отменить">×</button>
+              </div>
+            ) : null}
             {recording ? (
               <div class="composer is-recording" role="status">
                 <button type="button" class="composer-text" onClick={() => stopRecording(true)}>Отмена</button>
@@ -743,14 +803,14 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 <button type="button" class="composer-send" onClick={() => stopRecording(false)} aria-label="Отправить голосовое">Отправить</button>
               </div>
             ) : (
-              <form class={`composer${sending ? " is-sending" : ""}${replyTo || editing ? " is-labeled" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
+              <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
                 <label class="composer-attach" title="до 10 фото" aria-label="прикрепить фото, до 10">
                   <PhotoIcon />
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={sendPhotos} />
                 </label>
                 <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
-                <input ref={inputRef} name="body" maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" enterKeyHint="send" disabled={sending} />
-                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : replyTo ? "Ответить" : "Отправить сообщение"} title={editing ? "Сохранить" : replyTo ? "Ответить" : "Отправить"} disabled={sending || !draft.trim()}>{editing ? "OK" : replyTo ? "Ответить" : <SendIcon />}</button>
+                <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" disabled={sending} />
+                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : "Отправить сообщение"} title={editing ? "Сохранить" : "Отправить"} disabled={sending || !draft.trim()} onMouseDown={(event) => event.preventDefault()}><SendIcon /></button>
               </form>
             )}
           </div>

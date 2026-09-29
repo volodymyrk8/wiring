@@ -474,6 +474,8 @@ export function ProfileScreen({ host }: Props) {
             </div>
           </div>
 
+          <p class={styles.draftHint}>Чем больше заполнишь анкету, тем проще будет начать разговор.</p>
+
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
               Анкета пока не в ленте — черновик сохраняется автоматически, можно вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.

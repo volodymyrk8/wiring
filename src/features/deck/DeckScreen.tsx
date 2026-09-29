@@ -149,7 +149,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const changePhoto = (direction: number) => setPhotoIndex((index) => (index + direction + Math.max(photos.length, 1)) % Math.max(photos.length, 1));
   const gesture = usePhotoSwipe(changePhoto, onVertical);
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
-  const showGender = card.gender && card.gender !== "hidden" && card.gender !== "other";
+  const showGender = card.gender && card.gender !== "hidden" && card.gender !== "other" && card.gender !== "nb";
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
   const intentLine = openToIntentsLine(card.gender, labelsIntent);
   const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
