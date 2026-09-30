@@ -209,7 +209,22 @@ def install(
             )
             conn.commit()
             return _error("сессия недействительна", 401, token_expired=True)
-        conn.execute("UPDATE mobile_refresh_tokens SET used_at = ? WHERE token_hash = ?", (now, found["token_hash"]))
+        # Claim the refresh atomically. Two requests can both read the unused row
+        # above; only one may rotate it under PostgreSQL's concurrent row locking.
+        claimed = conn.execute(
+            """
+            UPDATE mobile_refresh_tokens SET used_at = ?
+            WHERE token_hash = ? AND used_at IS NULL AND revoked_at IS NULL
+            """,
+            (now, found["token_hash"]),
+        )
+        if claimed.rowcount != 1:
+            conn.execute(
+                "UPDATE mobile_refresh_tokens SET revoked_at = ? WHERE family = ? AND revoked_at IS NULL",
+                (now, found["family"]),
+            )
+            conn.commit()
+            return _error("сессия недействительна", 401, token_expired=True)
         payload = _login_payload(conn, user, str(found["family"]), str(found["device"] or ""))
         conn.commit()
         return jsonify(payload)

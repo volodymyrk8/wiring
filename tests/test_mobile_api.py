@@ -1,5 +1,7 @@
 import os
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
 
 import tests.test_app as base  # sets the test environment
@@ -79,6 +81,43 @@ class MobileApiTest(unittest.TestCase):
         # the rotated token from the same family is now dead too
         dead = self.mobile.post("/api/auth/refresh", json={"refresh_token": second["refresh_token"]})
         self.assertEqual(dead.status_code, 401)
+
+    def test_concurrent_refresh_cannot_rotate_the_same_token_twice(self):
+        self._user()
+        tokens = self._token_login()
+        barrier = threading.Barrier(2)
+        app_module = __import__("app")
+        original_db = app_module.db
+
+        class SynchronizedConnection:
+            def __init__(self, conn):
+                self.conn = conn
+
+            def execute(self, sql, params=None):
+                result = self.conn.execute(sql, params)
+                if "FROM mobile_refresh_tokens WHERE token_hash" in sql:
+                    barrier.wait(timeout=5)
+                return result
+
+            def __getattr__(self, name):
+                return getattr(self.conn, name)
+
+        def synchronized_db():
+            return SynchronizedConnection(original_db())
+
+        def refresh_once():
+            with app.test_client(use_cookies=False) as client:
+                return client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
+
+        with patch.object(app_module, "db", synchronized_db):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                responses = list(pool.map(lambda _index: refresh_once(), range(2)))
+
+        self.assertEqual(sorted(response.status_code for response in responses), [200, 401])
+        successful = next(response.get_json() for response in responses if response.status_code == 200)
+        # The racing replay is detected and revokes the family, including the new token.
+        revoked = self.mobile.post("/api/auth/refresh", json={"refresh_token": successful["refresh_token"]})
+        self.assertEqual(revoked.status_code, 401)
 
     def test_refresh_ignores_stale_bearer_header(self):
         self._user()
