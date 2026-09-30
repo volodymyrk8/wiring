@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { endpoints, mediaUrl } from "../../src/api/client";
 import type { Message, Thread } from "../../src/api/types";
 import { radius, useTheme } from "../../src/theme";
@@ -20,6 +21,9 @@ function merge(a: Message[], b: Message[]): Message[] {
   return [...byId.values()].sort((x, y) => x.id - y.id);
 }
 
+type Pending = { cid: string; body: string; failed: boolean };
+const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
 const clock = (ts: number) => new Date(ts * 1000).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
 export default function ChatScreen() {
@@ -33,7 +37,8 @@ export default function ChatScreen() {
   const [ready, setReady] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [uploading, setUploading] = useState(false);
   const seq = useRef(0);
   const lastId = useRef(0);
   const ticks = useRef(0);
@@ -61,11 +66,12 @@ export default function ChatScreen() {
   }, [peerId]);
 
   useEffect(() => {
-    poll();
+    const counter = seq;
+    void poll();
     const timer = setInterval(poll, POLL_MS);
     return () => {
       clearInterval(timer);
-      seq.current++;
+      counter.current++; // invalidate any in-flight response
     };
   }, [poll]);
 
@@ -81,24 +87,51 @@ export default function ChatScreen() {
     }
   }
 
-  async function send(body: string) {
-    const value = body.trim();
-    if (!value || sending) return;
-    setSending(true);
+  // Sends are optimistic. Each keeps its client id, so retrying after a lost response
+  // can never create a duplicate on the server.
+  async function deliver(item: Pending) {
+    setPending((p) => p.map((x) => (x.cid === item.cid ? { ...x, failed: false } : x)));
     try {
-      await endpoints.send(peerId, value);
-      setText("");
+      await endpoints.send(peerId, item.body, item.cid);
+      setPending((p) => p.filter((x) => x.cid !== item.cid));
       await poll();
     } catch (e: any) {
+      setPending((p) => p.map((x) => (x.cid === item.cid ? { ...x, failed: true } : x)));
       setError(e.message);
+    }
+  }
+
+  function send(body: string) {
+    const value = body.trim();
+    if (!value) return;
+    const item: Pending = { cid: newClientId(), body: value, failed: false };
+    setText("");
+    setError("");
+    setPending((p) => [...p, item]);
+    deliver(item);
+  }
+
+  async function sendPhoto() {
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
+    if (picked.canceled || !picked.assets[0]) return;
+    const asset = picked.assets[0];
+    setUploading(true);
+    try {
+      await endpoints.sendPhoto(peerId, asset.uri, asset.mimeType || "image/jpeg", asset.fileName || "photo.jpg");
+      await poll();
+    } catch (e: any) {
+      Alert.alert("Фото не отправлено", e.message);
     } finally {
-      setSending(false);
+      setUploading(false);
     }
   }
 
   if (!ready || !peer) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
-  const data = [...messages].reverse();
-  const canSend = !!text.trim() && !sending;
+  const data: (Message | (Pending & { pending: true }))[] = [
+    ...pending.map((p) => ({ ...p, pending: true as const })).reverse(),
+    ...[...messages].reverse(),
+  ];
+  const canSend = !!text.trim();
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
@@ -115,9 +148,21 @@ export default function ChatScreen() {
       <FlatList
         inverted
         data={data}
-        keyExtractor={(m) => String(m.id)}
+        keyExtractor={(m) => ("pending" in m ? m.cid : String(m.id))}
         contentContainerStyle={{ paddingVertical: 10 }}
         renderItem={({ item }) => {
+          if ("pending" in item) {
+            return (
+              <View style={{ alignSelf: "flex-end", maxWidth: "80%", marginVertical: 3, marginHorizontal: 12 }}>
+                <Pressable disabled={!item.failed} onPress={() => deliver(item)} style={{ backgroundColor: item.failed ? t.danger + "22" : t.accent + "99", borderRadius: radius.md, borderBottomRightRadius: 5, paddingHorizontal: 13, paddingVertical: 9, borderWidth: item.failed ? 1 : 0, borderColor: t.danger }}>
+                  <Text style={{ color: item.failed ? t.text : "#fff", fontSize: 16, lineHeight: 22 }}>{item.body}</Text>
+                  <Text style={{ color: item.failed ? t.danger : "rgba(255,255,255,0.8)", fontSize: 11, alignSelf: "flex-end", marginTop: 3 }}>
+                    {item.failed ? "Не отправлено · нажми, чтобы повторить" : "Отправляется…"}
+                  </Text>
+                </Pressable>
+              </View>
+            );
+          }
           const mine = item.mine ?? item.from_id !== peerId;
           const inner = (
             <>
@@ -164,6 +209,9 @@ export default function ChatScreen() {
       />
       <ErrorText>{error}</ErrorText>
       <View style={{ flexDirection: "row", alignItems: "flex-end", padding: 10, gap: 8, backgroundColor: t.bg }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Отправить фото" disabled={uploading} onPress={() => { tap(); sendPhoto(); }} style={{ height: 44, width: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.4 : 1 }}>
+          <Ionicons name="image-outline" size={26} color={t.accent} />
+        </Pressable>
         <TextInput
           accessibilityLabel="Сообщение"
           value={text}

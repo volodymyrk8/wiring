@@ -244,6 +244,30 @@ class MobileApiTest(unittest.TestCase):
         self.assertEqual([m["id"] for m in newer["messages"]], ids[4:])
         self.assertFalse(newer["has_more"])
 
+    def test_message_client_id_makes_retries_idempotent(self):
+        self.client = self.web
+        a = self._register(email="a2@example.com", name="Аня")
+        self._logout()
+        b = self._register(email="b2@example.com", name="Боря")
+        self.web.post("/api/swipe", json={"target_id": a["id"], "direction": "like"})
+        self._logout()
+        base.WiringTest._login.__get__(self)("a2@example.com")
+        self.assertTrue(self.web.post("/api/swipe", json={"target_id": b["id"], "direction": "like"}).get_json()["matched"])
+        payload = {"to_id": b["id"], "body": "привет", "client_id": "cid-1"}
+        first = self.web.post("/api/messages", json=payload).get_json()
+        again = self.web.post("/api/messages", json=payload).get_json()
+        self.assertTrue(first["ok"] and not first.get("duplicate"))
+        self.assertTrue(again["ok"] and again["duplicate"])
+        self.assertEqual(first["id"], again["id"])
+        other = self.web.post("/api/messages", json={**payload, "client_id": "cid-2"}).get_json()
+        self.assertNotEqual(other["id"], first["id"])
+        thread = self.web.get(f"/api/messages/{b['id']}").get_json()
+        self.assertEqual(len(thread["messages"]), 2)
+        # no client_id keeps the old behaviour: every send is a new message
+        self.web.post("/api/messages", json={"to_id": b["id"], "body": "без id"})
+        self.web.post("/api/messages", json={"to_id": b["id"], "body": "без id"})
+        self.assertEqual(len(self.web.get(f"/api/messages/{b['id']}").get_json()["messages"]), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

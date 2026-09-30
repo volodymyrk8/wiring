@@ -20,27 +20,29 @@ export default function Feed() {
   const busy = useRef(false);
   const [nonce, setNonce] = useState(0);
 
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const page = await endpoints.feed(seen.current);
-      setQueue((q) => [...q, ...page.cards.filter((c) => !seen.current.includes(c.id) && !q.some((x) => x.id === c.id))]);
-      setHasMore(page.has_more);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // State is only touched inside promise callbacks, never synchronously from an effect.
+  const load = useCallback(
+    () =>
+      endpoints
+        .feed(seen.current)
+        .then((page) => {
+          setError("");
+          setQueue((q) => [...q, ...page.cards.filter((c) => !seen.current.includes(c.id) && !q.some((x) => x.id === c.id))]);
+          setHasMore(page.has_more);
+        })
+        .catch((e: Error) => setError(e.message))
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   const current = queue[0];
 
   useEffect(() => {
-    if (!loading && hasMore && queue.length <= 2) load();
+    if (!loading && hasMore && queue.length <= 2) void load();
   }, [queue.length, hasMore, loading, load]);
 
   const onSwiped = useCallback(

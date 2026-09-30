@@ -3,9 +3,12 @@ import { Tabs } from "expo-router";
 import { useTheme } from "../../src/theme";
 
 type Icon = React.ComponentProps<typeof Ionicons>["name"];
-const icon = (on: Icon, off: Icon) => ({ focused, color }: { focused: boolean; color: import("react-native").ColorValue }) => (
-  <Ionicons name={focused ? on : off} size={25} color={color} />
-);
+const icon = (on: Icon, off: Icon) => {
+  function TabIcon({ focused, color }: { focused: boolean; color: import("react-native").ColorValue }) {
+    return <Ionicons name={focused ? on : off} size={25} color={color} />;
+  }
+  return TabIcon;
+};
 
 export default function TabsLayout() {
   const t = useTheme();
