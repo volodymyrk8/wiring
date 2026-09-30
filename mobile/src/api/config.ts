@@ -1,9 +1,11 @@
 import Constants from "expo-constants";
 
-// Override with EXPO_PUBLIC_API_URL (e.g. http://127.0.0.1:5070 for the iOS simulator,
-// http://10.0.2.2:5070 for the Android emulator).
+/**
+ * API base URL. Read only from the app config (`extra.apiUrl`, set in app.config.js from
+ * EXPO_PUBLIC_API_URL at build time). Deliberately NOT `process.env.EXPO_PUBLIC_*`: Metro inlines
+ * that into the JS bundle and its cache can keep a stale value from an earlier build (a release
+ * once shipped with a simulator's http://127.0.0.1:5070).
+ */
 export const API_URL: string = (
-  process.env.EXPO_PUBLIC_API_URL ||
-  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ||
-  "https://wiring.date"
+  (Constants.expoConfig?.extra?.apiUrl as string | undefined) || "https://wiring.date"
 ).replace(/\/+$/, "");
