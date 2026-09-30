@@ -1,23 +1,14 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { API_URL } from "./config";
+import { createApi, type Api, type Hooks } from "./core";
 import { clearSession, getToken, setToken } from "./tokens";
 import type { Catalog, FeedPage, Match, Me, Person, Photo, Thread } from "./types";
 
-export class ApiError extends Error {
-  status: number;
-  payload: any;
-  constructor(message: string, payload: any, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.payload = payload;
-    this.status = status;
-  }
-}
+export { ApiError } from "./core";
 
 export const APP_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
 
-type Hooks = { onSessionLost?: () => void; onUpgradeRequired?: (minVersion: string) => void };
 const hooks: Hooks = {};
 export const setApiHooks = (next: Hooks) => Object.assign(hooks, next);
 
@@ -28,77 +19,18 @@ export function mediaUrl(value?: Photo | null): string {
   return /^https?:\/\//.test(path) ? path : `${API_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-async function parse(response: Response) {
-  const raw = await response.text();
-  try {
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    const hint = response.status >= 500 ? "сервер временно недоступен" : "сервер вернул неожиданный ответ";
-    throw new ApiError(hint, {}, response.status);
-  }
-}
-
-async function send(path: string, init: RequestInit): Promise<Response> {
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-    "X-App-Version": APP_VERSION,
-    "X-App-Platform": Platform.OS,
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  const access = getToken("access");
-  // Auth endpoints take credentials in the body; a stale bearer must not block a refresh.
-  if (access && !path.startsWith("/api/auth/")) headers.Authorization = `Bearer ${access}`;
-  if (init.body && !(init.body instanceof FormData) && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-  try {
-    return await fetch(`${API_URL}${path}`, { ...init, headers });
-  } catch {
-    throw new ApiError("нет соединения с сервером", {}, 0);
-  }
-}
-
-// One refresh at a time: concurrent 401s share the same rotation.
-let refreshing: Promise<boolean> | null = null;
-
-async function refreshTokens(): Promise<boolean> {
-  refreshing ??= (async () => {
-    const refresh = getToken("refresh");
-    if (!refresh) return false;
-    try {
-      const response = await send("/api/auth/refresh", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: refresh }),
-      });
-      const data = await parse(response);
-      if (!response.ok || !data.access_token) return false;
-      await setToken("access", data.access_token);
-      await setToken("refresh", data.refresh_token);
-      return true;
-    } catch {
-      // Offline: keep the tokens, the caller sees the network error instead of being logged out.
-      return true;
-    }
-  })().finally(() => {
-    refreshing = null;
-  });
-  return refreshing;
-}
-
-export async function api<T = any>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
-  const response = await send(path, init);
-  const data = await parse(response);
-  if (response.status === 426 && data.upgrade) {
-    hooks.onUpgradeRequired?.(String(data.min_version || ""));
-  }
-  if (response.status === 401 && data.token_expired && !retried && !path.startsWith("/api/auth/")) {
-    if (await refreshTokens()) return api<T>(path, init, true);
-    await clearSession();
-    hooks.onSessionLost?.();
-  }
-  if (!response.ok || data.ok === false) {
-    throw new ApiError(String(data.error || `ошибка ${response.status}`), data, response.status);
-  }
-  return data as T;
-}
+export const api: Api = createApi({
+  baseUrl: API_URL,
+  version: APP_VERSION,
+  platform: Platform.OS,
+  fetchFn: (input, init) => fetch(input, init),
+  tokens: {
+    get: (key) => getToken(key),
+    set: (key, value) => setToken(key, value),
+    clear: clearSession,
+  },
+  hooks,
+});
 
 const json = (body: unknown, method = "POST"): RequestInit => ({ method, body: JSON.stringify(body) });
 
@@ -126,7 +58,14 @@ export const endpoints = {
     const qs = Object.entries(q).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join("&");
     return api<Thread & { ok: boolean; has_more?: boolean }>(`/api/messages/${id}${qs ? `?${qs}` : ""}`);
   },
-  send: (to_id: number, body: string) => api("/api/messages", json({ to_id, body })),
+  send: (to_id: number, body: string, client_id: string) =>
+    api<{ id: number; duplicate?: boolean }>("/api/messages", json({ to_id, body, client_id })),
+  sendPhoto: (to_id: number, uri: string, mime: string, name: string) => {
+    const form = new FormData();
+    form.append("to_id", String(to_id));
+    form.append("file", { uri, name, type: mime } as any);
+    return api("/api/messages/photo", { method: "POST", body: form });
+  },
   block: (user_id: number) => api("/api/block", json({ user_id })),
   report: (user_id: number, reason: string) => api("/api/report", json({ user_id, reason })),
   unmatch: (user_id: number) => api("/api/unmatch", json({ user_id })),

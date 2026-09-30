@@ -19,6 +19,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from admin import collect_stats, ensure_filter_tables, track_filters
 from database import (
     Connection,
+    IntegrityError,
     Row,
     USE_PG,
     columns as _db_columns,
@@ -492,6 +493,10 @@ def init_db() -> None:
     _ensure_column(conn, "messages", "transcript", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "messages", "edited_at", "INTEGER")
     _ensure_column(conn, "messages", "deleted_at", "INTEGER")
+    _ensure_column(conn, "messages", "client_id", "TEXT")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(from_id, client_id) WHERE client_id IS NOT NULL"
+    )
     _ensure_column(conn, "reads", "deleted_at", "INTEGER")
     # Map free-text cities onto the catalog when an alias/exact match exists.
     for row in conn.execute("SELECT id, city FROM users"):
@@ -2589,13 +2594,14 @@ def _insert_message(
     audio: str = "",
     audio_duration: int = 0,
     reply_to_id: int | None = None,
+    client_id: str | None = None,
 ) -> int:
     cur = conn.execute(
         """
-        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, client_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (uid, other_id, body, int(time.time()), reply_to_id, photo or "", audio or "", int(audio_duration or 0)),
+        (uid, other_id, body, int(time.time()), reply_to_id, photo or "", audio or "", int(audio_duration or 0), client_id),
     )
     return int(cur.lastrowid)
 
@@ -2727,7 +2733,26 @@ def api_send_message():
         ).fetchone()
         if not src:
             return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
-    _insert_message(conn, uid=uid, other_id=other_id, body=body, reply_to_id=reply_to_id)
+    # A client-generated id makes retries after a dropped response safe: the same
+    # (sender, client_id) never creates a second message.
+    client_id = str(data.get("client_id") or "").strip()[:64] or None
+    if client_id:
+        dup = conn.execute(
+            "SELECT id FROM messages WHERE from_id = ? AND client_id = ?", (uid, client_id)
+        ).fetchone()
+        if dup:
+            return jsonify({"ok": True, "duplicate": True, "id": int(dup["id"])})
+    try:
+        message_id = _insert_message(
+            conn, uid=uid, other_id=other_id, body=body, reply_to_id=reply_to_id, client_id=client_id
+        )
+    except IntegrityError:
+        # Lost a race with a concurrent identical request.
+        conn.rollback()
+        dup = conn.execute(
+            "SELECT id FROM messages WHERE from_id = ? AND client_id = ?", (uid, client_id)
+        ).fetchone()
+        return jsonify({"ok": True, "duplicate": True, "id": int(dup["id"]) if dup else 0})
     mark_read(conn, uid, other_id)
     if sender and other and _notifiable(other):
         notify_event(
@@ -2742,7 +2767,7 @@ def api_send_message():
             last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
         )
     conn.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "id": message_id})
 
 
 @app.post("/api/messages/photo")

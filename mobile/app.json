@@ -13,17 +13,19 @@
         "NSPhotoLibraryUsageDescription": "Фото для анкеты и чатов",
         "NSCameraUsageDescription": "Снимок для анкеты",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#6d5efc",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "date.wiring.app"
+      "package": "date.wiring.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,19 +35,12 @@
       "expo-secure-store",
       "expo-image",
       [
-        "expo-build-properties",
-        {
-          "android": {
-            "usesCleartextTraffic": true
-          }
-        }
-      ],
-      [
         "expo-notifications",
         {
           "color": "#6d5efc"
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "scheme": "wiring",
     "backgroundColor": "#f5f4fb",

@@ -15,14 +15,23 @@ npm run typecheck
 Локальный бэкенд и тестовые аккаунты (`dev@wiring.test` / `wiring-dev`) описаны в README репозитория wiring.
 
 ## Что есть
-Вход и регистрация (токены в Keychain/Keystore, автообновление), лента со свайпом, лайки, чаты (история постранично), профиль человека с жалобой и блокировкой, редактор анкеты с фото, настройки уведомлений и push, светлая и тёмная темы, экран «нужно обновление» по `426` от сервера.
+Вход и регистрация (токены в Keychain/Keystore, автообновление), лента со свайпом, лайки, чаты (история постранично, оптимистичная отправка с повтором без дублей, фото), профиль человека с жалобой и блокировкой, редактор анкеты с фото, настройки уведомлений и push, светлая и тёмная темы, экран «нужно обновление» по `426` от сервера.
 
 ## Push
 Клиент получает Expo push-токен и регистрирует его на `POST /api/push/device`. Нужен EAS-проект: `npx eas-cli init` (запишет `extra.eas.projectId` в `app.json`) и ключи APNs/FCM в аккаунте Expo. Без `projectId` переключатель push покажет понятное сообщение. Пока проверено только на сервере (моки). На симуляторе push не работает.
 
+## Проверки
+```sh
+npx tsc --noEmit && npx expo lint && npx expo-doctor
+npm test        # node --test: транспорт (bearer, refresh, 426, ошибки), 9 тестов
+```
+
+## Сборка и релиз (EAS)
+`eas.json`: профиль `preview` (внутренний APK/IPA, API `http://192.168.2.101:5070`, cleartext включён) и `production` (AAB, `https://wiring.date`, cleartext выключен). `app.config.js` включает cleartext только при `WIRING_CLEARTEXT=1`. Перед первой сборкой: `npx eas-cli login`, `npx eas-cli init` (projectId), Apple Developer и Google Play аккаунты, ключи push.
+
 ## Чего нет (следующие шаги)
-- Идемпотентность отправки, SSE/WebSocket, голосовые и фото в чате, фильтры ленты, WIRING+.
-- Тесты клиента (Jest, Maestro), Sentry, EAS Build/Submit.
+- SSE/WebSocket (сейчас опрос раз в 8 с), голосовые в чате, фильтры ленты, покупка WIRING+.
+- Тесты экранов (Maestro), Sentry (нужен DSN), EAS Build/Submit (нужны аккаунты).
 
 ## Сборка iOS (проверено на Xcode 27, iPhone 17 Simulator)
 ```sh
@@ -42,7 +51,7 @@ Release-сборка встраивает JS и не требует Metro. Debug
 ```sh
 export JAVA_HOME=$HOME/dev/tools/jdk17 ANDROID_HOME=$HOME/dev/android-sdk
 export PATH=$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH
-export EXPO_PUBLIC_API_URL=http://192.168.2.101:5070 CI=1
+export EXPO_PUBLIC_API_URL=http://192.168.2.101:5070 WIRING_CLEARTEXT=1 CI=1
 npm ci --legacy-peer-deps && npx expo prebuild --platform android --no-install
 cd android && echo "sdk.dir=$ANDROID_HOME" > local.properties && ./gradlew assembleRelease --no-daemon
 ```
@@ -51,5 +60,5 @@ cd android && echo "sdk.dir=$ANDROID_HOME" > local.properties && ./gradlew assem
 - При копировании проекта с Mac через tar появляются файлы `._*`; Metro падает на них. Удалять: `find . -name '._*' -not -path './node_modules/*' -delete` (или `COPYFILE_DISABLE=1 tar`).
 - Баннер WSL печатается в stdout любой ssh-команды, поэтому scp и бинарный `cat` через ssh ломаются. Файлы забирать через `base64` с маркерами.
 - `npm install` требует `--legacy-peer-deps` (конфликт peer-зависимостей react-dom).
-- Разрешён cleartext-трафик (`expo-build-properties`), потому что API по http. Для production переключить на https и убрать.
+- Cleartext-трафик включается только `WIRING_CLEARTEXT=1` (нужен для API по http). Без переменной сборка безопасна для production.
 - APK подписан debug-ключом. Для Google Play нужен release keystore и AAB (`./gradlew bundleRelease`).

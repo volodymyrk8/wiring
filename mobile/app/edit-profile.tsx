@@ -39,7 +39,6 @@ export default function EditProfile() {
   const { user, setUser, refresh } = useAuth();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [draft, setDraft] = useState<Draft | null>(user ? fromUser(user) : null);
-  const [photos, setPhotos] = useState<{ id: number; url: string; is_primary?: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -51,10 +50,10 @@ export default function EditProfile() {
     endpoints.catalog().then(setCatalog).catch((e) => setError(e.message));
   }, []);
 
-  useEffect(() => {
-    const list = (user?.photos || []).filter((p): p is { id: number; url: string; is_primary?: boolean } => typeof p !== "string" && !!p.id);
-    setPhotos(list);
-  }, [user]);
+  const photos = useMemo(
+    () => (user?.photos || []).filter((p): p is { id: number; url: string; is_primary?: boolean } => typeof p !== "string" && !!p.id),
+    [user],
+  );
 
   if (!user || !draft || !catalog) return <Loading />;
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));

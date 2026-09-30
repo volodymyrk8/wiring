@@ -5,8 +5,17 @@ import { useTheme } from "../src/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, ErrorText, Field } from "../src/ui/kit";
 
-export default function Register() {
+function Check({ on, set, text }: { on: boolean; set: (v: boolean) => void; text: string }) {
   const t = useTheme();
+  return (
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => set(!on)} style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+      <View style={{ width: 26, height: 26, borderRadius: 9, borderWidth: 2, borderColor: t.accent, backgroundColor: on ? t.accent : "transparent", marginRight: 12, alignItems: "center", justifyContent: "center" }}>{on && <Ionicons name="checkmark" size={17} color="#fff" />}</View>
+      <Text style={{ color: t.text, flex: 1 }}>{text}</Text>
+    </Pressable>
+  );
+}
+
+export default function Register() {
   const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,13 +36,6 @@ export default function Register() {
       setBusy(false);
     }
   }
-
-  const Check = ({ on, set, text }: { on: boolean; set: (v: boolean) => void; text: string }) => (
-    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => set(!on)} style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-      <View style={{ width: 26, height: 26, borderRadius: 9, borderWidth: 2, borderColor: t.accent, backgroundColor: on ? t.accent : "transparent", marginRight: 12, alignItems: "center", justifyContent: "center" }}>{on && <Ionicons name="checkmark" size={17} color="#fff" />}</View>
-      <Text style={{ color: t.text, flex: 1 }}>{text}</Text>
-    </Pressable>
-  );
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
