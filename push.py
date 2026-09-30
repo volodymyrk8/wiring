@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from database import Connection
+from mobile_api import send_device_push
 
 
 def ensure_push_tables(conn: Connection) -> None:
@@ -162,6 +163,7 @@ def send_user_push(
     if not _push_allowed(conn, user_id):
         return
     ensure_push_tables(conn)
+    send_device_push(conn, user_id, body=body, url=url, tag=tag)
     rows = conn.execute(
         "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?",
         (user_id,),
