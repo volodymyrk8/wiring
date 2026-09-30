@@ -21,8 +21,13 @@ export type Me = Person & {
   guest?: boolean;
   plus?: boolean;
   needs_profile?: boolean;
+  needs_special_consent?: boolean;
+  needs_photo_consent?: boolean;
+  notify_enabled?: boolean;
+  notify_push?: boolean;
   gender?: string;
   looking_for?: string;
+  height?: number | null;
 };
 
 export type FeedPage = { cards: Person[]; has_more: boolean; generation?: number };
@@ -47,5 +52,14 @@ export type Message = {
 
 export type Thread = { peer: Person; messages: Message[]; openers?: string[] };
 
-export type CatalogItem = { id: string; label?: string; name?: string };
-export type Catalog = { neuro?: CatalogItem[]; vibe?: CatalogItem[]; intents?: CatalogItem[] };
+export type CatalogItem = { id: string; label?: string; name?: string; blurb?: string };
+export type Place = { country: string; cities: string[] };
+export type Catalog = {
+  neuro?: CatalogItem[];
+  vibe?: CatalogItem[];
+  intents?: CatalogItem[];
+  genders?: CatalogItem[];
+  looking_for?: CatalogItem[];
+  places?: Place[];
+  limits?: { photos: number; bio: number };
+};

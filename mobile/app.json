@@ -39,10 +39,16 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#6d5efc"
+        }
       ]
     ],
     "scheme": "wiring",
-    "backgroundColor": "#e9ebf3",
+    "backgroundColor": "#f5f4fb",
     "extra": {
       "apiUrl": "https://wiring.date"
     }

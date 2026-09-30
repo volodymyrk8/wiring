@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import { endpoints } from "../../src/api/client";
 import type { Person } from "../../src/api/types";
-import { Button, ErrorText, Loading } from "../../src/ui/kit";
-import { PersonCard } from "../../src/ui/PersonCard";
+import { Button, ErrorText, Loading, SectionTitle } from "../../src/ui/kit";
+import { ProfileView } from "../../src/ui/ProfileView";
 
 const REASONS: [string, string][] = [
   ["spam", "Спам / реклама"],
@@ -28,11 +28,7 @@ export default function PersonScreen() {
   function confirmBlock() {
     Alert.alert("Заблокировать?", "Человек исчезнет из ленты и чатов.", [
       { text: "Отмена", style: "cancel" },
-      {
-        text: "Заблокировать",
-        style: "destructive",
-        onPress: () => endpoints.block(id).then(() => router.dismissAll()).catch((e) => Alert.alert("Ошибка", e.message)),
-      },
+      { text: "Заблокировать", style: "destructive", onPress: () => endpoints.block(id).then(() => router.dismissAll()).catch((e) => Alert.alert("Ошибка", e.message)) },
     ]);
   }
 
@@ -48,19 +44,21 @@ export default function PersonScreen() {
 
   if (!person) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, gap: 10 }}>
-      <PersonCard person={person} />
-      {person.matched && <Button title="Написать" onPress={() => router.push(`/chat/${id}`)} />}
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ProfileView person={person} />
+      <View style={{ height: 18 }} />
+      {person.matched && <Button title="Написать" icon="chatbubble-ellipses" onPress={() => router.push(`/chat/${id}`)} />}
+      <SectionTitle>Безопасность</SectionTitle>
       {reasonsOpen ? (
         <View style={{ gap: 8 }}>
-          {REASONS.map(([rid, label]) => <Button key={rid} title={label} kind="ghost" onPress={() => report(rid)} />)}
+          {REASONS.map(([rid, label]) => <Button key={rid} title={label} kind="soft" onPress={() => report(rid)} />)}
           <Button title="Отмена" kind="ghost" onPress={() => setReasonsOpen(false)} />
         </View>
       ) : (
-        <>
-          <Button title="Пожаловаться" kind="ghost" onPress={() => setReasonsOpen(true)} />
-          <Button title="Заблокировать" kind="danger" onPress={confirmBlock} />
-        </>
+        <View style={{ gap: 8 }}>
+          <Button title="Пожаловаться" kind="soft" icon="flag-outline" onPress={() => setReasonsOpen(true)} />
+          <Button title="Заблокировать" kind="ghost" icon="ban-outline" onPress={confirmBlock} />
+        </View>
       )}
     </ScrollView>
   );

@@ -1,14 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { endpoints } from "./api/client";
+import { endpoints, setApiHooks } from "./api/client";
+import { clearSession, getToken, loadTokens, setToken } from "./api/tokens";
 import type { Me } from "./api/types";
+import { unregisterPush } from "./push";
 
 type AuthState = {
   user: Me | null;
   loading: boolean;
+  upgradeRequired: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  setUser: (user: Me) => void;
 };
 
 const Ctx = createContext<AuthState | null>(null);
@@ -16,39 +20,60 @@ const Ctx = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const [upgradeRequired, setUpgradeRequired] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       setUser((await endpoints.me()).user);
     } catch {
-      setUser(null);
+      // Network errors keep the current user; a lost session is handled by the api hook.
     }
   }, []);
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
+    setApiHooks({
+      onSessionLost: () => setUser(null),
+      onUpgradeRequired: (min) => setUpgradeRequired(min || "новой версии"),
+    });
+    (async () => {
+      await loadTokens();
+      if (getToken("access") || getToken("refresh")) await refresh();
+      setLoading(false);
+    })();
   }, [refresh]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const res = await endpoints.token(email.trim(), password);
+    await setToken("access", res.access_token);
+    await setToken("refresh", res.refresh_token);
+    setUser(res.user);
+  }, []);
 
   const value = useMemo<AuthState>(
     () => ({
       user,
       loading,
+      upgradeRequired,
       refresh,
-      login: async (email, password) => setUser((await endpoints.login(email.trim(), password)).user),
+      setUser,
+      login: signIn,
       register: async (name, email, password) => {
         await endpoints.register({ name: name.trim(), email: email.trim(), password });
-        await endpoints.login(email.trim(), password);
-        await refresh();
+        await signIn(email, password);
       },
       logout: async () => {
+        const refreshToken = getToken("refresh");
+        const push = await unregisterPush().catch(() => null);
         try {
-          await endpoints.logout();
-        } finally {
-          setUser(null);
+          await endpoints.logout(refreshToken, push);
+        } catch {
+          // Tokens are dropped locally either way.
         }
+        await clearSession();
+        setUser(null);
       },
     }),
-    [user, loading, refresh],
+    [user, loading, upgradeRequired, refresh, signIn],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

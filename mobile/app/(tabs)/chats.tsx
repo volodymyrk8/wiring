@@ -1,11 +1,18 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { Image } from "expo-image";
-import { endpoints, mediaUrl } from "../../src/api/client";
+import { endpoints } from "../../src/api/client";
 import type { Match } from "../../src/api/types";
 import { useTheme } from "../../src/theme";
-import { Empty, ErrorText, Loading } from "../../src/ui/kit";
+import { Avatar, Empty, ErrorText, Loading } from "../../src/ui/kit";
+
+function when(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
 
 export default function Chats() {
   const t = useTheme();
@@ -20,25 +27,39 @@ export default function Chats() {
   );
 
   if (!matches) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
-  if (!matches.length) return <Empty text="Пока нет взаимных лайков. Они появятся здесь." />;
+  if (!matches.length) return <Empty icon="chatbubbles-outline" title="Пока нет мэтчей" text="Когда вы с кем-то лайкнете друг друга, чат появится здесь." />;
   return (
     <FlatList
       data={matches}
       keyExtractor={(m) => String(m.id)}
-      renderItem={({ item }) => (
-        <Pressable onPress={() => router.push(`/chat/${item.id}`)} style={{ flexDirection: "row", padding: 14, alignItems: "center", borderBottomWidth: 1, borderBottomColor: t.border }}>
-          <Image source={{ uri: mediaUrl(item.photo) }} style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: t.chip }} />
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={{ color: t.text, fontWeight: "600", fontSize: 16 }}>{item.name}</Text>
-            <Text numberOfLines={1} style={{ color: t.muted, marginTop: 2 }}>{item.last_message || "Напиши первым"}</Text>
-          </View>
-          {!!item.unread && (
-            <View style={{ backgroundColor: t.accent, borderRadius: 12, minWidth: 24, paddingHorizontal: 7, paddingVertical: 2 }}>
-              <Text style={{ color: t.accentText, textAlign: "center", fontWeight: "700" }}>{item.unread}</Text>
+      contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 20 }}
+      renderItem={({ item }) => {
+        const unread = !!item.unread;
+        return (
+          <Pressable
+            onPress={() => router.push(`/chat/${item.id}`)}
+            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", paddingVertical: 12, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Avatar uri={item.photo} name={item.name} size={60} online={item.online} />
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: t.text, fontWeight: "700", fontSize: 17 }}>{item.name}</Text>
+                <Text style={{ color: unread ? t.accent : t.muted, fontSize: 12.5, fontWeight: unread ? "700" : "400" }}>{when(item.last_at)}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}>
+                <Text numberOfLines={1} style={{ flex: 1, color: unread ? t.text : t.muted, fontWeight: unread ? "600" : "400", fontSize: 15 }}>
+                  {item.last_message || "Напиши первым 👋"}
+                </Text>
+                {unread && (
+                  <View style={{ backgroundColor: t.accent, borderRadius: 11, minWidth: 22, height: 22, paddingHorizontal: 6, alignItems: "center", justifyContent: "center", marginLeft: 8 }}>
+                    <Text style={{ color: t.accentText, fontSize: 12, fontWeight: "800" }}>{item.unread}</Text>
+                  </View>
+                )}
+              </View>
             </View>
-          )}
-        </Pressable>
-      )}
+          </Pressable>
+        );
+      }}
     />
   );
 }
