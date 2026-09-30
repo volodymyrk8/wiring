@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "WIRING",
+    "slug": "wiring",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "date.wiring.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Фото для анкеты и чатов",
+        "NSCameraUsageDescription": "Снимок для анкеты",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "date.wiring.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "scheme": "wiring",
+    "backgroundColor": "#e9ebf3",
+    "extra": {
+      "apiUrl": "https://wiring.date"
+    }
+  }
+}
