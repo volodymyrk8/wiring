@@ -15,7 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocalNetworkUsageDescription": "Нужно только для тестовых сборок, чтобы подключаться к серверу в вашей сети"
       },
-      "buildNumber": "2",
+      "buildNumber": "3",
       "appleTeamId": "G3T7684N3M"
     },
     "android": {
