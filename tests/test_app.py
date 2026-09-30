@@ -4,10 +4,15 @@ import unittest
 from io import BytesIO
 from unittest.mock import patch
 
-os.environ["DATABASE_URL"] = os.environ.get(
-    "TEST_DATABASE_URL",
-    os.environ.get("DATABASE_URL", "postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test"),
+os.environ["DATABASE_URL"] = (
+    os.environ.get("TEST_DATABASE_URL")
+    or os.environ.get("DATABASE_URL")
+    or "postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test"
 )
+# The suite truncates every table, so it must never run against a real database.
+_db_name = os.environ["DATABASE_URL"].split("?")[0].rstrip("/").rsplit("/", 1)[-1]
+if not _db_name.endswith("_test"):
+    raise SystemExit(f"Refusing to run tests against database {_db_name!r}: the name must end with _test")
 os.environ.setdefault("APP_SECRET_KEY", "test-secret")
 os.environ["UPLOAD_DIR"] = os.path.join(tempfile.gettempdir(), f"wiring-uploads-{os.getpid()}")
 os.environ["OPENAI_API_KEY"] = ""
