@@ -19,6 +19,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from admin import collect_stats, ensure_filter_tables, track_filters
 from database import (
     Connection,
+    IntegrityError,
     Row,
     USE_PG,
     columns as _db_columns,
@@ -50,6 +51,7 @@ from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
 from speech import MAX_AUDIO_SECONDS, SpeechError, audio_kind, transcribe_audio
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
+import mobile_api
 from push import delete_subscription, delete_user_subscriptions, ensure_push_tables, public_key, save_subscription
 from premium import (
     REFERRAL_DAYS,
@@ -138,6 +140,15 @@ def _close_db(_exc: BaseException | None) -> None:
     conn = getattr(g, "_db", None)
     if conn is not None:
         conn.close()
+
+
+mobile_api.install(
+    app,
+    db=lambda: db(),
+    authenticate=lambda email, password: _authenticate(email, password),
+    current_user=lambda: current_user(),
+    too_many=lambda key, limit, window: too_many(key, limit, window),
+)
 
 
 _DEVICE_SKIP_PREFIXES = ("/public/", "/media/", "/health", "/admin")
@@ -482,6 +493,10 @@ def init_db() -> None:
     _ensure_column(conn, "messages", "transcript", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "messages", "edited_at", "INTEGER")
     _ensure_column(conn, "messages", "deleted_at", "INTEGER")
+    _ensure_column(conn, "messages", "client_id", "TEXT")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(from_id, client_id) WHERE client_id IS NOT NULL"
+    )
     _ensure_column(conn, "reads", "deleted_at", "INTEGER")
     # Map free-text cities onto the catalog when an alias/exact match exists.
     for row in conn.execute("SELECT id, city FROM users"):
@@ -498,6 +513,7 @@ def init_db() -> None:
 
     ensure_legacy_vibe_cleanup(conn)
     ensure_push_tables(conn)
+    mobile_api.ensure_mobile_tables(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
@@ -1264,6 +1280,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
     delete_user_subscriptions(conn, uid)
+    mobile_api.delete_user_devices(conn, uid)
     folder = os.path.join(UPLOAD_DIR, str(uid))
     if os.path.isdir(folder):
         shutil.rmtree(folder, ignore_errors=True)
@@ -1572,6 +1589,37 @@ def api_register():
     return jsonify({"ok": True, "user": current_user()})
 
 
+def _authenticate(email: str, password: str):
+    """Shared by cookie login and token login. Returns (row, None) or (None, error_response)."""
+    row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    if not row or not check_password_hash(row["password_hash"], password):
+        return None, (jsonify({"ok": False, "error": "неверная почта или пароль"}), 401)
+    if "deleted_at" in row.keys() and row["deleted_at"]:
+        return None, (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "аккаунт удалён (восстановление доступно в течение 7 суток)",
+                    "deleted": True,
+                }
+            ),
+            403,
+        )
+    if email_verify_enforced() and not email_is_verified(row):
+        return None, (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "подтверди почту — мы отправили ссылку",
+                    "needs_email_verify": True,
+                    "email": email,
+                }
+            ),
+            403,
+        )
+    return row, None
+
+
 @app.post("/api/login")
 def api_login():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
@@ -1580,26 +1628,9 @@ def api_login():
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
     password = str(data.get("password") or "")
-    row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if not row or not check_password_hash(row["password_hash"], password):
-        return jsonify({"ok": False, "error": "неверная почта или пароль"}), 401
-    if "deleted_at" in row.keys() and row["deleted_at"]:
-        return jsonify(
-            {
-                "ok": False,
-                "error": "аккаунт удалён (восстановление доступно в течение 7 суток)",
-                "deleted": True,
-            }
-        ), 403
-    if email_verify_enforced() and not email_is_verified(row):
-        return jsonify(
-            {
-                "ok": False,
-                "error": "подтверди почту — мы отправили ссылку",
-                "needs_email_verify": True,
-                "email": email,
-            }
-        ), 403
+    row, err = _authenticate(email, password)
+    if err is not None:
+        return err
     session.clear()
     session.permanent = True
     session["uid"] = row["id"]
@@ -1925,6 +1956,7 @@ def api_patch_notifications():
         push = 0
     if not push:
         delete_user_subscriptions(conn, uid)
+        mobile_api.delete_user_devices(conn, uid)
     conn.execute("UPDATE users SET notify_enabled = ?, notify_push = ? WHERE id = ?", (enabled, push, uid))
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
@@ -2562,13 +2594,14 @@ def _insert_message(
     audio: str = "",
     audio_duration: int = 0,
     reply_to_id: int | None = None,
+    client_id: str | None = None,
 ) -> int:
     cur = conn.execute(
         """
-        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO messages (from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, client_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (uid, other_id, body, int(time.time()), reply_to_id, photo or "", audio or "", int(audio_duration or 0)),
+        (uid, other_id, body, int(time.time()), reply_to_id, photo or "", audio or "", int(audio_duration or 0), client_id),
     )
     return int(cur.lastrowid)
 
@@ -2616,15 +2649,24 @@ def api_messages(other_id: int):
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
+    after_id = max(0, request.args.get("after", type=int) or 0)
+    before_id = max(0, request.args.get("before", type=int) or 0)
+    limit = max(0, min(200, request.args.get("limit", type=int) or 0))
     rows = conn.execute(
         """
         SELECT id, from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, transcript, edited_at, deleted_at FROM messages
         WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
           AND COALESCE(deleted_at, 0) = 0
+          AND id > ? AND (? = 0 OR id < ?)
         ORDER BY id ASC
         """,
-        (uid, other_id, other_id, uid),
+        (uid, other_id, other_id, uid, after_id, before_id, before_id),
     ).fetchall()
+    has_more = False
+    if limit and len(rows) > limit:
+        # `after` returns the oldest new messages first; history pages return the newest slice.
+        has_more = True
+        rows = rows[:limit] if after_id else rows[-limit:]
     mark_read(conn, uid, other_id)
     conn.execute(
         "UPDATE notifications SET read = 1 WHERE user_id = ? AND from_id = ? AND kind = 'message' AND read = 0",
@@ -2648,6 +2690,7 @@ def api_messages(other_id: int):
             "ok": True,
             "peer": peer,
             "messages": messages,
+            "has_more": has_more,
             "openers": openers,
         }
     )
@@ -2690,7 +2733,26 @@ def api_send_message():
         ).fetchone()
         if not src:
             return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
-    _insert_message(conn, uid=uid, other_id=other_id, body=body, reply_to_id=reply_to_id)
+    # A client-generated id makes retries after a dropped response safe: the same
+    # (sender, client_id) never creates a second message.
+    client_id = str(data.get("client_id") or "").strip()[:64] or None
+    if client_id:
+        dup = conn.execute(
+            "SELECT id FROM messages WHERE from_id = ? AND client_id = ?", (uid, client_id)
+        ).fetchone()
+        if dup:
+            return jsonify({"ok": True, "duplicate": True, "id": int(dup["id"])})
+    try:
+        message_id = _insert_message(
+            conn, uid=uid, other_id=other_id, body=body, reply_to_id=reply_to_id, client_id=client_id
+        )
+    except IntegrityError:
+        # Lost a race with a concurrent identical request.
+        conn.rollback()
+        dup = conn.execute(
+            "SELECT id FROM messages WHERE from_id = ? AND client_id = ?", (uid, client_id)
+        ).fetchone()
+        return jsonify({"ok": True, "duplicate": True, "id": int(dup["id"]) if dup else 0})
     mark_read(conn, uid, other_id)
     if sender and other and _notifiable(other):
         notify_event(
@@ -2705,7 +2767,7 @@ def api_send_message():
             last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
         )
     conn.commit()
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "id": message_id})
 
 
 @app.post("/api/messages/photo")
