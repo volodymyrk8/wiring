@@ -25,13 +25,15 @@
 
 .header.header {
   position: absolute;
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   left: 0;
   right: 0;
   z-index: 6;
   margin: 0;
   border: 0;
   pointer-events: none;
+  /* AppHeader adds its own safe-area padding. Keep a single inset so the buttons stay above the photo. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .header.header :global(button) {
@@ -159,7 +161,7 @@
   min-height: 180px;
   box-sizing: border-box;
   overflow: hidden;
-  padding: 52px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
+  padding: 72px max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
@@ -202,7 +204,7 @@
 @media (max-width: 767px) {
   .pause { align-items: stretch; flex-direction: column; margin-inline: 16px; }
   .body { max-height: min(74%, 340px); padding: 24px 12px 10px; }
-  .slide { padding: 48px 10px 4px; }
+  .slide { padding: 68px 10px 4px; }
   .card {
     width: 100%;
     max-width: 100%;
