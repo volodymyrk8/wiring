@@ -307,6 +307,26 @@ class MobileApiTest(unittest.TestCase):
         self.web.post("/api/messages", json={"to_id": b["id"], "body": "без id"})
         self.assertEqual(len(self.web.get(f"/api/messages/{b['id']}").get_json()["messages"]), 4)
 
+    def test_notification_switches_do_not_flip_each_other(self):
+        self._user()
+        tokens = self._token_login()
+        h = self._bearer(tokens["access_token"])
+
+        def patch(body):
+            res = self.mobile.patch("/api/notifications", json=body, headers=h)
+            self.assertEqual(res.status_code, 200, res.get_data(as_text=True))
+            user = res.get_json()["user"]
+            return user["notify_enabled"], user["notify_push"]
+
+        self.assertEqual(patch({"enabled": False}), (False, False))
+        # changing only push must not switch notifications back on
+        self.assertEqual(patch({"push": True}), (False, False))
+        self.assertEqual(patch({"enabled": True}), (True, False))  # push stays off
+        self.assertEqual(patch({"push": True}), (True, True))
+        self.assertEqual(patch({"push": False}), (True, False))
+        self.assertEqual(patch({"enabled": False}), (False, False))
+        self.assertEqual(patch({"enabled": True, "push": True}), (True, True))
+
 
 if __name__ == "__main__":
     unittest.main()

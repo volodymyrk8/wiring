@@ -1960,8 +1960,15 @@ def api_patch_notifications():
     if not row:
         return jsonify({"ok": False, "error": "нет профиля"}), 401
     keys = set(row.keys())
-    enabled = int(row["notify_enabled"] or 1) if "notify_enabled" in keys else 1
-    push = int(row["notify_push"] or 1) if "notify_push" in keys else 1
+    # A stored 0 is a real value: `x or 1` used to turn "off" back into "on" whenever the other
+    # switch was changed, so the two toggles flipped each other.
+    def _flag(column: str) -> int:
+        if column not in keys or row[column] is None:
+            return 1
+        return 1 if int(row[column]) else 0
+
+    enabled = _flag("notify_enabled")
+    push = _flag("notify_push")
     if "enabled" in data:
         enabled = 1 if data.get("enabled") else 0
     if "push" in data:
