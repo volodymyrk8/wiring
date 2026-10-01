@@ -3,12 +3,12 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { endpoints, mediaUrl } from "../src/api/client";
 import type { Catalog, Me } from "../src/api/types";
 import { useAuth } from "../src/auth";
 import { radius, useTheme } from "../src/theme";
+import { CityPicker } from "../src/ui/CityPicker";
 import { Button, Card, Chip, ErrorText, Field, Loading, Row, SectionTitle, Toggle } from "../src/ui/kit";
 
 type Draft = {
@@ -193,39 +193,5 @@ export default function EditProfile() {
       </ScrollView>
       <CityPicker visible={cityOpen} places={catalog.places || []} onClose={() => setCityOpen(false)} onPick={(c) => { set("city", c); setCityOpen(false); }} />
     </KeyboardAvoidingView>
-  );
-}
-
-function CityPicker({ visible, places, onClose, onPick }: { visible: boolean; places: { country: string; cities: string[] }[]; onClose: () => void; onPick: (city: string) => void }) {
-  const t = useTheme();
-  const [q, setQ] = useState("");
-  const rows = useMemo(() => {
-    const flat = places.flatMap((p) => p.cities.map((c) => ({ city: c, country: p.country })));
-    const needle = q.trim().toLowerCase();
-    return (needle ? flat.filter((r) => r.city.toLowerCase().includes(needle) || r.country.toLowerCase().includes(needle)) : flat).slice(0, 80);
-  }, [places, q]);
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
-        <View style={{ padding: 16 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <Text style={{ color: t.text, fontSize: 20, fontWeight: "800" }}>Город</Text>
-            <Pressable onPress={onClose} accessibilityLabel="Закрыть"><Ionicons name="close" size={26} color={t.text} /></Pressable>
-          </View>
-          <Field label="Поиск" icon="search" value={q} onChangeText={setQ} autoFocus />
-        </View>
-        <FlatList
-          data={rows}
-          keyExtractor={(r) => `${r.country}-${r.city}`}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <Pressable onPress={() => onPick(item.city)} style={{ paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border }}>
-              <Text style={{ color: t.text, fontSize: 17, fontWeight: "600" }}>{item.city}</Text>
-              <Text style={{ color: t.muted, fontSize: 13 }}>{item.country}</Text>
-            </Pressable>
-          )}
-        />
-      </SafeAreaView>
-    </Modal>
   );
 }

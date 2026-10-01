@@ -4,15 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
 import { endpoints } from "../../src/api/client";
 import type { Person } from "../../src/api/types";
+import { getFilters, setFilters, useFilters, activeFilterCount, type Filters } from "../../src/filters";
 import { useTheme } from "../../src/theme";
+import { FilterButton, FiltersSheet } from "../../src/ui/FiltersSheet";
 import { Glass, GlassGroup } from "../../src/ui/glass";
 import { Button, Empty, ErrorText, Loading, tap } from "../../src/ui/kit";
+import { defaultFilters } from "../../src/filtersCore";
 import { Column, useLayout, useTabBarInset } from "../../src/ui/layout";
 import { MatchModal } from "../../src/ui/MatchModal";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
 import { SwipeCard, type SwipeCardHandle, type SwipeDirection } from "../../src/ui/SwipeCard";
 
 const UNDO_WINDOW_MS = 5000;
+const normalizeReset = () => defaultFilters();
 
 export default function Feed() {
   const t = useTheme();
@@ -30,21 +34,38 @@ export default function Feed() {
   const busy = useRef(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [nonce, setNonce] = useState(0);
+  const filters = useFilters();
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const requestId = useRef(0);
 
   // State is only touched inside promise callbacks, never synchronously from an effect.
-  const load = useCallback(
-    () =>
-      endpoints
-        .feed(seen.current)
-        .then((page) => {
-          setError("");
-          setQueue((q) => [...q, ...page.cards.filter((c) => !seen.current.includes(c.id) && !q.some((x) => x.id === c.id))]);
-          setHasMore(page.has_more);
-        })
-        .catch((e: Error) => setError(e.message))
-        .finally(() => setLoading(false)),
-    [],
-  );
+  // `requestId` drops responses that belong to an earlier filter set.
+  const load = useCallback(() => {
+    const id = ++requestId.current;
+    return endpoints
+      .feed(seen.current, getFilters())
+      .then((page) => {
+        if (id !== requestId.current) return;
+        setError("");
+        setQueue((q) => [...q, ...page.cards.filter((c) => !seen.current.includes(c.id) && !q.some((x) => x.id === c.id))]);
+        setHasMore(page.has_more);
+      })
+      .catch((e: Error) => {
+        if (id === requestId.current) setError(e.message);
+      })
+      .finally(() => {
+        if (id === requestId.current) setLoading(false);
+      });
+  }, []);
+
+  const applyFilters = (next: Filters) => {
+    setFilters(next);
+    setFiltersOpen(false);
+    setQueue([]);
+    setHasMore(true);
+    setLoading(true);
+    void load();
+  };
 
   useEffect(() => {
     void load();
@@ -109,18 +130,32 @@ export default function Feed() {
     }
   }
 
-  if (loading) return <Loading />;
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <ScreenHeader title="Лента" right={<FilterButton filters={filters} onPress={() => setFiltersOpen(true)} />} />
+        <Loading />
+        {filtersOpen && <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} />}
+      </View>
+    );
+  }
   if (!current) {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <ScreenHeader title="Лента" />
+        <ScreenHeader title="Лента" right={<FilterButton filters={filters} onPress={() => setFiltersOpen(true)} />} />
         <ErrorText>{error}</ErrorText>
         <Empty
           icon="planet-outline"
-          title={hasMore ? "Ищем людей…" : "Пока всё"}
-          text={hasMore ? undefined : "Загляни позже — лента обновится. А пока можно улучшить свою анкету."}
-          action={<Button title="Обновить" kind="soft" icon="refresh" onPress={() => { setLoading(true); load(); }} />}
+          title={hasMore ? "Ищем людей…" : activeFilterCount(filters) ? "Никого по фильтрам" : "Пока всё"}
+          text={hasMore ? undefined : activeFilterCount(filters) ? "Попробуй расширить возраст или убрать часть фильтров." : "Загляни позже — лента обновится. А пока можно улучшить свою анкету."}
+          action={
+            <View style={{ gap: 8 }}>
+              {activeFilterCount(filters) > 0 && <Button title="Сбросить фильтры" icon="close-circle-outline" onPress={() => applyFilters(normalizeReset())} />}
+              <Button title="Обновить" kind="soft" icon="refresh" onPress={() => { setLoading(true); load(); }} />
+            </View>
+          }
         />
+        {filtersOpen && <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} />}
       </View>
     );
   }
@@ -141,7 +176,7 @@ export default function Feed() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <ScreenHeader title="Лента" />
+      <ScreenHeader title="Лента" right={<FilterButton filters={filters} onPress={() => setFiltersOpen(true)} />} />
       <Column style={{ paddingHorizontal: 12, paddingBottom: tabInset }}>
         <View style={{ flex: 1 }}>
           <SwipeCard key={`${current.id}-${nonce}`} ref={card} person={current} onSwiped={onSwiped} onInfo={() => router.push(`/person/${current.id}`)} />
@@ -161,6 +196,7 @@ export default function Feed() {
           {round("heart", t.success, "like", size.like, "Нравится")}
         </GlassGroup>
       </Column>
+      {filtersOpen && <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} />}
       <MatchModal
         person={match}
         onClose={() => setMatch(null)}

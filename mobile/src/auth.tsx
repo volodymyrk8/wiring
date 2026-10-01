@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { endpoints, setApiHooks } from "./api/client";
 import { clearSession, getToken, loadTokens, setToken } from "./api/tokens";
 import type { Me } from "./api/types";
+import { loadFilters } from "./filters";
 import { unregisterPush } from "./push";
 
 type AuthState = {
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onUpgradeRequired: (min) => setUpgradeRequired(min || "новой версии"),
     });
     (async () => {
-      await loadTokens();
+      await Promise.all([loadTokens(), loadFilters()]);
       if (getToken("access") || getToken("refresh")) await refresh();
       setLoading(false);
     })();
