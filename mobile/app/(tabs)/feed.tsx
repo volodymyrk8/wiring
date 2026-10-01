@@ -10,7 +10,7 @@ import { FilterButton, FiltersSheet } from "../../src/ui/FiltersSheet";
 import { Glass, GlassGroup } from "../../src/ui/glass";
 import { Button, Empty, ErrorText, Loading, tap } from "../../src/ui/kit";
 import { defaultFilters } from "../../src/filtersCore";
-import { Column, useLayout, useTabBarInset } from "../../src/ui/layout";
+import { Column, useGutter, useLayout, useTabBarInset } from "../../src/ui/layout";
 import { MatchModal } from "../../src/ui/MatchModal";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
 import { SwipeCard, type SwipeCardHandle, type SwipeDirection } from "../../src/ui/SwipeCard";
@@ -23,6 +23,7 @@ export default function Feed() {
   const router = useRouter();
   const { compact } = useLayout();
   const tabInset = useTabBarInset();
+  const gutter = useGutter();
   const [queue, setQueue] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -177,7 +178,7 @@ export default function Feed() {
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <ScreenHeader title="Лента" right={<FilterButton filters={filters} onPress={() => setFiltersOpen(true)} />} />
-      <Column style={{ paddingHorizontal: 12, paddingBottom: tabInset }}>
+      <Column style={{ paddingHorizontal: gutter - 4, paddingBottom: tabInset }}>
         <View style={{ flex: 1 }}>
           <SwipeCard key={`${current.id}-${nonce}`} ref={card} person={current} onSwiped={onSwiped} onInfo={() => router.push(`/person/${current.id}`)} />
           {undo && (

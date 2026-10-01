@@ -82,23 +82,31 @@ export function Row({ icon, title, subtitle, onPress, right, danger }: {
 }) {
   const t = useTheme();
   const color = danger ? t.danger : t.text;
-  return (
-    <Pressable accessibilityRole="button" disabled={!onPress} onPress={() => { tap(); onPress?.(); }} style={({ pressed }) => [s.listRow, { opacity: pressed ? 0.7 : 1 }]}>
+  const content = (
+    <>
       <View style={[s.iconBubble, { backgroundColor: danger ? t.danger + "22" : t.chip }]}>
         <Ionicons name={icon} size={19} color={danger ? t.danger : t.accent} />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, paddingRight: 8 }}>
         <Text style={{ color, fontSize: 16, fontWeight: "600" }}>{title}</Text>
         {!!subtitle && <Text style={{ color: t.muted, fontSize: 13, marginTop: 1 }}>{subtitle}</Text>}
       </View>
       {right ?? (onPress ? <Ionicons name="chevron-forward" size={18} color={t.muted} /> : null)}
+    </>
+  );
+  // A row without an action must be a plain View: a disabled Pressable still becomes the touch
+  // responder on iOS and swallows taps meant for a Switch in the `right` slot.
+  if (!onPress) return <View style={s.listRow}>{content}</View>;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={() => { tap(); onPress(); }} style={({ pressed }) => [s.listRow, { opacity: pressed ? 0.7 : 1 }]}>
+      {content}
     </Pressable>
   );
 }
 
-export function Toggle({ value, onValueChange }: { value: boolean; onValueChange: (v: boolean) => void }) {
+export function Toggle({ value, onValueChange, disabled }: { value: boolean; onValueChange: (v: boolean) => void; disabled?: boolean }) {
   const t = useTheme();
-  return <Switch value={value} onValueChange={(v) => { tap(); onValueChange(v); }} trackColor={{ true: t.accent, false: t.border }} />;
+  return <Switch value={value} disabled={disabled} onValueChange={(v) => { tap(); onValueChange(v); }} trackColor={{ true: t.accent, false: t.border }} />;
 }
 
 export function Avatar({ uri, name, size = 52, online }: { uri?: string; name?: string; size?: number; online?: boolean }) {

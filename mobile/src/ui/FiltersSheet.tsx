@@ -8,7 +8,7 @@ import { useTheme } from "../theme";
 import { CityPicker } from "./CityPicker";
 import { Glass } from "./glass";
 import { Button, Card, Chip, Field, Loading, Row, SectionTitle, Toggle, tap } from "./kit";
-import { MAX_CONTENT_WIDTH } from "./layout";
+import { MAX_CONTENT_WIDTH, useGutter } from "./layout";
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
@@ -44,6 +44,7 @@ export function FilterButton({ filters, onPress }: { filters: Filters; onPress: 
 export function FiltersSheet({ value, onApply, onClose }: { value: Filters; onApply: (f: Filters) => void; onClose: () => void }) {
   const t = useTheme();
   const catalog = useCatalog();
+  const gutter = useGutter();
   const [draft, setDraft] = useState<Filters>(value);
   const [minText, setMinText] = useState(String(value.min_age));
   const [maxText, setMaxText] = useState(String(value.max_age));
@@ -67,7 +68,7 @@ export function FiltersSheet({ value, onApply, onClose }: { value: Filters; onAp
   return (
     <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: t.bg }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 6 }}>
           <Text accessibilityRole="header" style={{ color: t.text, fontSize: 26, fontWeight: "800" }}>Фильтры</Text>
           <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Закрыть" hitSlop={12}>
             <Ionicons name="close-circle" size={30} color={t.muted} />
@@ -77,7 +78,7 @@ export function FiltersSheet({ value, onApply, onClose }: { value: Filters; onAp
           <Loading />
         ) : (
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 16, paddingBottom: 24, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
               <SectionTitle>Возраст</SectionTitle>
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <View style={{ flex: 1 }}><Field label="От" value={minText} onChangeText={(v) => setMinText(v.replace(/\D/g, ""))} keyboardType="number-pad" maxLength={2} /></View>
@@ -98,7 +99,7 @@ export function FiltersSheet({ value, onApply, onClose }: { value: Filters; onAp
               <SectionTitle>Вайб</SectionTitle>
               {chips(catalog.vibe, "vibe")}
             </ScrollView>
-            <View style={{ flexDirection: "row", gap: 10, padding: 16, paddingBottom: 24, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" }}>
+            <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: gutter, paddingTop: 16, paddingBottom: 24, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" }}>
               <View style={{ flex: 1 }}><Button title="Сбросить" kind="soft" onPress={reset} /></View>
               <View style={{ flex: 1.3 }}><Button title="Показать" icon="checkmark" onPress={apply} /></View>
             </View>

@@ -10,7 +10,7 @@ import type { Message, Thread } from "../../src/api/types";
 import { radius, useTheme } from "../../src/theme";
 import { Avatar, ErrorText, Loading, tap } from "../../src/ui/kit";
 import { Glass, GlassGroup } from "../../src/ui/glass";
-import { Column } from "../../src/ui/layout";
+import { Column, useGutter } from "../../src/ui/layout";
 
 const POLL_MS = 8000;
 const PAGE = 50;
@@ -32,6 +32,7 @@ export default function ChatScreen() {
   const t = useTheme();
   const router = useRouter();
   const peerId = Number(useLocalSearchParams<{ id: string }>().id);
+  const gutter = useGutter();
   const [peer, setPeer] = useState<Thread["peer"] | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [openers, setOpeners] = useState<string[]>([]);
@@ -156,7 +157,7 @@ export default function ChatScreen() {
         renderItem={({ item }) => {
           if ("pending" in item) {
             return (
-              <View style={{ alignSelf: "flex-end", maxWidth: "80%", marginVertical: 3, marginHorizontal: 12 }}>
+              <View style={{ alignSelf: "flex-end", maxWidth: "80%", marginVertical: 3, marginHorizontal: gutter - 4 }}>
                 <Pressable disabled={!item.failed} onPress={() => deliver(item)} style={{ backgroundColor: item.failed ? t.danger + "22" : t.accent + "99", borderRadius: radius.md, borderBottomRightRadius: 5, paddingHorizontal: 13, paddingVertical: 9, borderWidth: item.failed ? 1 : 0, borderColor: t.danger }}>
                   <Text style={{ color: item.failed ? t.text : "#fff", fontSize: 16, lineHeight: 22 }}>{item.body}</Text>
                   <Text style={{ color: item.failed ? t.danger : "rgba(255,255,255,0.8)", fontSize: 11, alignSelf: "flex-end", marginTop: 3 }}>
@@ -181,7 +182,7 @@ export default function ChatScreen() {
             </>
           );
           return (
-            <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "80%", marginVertical: 3, marginHorizontal: 12 }}>
+            <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "80%", marginVertical: 3, marginHorizontal: gutter - 4 }}>
               {mine ? (
                 <LinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: radius.md, borderBottomRightRadius: 5, paddingHorizontal: 13, paddingVertical: 9 }}>{inner}</LinearGradient>
               ) : (
@@ -211,7 +212,7 @@ export default function ChatScreen() {
         }
       />
       <ErrorText>{error}</ErrorText>
-      <GlassGroup spacing={12} style={{ flexDirection: "row", alignItems: "flex-end", padding: 10, gap: 8 }}>
+      <GlassGroup spacing={12} style={{ flexDirection: "row", alignItems: "flex-end", paddingHorizontal: gutter - 6, paddingVertical: 10, gap: 8 }}>
         <Glass radius={22} interactive style={{ width: 44, height: 44 }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Отправить фото" disabled={uploading} onPress={() => { tap(); sendPhoto(); }} style={{ flex: 1, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.4 : 1 }}>
             <Ionicons name="image-outline" size={24} color={t.accent} />

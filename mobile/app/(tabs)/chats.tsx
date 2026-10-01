@@ -5,7 +5,7 @@ import { endpoints } from "../../src/api/client";
 import type { Match } from "../../src/api/types";
 import { useTheme } from "../../src/theme";
 import { Avatar, Empty, ErrorText, Loading } from "../../src/ui/kit";
-import { Column, useTabBarInset } from "../../src/ui/layout";
+import { Column, useGutter, useTabBarInset } from "../../src/ui/layout";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
 
 function when(ts?: number): string {
@@ -23,6 +23,7 @@ export default function Chats() {
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const tabInset = useTabBarInset();
+  const gutter = useGutter();
 
   useFocusEffect(
     useCallback(() => {
@@ -59,7 +60,7 @@ export default function Chats() {
       data={matches}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={t.accent} />}
       keyExtractor={(m) => String(m.id)}
-      contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 20 + tabInset }}
+      contentContainerStyle={{ paddingHorizontal: gutter, paddingBottom: 20 + tabInset }}
       renderItem={({ item }) => {
         const unread = !!item.unread;
         return (

@@ -37,3 +37,16 @@ export function useTabBarInset(): number {
   const insets = useSafeAreaInsets();
   return Platform.OS === "ios" ? insets.bottom + 62 : 0;
 }
+
+/**
+ * Horizontal margin that keeps text and controls clear of the screen edge. Follows the platform
+ * guidelines (16 pt iOS layout margin, 16 dp Material compact margin) plus extra room on Android
+ * for rounded display corners, which are not part of the safe-area insets. Landscape cutouts
+ * (left/right insets) are added on top; wide screens get 24.
+ */
+export function useGutter(): number {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const base = width > MAX_CONTENT_WIDTH + 80 ? 24 : Platform.OS === "android" ? 20 : 16;
+  return base + Math.max(insets.left, insets.right);
+}

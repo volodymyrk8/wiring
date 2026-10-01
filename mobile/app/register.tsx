@@ -4,6 +4,7 @@ import { useAuth } from "../src/auth";
 import { useTheme } from "../src/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, ErrorText, Field } from "../src/ui/kit";
+import { useGutter } from "../src/ui/layout";
 
 function Check({ on, set, text }: { on: boolean; set: (v: boolean) => void; text: string }) {
   const t = useTheme();
@@ -16,6 +17,7 @@ function Check({ on, set, text }: { on: boolean; set: (v: boolean) => void; text
 }
 
 export default function Register() {
+  const gutter = useGutter();
   const { register } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -39,7 +41,7 @@ export default function Register() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ padding: 24, width: "100%", maxWidth: 480, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: Math.max(24, gutter), paddingVertical: 24, width: "100%", maxWidth: 480, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
         <Field label="Имя (2–32 символа)" icon="person-outline" value={name} onChangeText={setName} />
         <Field label="Почта" icon="mail-outline" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
         <Field label="Пароль (минимум 6 символов)" icon="lock-closed-outline" value={password} onChangeText={setPassword} secureTextEntry />

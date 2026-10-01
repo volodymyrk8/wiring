@@ -28,6 +28,11 @@ export type Me = Person & {
   /** Unread chat messages and incoming likes, from /api/me. */
   unread?: number;
   likes_in?: number;
+  /** Who can see my profile ("Кому показывать мою анкету"). */
+  seek_min_age?: number;
+  seek_max_age?: number;
+  seek_place?: string;
+  hide_tags?: string[];
   gender?: string;
   looking_for?: string;
   height?: number | null;
