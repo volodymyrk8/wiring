@@ -392,7 +392,12 @@ class WiringTest(unittest.TestCase):
         user = saved.get_json()["user"]
         self.assertEqual(user["seek_place"], "Сербия")
         self.assertEqual(user["seek_min_age"], 21)
-        self.assertTrue(str(user["photo"]).endswith("42/upload.jpg"))
+        conn = open_request_connection()
+        try:
+            stored = conn.execute("SELECT photo FROM users WHERE email = ?", ("ada@example.com",)).fetchone()
+            self.assertEqual(stored["photo"], "42/upload.jpg")
+        finally:
+            conn.close()
         men = self.client.get("/api/feed?gender=man&limit=10").get_json()["cards"]
         ids = {card["id"] for card in men}
         self.assertIn(man["id"], ids)
