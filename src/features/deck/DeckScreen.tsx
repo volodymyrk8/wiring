@@ -173,6 +173,14 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
       </div>
     </div>
     {photos.length > 1 ? <span class={styles.srOnly} aria-live={active ? "polite" : "off"}>Фото {photoIndex + 1} из {photos.length}</span> : null}
+    {photos.length > 1 ? <div class={styles.photoNav}>
+      <button type="button" class={styles.photoNavBtn} aria-label="Предыдущее фото" onClick={() => changePhoto(-1)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5" /></svg>
+      </button>
+      <button type="button" class={styles.photoNavBtn} aria-label="Следующее фото" onClick={() => changePhoto(1)}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5" /></svg>
+      </button>
+    </div> : null}
     {photos.length > 1 ? <div class={styles.photoChoices}>
       <div class={styles.photoSegments} aria-hidden="true">{photos.map((_, index) => <span key={index} class={index === photoIndex ? styles.photoSegmentActive : undefined} />)}</div>
       <input class={styles.photoSelector} type="range" min={0} max={photos.length - 1} step={1} value={photoIndex} tabIndex={active ? 0 : -1}

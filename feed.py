@@ -44,44 +44,56 @@ def claim_feed(
     """
     viewer = conn.execute("SELECT feed_generation FROM users WHERE id = ? FOR UPDATE", (user_id,)).fetchone()
     skipped = sorted(int(item) for item in (skip_ids or set()))
-    history_sql = (
-        "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id AND h.excluded_at IS NOT NULL)"
-        if include_delivered
-        else "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id)"
-    )
-    skip_sql = ""
     none_sql = "AND FALSE" if match_none else ""
-    params: list[Any] = [user_id, min_age, max_age, city, city, user_id, user_id]
-    if skipped:
-        skip_sql = f"AND users.id NOT IN ({', '.join('?' for _ in skipped)})"
-        params.extend(skipped)
-    rows = conn.execute(f"""
-        SELECT * FROM users
-        WHERE id != ? AND COALESCE(deleted_at, 0) = 0
-          AND age BETWEEN ? AND ? AND (? = '' OR city = ?)
-          AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_id = ? AND s.to_id = users.id)
-          {history_sql}
-          {skip_sql}
-          {none_sql}
-          AND (EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id) OR COALESCE(photo, '') != '')
-        ORDER BY random()
-    """, tuple(params)).fetchall()
-    cards = []
+
+    def fetch(history_sql: str) -> list[Row]:
+        params: list[Any] = [user_id, min_age, max_age, city, city, user_id, user_id]
+        skip_sql = ""
+        if skipped:
+            skip_sql = f"AND users.id NOT IN ({', '.join('?' for _ in skipped)})"
+            params.extend(skipped)
+        return conn.execute(f"""
+            SELECT * FROM users
+            WHERE id != ? AND COALESCE(deleted_at, 0) = 0
+              AND age BETWEEN ? AND ? AND (? = '' OR city = ?)
+              AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_id = ? AND s.to_id = users.id)
+              {history_sql}
+              {skip_sql}
+              {none_sql}
+              AND (EXISTS (SELECT 1 FROM photos p WHERE p.user_id = users.id) OR COALESCE(photo, '') != '')
+            ORDER BY random()
+        """, tuple(params)).fetchall()
+
+    unseen_sql = "AND NOT EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id)"
+    replay_sql = (
+        "AND EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id AND h.excluded_at IS NULL)"
+    )
+    cards: list[dict[str, Any]] = []
     has_more = False
     now = int(time.time())
-    for row in rows:
-        card = eligible(row)
-        if card is None:
-            continue
-        if len(cards) == limit:
-            has_more = True
-            break
-        inserted = conn.execute("""
-            INSERT INTO feed_history (user_id, other_id, delivered_at)
-            VALUES (?, ?, ?) ON CONFLICT (user_id, other_id) DO NOTHING
-        """, (user_id, row["id"], now)).rowcount
-        if inserted or include_delivered:
-            cards.append(card)
+
+    def take(rows: list[Row], *, replay: bool) -> None:
+        nonlocal has_more
+        for row in rows:
+            card = eligible(row)
+            if card is None:
+                continue
+            if len(cards) == limit:
+                has_more = True
+                return
+            if replay:
+                cards.append(card)
+                continue
+            inserted = conn.execute("""
+                INSERT INTO feed_history (user_id, other_id, delivered_at)
+                VALUES (?, ?, ?) ON CONFLICT (user_id, other_id) DO NOTHING
+            """, (user_id, row["id"], now)).rowcount
+            if inserted:
+                cards.append(card)
+
+    take(fetch(unseen_sql), replay=False)
+    if include_delivered and not has_more and len(cards) <= limit:
+        take(fetch(replay_sql), replay=True)
     return cards, has_more, int(viewer["feed_generation"])
 
 

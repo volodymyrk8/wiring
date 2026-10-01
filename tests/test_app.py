@@ -375,6 +375,19 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(any(card["id"] == peer["id"] for card in again["cards"]))
         self.assertTrue(all(card["city"] == "Белград" for card in again["cards"]))
 
+    def test_filtered_feed_shows_new_profiles_before_replay(self):
+        self._register()
+        seen = self._register(email="seen-filter@example.com", name="Старый", gender="man", city="Белград", photo="portraits/p02.jpg")
+        self._login("ada@example.com")
+        first = self.client.get("/api/feed?limit=10").get_json()
+        self.assertTrue(any(card["id"] == seen["id"] for card in first["cards"]))
+        fresh = self._register(email="fresh-filter@example.com", name="Новый", gender="man", city="Белград", photo="portraits/p03.jpg")
+        self._login("ada@example.com")
+        page = self.client.get("/api/feed?city=Белград&limit=5").get_json()
+        ids = [card["id"] for card in page["cards"]]
+        self.assertIn(fresh["id"], ids)
+        self.assertLess(ids.index(fresh["id"]), ids.index(seen["id"]))
+
     def test_feed_filter_misses_do_not_consume_candidates(self):
         self._register()
         self._peers(2)

@@ -445,10 +445,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const draftReadyRef = useRef(false);
 
   const scrollToEnd = () => {
-    requestAnimationFrame(() => {
-      const element = threadRef.current;
-      if (element) element.scrollTop = element.scrollHeight;
-    });
+    const element = threadRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
   };
 
   const loadThread = async (scroll = false) => {
@@ -516,11 +515,38 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   }, [chatId, host]);
 
   useEffect(() => {
-    if (thread && shouldScrollRef.current) {
-      shouldScrollRef.current = false;
-      scrollToEnd();
-    }
-  }, [thread?.messages.length]);
+    if (!thread || !shouldScrollRef.current) return;
+    shouldScrollRef.current = false;
+    const element = threadRef.current;
+    if (!element) return;
+    let alive = true;
+    let userMoved = false;
+    const markMoved = () => { userMoved = true; };
+    const pin = () => {
+      if (alive && !userMoved) scrollToEnd();
+    };
+    pin();
+    const frame = window.requestAnimationFrame(() => {
+      pin();
+      window.requestAnimationFrame(pin);
+    });
+    element.addEventListener("wheel", markMoved, { passive: true });
+    element.addEventListener("touchmove", markMoved, { passive: true });
+    element.addEventListener("pointerdown", markMoved);
+    const observer = new ResizeObserver(() => pin());
+    observer.observe(element);
+    for (const child of element.children) observer.observe(child);
+    const stop = window.setTimeout(() => observer.disconnect(), 2500);
+    return () => {
+      alive = false;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(stop);
+      observer.disconnect();
+      element.removeEventListener("wheel", markMoved);
+      element.removeEventListener("touchmove", markMoved);
+      element.removeEventListener("pointerdown", markMoved);
+    };
+  }, [thread?.messages.length, chatId]);
 
   useEffect(() => () => {
     discardRecRef.current = true;

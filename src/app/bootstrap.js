@@ -806,7 +806,9 @@ import { createInboxController } from "./inbox";
     },
     onResetDone: () => {
       state.resetToken = "";
+      state.user = null;
       state.view = "login";
+      api("/api/logout", { method: "POST" }).catch(() => {});
       render();
     },
   });
@@ -1122,7 +1124,12 @@ import { createInboxController } from "./inbox";
       void renderAuthFeature("forgot");
       return;
     }
-    if (!state.user && state.view === "reset") {
+    if (state.view === "reset") {
+      if (!state.resetToken) {
+        state.view = state.user ? "deck" : "login";
+        render();
+        return;
+      }
       void renderAuthFeature("reset");
       return;
     }
@@ -1207,7 +1214,7 @@ import { createInboxController } from "./inbox";
     if (resetQ) {
       state.resetToken = resetQ;
       state.view = "reset";
-      history.replaceState({ view: "reset" }, "", hrefFor("reset"));
+      history.replaceState({ view: "reset" }, "", `${hrefFor("reset")}?reset=${encodeURIComponent(resetQ)}`);
       render();
       return;
     }

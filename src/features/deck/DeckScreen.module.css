@@ -164,6 +164,25 @@
   scroll-snap-stop: always;
 }
 
+.photoNav { display: none; }
+.photoNavBtn { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: rgba(17, 14, 12, 0.48); color: #fff; cursor: pointer; }
+.photoNavBtn svg { width: 18px; height: 18px; }
+@media (hover: hover) and (pointer: fine) {
+  .photoNav {
+    position: absolute;
+    z-index: 4;
+    top: 56px;
+    bottom: 30%;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  .photoNavBtn { pointer-events: auto; }
+  .photoNavBtn:hover { background: rgba(17, 14, 12, 0.72); }
+}
 .photoChoices { position: absolute; top: 0; left: 0; right: 0; height: 44px; padding: 0 12px; border-radius: 26px 26px 0 0; background: linear-gradient(rgba(17,14,12,.6), transparent); z-index: 2; }
 .photoSegments { display: flex; align-items: center; gap: 4px; height: 100%; pointer-events: none; }
 .photoSegments span { flex: 1; min-width: 0; height: 4px; border-radius: 999px; background: rgba(255,255,255,.5); box-shadow: 0 1px 3px rgba(0,0,0,.45); transition: background-color 160ms ease; }
