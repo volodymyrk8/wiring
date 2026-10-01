@@ -1,10 +1,12 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { endpoints } from "../../src/api/client";
 import type { Match } from "../../src/api/types";
 import { useTheme } from "../../src/theme";
 import { Avatar, Empty, ErrorText, Loading } from "../../src/ui/kit";
+import { Column, useTabBarInset } from "../../src/ui/layout";
+import { ScreenHeader } from "../../src/ui/ScreenHeader";
 
 function when(ts?: number): string {
   if (!ts) return "";
@@ -19,6 +21,8 @@ export default function Chats() {
   const router = useRouter();
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [error, setError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const tabInset = useTabBarInset();
 
   useFocusEffect(
     useCallback(() => {
@@ -26,13 +30,36 @@ export default function Chats() {
     }, []),
   );
 
+  const reload = async () => {
+    setRefreshing(true);
+    try {
+      setMatches((await endpoints.matches()).matches);
+      setError("");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (!matches) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
-  if (!matches.length) return <Empty icon="chatbubbles-outline" title="Пока нет мэтчей" text="Когда вы с кем-то лайкнете друг друга, чат появится здесь." />;
+  if (!matches.length) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <ScreenHeader title="Чаты" />
+        <Empty icon="chatbubbles-outline" title="Пока нет мэтчей" text="Когда вы с кем-то лайкнете друг друга, чат появится здесь." />
+      </View>
+    );
+  }
   return (
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+    <ScreenHeader title="Чаты" />
+    <Column>
     <FlatList
       data={matches}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={t.accent} />}
       keyExtractor={(m) => String(m.id)}
-      contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 20 }}
+      contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 20 + tabInset }}
       renderItem={({ item }) => {
         const unread = !!item.unread;
         return (
@@ -61,5 +88,7 @@ export default function Chats() {
         );
       }}
     />
+    </Column>
+    </View>
   );
 }

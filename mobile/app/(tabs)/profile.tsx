@@ -8,6 +8,8 @@ import { useAuth } from "../../src/auth";
 import { disablePush, enablePush } from "../../src/push";
 import { useTheme } from "../../src/theme";
 import { Avatar, Button, Card, ErrorText, Field, Row, SectionTitle, Toggle } from "../../src/ui/kit";
+import { Column, useTabBarInset } from "../../src/ui/layout";
+import { ScreenHeader } from "../../src/ui/ScreenHeader";
 
 function completeness(u: NonNullable<ReturnType<typeof useAuth>["user"]>): { pct: number; missing: string[] } {
   const checks: [boolean, string][] = [
@@ -29,6 +31,7 @@ export default function Profile() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
+  const tabInset = useTabBarInset();
 
   if (!user) return null;
   const { pct, missing } = completeness(user);
@@ -70,7 +73,10 @@ export default function Profile() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+    <ScreenHeader title="Профиль" />
+    <Column>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + tabInset }}>
       <LinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 28, padding: 20 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Avatar uri={user.photo} name={user.name} size={72} />
@@ -122,5 +128,7 @@ export default function Profile() {
       )}
       <Text style={{ color: t.muted, textAlign: "center", marginTop: 20, fontSize: 12 }}>{user.email}</Text>
     </ScrollView>
+    </Column>
+    </View>
   );
 }

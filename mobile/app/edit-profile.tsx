@@ -131,7 +131,7 @@ export default function EditProfile() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
         <SectionTitle>Фото</SectionTitle>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           {photos.map((p) => (

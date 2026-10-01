@@ -44,7 +44,7 @@ export default function PersonScreen() {
 
   if (!person) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }}>
       <ProfileView person={person} />
       <View style={{ height: 18 }} />
       {person.matched && <Button title="Написать" icon="chatbubble-ellipses" onPress={() => router.push(`/chat/${id}`)} />}

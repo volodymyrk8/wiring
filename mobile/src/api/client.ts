@@ -50,6 +50,7 @@ export const endpoints = {
     api<FeedPage>(`/api/feed?hide_empty=1${skip.length ? `&skip=${skip.slice(-200).join(",")}` : ""}`),
   swipe: (target_id: number, direction: "like" | "pass") =>
     api<{ matched: boolean; match: Person | null }>("/api/swipe", json({ target_id, direction })),
+  rewind: () => api<{ card: Person | null; undid: string }>("/api/rewind", { method: "POST" }),
   likes: () => api<{ likes: Person[]; plus: boolean }>("/api/likes"),
   matches: () => api<{ matches: Match[] }>("/api/matches"),
   person: (id: number) =>

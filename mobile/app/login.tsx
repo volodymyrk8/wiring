@@ -7,9 +7,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth";
 import { useTheme } from "../src/theme";
 import { Button, ErrorText, Field } from "../src/ui/kit";
+import { useLayout } from "../src/ui/layout";
 
 export default function Login() {
   const t = useTheme();
+  const { height, compact } = useLayout();
+  const hero = Math.round(Math.min(300, Math.max(compact ? 200 : 240, height * 0.3)));
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +33,7 @@ export default function Login() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <LinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: 300, borderBottomLeftRadius: 44, borderBottomRightRadius: 44 }}>
+      <LinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: hero, borderBottomLeftRadius: 44, borderBottomRightRadius: 44 }}>
         <SafeAreaView style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: 28, paddingBottom: 34 }}>
           <View style={{ width: 54, height: 54, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
             <Ionicons name="flash" size={28} color="#fff" />
@@ -40,7 +43,7 @@ export default function Login() {
         </SafeAreaView>
       </LinearGradient>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 24, width: "100%", maxWidth: 480, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
           <Field label="Почта" icon="mail-outline" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
           <Field label="Пароль" icon="lock-closed-outline" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" onSubmitEditing={submit} />
           <ErrorText>{error}</ErrorText>

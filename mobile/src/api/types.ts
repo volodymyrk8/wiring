@@ -25,6 +25,9 @@ export type Me = Person & {
   needs_photo_consent?: boolean;
   notify_enabled?: boolean;
   notify_push?: boolean;
+  /** Unread chat messages and incoming likes, from /api/me. */
+  unread?: number;
+  likes_in?: number;
   gender?: string;
   looking_for?: string;
   height?: number | null;
