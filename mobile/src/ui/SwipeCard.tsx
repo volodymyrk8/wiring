@@ -8,6 +8,8 @@ import { mediaUrl } from "../api/client";
 import type { Person } from "../api/types";
 import { useTagLabel } from "../catalog";
 import { radius, shadow, useTheme } from "../theme";
+import { Glass } from "./glass";
+import { useLayout } from "./layout";
 
 export type SwipeDirection = "like" | "pass";
 export type SwipeCardHandle = { fling: (dir: SwipeDirection) => void };
@@ -22,6 +24,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, Props>(function SwipeCard({
   const t = useTheme();
   const label = useTagLabel();
   const { width } = useWindowDimensions();
+  const { compact } = useLayout();
   const photos = useMemo(() => photosOf(person), [person]);
   const [index, setIndex] = useState(0);
   const pan = useRef(new Animated.ValueXY()).current;
@@ -56,7 +59,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, Props>(function SwipeCard({
   const rotate = pan.x.interpolate({ inputRange: [-width, 0, width], outputRange: ["-12deg", "0deg", "12deg"] });
   const likeOpacity = pan.x.interpolate({ inputRange: [20, 120], outputRange: [0, 1], extrapolate: "clamp" });
   const passOpacity = pan.x.interpolate({ inputRange: [-120, -20], outputRange: [1, 0], extrapolate: "clamp" });
-  const tags = [...(person.neuro || []), ...(person.vibe || [])].slice(0, 4);
+  const tags = [...(person.neuro || []), ...(person.vibe || [])].slice(0, compact ? 3 : 4);
 
   const step = (delta: number) => setIndex((i) => Math.max(0, Math.min(photos.length - 1, i + delta)));
 
@@ -85,7 +88,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, Props>(function SwipeCard({
       <View style={s.info} pointerEvents="box-none">
         <View style={{ flex: 1 }} pointerEvents="none">
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={s.name} numberOfLines={1}>{person.name}{person.age ? `, ${person.age}` : ""}</Text>
+            <Text style={[s.name, compact && { fontSize: 25 }]} numberOfLines={1}>{person.name}{person.age ? `, ${person.age}` : ""}</Text>
             {person.online && <View style={s.online} />}
           </View>
           {!!(person.city || person.job) && <Text style={s.meta} numberOfLines={1}>{[person.city, person.job].filter(Boolean).join(" · ")}</Text>}
@@ -95,9 +98,11 @@ export const SwipeCard = forwardRef<SwipeCardHandle, Props>(function SwipeCard({
             ))}
           </View>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={onInfo} style={s.infoBtn} hitSlop={10}>
-          <Ionicons name="information" size={22} color="#fff" />
-        </Pressable>
+        <Glass radius={22} interactive strength="clear" style={s.infoBtn}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Открыть профиль" onPress={onInfo} hitSlop={10} style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="information" size={22} color="#fff" />
+          </Pressable>
+        </Glass>
       </View>
       <Animated.View style={[s.stamp, s.stampLike, { opacity: likeOpacity }]} pointerEvents="none"><Text style={[s.stampText, { color: "#3ddc97" }]}>НРАВИТСЯ</Text></Animated.View>
       <Animated.View style={[s.stamp, s.stampPass, { opacity: passOpacity }]} pointerEvents="none"><Text style={[s.stampText, { color: "#ff6b70" }]}>ПРОПУСК</Text></Animated.View>
@@ -117,7 +122,7 @@ const s = StyleSheet.create({
   online: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#3ddc97", marginLeft: 8 },
   glassChip: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginRight: 6, marginBottom: 6 },
   glassChipText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  infoBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", marginLeft: 8 },
+  infoBtn: { width: 44, height: 44, marginLeft: 8 },
   stamp: { position: "absolute", top: 46, borderWidth: 4, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4 },
   stampLike: { left: 22, borderColor: "#3ddc97", transform: [{ rotate: "-14deg" }] },
   stampPass: { right: 22, borderColor: "#ff6b70", transform: [{ rotate: "14deg" }] },

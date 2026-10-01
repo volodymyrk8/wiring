@@ -39,7 +39,7 @@ export default function Register() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: 24, width: "100%", maxWidth: 480, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
         <Field label="Имя (2–32 символа)" icon="person-outline" value={name} onChangeText={setName} />
         <Field label="Почта" icon="mail-outline" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
         <Field label="Пароль (минимум 6 символов)" icon="lock-closed-outline" value={password} onChangeText={setPassword} secureTextEntry />

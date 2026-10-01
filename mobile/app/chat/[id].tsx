@@ -9,6 +9,8 @@ import { endpoints, mediaUrl } from "../../src/api/client";
 import type { Message, Thread } from "../../src/api/types";
 import { radius, useTheme } from "../../src/theme";
 import { Avatar, ErrorText, Loading, tap } from "../../src/ui/kit";
+import { Glass, GlassGroup } from "../../src/ui/glass";
+import { Column } from "../../src/ui/layout";
 
 const POLL_MS = 8000;
 const PAGE = 50;
@@ -135,6 +137,7 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
+    <Column>
       <Stack.Screen
         options={{
           headerTitle: () => (
@@ -208,26 +211,31 @@ export default function ChatScreen() {
         }
       />
       <ErrorText>{error}</ErrorText>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", padding: 10, gap: 8, backgroundColor: t.bg }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Отправить фото" disabled={uploading} onPress={() => { tap(); sendPhoto(); }} style={{ height: 44, width: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.4 : 1 }}>
-          <Ionicons name="image-outline" size={26} color={t.accent} />
-        </Pressable>
-        <TextInput
-          accessibilityLabel="Сообщение"
-          value={text}
-          onChangeText={setText}
-          placeholder="Сообщение"
-          placeholderTextColor={t.muted}
-          maxLength={1000}
-          multiline
-          style={{ flex: 1, color: t.text, backgroundColor: t.card, borderRadius: 22, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, maxHeight: 120, fontSize: 16 }}
-        />
+      <GlassGroup spacing={12} style={{ flexDirection: "row", alignItems: "flex-end", padding: 10, gap: 8 }}>
+        <Glass radius={22} interactive style={{ width: 44, height: 44 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Отправить фото" disabled={uploading} onPress={() => { tap(); sendPhoto(); }} style={{ flex: 1, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.4 : 1 }}>
+            <Ionicons name="image-outline" size={24} color={t.accent} />
+          </Pressable>
+        </Glass>
+        <Glass radius={22} style={{ flex: 1 }}>
+          <TextInput
+            accessibilityLabel="Сообщение"
+            value={text}
+            onChangeText={setText}
+            placeholder="Сообщение"
+            placeholderTextColor={t.muted}
+            maxLength={1000}
+            multiline
+            style={{ color: t.text, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, maxHeight: 120, fontSize: 16 }}
+          />
+        </Glass>
         <Pressable accessibilityRole="button" accessibilityLabel="Отправить" disabled={!canSend} onPress={() => { tap(); send(text); }}>
           <LinearGradient colors={[t.accent, t.accent2]} style={{ width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", opacity: canSend ? 1 : 0.4 }}>
             <Ionicons name="arrow-up" size={22} color="#fff" />
           </LinearGradient>
         </Pressable>
-      </View>
+      </GlassGroup>
+    </Column>
     </KeyboardAvoidingView>
   );
 }
