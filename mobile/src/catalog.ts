@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { endpoints } from "./api/client";
+import type { Catalog } from "./api/types";
 
 let labels: Record<string, string> | null = null;
 let pending: Promise<void> | null = null;
@@ -26,4 +27,25 @@ export function useTagLabel(): (id: string) => string {
     if (!labels) load().then(() => bump((n) => n + 1));
   }, []);
   return (id) => labels?.[id] || id;
+}
+
+let full: Catalog | null = null;
+let fullPending: Promise<Catalog | null> | null = null;
+
+/** Full catalog (tags, intents, places), cached for the session. */
+export function useCatalog(): Catalog | null {
+  const [catalog, setCatalog] = useState<Catalog | null>(full);
+  useEffect(() => {
+    if (full) return;
+    fullPending ??= endpoints.catalog().then((c) => (full = c)).catch(() => {
+      fullPending = null;
+      return null;
+    });
+    let alive = true;
+    fullPending.then((c) => alive && c && setCatalog(c));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return catalog;
 }

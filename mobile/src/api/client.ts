@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { API_URL } from "./config";
 import { createApi, type Api, type Hooks } from "./core";
+import { filtersQuery, type Filters } from "../filtersCore";
 import { clearSession, getToken, setToken } from "./tokens";
 import type { Catalog, FeedPage, Match, Me, Person, Photo, Thread } from "./types";
 
@@ -46,12 +47,17 @@ export const endpoints = {
   logout: (refresh_token: string | null, push_token: string | null) =>
     api("/api/auth/logout", json({ refresh_token, push_token })),
   catalog: () => api<Catalog>("/api/catalog"),
-  feed: (skip: number[] = []) =>
-    api<FeedPage>(`/api/feed?hide_empty=1${skip.length ? `&skip=${skip.slice(-200).join(",")}` : ""}`),
+  feed: (skip: number[] = [], filters?: Filters) => {
+    const q = [filters ? filtersQuery(filters) : "hide_empty=1", skip.length ? `skip=${skip.slice(-200).join(",")}` : ""].filter(Boolean).join("&");
+    return api<FeedPage>(`/api/feed?${q}`);
+  },
   swipe: (target_id: number, direction: "like" | "pass") =>
     api<{ matched: boolean; match: Person | null }>("/api/swipe", json({ target_id, direction })),
   rewind: () => api<{ card: Person | null; undid: string }>("/api/rewind", { method: "POST" }),
-  likes: () => api<{ likes: Person[]; plus: boolean }>("/api/likes"),
+  likes: (filters?: Filters) => {
+    const q = filters ? filtersQuery(filters) : "";
+    return api<{ likes: Person[]; plus: boolean }>(`/api/likes${q ? `?${q}` : ""}`);
+  },
   matches: () => api<{ matches: Match[] }>("/api/matches"),
   person: (id: number) =>
     api<{ person: Person & { matched?: boolean; liked_you?: boolean; you_liked?: boolean } }>(`/api/people/${id}`),

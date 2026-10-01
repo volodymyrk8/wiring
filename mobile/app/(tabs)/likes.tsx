@@ -6,7 +6,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { endpoints, mediaUrl } from "../../src/api/client";
 import type { Person } from "../../src/api/types";
+import { setFilters, useFilters, getFilters, type Filters } from "../../src/filters";
 import { radius, shadow, useTheme } from "../../src/theme";
+import { FilterButton, FiltersSheet } from "../../src/ui/FiltersSheet";
 import { Empty, ErrorText, Loading } from "../../src/ui/kit";
 import { Column, useLayout, useTabBarInset } from "../../src/ui/layout";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
@@ -20,17 +22,19 @@ export default function Likes() {
   const [refreshing, setRefreshing] = useState(false);
   const { wide } = useLayout();
   const tabInset = useTabBarInset();
+  const filters = useFilters();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      endpoints.likes().then((r) => { setLikes(r.likes); setPlus(r.plus); setError(""); }).catch((e) => setError(e.message));
+      endpoints.likes(getFilters()).then((r) => { setLikes(r.likes); setPlus(r.plus); setError(""); }).catch((e) => setError(e.message));
     }, []),
   );
 
   const reload = async () => {
     setRefreshing(true);
     try {
-      const r = await endpoints.likes();
+      const r = await endpoints.likes(getFilters());
       setLikes(r.likes);
       setPlus(r.plus);
       setError("");
@@ -41,19 +45,28 @@ export default function Likes() {
     }
   };
 
+  const applyFilters = (next: Filters) => {
+    setFilters(next);
+    setFiltersOpen(false);
+    void reload();
+  };
+  const header = <ScreenHeader title="Лайки" right={<FilterButton filters={filters} onPress={() => setFiltersOpen(true)} />} />;
+  const sheet = filtersOpen ? <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} /> : null;
+
   if (!likes) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
   if (!likes.length) {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <ScreenHeader title="Лайки" />
-        <Empty icon="heart-outline" title="Пока никто не лайкнул" text="Заполни анкету и загляни в ленту, лайки появятся здесь." />
+        {header}
+        <Empty icon="heart-outline" title="Пока никто не лайкнул" text="Заполни анкету и загляни в ленту, лайки появятся здесь. Если включены фильтры, попробуй их сбросить." />
+        {sheet}
       </View>
     );
   }
   const columns = wide ? 3 : 2;
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-    <ScreenHeader title="Лайки" />
+    {header}
     <Column>
     <FlatList
       key={columns}
@@ -95,6 +108,7 @@ export default function Likes() {
       )}
     />
     </Column>
+    {sheet}
     </View>
   );
 }
