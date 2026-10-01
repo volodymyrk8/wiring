@@ -167,15 +167,26 @@ def _log_device_visit() -> None:
     if not ua:
         return
     uid = session.get("uid")
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
-    visitor_key = "" if uid else visitor_key_from_request(ip, ua)
+    user_id = int(uid) if uid else None
     conn = db()
-    if track_device_visit(
-        conn,
-        user_id=int(uid) if uid else None,
-        ua=ua,
-        visitor_key=visitor_key,
-    ):
+    if user_id and not conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone():
+        session.clear()
+        user_id = None
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
+    visitor_key = "" if user_id else visitor_key_from_request(ip, ua)
+    try:
+        logged = track_device_visit(
+            conn,
+            user_id=user_id,
+            ua=ua,
+            visitor_key=visitor_key,
+        )
+    except IntegrityError:
+        conn.rollback()
+        if user_id:
+            session.clear()
+        return
+    if logged:
         conn.commit()
 
 
@@ -847,7 +858,10 @@ def current_user() -> dict[str, Any] | None:
         return None
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    if not row or ("deleted_at" in row.keys() and row["deleted_at"]):
+    if not row:
+        session.clear()
+        return None
+    if "deleted_at" in row.keys() and row["deleted_at"]:
         return None
     if not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
         ensure_referral_code(conn, uid)

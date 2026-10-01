@@ -157,6 +157,18 @@ class WiringTest(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_missing_session_user_does_not_500(self):
+        iphone = (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.7 Mobile/15E148 Safari/604.1"
+        )
+        with self.client.session_transaction() as sess:
+            sess["uid"] = 999999
+        response = self.client.get("/", headers={"User-Agent": iphone})
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as sess:
+            self.assertNotIn("uid", sess)
+
     def test_health_and_catalog(self):
         health = self.client.get("/health").get_json()
         self.assertTrue(health["ok"])
