@@ -91,14 +91,15 @@
 
 .switchRow {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 4px;
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
-  text-align: left;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .switchPrompt {
@@ -109,7 +110,8 @@
   color: var(--ink);
   font-weight: 600;
   text-decoration: none;
-  padding: 4px 8px;
+  padding: 8px 2px;
+  margin-block: -8px;
   border-radius: 8px;
   transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
