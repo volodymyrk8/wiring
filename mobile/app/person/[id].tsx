@@ -5,6 +5,7 @@ import { endpoints } from "../../src/api/client";
 import type { Person } from "../../src/api/types";
 import { Button, ErrorText, Loading, SectionTitle } from "../../src/ui/kit";
 import { ProfileView } from "../../src/ui/ProfileView";
+import { useGutter } from "../../src/ui/layout";
 
 const REASONS: [string, string][] = [
   ["spam", "Спам / реклама"],
@@ -17,6 +18,7 @@ const REASONS: [string, string][] = [
 export default function PersonScreen() {
   const id = Number(useLocalSearchParams<{ id: string }>().id);
   const router = useRouter();
+  const gutter = useGutter();
   const [person, setPerson] = useState<(Person & { matched?: boolean }) | null>(null);
   const [error, setError] = useState("");
   const [reasonsOpen, setReasonsOpen] = useState(false);
@@ -44,7 +46,7 @@ export default function PersonScreen() {
 
   if (!person) return error ? <ErrorText>{error}</ErrorText> : <Loading />;
   return (
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }}>
+    <ScrollView contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }}>
       <ProfileView person={person} />
       <View style={{ height: 18 }} />
       {person.matched && <Button title="Написать" icon="chatbubble-ellipses" onPress={() => router.push(`/chat/${id}`)} />}

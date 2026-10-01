@@ -6,8 +6,12 @@ type Key = keyof typeof KEYS;
 let cache: Partial<Record<Key, string | null>> = {};
 
 export async function loadTokens() {
-  const [access, refresh] = await Promise.all([SecureStore.getItemAsync(KEYS.access), SecureStore.getItemAsync(KEYS.refresh)]);
-  cache = { ...cache, access, refresh };
+  const [access, refresh, push] = await Promise.all([
+    SecureStore.getItemAsync(KEYS.access),
+    SecureStore.getItemAsync(KEYS.refresh),
+    SecureStore.getItemAsync(KEYS.push),
+  ]);
+  cache = { ...cache, access, refresh, push };
 }
 
 export const getToken = (key: Key): string | null => cache[key] ?? null;

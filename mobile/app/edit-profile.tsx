@@ -8,6 +8,7 @@ import { endpoints, mediaUrl } from "../src/api/client";
 import type { Catalog, Me } from "../src/api/types";
 import { useAuth } from "../src/auth";
 import { radius, useTheme } from "../src/theme";
+import { useGutter } from "../src/ui/layout";
 import { CityPicker } from "../src/ui/CityPicker";
 import { Button, Card, Chip, ErrorText, Field, Loading, Row, SectionTitle, Toggle } from "../src/ui/kit";
 
@@ -37,6 +38,7 @@ export default function EditProfile() {
   const t = useTheme();
   const router = useRouter();
   const { user, setUser, refresh } = useAuth();
+  const gutter = useGutter();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [draft, setDraft] = useState<Draft | null>(user ? fromUser(user) : null);
   const [saving, setSaving] = useState(false);
@@ -95,10 +97,29 @@ export default function EditProfile() {
     ]);
   }
 
+  // What blocks saving at all (the server rejects it even as a draft) and what only keeps the
+  // profile out of the feed (saved as a draft).
+  const hardMissing = [
+    !(draft.name.trim().length >= 2) && "имя (2–32 символа)",
+    !(Number(draft.age) >= 18 && Number(draft.age) <= 99) && "возраст 18–99",
+    !draft.gender && "пол",
+    !draft.looking_for && "кого ищешь",
+  ].filter(Boolean) as string[];
+  const softMissing = [
+    !draft.city && "город",
+    !draft.neuro.length && "хотя бы одна особенность",
+    draft.neuro.length > 0 && !specialConsent && "согласие показывать особенности",
+  ].filter(Boolean) as string[];
+
   async function save() {
     if (!draft) return;
+    if (hardMissing.length) {
+      setError(`Заполни: ${hardMissing.join(", ")}.`);
+      return;
+    }
     setSaving(true);
     setError("");
+    const asDraft = softMissing.length > 0;
     try {
       const res = await endpoints.saveProfile({
         name: draft.name.trim(),
@@ -113,9 +134,14 @@ export default function EditProfile() {
         intents: draft.intents,
         special_data_consent: specialConsent,
         photo_rights_consent: photoConsent,
+        ...(asDraft ? { draft: true } : {}),
       });
       setUser(res.user);
-      router.back();
+      if (asDraft) {
+        Alert.alert("Сохранено как черновик", `Чтобы анкета появилась в ленте, добавь: ${softMissing.join(", ")}.`);
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -131,7 +157,7 @@ export default function EditProfile() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }} keyboardShouldPersistTaps="handled">
         <SectionTitle>Фото</SectionTitle>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           {photos.map((p) => (
@@ -189,7 +215,15 @@ export default function EditProfile() {
 
         <View style={{ height: 16 }} />
         <ErrorText>{error}</ErrorText>
-        <Button title="Сохранить" icon="checkmark" onPress={save} busy={saving} disabled={!draft.name.trim() || !draft.age || !draft.gender || !draft.looking_for || !draft.city || !draft.neuro.length || !specialConsent} />
+        {(hardMissing.length > 0 || softMissing.length > 0) && (
+          <Card style={{ marginBottom: 12 }}>
+            <Text style={{ color: t.text, fontWeight: "700", marginBottom: 4 }}>
+              {hardMissing.length ? "Нужно заполнить, чтобы сохранить:" : "Сохранится как черновик. Для ленты добавь:"}
+            </Text>
+            <Text style={{ color: t.muted, lineHeight: 20 }}>{[...hardMissing, ...softMissing].join(" · ")}</Text>
+          </Card>
+        )}
+        <Button title={hardMissing.length ? "Сохранить" : softMissing.length ? "Сохранить черновик" : "Сохранить"} icon="checkmark" onPress={save} busy={saving} />
       </ScrollView>
       <CityPicker visible={cityOpen} places={catalog.places || []} onClose={() => setCityOpen(false)} onPick={(c) => { set("city", c); setCityOpen(false); }} />
     </KeyboardAvoidingView>

@@ -3,6 +3,7 @@ import { endpoints, setApiHooks } from "./api/client";
 import { clearSession, getToken, loadTokens, setToken } from "./api/tokens";
 import type { Me } from "./api/types";
 import { loadFilters } from "./filters";
+import { loadPrefs } from "./prefs";
 import { unregisterPush } from "./push";
 
 type AuthState = {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onUpgradeRequired: (min) => setUpgradeRequired(min || "новой версии"),
     });
     (async () => {
-      await Promise.all([loadTokens(), loadFilters()]);
+      await Promise.all([loadTokens(), loadFilters(), loadPrefs()]);
       if (getToken("access") || getToken("refresh")) await refresh();
       setLoading(false);
     })();
@@ -50,13 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.user);
   }, []);
 
+  // Profile/notification PATCH responses omit inbox counters; keep the last known ones so the
+  // tab badges do not blink to zero until the next /api/me refresh.
+  const mergeUser = useCallback((next: Me) => {
+    setUser((prev) => ({ ...next, unread: next.unread ?? prev?.unread, likes_in: next.likes_in ?? prev?.likes_in }));
+  }, []);
+
   const value = useMemo<AuthState>(
     () => ({
       user,
       loading,
       upgradeRequired,
       refresh,
-      setUser,
+      setUser: mergeUser,
       login: signIn,
       register: async (name, email, password) => {
         await endpoints.register({ name: name.trim(), email: email.trim(), password });
@@ -74,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
       },
     }),
-    [user, loading, upgradeRequired, refresh, signIn],
+    [user, loading, upgradeRequired, refresh, signIn, mergeUser],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

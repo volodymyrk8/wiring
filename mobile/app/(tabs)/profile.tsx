@@ -1,14 +1,15 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Linking, ScrollView, Text, View } from "react-native";
+import { Alert, Linking, Platform, ScrollView, Text, View } from "react-native";
 import { endpoints } from "../../src/api/client";
 import { API_URL } from "../../src/api/config";
 import { useAuth } from "../../src/auth";
-import { disablePush, enablePush } from "../../src/push";
+import { disablePush, enablePush, notificationSwitches, pushUnavailableReason, setNotificationsEnabled } from "../../src/push";
 import { useTheme } from "../../src/theme";
 import { Avatar, Button, Card, ErrorText, Field, Row, SectionTitle, Toggle } from "../../src/ui/kit";
-import { Column, useTabBarInset } from "../../src/ui/layout";
+import { Column, useGutter, useTabBarInset } from "../../src/ui/layout";
+import { setPrefs, usePrefs } from "../../src/prefs";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
 
 function completeness(u: NonNullable<ReturnType<typeof useAuth>["user"]>): { pct: number; missing: string[] } {
@@ -26,39 +27,40 @@ function completeness(u: NonNullable<ReturnType<typeof useAuth>["user"]>): { pct
 export default function Profile() {
   const t = useTheme();
   const router = useRouter();
-  const { user, logout, refresh, setUser } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
   const tabInset = useTabBarInset();
+  const gutter = useGutter();
+  const prefs = usePrefs();
 
   if (!user) return null;
   const { pct, missing } = completeness(user);
 
+  const switches = notificationSwitches(user);
+  const pushBlocked = pushUnavailableReason();
+
   async function togglePush(on: boolean) {
     setPushBusy(true);
     try {
-      if (on) {
-        const res = await enablePush();
-        if (!res.ok) Alert.alert("Push не включён", res.reason);
-      } else {
-        await disablePush();
-      }
-      await refresh();
+      setUser(on ? await enablePush() : await disablePush(true));
     } catch (e: any) {
-      Alert.alert("Ошибка", e.message);
+      Alert.alert("Push не включён", e.message);
     } finally {
       setPushBusy(false);
     }
   }
 
   async function toggleNotices(on: boolean) {
+    setPushBusy(true);
     try {
-      const res = await endpoints.setNotifications({ enabled: on });
-      setUser(res.user);
+      setUser(await setNotificationsEnabled(on));
     } catch (e: any) {
       Alert.alert("Ошибка", e.message);
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -76,7 +78,7 @@ export default function Profile() {
     <View style={{ flex: 1, backgroundColor: t.bg }}>
     <ScreenHeader title="Профиль" />
     <Column>
-    <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 + tabInset }}>
+    <ScrollView contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 8, paddingBottom: 40 + tabInset }}>
       <LinearGradient colors={[t.accent, t.accent2]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 28, padding: 20 }}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <Avatar uri={user.photo} name={user.name} size={72} />
@@ -98,10 +100,30 @@ export default function Profile() {
       <View style={{ height: 14 }} />
       <Button title="Редактировать анкету" icon="create-outline" onPress={() => router.push("/edit-profile")} />
 
+      <SectionTitle>Видимость</SectionTitle>
+      <Card>
+        <Row icon="eye-outline" title="Кому показывать мою анкету" subtitle="Возраст, откуда, особенности" onPress={() => router.push("/visibility")} />
+      </Card>
+
+      {Platform.OS === "android" && (
+        <>
+          <SectionTitle>Оформление</SectionTitle>
+          <Card>
+            <Row icon="sparkles-outline" title="Стеклянный стиль" subtitle="Полупрозрачные кнопки и панели (бета)" onPress={() => setPrefs({ androidGlass: !prefs.androidGlass })} right={<Toggle value={prefs.androidGlass} onValueChange={(v) => setPrefs({ androidGlass: v })} />} />
+          </Card>
+        </>
+      )}
+
       <SectionTitle>Уведомления</SectionTitle>
       <Card>
-        <Row icon="notifications-outline" title="Уведомления" subtitle="Лайки, мэтчи и сообщения" right={<Toggle value={!!user.notify_enabled} onValueChange={toggleNotices} />} />
-        <Row icon="phone-portrait-outline" title="Push на телефон" subtitle={pushBusy ? "Подключаем…" : "Когда приложение закрыто"} right={<Toggle value={!!user.notify_push && !!user.notify_enabled} onValueChange={togglePush} />} />
+        <Row icon="notifications-outline" title="Уведомления" subtitle="Лайки, мэтчи и сообщения" onPress={pushBusy ? undefined : () => toggleNotices(!switches.enabled)} right={<Toggle value={switches.enabled} disabled={pushBusy} onValueChange={toggleNotices} />} />
+        <Row
+          icon="phone-portrait-outline"
+          title="Push на телефон"
+          subtitle={pushBusy ? "Сохраняем…" : !switches.enabled ? "Сначала включи уведомления" : pushBlocked ?? "Когда приложение закрыто"}
+          onPress={pushBusy || !switches.enabled || pushBlocked ? undefined : () => togglePush(!switches.push)}
+          right={<Toggle value={switches.push} disabled={pushBusy || !switches.enabled || !!pushBlocked} onValueChange={togglePush} />}
+        />
       </Card>
 
       <SectionTitle>О сервисе</SectionTitle>

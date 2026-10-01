@@ -56,6 +56,7 @@ function Gate() {
           <Stack.Screen name="chat/[id]" options={{ title: "Чат" }} />
           <Stack.Screen name="person/[id]" options={{ title: "Профиль" }} />
           <Stack.Screen name="edit-profile" options={{ title: "Моя анкета" }} />
+          <Stack.Screen name="visibility" options={{ title: "Кому показывать" }} />
         </Stack.Protected>
         <Stack.Protected guard={!user}>
           <Stack.Screen name="login" options={{ headerShown: false }} />

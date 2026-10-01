@@ -5,27 +5,30 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../theme";
 import { Field } from "./kit";
 
-export function CityPicker({ visible, places, onClose, onPick, allowAny }: { visible: boolean; places: { country: string; cities: string[] }[]; onClose: () => void; onPick: (city: string) => void; allowAny?: boolean }) {
+export function CityPicker({ visible, places, onClose, onPick, allowAny, anyLabel = "Любой город", includeCountries, title = "Город" }: { visible: boolean; places: { country: string; cities: string[] }[]; onClose: () => void; onPick: (city: string) => void; allowAny?: boolean; anyLabel?: string; includeCountries?: boolean; title?: string }) {
   const t = useTheme();
   const [q, setQ] = useState("");
   const rows = useMemo(() => {
-    const flat = places.flatMap((p) => p.cities.map((c) => ({ city: c, country: p.country })));
+    const flat = places.flatMap((p) => [
+      ...(includeCountries ? [{ city: p.country, country: "вся страна" }] : []),
+      ...p.cities.map((c) => ({ city: c, country: p.country })),
+    ]);
     const needle = q.trim().toLowerCase();
     return (needle ? flat.filter((r) => r.city.toLowerCase().includes(needle) || r.country.toLowerCase().includes(needle)) : flat).slice(0, 80);
-  }, [places, q]);
+  }, [places, q, includeCountries]);
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
         <View style={{ padding: 16 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <Text style={{ color: t.text, fontSize: 20, fontWeight: "800" }}>Город</Text>
+            <Text style={{ color: t.text, fontSize: 20, fontWeight: "800" }}>{title}</Text>
             <Pressable onPress={onClose} accessibilityLabel="Закрыть"><Ionicons name="close" size={26} color={t.text} /></Pressable>
           </View>
           <Field label="Поиск" icon="search" value={q} onChangeText={setQ} autoFocus />
         </View>
         {allowAny && (
           <Pressable onPress={() => onPick("")} style={{ paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.border }}>
-            <Text style={{ color: t.accent, fontSize: 17, fontWeight: "700" }}>Любой город</Text>
+            <Text style={{ color: t.accent, fontSize: 17, fontWeight: "700" }}>{anyLabel}</Text>
           </Pressable>
         )}
         <FlatList

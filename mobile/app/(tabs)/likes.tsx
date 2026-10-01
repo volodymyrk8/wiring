@@ -10,7 +10,7 @@ import { setFilters, useFilters, getFilters, type Filters } from "../../src/filt
 import { radius, shadow, useTheme } from "../../src/theme";
 import { FilterButton, FiltersSheet } from "../../src/ui/FiltersSheet";
 import { Empty, ErrorText, Loading } from "../../src/ui/kit";
-import { Column, useLayout, useTabBarInset } from "../../src/ui/layout";
+import { Column, useGutter, useLayout, useTabBarInset } from "../../src/ui/layout";
 import { ScreenHeader } from "../../src/ui/ScreenHeader";
 
 export default function Likes() {
@@ -22,6 +22,7 @@ export default function Likes() {
   const [refreshing, setRefreshing] = useState(false);
   const { wide } = useLayout();
   const tabInset = useTabBarInset();
+  const gutter = useGutter();
   const filters = useFilters();
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -74,9 +75,9 @@ export default function Likes() {
       numColumns={columns}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={t.accent} />}
       keyExtractor={(p, i) => String(p.id ?? `h${i}`)}
-      contentContainerStyle={{ padding: 10, paddingBottom: 10 + tabInset }}
+      contentContainerStyle={{ paddingHorizontal: gutter - 6, paddingTop: 10, paddingBottom: 10 + tabInset }}
       ListHeaderComponent={
-        <View style={{ padding: 6, paddingBottom: 10 }}>
+        <View style={{ paddingHorizontal: 6, paddingBottom: 10 }}>
           <Text style={{ color: t.muted, fontSize: 15 }}>
             {plus ? `Тебя лайкнули: ${likes.length}` : "Кто тебя лайкнул — доступно с WIRING+. Оформить пока можно на сайте wiring.date."}
           </Text>
