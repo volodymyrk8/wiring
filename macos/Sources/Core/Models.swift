@@ -86,6 +86,12 @@ struct Person: Decodable, Identifiable, Hashable {
     var subtitle: String { [city, job].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ") }
 }
 
+struct PhotoItem: Decodable, Identifiable, Hashable {
+    var id: Int
+    var url: String
+    var isPrimary: Bool
+}
+
 struct Me: Decodable {
     var person: Person
     var email: String
@@ -95,19 +101,44 @@ struct Me: Decodable {
     var unread: Int
     var likesIn: Int
     var needsProfile: Bool
+    var needsSpecialConsent: Bool
+    var needsPhotoConsent: Bool
+    var gender: String
+    var lookingFor: String
+    var photoItems: [PhotoItem]
+    var seekMinAge: Int
+    var seekMaxAge: Int
+    var seekPlace: String
+    var hideTags: [String]
 
-    enum CodingKeys: String, CodingKey { case email, plus, notifyEnabled, notifyPush, unread, likesIn, needsProfile }
+    enum CodingKeys: String, CodingKey {
+        case email, plus, notifyEnabled, notifyPush, unread, likesIn, needsProfile, needsSpecialConsent, needsPhotoConsent
+        case gender, lookingFor, photos, seekMinAge, seekMaxAge, seekPlace, hideTags
+    }
 
     init(from decoder: Decoder) throws {
         person = try Person(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        email = (try? c.decodeIfPresent(String.self, forKey: .email)) ?? ""
-        plus = ((try? c.decodeIfPresent(Bool.self, forKey: .plus)) ?? nil) ?? false
-        notifyEnabled = ((try? c.decodeIfPresent(Bool.self, forKey: .notifyEnabled)) ?? nil) ?? true
-        notifyPush = ((try? c.decodeIfPresent(Bool.self, forKey: .notifyPush)) ?? nil) ?? false
-        unread = ((try? c.decodeIfPresent(Int.self, forKey: .unread)) ?? nil) ?? 0
-        likesIn = ((try? c.decodeIfPresent(Int.self, forKey: .likesIn)) ?? nil) ?? 0
-        needsProfile = ((try? c.decodeIfPresent(Bool.self, forKey: .needsProfile)) ?? nil) ?? false
+        func b(_ k: CodingKeys, _ d: Bool) -> Bool { ((try? c.decodeIfPresent(Bool.self, forKey: k)) ?? nil) ?? d }
+        func i(_ k: CodingKeys, _ d: Int) -> Int { ((try? c.decodeIfPresent(Int.self, forKey: k)) ?? nil) ?? d }
+        func s(_ k: CodingKeys) -> String { ((try? c.decodeIfPresent(String.self, forKey: k)) ?? nil) ?? "" }
+        email = s(.email)
+        plus = b(.plus, false)
+        notifyEnabled = b(.notifyEnabled, true)
+        notifyPush = b(.notifyPush, false)
+        unread = i(.unread, 0)
+        likesIn = i(.likesIn, 0)
+        needsProfile = b(.needsProfile, false)
+        needsSpecialConsent = b(.needsSpecialConsent, false)
+        needsPhotoConsent = b(.needsPhotoConsent, false)
+        gender = s(.gender)
+        lookingFor = s(.lookingFor)
+        // /api/me returns photos as objects; other endpoints may return plain URLs (no id, not editable).
+        photoItems = ((try? c.decodeIfPresent([PhotoItem].self, forKey: .photos)) ?? nil) ?? []
+        seekMinAge = i(.seekMinAge, 18)
+        seekMaxAge = i(.seekMaxAge, 99)
+        seekPlace = s(.seekPlace)
+        hideTags = ((try? c.decodeIfPresent([String].self, forKey: .hideTags)) ?? nil) ?? []
     }
 }
 
@@ -134,6 +165,7 @@ struct LikesPage: Decodable { var likes: [Person]; var plus: Bool }
 struct MatchesPage: Decodable { var matches: [Person] }
 struct MeResponse: Decodable { var user: Me? }
 struct PersonResponse: Decodable { var person: Person }
+struct SaveResponse: Decodable { var user: Me }
 struct TokenResponse: Decodable { var accessToken: String; var refreshToken: String; var user: Me? }
 struct SwipeResponse: Decodable { var matched: Bool? }
 struct RewindResponse: Decodable { var card: Person? }
@@ -144,6 +176,8 @@ struct Catalog: Decodable {
     var neuro: [CatalogItem]?
     var vibe: [CatalogItem]?
     var intents: [CatalogItem]?
+    var genders: [CatalogItem]?
+    var lookingFor: [CatalogItem]?
     var places: [Place]?
 
     func label(_ id: String) -> String {

@@ -86,12 +86,27 @@ enum Snapshots {
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             capture(into: dir, name: "05-conversation")
         }
+        model.section = .profile
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        model.editingProfile = true
+        try? await Task.sleep(nanoseconds: 4_000_000_000)
+        capture(into: dir, name: "06-edit-profile", sheet: true)
+        model.editingProfile = false
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        model.editingVisibility = true
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        capture(into: dir, name: "07-visibility", sheet: true)
+        model.editingVisibility = false
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
         NSApp.terminate(nil)
     }
 
     @MainActor
-    static func capture(into dir: String, name: String) {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && $0.title == "WIRING" }) ?? NSApp.windows.first,
+    static func capture(into dir: String, name: String, sheet: Bool = false) {
+        let candidate = sheet
+            ? NSApp.windows.first(where: { $0.isSheet && $0.isVisible })
+            : NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && $0.title == "WIRING" })
+        guard let window = candidate ?? NSApp.windows.first,
               let view = window.contentView?.superview ?? window.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
         view.cacheDisplay(in: view.bounds, to: rep)

@@ -46,6 +46,10 @@ struct WiringCommands: Commands {
             Button("Чаты") { model.section = .chats }.keyboardShortcut("3")
             Button("Профиль") { model.section = .profile }.keyboardShortcut("4")
         }
+        CommandMenu("Анкета") {
+            Button("Редактировать анкету…") { model.section = .profile; model.editingProfile = true }.keyboardShortcut("e")
+            Button("Кому показывать мою анкету…") { model.section = .profile; model.editingVisibility = true }
+        }
     }
 }
 

@@ -33,6 +33,8 @@ final class AppModel {
     var catalog: Catalog?
     var section: Section? = .feed
     var openChatId: Int?
+    var editingProfile = false
+    var editingVisibility = false
     var unread = 0
     var likesIn = 0
     var upgradeRequired = false

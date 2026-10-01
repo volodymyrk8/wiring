@@ -13,18 +13,13 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header(me)
                     section("Анкета") {
-                        row("square.and.pencil", "Редактировать анкету", "Фото, теги, город, о себе") { open("/me") }
-                        row("eye", "Кому показывать мою анкету", "Возраст, откуда, особенности") { open("/me") }
+                        row("square.and.pencil", "Редактировать анкету", "Фото, теги, город, о себе") { model.editingProfile = true }
+                        row("eye", "Кому показывать мою анкету", "Возраст, откуда, особенности") { model.editingVisibility = true }
                         row("archivebox", "Архив решений", "Лайки, пропуски и блокировки") { open("/archive") }
                     }
                     section("Уведомления") {
-                        Toggle(isOn: Binding(get: { model.me?.notifyEnabled ?? false }, set: { v in Task { await setNotifications(v) } })) {
-                            VStack(alignment: .leading) {
-                                Text("Уведомления на этом Mac").font(.body.weight(.semibold))
-                                Text("Баннер о новых сообщениях, когда окно не активно").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                        .toggleStyle(.switch).disabled(busy).padding(.vertical, 6)
+                        settingRow("bell", "Уведомления на этом Mac", "Баннер о новых сообщениях, когда окно не активно",
+                                   isOn: Binding(get: { model.me?.notifyEnabled ?? false }, set: { v in Task { await setNotifications(v) } }), disabled: busy)
                     }
                     section("О сервисе") {
                         row("checkmark.shield", "Правила", nil) { open("/rules") }
@@ -43,6 +38,9 @@ struct ProfileView: View {
             }
         }
         .navigationTitle("Профиль")
+        .sheet(isPresented: Binding(get: { model.editingProfile }, set: { model.editingProfile = $0 })) { EditProfileView().frame(minWidth: 680, idealWidth: 760, minHeight: 640, idealHeight: 820) }
+        .sheet(isPresented: Binding(get: { model.editingVisibility }, set: { model.editingVisibility = $0 })) { VisibilityView().frame(minWidth: 620, minHeight: 560, idealHeight: 720) }
+        .task { await model.loadCatalog() }
         .confirmationDialog("Выйти из аккаунта?", isPresented: $confirmLogout) {
             Button("Выйти", role: .destructive) { Task { await model.logout() } }
         }

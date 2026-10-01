@@ -122,6 +122,18 @@ actor API {
         try decoder.decode(T.self, from: try await raw(path, method: method, json: json))
     }
 
+    /// Profile photo upload; `photo_rights_consent` confirms the person uploads only their own photos.
+    func uploadProfilePhoto(file: URL) async throws {
+        let boundary = "wiring-\(UUID().uuidString)"
+        var body = Data()
+        func part(_ s: String) { body.append(s.data(using: .utf8)!) }
+        part("--\(boundary)\r\nContent-Disposition: form-data; name=\"photo_rights_consent\"\r\n\r\n1\r\n")
+        part("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(file.lastPathComponent)\"\r\nContent-Type: image/jpeg\r\n\r\n")
+        body.append(try Data(contentsOf: file))
+        part("\r\n--\(boundary)--\r\n")
+        _ = try await raw("/api/photos", method: "POST", multipart: (body, "multipart/form-data; boundary=\(boundary)"))
+    }
+
     func sendPhoto(to peer: Int, file: URL) async throws {
         let boundary = "wiring-\(UUID().uuidString)"
         var body = Data()
