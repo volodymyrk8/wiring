@@ -33,6 +33,7 @@ def ensure_feed_history(conn: Connection) -> None:
 def claim_feed(
     conn: Connection, user_id: int, *, min_age: int, max_age: int, city: str,
     limit: int, eligible: Callable[[Row], dict[str, Any] | None],
+    gender: str = "",
     skip_ids: set[int] | None = None, include_delivered: bool = False,
     match_none: bool = False,
 ) -> tuple[list[dict[str, Any]], bool, int]:
@@ -47,7 +48,7 @@ def claim_feed(
     none_sql = "AND FALSE" if match_none else ""
 
     def fetch(history_sql: str) -> list[Row]:
-        params: list[Any] = [user_id, min_age, max_age, city, city, user_id, user_id]
+        params: list[Any] = [user_id, min_age, max_age, city, city, gender, gender, user_id, user_id]
         skip_sql = ""
         if skipped:
             skip_sql = f"AND users.id NOT IN ({', '.join('?' for _ in skipped)})"
@@ -56,6 +57,7 @@ def claim_feed(
             SELECT * FROM users
             WHERE id != ? AND COALESCE(deleted_at, 0) = 0
               AND age BETWEEN ? AND ? AND (? = '' OR city = ?)
+              AND (? = '' OR gender = ?)
               AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.from_id = ? AND s.to_id = users.id)
               {history_sql}
               {skip_sql}

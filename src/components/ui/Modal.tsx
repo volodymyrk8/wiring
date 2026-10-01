@@ -63,10 +63,32 @@ export function Modal({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKeyDown);
+    const viewport = window.visualViewport;
+    const modal = modalRef.current;
+    const liftAboveKeyboard = () => {
+      if (!modal || !viewport) return;
+      const covered = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      if (covered < 80) {
+        modal.style.maxHeight = "";
+        modal.style.transform = "";
+        return;
+      }
+      modal.style.maxHeight = `${Math.max(240, Math.round(viewport.height - 12))}px`;
+      modal.style.transform = `translateY(-${Math.round(covered)}px)`;
+    };
+    liftAboveKeyboard();
+    viewport?.addEventListener("resize", liftAboveKeyboard);
+    viewport?.addEventListener("scroll", liftAboveKeyboard);
 
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      viewport?.removeEventListener("resize", liftAboveKeyboard);
+      viewport?.removeEventListener("scroll", liftAboveKeyboard);
+      if (modal) {
+        modal.style.maxHeight = "";
+        modal.style.transform = "";
+      }
       if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [isOpen, closeOnEsc]);

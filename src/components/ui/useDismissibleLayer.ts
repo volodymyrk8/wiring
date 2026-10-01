@@ -9,14 +9,15 @@ export function announcePopupOpen(element: HTMLElement | null) {
 
 /** Shared dismissal behavior for independent dropdowns and popovers. */
 export function useDismissibleLayer(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null> | Array<RefObject<HTMLElement | null>>,
   open: boolean,
   onClose: () => void,
 ) {
+  const refs = Array.isArray(ref) ? ref : [ref];
   useEffect(() => {
     const closeWhenAnotherOpens = (event: Event) => {
       const otherElement = (event as CustomEvent<HTMLElement | null>).detail;
-      if (otherElement !== ref.current) onClose();
+      if (!refs.some((item) => item.current && otherElement === item.current)) onClose();
     };
 
     document.addEventListener(POPUP_OPEN_EVENT, closeWhenAnotherOpens);
@@ -27,7 +28,9 @@ export function useDismissibleLayer(
     if (!open) return;
 
     const closeOnPointerDown = (event: PointerEvent) => {
-      if (!ref.current?.contains(event.target as Node)) onClose();
+      const target = event.target;
+      if (target instanceof Node && refs.some((item) => item.current?.contains(target))) return;
+      onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();

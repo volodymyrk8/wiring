@@ -173,7 +173,7 @@
   background: var(--bg, #fff);
   color: inherit;
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .empty {

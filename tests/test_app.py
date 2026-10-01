@@ -375,6 +375,31 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(any(card["id"] == peer["id"] for card in again["cards"]))
         self.assertTrue(all(card["city"] == "Белград" for card in again["cards"]))
 
+    def test_feed_gender_filter_and_discovery_save_with_uploaded_photo(self):
+        self._register()
+        woman = self._register(email="gender-w@example.com", name="Мира", gender="woman", looking_for="everyone", photo="portraits/p01.jpg")
+        man = self._register(email="gender-m@example.com", name="Макс", gender="man", looking_for="everyone", photo="portraits/p02.jpg")
+        hidden = self._register(email="gender-h@example.com", name="Нора", gender="hidden", looking_for="everyone", photo="portraits/p03.jpg")
+        self._login("ada@example.com")
+        conn = open_request_connection()
+        try:
+            conn.execute("UPDATE users SET photo = ? WHERE email = ?", ("42/upload.jpg", "ada@example.com"))
+            conn.commit()
+        finally:
+            conn.close()
+        saved = self.client.patch("/api/me", json={"seek_place": "Сербия", "seek_min_age": 21, "draft": True})
+        self.assertEqual(saved.status_code, 200, saved.get_data(as_text=True))
+        user = saved.get_json()["user"]
+        self.assertEqual(user["seek_place"], "Сербия")
+        self.assertEqual(user["seek_min_age"], 21)
+        self.assertTrue(str(user["photo"]).endswith("42/upload.jpg"))
+        men = self.client.get("/api/feed?gender=man&limit=10").get_json()["cards"]
+        ids = {card["id"] for card in men}
+        self.assertIn(man["id"], ids)
+        self.assertNotIn(woman["id"], ids)
+        self.assertNotIn(hidden["id"], ids)
+        self.assertTrue(all(card["gender"] == "man" for card in men))
+
     def test_filtered_feed_shows_new_profiles_before_replay(self):
         self._register()
         seen = self._register(email="seen-filter@example.com", name="Старый", gender="man", city="Белград", photo="portraits/p02.jpg")

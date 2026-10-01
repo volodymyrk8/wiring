@@ -7,6 +7,8 @@ export type DeckFilters = {
   min_age: number;
   max_age: number;
   city: string;
+  /** Empty shows every gender. Hidden profiles stay out of a chosen gender. */
+  gender?: "" | "woman" | "man";
   real_only?: boolean;
   /** When true, profiles with no diagnosis stay out of the feed. Default on. */
   hide_undiagnosed?: boolean;

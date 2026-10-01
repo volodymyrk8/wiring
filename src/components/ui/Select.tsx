@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import type { ComponentChildren, JSX } from "preact";
 import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
 import { IconButton } from "./IconButton";
@@ -85,7 +86,8 @@ export function Select<T extends string = string>({
   const selectedValue = isControlled ? controlledValue : internalValue;
   const selectedOption = options.find((o) => o.value === selectedValue);
 
-  useDismissibleLayer(wrapRef, isOpen, () => setIsOpen(false));
+  const layerRefs = useRef([wrapRef, menuRef]);
+  useDismissibleLayer(layerRefs.current, isOpen, () => setIsOpen(false));
 
   useEffect(() => {
     if (!isOpen) {
@@ -218,12 +220,12 @@ export function Select<T extends string = string>({
         <span id={hintId} class={styles.hintText}>{hint}</span>
       ) : null}
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           ref={menuRef}
           role="listbox"
           tabIndex={-1}
-          style={{ ...menuBox, maxHeight: `${menuMaxHeight}px` }}
+          style={{ ...menuBox, maxHeight: `${menuMaxHeight}px`, visibility: menuBox.left == null ? "hidden" : "visible" }}
           class={`${styles.menu}${placement === "up" ? ` ${styles.menuUp}` : ""}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
         >
           {searchable ? (
@@ -273,7 +275,8 @@ export function Select<T extends string = string>({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

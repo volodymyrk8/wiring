@@ -1866,6 +1866,10 @@ def api_patch_me():
     if not me:
         return jsonify({"ok": False, "error": "нет профиля"}), 401
     payload_in = _merge_me_for_draft(me, data) if draft else {**data}
+    # An uploaded photo lives on the photos row. It is not a seed portrait, and a
+    # filter save must not fail just because that path is still on the profile.
+    if str(payload_in.get("photo") or "") not in SEED_PHOTOS:
+        payload_in = {**payload_in, "photo": ""}
     parsed, err = parse_profile(
         {**payload_in, "email": "x@y.zz", "password": "ignore1"},
         require_password=False,
@@ -2084,6 +2088,9 @@ def api_feed():
     unknown_city = bool(city_raw) and not city_q
     real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
     hide_undiagnosed = str(request.args.get("hide_empty", "1")).lower() not in {"0", "false", "no"}
+    gender_q = str(request.args.get("gender") or "").strip()
+    if gender_q not in {"woman", "man"}:
+        gender_q = ""
     skip_ids = {int(part) for part in str(request.args.get("skip") or "").split(",") if part.isdigit()}
     if len(skip_ids) > 200:
         skip_ids = set(list(skip_ids)[:200])
@@ -2124,10 +2131,10 @@ def api_feed():
                               skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me,
                               hide_undiagnosed=hide_undiagnosed)
 
-    narrowed = bool(city_raw or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99)
+    narrowed = bool(city_raw or gender_q or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99)
     cards, has_more, generation = claim_feed(
         db(), int(me["id"]), min_age=min_age, max_age=max_age,
-        city=city_q, limit=limit, eligible=eligible,
+        city=city_q, gender=gender_q, limit=limit, eligible=eligible,
         skip_ids=skip_ids, include_delivered=narrowed, match_none=unknown_city,
     )
     jev_ranked = False

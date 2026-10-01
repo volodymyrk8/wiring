@@ -63,7 +63,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
   />;
 }
 
-const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", real_only: false, hide_undiagnosed: true });
+const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "", real_only: false, hide_undiagnosed: true });
 
 type DiscoveryDraft = {
   seekMinAge: string;
@@ -104,7 +104,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
     setMaxAge("99");
   };
   return <Modal isOpen onClose={onClose} title="Фильтры" responsiveSheet
-    footer={<><Button variant="ghost" disabled={busy} onClick={reset}>Сбросить</Button><Button type="submit" form="deck-filters" loading={busy}>Применить</Button></>}>
+    footer={<><Button variant="ghost" disabled={busy} onClick={reset}>Сбросить</Button><Button type="button" disabled={busy} loading={busy} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>Применить</Button></>}>
     <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
       event.preventDefault();
       if (!busy) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
@@ -116,6 +116,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
           <Input label="Возраст от" name="deck-min-age" type="number" inputMode="numeric" required min={18} max={Number(maxAge) || 99} value={minAge} onInput={(event) => setMinAge(event.currentTarget.value)} />
           <Input label="Возраст до" name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
         </div>
+        <Select className={styles.citySelect} label="Пол" id="deck-gender" options={[{ value: "", label: "Любой" }, { value: "woman", label: "Женщины" }, { value: "man", label: "Мужчины" }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel="Пол в ленте" />
         <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
         <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
         <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
@@ -251,7 +252,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   const panelMovedRef = useRef(false);
   const scrollTimerRef = useRef<number | null>(null);
   const current = cards[index];
-  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
+  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
 
   useEffect(() => {
     host.onFeedChange(cards, index, filters, hasMore, generation);
@@ -293,23 +294,9 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   }, [current?.id]);
 
   const saveDiscovery = async (discovery: DiscoveryDraft) => {
-    const user = host.user;
     const response = await host.api("/api/me", {
       method: "PATCH",
       body: JSON.stringify({
-        name: user.name,
-        age: Number(user.age),
-        city: user.city || "",
-        gender: user.gender,
-        looking_for: user.looking_for,
-        bio: user.bio || "",
-        job: user.job || "",
-        communication: user.communication || "",
-        intents: user.intents || [],
-        height: user.height || null,
-        neuro: user.neuro || [],
-        vibe: user.vibe || [],
-        prompts: user.prompts || [],
         seek_min_age: Number(discovery.seekMinAge || 18),
         seek_max_age: Number(discovery.seekMaxAge || 99),
         seek_place: discovery.seekPlace,
