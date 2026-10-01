@@ -1,13 +1,10 @@
 import SwiftUI
 
-/// Entry point. `--selftest` runs an API smoke test against WIRING_API_URL and exits;
-/// `--snapshot <dir>` renders the main screens with sample data to PNG files.
+/// Entry point. `--selftest` runs an API smoke test (see DevTools.swift) and exits.
 @main
 enum Main {
     static func main() {
-        let args = CommandLine.arguments
-        if args.contains("--selftest") { SelfTest.run(); return }
-        if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count { Snapshots.run(into: args[i + 1]); return }
+        if CommandLine.arguments.contains("--selftest") { SelfTest.run(); return }
         WiringApp.main()
     }
 }
@@ -20,7 +17,10 @@ struct WiringApp: App {
             RootView()
                 .environment(model)
                 .frame(minWidth: 880, minHeight: 600)
-                .task { await model.start() }
+                .task {
+                    await model.start()
+                    if Snapshots.directory != nil { await Snapshots.run(model: model) }
+                }
         }
         .defaultSize(width: 1180, height: 780)
         .commands { WiringCommands(model: model) }
