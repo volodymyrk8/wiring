@@ -45,7 +45,7 @@ from devices import ensure_device_tables, track_device_visit, visitor_key_from_r
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access, prepare_jev_feed
 from glossary import glossary_html
-from legal_pages import MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
+from legal_pages import CHILD_SAFETY_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
@@ -3710,6 +3710,18 @@ def admin_task_decision(task_id: int):
     return redirect("/admin#tasks")
 
 
+@app.get("/child-safety")
+def child_safety():
+    return render_template(
+        "legal.html",
+        title="Стандарты защиты детей в WIRING",
+        description="WIRING — только для взрослых. Запрет CSAE и CSAM, жалобы и контакт по вопросам защиты детей.",
+        path="/child-safety",
+        site_url=SITE_URL,
+        body=CHILD_SAFETY_HTML,
+    )
+
+
 @app.get("/privacy")
 def privacy():
     return render_template(
@@ -3824,7 +3836,7 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
-    urls = ["/", "/rules", "/privacy", "/marketing", "/support"]
+    urls = ["/", "/rules", "/privacy", "/marketing", "/support", "/child-safety"]
     items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype="application/xml")

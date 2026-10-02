@@ -165,3 +165,9 @@ Feed photos support horizontal swipes, numbered photo controls and Left/Right ke
 WIRING+ users can replay eligible profiles from the exhausted feed after confirmation. Permanent exclusions and likes are retained; free accounts see a disabled replay button. The server enforces entitlement and retry safety.
 
 While the signup gift is on, every real account receives 90 days of WIRING+. A one-time backfill raises existing accounts to at least 90 days from deploy without shortening a longer grant. Set `WIRING_SIGNUP_PLUS=0` in the server environment and restart to stop granting it to new registrations. Guests, seed, and demo accounts are excluded.
+
+## Публичные стандарты защиты детей
+
+`/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
+
+Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.

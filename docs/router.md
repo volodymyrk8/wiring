@@ -49,3 +49,5 @@ The `/feed` URL is unchanged. The vertical Preact feed uses `GET /api/feed?limit
 The feed’s “Профиль” Button link uses the existing `/p/:id` route. Horizontal photo gestures and Left/Right keys are local gallery state and do not change the URL or send a swipe action.
 
 `POST /api/feed/reset` is a WIRING+-only action in the exhausted `/feed` screen, behind shared Modal confirmation. It accepts the current `generation`; no new SPA route is introduced. Non-premium requests return 403.
+
+`/child-safety` — публичный серверный документ (`legal.html`), GET/HEAD без сессии; в SPA_PATHS не включается. Переход из юридического подвала загружает документ полностью. `/delete-account` сохраняет существующий SPA-контракт.

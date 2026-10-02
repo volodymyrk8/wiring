@@ -22,6 +22,9 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
       <a class={styles.link} href="/marketing" draggable={false}>
         рассылка
       </a>
+      <a class={styles.link} href="/child-safety" draggable={false}>
+        Защита детей
+      </a>
       <a
         class={styles.link}
         href="/support"

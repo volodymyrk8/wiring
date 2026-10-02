@@ -5,6 +5,27 @@ typical Russian dating-service pack (user agreement, privacy policy, mailing
 consent). They are not a copy of any third-party agreement.
 """
 
+CHILD_SAFETY_HTML = """
+<p>WIRING предназначен только для взрослых (18+). Мы запрещаем сексуальную эксплуатацию и жестокое обращение с детьми (CSAE), а также материалы сексуального насилия над детьми (CSAM).</p>
+<h2>Возраст</h2>
+<p>Регистрация требует подтверждения 18+. Если аккаунт принадлежит несовершеннолетнему, он подлежит блокировке. Данные обрабатываются в соответствии с применимым законом и <a href="/privacy">политикой конфиденциальности</a>.</p>
+<h2>Запрещённые действия и материалы</h2>
+<p>Нельзя публиковать, отправлять или запрашивать материалы сексуального характера с участием несовершеннолетних, сексуализировать детей или вступать в контакт с несовершеннолетними с сексуальной целью. Эти запреты распространяются на анкеты, фотографии и переписку.</p>
+<h2>Как сообщить о нарушении</h2>
+<p>На сайте откройте профиль человека (из ленты — кнопка «Профиль») и выберите «Пожаловаться». Вы также можете заблокировать участника или обратиться через <a href="/support">поддержку</a>.</p>
+<p>Контакт по вопросам защиты детей: <a href="mailto:support@wiring.date">support@wiring.date</a>. Укажите аккаунт и обстоятельства нарушения. Не пересылайте подозрительные материалы и не сообщайте свой пароль.</p>
+<h2>Реакция на нарушения</h2>
+<p>Сообщения о нарушениях направляются администрации для рассмотрения. Подтверждённые нарушения требуют ограничения доступа нарушителя и удаления запрещённого содержимого. О выявленных материалах CSAM необходимо сообщать компетентным органам в соответствии с применимым законом.</p>
+<h2>Профилактика</h2>
+<p>Соблюдайте <a href="/rules">правила WIRING</a>. Не передавайте несовершеннолетним доступ к аккаунту. Используйте блокировку и жалобы, чтобы сообщать администрации о нарушениях.</p>
+<section lang="en" aria-label="English summary">
+<h2>Child safety standards — English summary</h2>
+<p>WIRING is for adults (18+) only. We prohibit child sexual abuse and exploitation (CSAE), child sexual abuse material (CSAM), sexualization of children, and contacting minors for sexual purposes.</p>
+<p>On the website, open a person's profile to report or block them. You can also use the support form. Child safety contact: <a href="mailto:support@wiring.date">support@wiring.date</a>. Identify the account and circumstances; do not forward suspected abuse material or send your password.</p>
+<p>Reports are submitted to the administration for review. Confirmed violations require restricting the offending account and removing prohibited content. Identified CSAM must be reported to competent authorities as required by applicable law.</p>
+</section>
+"""
+
 RULES_HTML = """
 <p>Настоящее пользовательское соглашение (далее — соглашение) регулирует использование сервиса знакомств WIRING. Используя сервис, вы подтверждаете, что прочитали соглашение и <a href="/privacy">политику конфиденциальности</a> и принимаете их. Если вы не согласны с условиями, не регистрируйтесь и не пользуйтесь сервисом.</p>
 <p>Соглашение может быть изменено. Новая редакция публикуется на этой странице. Продолжение использования сервиса после публикации означает согласие с новой редакцией, если закон не требует отдельного согласия.</p>

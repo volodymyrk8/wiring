@@ -643,6 +643,22 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(page.status_code, 200, path)
             self.assertIn(b"WIRING", page.data)
 
+    def test_child_safety_public_document(self):
+        response = self.client.get("/child-safety")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content_type.startswith("text/html"))
+        text = response.get_data(as_text=True)
+        for expected in ("CSAE", "CSAM", "WIRING", "18+", "support@wiring.date", "Пожаловаться"):
+            self.assertIn(expected, text)
+        self.assertIn('rel="canonical" href="https://wiring.date/child-safety"', text)
+        self.assertIn('href="/child-safety" aria-current="page"', text)
+        self.assertNotIn('id="app"', text)
+        self.assertEqual(self.client.head("/child-safety").status_code, 200)
+        self.assertIn(b"/child-safety", self.client.get("/sitemap.xml").data)
+        self.assertIn('href="/child-safety"', self.client.get("/privacy").get_data(as_text=True))
+        # The existing account-deletion confirmation remains a SPA document.
+        self.assertIn(b'id="app"', self.client.get("/delete-account").data)
+
     def _register(self, email="ada@example.com", **extra):
         name = extra.pop("name", "Ада")
         password = extra.pop("password", "secret1")

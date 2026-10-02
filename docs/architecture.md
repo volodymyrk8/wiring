@@ -128,3 +128,9 @@ The typed shared API resets and then fetches the first new page. Cancel does not
 The optional Jev ranking runs only after the existing `/api/feed` eligibility and delivery checks. Access requires both the single numeric `JEV_BETA_USER_ID` allowlist and that account's persisted `users.jev_feed_enabled` setting. The allowlist is fail-closed when unset. The opt-in client requests pages of ten candidates for ranking; the normal feed keeps its two-card page. The server sends one structured request per delivered page and ranks only that page; provider errors, timeouts, missing keys or malformed answers retain the baseline order. Jev cannot create swipes or matches.
 
 The Jev request contains structured pair signals: catalog neuro and vibe tag ids (full lists plus intersections), same-city flag, age-gap band and shared intent ids. It omits names, account IDs, photos, free-text bio/prompts and messages. Successful ranking adds `jev_match_pct` and `jev_match_reasons` on feed cards for the opt-in viewer. Configure `JEV_API_KEY` only in local ignored `.env` or production `/etc/wiring.env`; never in client code. Scores are experimental, not calibrated match probabilities.
+
+## Публичные стандарты защиты детей
+
+`/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
+
+Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.
