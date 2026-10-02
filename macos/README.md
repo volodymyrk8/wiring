@@ -25,11 +25,11 @@ xcodebuild -project WIRING.xcodeproj -scheme WIRING -configuration Debug -derive
   CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" build
 open build/Build/Products/Debug/WIRING.app
 ```
-Для раздачи (TestFlight для Mac / App Store) — Release с подписью команды `G3T7684N3M`, bundle ID `date.wiring.mac`; запись приложения в App Store Connect нужно создать отдельно.
+Для раздачи (TestFlight для Mac / App Store) — Release с подписью команды `G3T7684N3M`, bundle ID `date.wiring.app` — тот же, что у iOS (универсальная покупка: платформа macOS добавляется к существующей записи в App Store Connect).
 
 ## Локальный сервер
 ```sh
-defaults write date.wiring.mac apiURL http://127.0.0.1:5070   # или WIRING_API_URL=...
+defaults write date.wiring.app apiURL http://127.0.0.1:5070   # или WIRING_API_URL=...
 ```
 
 ## Проверки
@@ -39,7 +39,7 @@ WIRING_API_URL=http://127.0.0.1:5070 WIRING_TEST_EMAIL=dev@wiring.test WIRING_TE
 ```
 Проходит вход, профиль, каталог, ленту с фильтрами, лайки, чаты, переписку, профиль человека, ротацию токена и выход (`WIRING_TEST_WRITE=1` — ещё и отправку без дублей). Только для локального сервера с тестовыми аккаунтами.
 
-`WIRING_SNAPSHOT_DIR=<любой путь>` с теми же переменными: приложение само входит, проходит по разделам, сохраняет снимки окна в `~/Library/Containers/date.wiring.mac/Data/tmp/wiring-snapshots/` и закрывается.
+`WIRING_SNAPSHOT_DIR=<любой путь>` с теми же переменными: приложение само входит, проходит по разделам, сохраняет снимки окна в `~/Library/Containers/date.wiring.app/Data/tmp/wiring-snapshots/` и закрывается.
 
 ## Скриншоты для Mac App Store
 `docs/screenshots/macos/` — 8 снимков 2880×1800 (16:10, принимается App Store), светлая тема, полный экран. Для загрузки рекомендуемый порядок: 01-feed, 05-conversation, 02-likes, 04-profile, 06-edit-profile, 07-visibility, 00-login (03-chats — список без открытого чата, можно не загружать).

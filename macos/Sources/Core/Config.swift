@@ -1,7 +1,7 @@
 import Foundation
 
 enum Config {
-    /// API base URL. Override for a local server with `defaults write date.wiring.mac apiURL http://127.0.0.1:5070`
+    /// API base URL. Override for a local server with `defaults write date.wiring.app apiURL http://127.0.0.1:5070`
     /// or the WIRING_API_URL environment variable.
     static var apiURL: URL {
         let raw = ProcessInfo.processInfo.environment["WIRING_API_URL"]
