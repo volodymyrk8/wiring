@@ -40,7 +40,7 @@ flowchart LR
 
 1. Почти все «страницы» (`/`, `/login`, `/feed`, `/chats/...`) — один **`templates/index.html`**: пустой `#app` + подключение собранного shell `public/dist/app.js`.
 2. **`src/app/bootstrap.js` — coordinator shell**: ходит в **`/api/*`**, хранит session state в памяти, синхронизирует URL через history API и передаёт typed host bridges в feature bundles. Общий API-клиент вынесен в `src/app/api.ts`, inbox-lifecycle — в `src/app/inbox.ts`, lazy-загрузка feature-бандлов — в `src/app/features.ts`; пользовательские экраны живут в Preact.
-3. Отдельные **серверные шаблоны**: `templates/admin.html`, `templates/legal.html` (правила, privacy). Экраны `/support` и `/notifications` вынесены в отдельные Preact-модули; настройки уведомлений живут рядом с профилем.
+3. Отдельные **серверные шаблоны**: `templates/admin.html`, `templates/legal.html` (правила, privacy, защита детей и удаление аккаунта). `/account-deletion` — публичная инструкция; `/delete-account` остаётся авторизованным SPA-подтверждением. Экраны `/support` и `/notifications` вынесены в отдельные Preact-модули; настройки уведомлений живут рядом с профилем.
 4. Доменная логика вынесена из монолита в модули рядом с `app.py`: `catalog`, `notify`, `push`, `premium`, `media`, `matchmaker`, и т.д. Web Push добровольный: подписка только с тумблера уведомлений, доставка лайков и сообщений когда вкладка не опрашивает inbox (`/sw.js`).
 
 ## Оценка текущей архитектуры
@@ -133,4 +133,6 @@ The Jev request contains structured pair signals: catalog neuro and vibe tag ids
 
 `/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
 
-Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.
+Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылки «Защита детей» → `https://wiring.date/child-safety` и «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.
+
+`/account-deletion` — серверная инструкция по удалению и сохранению данных. Она сообщает, что аккаунт восстанавливается входом с правильным паролем в течение 7 суток, вспомогательные данные очищаются только при создании гостевого демо-сеанса (не по расписанию), а основная запись с почтой, хешем пароля и полями анкеты сейчас остаётся без установленного срока очистки. `/delete-account` остаётся существующим SPA-путём для подтверждения действия.
