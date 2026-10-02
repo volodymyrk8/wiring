@@ -98,6 +98,7 @@ MAX_PHOTOS = 12
 MAX_ALBUMS = 8
 MAX_PROMPTS = 3
 ONLINE_WINDOW = 10 * 60
+ACCOUNT_DELETE_GRACE = 7 * 86400
 
 app = Flask(__name__, template_folder="templates", static_folder=None)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
@@ -1304,7 +1305,7 @@ def _purge_deleted_users_data(conn: Connection) -> None:
     """Full auxiliary data wipe for accounts deleted > 7 days (604800s) ago.
     The user row in 'users' is NEVER deleted, keeping the deleted_at flag.
     """
-    cutoff = int(time.time()) - 7 * 86400
+    cutoff = int(time.time()) - ACCOUNT_DELETE_GRACE
     rows = conn.execute(
         "SELECT id FROM users WHERE deleted_at IS NOT NULL AND deleted_at > 0 AND deleted_at < ?",
         (cutoff,),
@@ -1608,17 +1609,24 @@ def _authenticate(email: str, password: str):
     row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return None, (jsonify({"ok": False, "error": "неверная почта или пароль"}), 401)
-    if "deleted_at" in row.keys() and row["deleted_at"]:
-        return None, (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": "аккаунт удалён (восстановление доступно в течение 7 суток)",
-                    "deleted": True,
-                }
-            ),
-            403,
-        )
+    deleted_at = int(row["deleted_at"] or 0) if "deleted_at" in row.keys() and row["deleted_at"] else 0
+    if deleted_at:
+        if int(time.time()) - deleted_at > ACCOUNT_DELETE_GRACE:
+            return None, (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "аккаунт удалён, срок восстановления прошёл",
+                        "deleted": True,
+                    }
+                ),
+                403,
+            )
+        conn = db()
+        conn.execute("UPDATE users SET deleted_at = NULL WHERE id = ?", (row["id"],))
+        conn.commit()
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone()
+        g.account_restored = True
     if email_verify_enforced() and not email_is_verified(row):
         return None, (
             jsonify(
@@ -1650,7 +1658,10 @@ def api_login():
     session["uid"] = row["id"]
     db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (int(time.time()), row["id"]))
     db().commit()
-    return jsonify({"ok": True, "user": current_user()})
+    payload: dict[str, Any] = {"ok": True, "user": current_user()}
+    if g.get("account_restored"):
+        payload["restored"] = True
+    return jsonify(payload)
 
 
 @app.post("/api/email/verify")

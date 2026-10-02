@@ -775,6 +775,7 @@ import { createInboxController } from "./inbox";
     },
     onAuthSuccess: async (mode, data) => {
       state.user = data.user;
+      if (mode === "login" && data.restored) toast("профиль восстановлен");
       if (mode === "register") {
         sessionStorage.removeItem("wiring-ref");
         state.pendingRef = "";

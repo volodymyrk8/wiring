@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 import unittest
 from io import BytesIO
 from unittest.mock import patch
@@ -1630,12 +1631,29 @@ class WiringTest(unittest.TestCase):
         me = self.client.get("/api/me").get_json()["user"]
         self.assertIsNone(me)
 
-        # Login is blocked
+        # Correct password within 7 days restores the account and logs in.
         login = self.client.post("/api/login", json={"email": "del-test@example.com", "password": "mysecretpassword"})
-        self.assertEqual(login.status_code, 403)
-        self.assertIn("удалён", login.get_json()["error"])
+        self.assertEqual(login.status_code, 200)
+        body = login.get_json()
+        self.assertTrue(body["ok"])
+        self.assertTrue(body["restored"])
+        self.assertEqual(body["user"]["id"], uid)
+        with app.app_context():
+            row = db().execute("SELECT deleted_at FROM users WHERE id = ?", (uid,)).fetchone()
+            self.assertFalse(row["deleted_at"])
 
-        # Excluded from people lookup
+        self.client.post("/api/logout")
+        with app.app_context():
+            db().execute(
+                "UPDATE users SET deleted_at = ? WHERE id = ?",
+                (int(time.time()) - 8 * 86400, uid),
+            )
+            db().commit()
+        expired = self.client.post("/api/login", json={"email": "del-test@example.com", "password": "mysecretpassword"})
+        self.assertEqual(expired.status_code, 403)
+        self.assertIn("срок восстановления", expired.get_json()["error"])
+
+        # Still excluded from people lookup after the window
         self._register("viewer@example.com")
         p = self.client.get(f"/api/people/{uid}")
         self.assertEqual(p.status_code, 404)

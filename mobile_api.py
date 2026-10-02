@@ -179,6 +179,8 @@ def install(
         session["uid"] = int(row["id"])
         session.modified = False
         payload["user"] = current_user()
+        if g.get("account_restored"):
+            payload["restored"] = True
         return jsonify(payload)
 
     @app.post("/api/auth/refresh")
