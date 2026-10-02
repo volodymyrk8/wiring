@@ -45,7 +45,7 @@ from devices import ensure_device_tables, track_device_visit, visitor_key_from_r
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access, prepare_jev_feed
 from glossary import glossary_html
-from legal_pages import CHILD_SAFETY_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
+from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
@@ -3729,6 +3729,18 @@ def child_safety():
     )
 
 
+@app.get("/account-deletion")
+def account_deletion():
+    return render_template(
+        "legal.html",
+        title="Удаление аккаунта и данных",
+        description="Как удалить аккаунт WIRING, восстановить его в течение 7 суток и какие данные сохраняются.",
+        path="/account-deletion",
+        site_url=SITE_URL,
+        body=ACCOUNT_DELETION_HTML,
+    )
+
+
 @app.get("/privacy")
 def privacy():
     return render_template(
@@ -3843,7 +3855,7 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
-    urls = ["/", "/rules", "/privacy", "/marketing", "/support", "/child-safety"]
+    urls = ["/", "/rules", "/privacy", "/marketing", "/support", "/child-safety", "/account-deletion"]
     items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype="application/xml")
