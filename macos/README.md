@@ -40,3 +40,8 @@ WIRING_API_URL=http://127.0.0.1:5070 WIRING_TEST_EMAIL=dev@wiring.test WIRING_TE
 Проходит вход, профиль, каталог, ленту с фильтрами, лайки, чаты, переписку, профиль человека, ротацию токена и выход (`WIRING_TEST_WRITE=1` — ещё и отправку без дублей). Только для локального сервера с тестовыми аккаунтами.
 
 `WIRING_SNAPSHOT_DIR=<любой путь>` с теми же переменными: приложение само входит, проходит по разделам, сохраняет снимки окна в `~/Library/Containers/date.wiring.mac/Data/tmp/wiring-snapshots/` и закрывается.
+
+## Скриншоты для Mac App Store
+`docs/screenshots/macos/` — 8 снимков 2880×1800 (16:10, принимается App Store), светлая тема, полный экран. Для загрузки рекомендуемый порядок: 01-feed, 05-conversation, 02-likes, 04-profile, 06-edit-profile, 07-visibility, 00-login (03-chats — список без открытого чата, можно не загружать).
+
+Переснять: при включённом разрешении «Запись экрана» запустить приложение с `WIRING_SNAPSHOT_DIR=/x WIRING_SNAPSHOT_EXTERNAL=1 WIRING_APPEARANCE=light` и тестовыми переменными, а на каждую строку `SHOT <name>` в выводе делать `screencapture -x`, только если на переднем плане WIRING (`lsappinfo front`). Индикатор записи в правом верхнем углу закрашивается после съёмки. Mac во время съёмки (≈1 мин) не трогать.
