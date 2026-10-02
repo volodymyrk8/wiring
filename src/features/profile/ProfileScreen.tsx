@@ -556,7 +556,7 @@ export function ProfileScreen({ host }: Props) {
               <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
               <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
-              <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим враньё — можем забанить.</p>
+              <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
             </section>
 

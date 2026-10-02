@@ -1,15 +1,15 @@
 type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "account" | "chat" | "support";
 
 const FEATURE_FILES: Record<FeatureName, string> = {
-  auth: "auth.js?v=11",
-  home: "home.js?v=71",
-  profile: "profile.js?v=26",
-  likes: "likes.js?v=28",
-  person: "person.js?v=17",
-  deck: "deck.js?v=25",
-  account: "account.js?v=7",
-  chat: "chat.js?v=30",
-  support: "support.js?v=6",
+  auth: "auth.js?v=12",
+  home: "home.js?v=72",
+  profile: "profile.js?v=27",
+  likes: "likes.js?v=29",
+  person: "person.js?v=18",
+  deck: "deck.js?v=26",
+  account: "account.js?v=8",
+  chat: "chat.js?v=31",
+  support: "support.js?v=7",
 };
 
 /** Lazy, cached loaders for route-level feature bundles. */

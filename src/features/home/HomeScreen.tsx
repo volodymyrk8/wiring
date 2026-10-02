@@ -132,8 +132,6 @@ export function HomeScreen({ host }: HomeScreenProps) {
             </div>
           </div>
 
-          <div class={styles.homeLowerSpacer} aria-hidden="true" />
-
           <div class={styles.about}>
             <div class={styles.aboutFrame}>
               <p class={styles.plusGiftText} aria-label="подарок WIRING+">

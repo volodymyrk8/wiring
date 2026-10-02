@@ -6,8 +6,8 @@ import { Button } from "./Button";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
+  { id: "pastel", label: "утро" },
   { id: "mist", label: "день" },
-  { id: "pastel", label: "пастель" },
   { id: "dusk", label: "сумерки" },
   { id: "night", label: "ночь" },
   { id: "slate", label: "полночь" },
@@ -54,8 +54,8 @@ export function ThemeIcon({ theme, size = 20 }: { theme: ThemeName; size?: numbe
 }
 
 export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
+  { value: "pastel", label: "утро", icon: <ThemeIcon theme="pastel" /> },
   { value: "mist", label: "день", icon: <ThemeIcon theme="mist" /> },
-  { value: "pastel", label: "пастель", icon: <ThemeIcon theme="pastel" /> },
   { value: "dusk", label: "сумерки", icon: <ThemeIcon theme="dusk" /> },
   { value: "night", label: "ночь", icon: <ThemeIcon theme="night" /> },
   { value: "slate", label: "полночь", icon: <ThemeIcon theme="slate" /> },

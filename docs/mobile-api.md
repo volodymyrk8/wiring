@@ -2,7 +2,7 @@
 
 Модуль `mobile_api.py`. Веб-клиент по-прежнему работает на cookie-сессии; мобильные приложения используют токены.
 
-Приложения — тот же продукт, что и сайт. Правило для правок сайта и тем: `AGENTS.md`, раздел «Site and mobile apps are one product», и `docs/architecture.md`. Темы сайта (`mist`, `pastel`, `dusk`, `night`, `slate`) на iOS и Android те же, с теми же названиями и палитрой.
+Приложения — тот же продукт, что и сайт. Правило для правок сайта и тем: `AGENTS.md`, раздел «Site and mobile apps are one product», и `docs/architecture.md`. Темы сайта (`pastel` — утро, `mist` — день, `dusk` — сумерки, `night` — ночь, `slate` — полночь) на iOS и Android те же, с теми же названиями и палитрой.
 
 ## Авторизация
 

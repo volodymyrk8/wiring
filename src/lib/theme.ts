@@ -1,5 +1,5 @@
 const COLORS = {
-  mist: "#e9ebf3", pastel: "#f3eee6", dusk: "#1a1c24", night: "#110e0c", slate: "#0b0f14",
+  mist: "#e9ebf3", pastel: "#f3eee6", dusk: "#3c365c", night: "#110e0c", slate: "#0b0f14",
 } as const;
 export function themeNow(): keyof typeof COLORS {
   const theme = document.documentElement.dataset.theme || "mist";

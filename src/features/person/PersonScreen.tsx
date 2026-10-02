@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, Modal, ProfileMenu } from "@/components/ui";
-import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
+import { AppHeader, Button, Modal, ProfileMenu, TagHints } from "@/components/ui";
+import { hintForTag, labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { sharedNeuroIdSet, sharedVibeIdSet } from "@/lib/shared-vibes";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
@@ -143,11 +143,11 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const tags = [
     ...split.neuro.flatMap((id) => {
       const label = labelForTag("neuro", id, host.catalog);
-      return label ? [{ id, label, vibe: false as const, shared: sharedNeuro.has(id) }] : [];
+      return label ? [{ id, label, hint: hintForTag("neuro", id, host.catalog), vibe: false, shared: sharedNeuro.has(id) }] : [];
     }),
     ...split.vibe.flatMap((id) => {
       const label = labelForTag("vibe", id, host.catalog);
-      return label ? [{ id, label, vibe: true as const, shared: sharedVibes.has(id) }] : [];
+      return label ? [{ id, label, hint: hintForTag("vibe", id, host.catalog), vibe: true, shared: sharedVibes.has(id) }] : [];
     }),
   ];
   const hasShared = tags.some((tag) => tag.shared);
@@ -170,23 +170,13 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       </section>
       {photos.length > 1 ? <div class={styles.photoStrip} aria-label="Фотографии анкеты">{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-pressed={index === photoIndex} aria-label={`Фото ${index + 1} из ${photos.length}`}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
       <div class={styles.body}>
-        <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим враньё — можем забанить.</p>
+        <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
         {person.bio ? <p class={styles.bio}>{person.bio}</p> : null}
         {person.communication ? <div class={styles.prompt}><strong>как тебе писать</strong><p>{person.communication}</p></div> : null}
         {tags.length ? (
           <div class={styles.tagBlock}>
             {hasShared ? <p class={styles.tagLegend}>Яркие — совпадает с твоей анкетой</p> : null}
-            <div class={styles.tags}>
-              {tags.map((tag) => (
-                <span
-                  key={`${tag.vibe ? "vibe" : "neuro"}-${tag.id}`}
-                  class={`${styles.tag}${tag.vibe ? ` ${styles.tagVibe}` : ""}${tag.shared ? ` ${styles.tagShared}` : ""}`}
-                  title={tag.shared ? (tag.vibe ? "Совпадает с твоим вайбом" : "Совпадает с твоим диагнозом") : undefined}
-                >
-                  {tag.label}
-                </span>
-              ))}
-            </div>
+            <TagHints tags={tags} />
           </div>
         ) : null}
         {(person.prompts || []).map((prompt) => <div class={styles.prompt} key={prompt.id}><strong>{host.catalog.prompts?.find((item) => item.id === prompt.id)?.label || prompt.id}</strong><p>{prompt.answer}</p></div>)}

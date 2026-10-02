@@ -114,28 +114,28 @@ html[data-theme="slate"] {
 
 html[data-theme="dusk"] {
   color-scheme: dark;
-  --bg: #1a1c24;
-  --bg-2: #242734;
-  --ink: #e4e6ef;
-  --muted: #9ea3b5;
-  --line: rgba(228, 230, 239, 0.1);
-  --lime: #9aa5d1;
-  --coral: #c9a0ae;
-  --card: #222530;
-  --shadow: 0 20px 56px rgba(0, 0, 0, 0.35);
-  --on-accent: #ffffff;
+  --bg: #3c365c;
+  --bg-2: #4a4370;
+  --ink: #f4f0fa;
+  --muted: #c9c0dc;
+  --line: rgba(244, 240, 250, 0.16);
+  --lime: #d7c4ff;
+  --coral: #f0a8bc;
+  --card: #524a78;
+  --shadow: 0 18px 48px rgba(28, 20, 52, 0.28);
+  --on-accent: #2a2340;
   --on-danger: #fff8f5;
-  --pass: #2e3140;
-  --photo: #2a2d3a;
-  --glow-1: rgba(154, 165, 209, 0.14);
-  --glow-2: rgba(201, 160, 174, 0.12);
-  --accent-soft: rgba(154, 165, 209, 0.14);
-  --accent-line: rgba(154, 165, 209, 0.32);
-  --on-photo: #eef0f7;
-  --on-photo-muted: #b4b8c8;
-  --overlay: rgba(18, 20, 28, 0.88);
-  --tip: #242734;
-  --chrome: #1a1c24;
+  --pass: #5c547f;
+  --photo: #564e7c;
+  --glow-1: rgba(215, 196, 255, 0.22);
+  --glow-2: rgba(240, 168, 188, 0.16);
+  --accent-soft: rgba(215, 196, 255, 0.2);
+  --accent-line: rgba(215, 196, 255, 0.45);
+  --on-photo: #f7f3fb;
+  --on-photo-muted: #ddd4ee;
+  --overlay: rgba(42, 35, 64, 0.78);
+  --tip: #4a4370;
+  --chrome: #3c365c;
 }
 
 * { box-sizing: border-box; }
@@ -499,7 +499,6 @@ html[data-view="login"][data-tabs] .auth-shell {
 }
 
 html[data-theme="night"] .beta-popover,
-html[data-theme="dusk"] .beta-popover,
 html[data-theme="slate"] .beta-popover {
   background: #1e202a;
   border-color: #3e4256;
@@ -507,11 +506,22 @@ html[data-theme="slate"] .beta-popover {
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
+html[data-theme="dusk"] .beta-popover {
+  background: #4a4370;
+  border-color: rgba(244, 240, 250, 0.2);
+  color: #f4f0fa;
+  box-shadow: 0 14px 36px rgba(28, 20, 52, 0.45);
+}
+
 html[data-theme="night"] .beta-popover::before,
-html[data-theme="dusk"] .beta-popover::before,
 html[data-theme="slate"] .beta-popover::before {
   background: #1e202a;
   border-color: #3e4256;
+}
+
+html[data-theme="dusk"] .beta-popover::before {
+  background: #4a4370;
+  border-color: rgba(244, 240, 250, 0.2);
 }
 
 html[data-theme="mist"] .brand .beta-label {
@@ -541,10 +551,10 @@ html[data-theme="slate"] .brand .beta-label {
 }
 
 html[data-theme="dusk"] .brand .beta-label {
-  background: #242737;
-  border-color: rgba(154, 165, 209, 0.24);
-  color: #c5c0db;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  background: #4a4370;
+  border-color: rgba(215, 196, 255, 0.35);
+  color: #f4f0fa;
+  box-shadow: 0 1px 4px rgba(28, 20, 52, 0.28);
 }
 a.brand,
 .brand {

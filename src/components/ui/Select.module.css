@@ -183,12 +183,18 @@
 }
 
 :global(html[data-theme="night"]) .menu,
-:global(html[data-theme="dusk"]) .menu,
 :global(html[data-theme="slate"]) .menu {
   background: #1c1e26;
   border-color: #363948;
   color: #f0f1f6;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+:global(html[data-theme="dusk"]) .menu {
+  background: #4a4370;
+  border-color: rgba(244, 240, 250, 0.16);
+  color: #f4f0fa;
+  box-shadow: 0 14px 40px rgba(28, 20, 52, 0.4);
 }
 
 .option {
@@ -281,9 +287,9 @@
 
 .option[data-theme="dusk"] .optionIcon,
 .option[data-value="dusk"] .optionIcon {
-  background: #1a1c24;
-  color: #e4e6ef;
-  border: 1px solid rgba(154, 165, 209, 0.22);
+  background: #3c365c;
+  color: #f4f0fa;
+  border: 1px solid rgba(215, 196, 255, 0.35);
 }
 
 .option[data-theme="night"] .optionIcon,
@@ -348,8 +354,8 @@
 
 .swatch[data-theme="dusk"],
 .swatch[data-theme-set="dusk"] {
-  background: #1a1c24;
-  border-color: rgba(154, 165, 209, 0.35);
+  background: #3c365c;
+  border-color: rgba(215, 196, 255, 0.45);
 }
 
 /* Tablet (768px - 1024px) */

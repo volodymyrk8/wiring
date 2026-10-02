@@ -47,3 +47,12 @@ export function labelForTag(
   const item = list?.find((entry) => entry.id === id);
   return item?.label || null;
 }
+
+export function hintForTag(
+  kind: "neuro" | "vibe",
+  id: string,
+  catalog: { neuro?: CatalogItem[]; vibe?: CatalogItem[] },
+): string | undefined {
+  const list = kind === "neuro" ? catalog.neuro : catalog.vibe;
+  return list?.find((entry) => entry.id === id)?.hint || undefined;
+}

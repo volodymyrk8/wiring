@@ -168,7 +168,7 @@
   background: var(--card) !important;
   border: 1px solid var(--line) !important;
   box-shadow: none !important;
-  color: #e4e6ef !important;
+  color: #f4f0fa !important;
 }
 :global(html[data-theme="dusk"]) .backBtn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--line) 40%, var(--card)) !important;
@@ -307,9 +307,9 @@
 }
 
 :global(html[data-theme="dusk"]) .betaLabel {
-  background: #242737;
-  border-color: rgba(154, 165, 209, 0.24);
-  color: #c5c0db;
+  background: #4a4370;
+  border-color: rgba(215, 196, 255, 0.35);
+  color: #f4f0fa;
 }
 
 .headerEnd {

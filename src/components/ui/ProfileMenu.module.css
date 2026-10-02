@@ -22,12 +22,18 @@
 }
 
 :global(html[data-theme="night"]) .profileMenu,
-:global(html[data-theme="dusk"]) .profileMenu,
 :global(html[data-theme="slate"]) .profileMenu {
   background: #1c1e26;
   border-color: #363948;
   color: #f0f1f6;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+:global(html[data-theme="dusk"]) .profileMenu {
+  background: #4a4370;
+  border-color: rgba(244, 240, 250, 0.16);
+  color: #f4f0fa;
+  box-shadow: 0 14px 40px rgba(28, 20, 52, 0.4);
 }
 
 .menuHeader {

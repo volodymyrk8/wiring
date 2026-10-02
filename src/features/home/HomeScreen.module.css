@@ -35,17 +35,11 @@
 
 .homeLower {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
-  gap: clamp(12px, 2.5vh, 20px);
-  min-height: 0;
+  gap: 12px;
   width: 100%;
-  padding-top: clamp(8px, 2vh, 16px);
-}
-
-.homeLowerSpacer {
-  flex: 1 1 auto;
-  min-height: clamp(16px, 4vh, 48px);
+  padding-top: 16px;
 }
 
 .hero {
