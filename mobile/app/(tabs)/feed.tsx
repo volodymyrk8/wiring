@@ -131,6 +131,18 @@ export default function Feed() {
     }
   }
 
+  const matchModal = (
+    <MatchModal
+        person={match}
+        onClose={() => setMatch(null)}
+        onWrite={() => {
+          const id = match?.id;
+          setMatch(null);
+          if (id) router.push(`/chat/${id}`);
+        }}
+      />
+  );
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -157,6 +169,7 @@ export default function Feed() {
           }
         />
         {filtersOpen && <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} />}
+        {matchModal}
       </View>
     );
   }
@@ -198,15 +211,7 @@ export default function Feed() {
         </GlassGroup>
       </Column>
       {filtersOpen && <FiltersSheet value={filters} onApply={applyFilters} onClose={() => setFiltersOpen(false)} />}
-      <MatchModal
-        person={match}
-        onClose={() => setMatch(null)}
-        onWrite={() => {
-          const id = match?.id;
-          setMatch(null);
-          if (id) router.push(`/chat/${id}`);
-        }}
-      />
+      {matchModal}
     </View>
   );
 }
