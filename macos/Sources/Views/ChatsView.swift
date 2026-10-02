@@ -169,21 +169,21 @@ struct ConversationView: View {
         let mine = m.mine ?? (m.fromId != peer.id)
         return HStack {
             if mine { Spacer(minLength: 80) }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .trailing, spacing: 4) {
                 if let p = m.photoUrl, !p.isEmpty {
                     RemoteImage(path: p).frame(width: 240, height: 240).clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 if let a = m.audioUrl, !a.isEmpty {
                     Label(m.transcript?.isEmpty == false ? m.transcript! : "Голосовое сообщение", systemImage: "waveform")
                 }
-                if let b = m.body, !b.isEmpty { Text(b).textSelection(.enabled) }
-                Text(relativeTime(m.createdAt)).font(.caption2).opacity(0.65).frame(maxWidth: .infinity, alignment: .trailing)
+                if let b = m.body, !b.isEmpty { Text(b).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+                Text(relativeTime(m.createdAt)).font(.caption2).opacity(0.65)
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .foregroundStyle(mine ? Color.white : Color.primary)
             .background {
                 if mine { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(LinearGradient.wiring) }
-                else { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)) }
+                else { RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.primary.opacity(0.07)) }
             }
             .frame(maxWidth: 460, alignment: mine ? .trailing : .leading)
             if !mine { Spacer(minLength: 80) }

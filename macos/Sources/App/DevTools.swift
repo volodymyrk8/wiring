@@ -69,6 +69,7 @@ enum Snapshots {
     static func run(model: AppModel) async {
         guard let dir = directory else { return }
         let env = ProcessInfo.processInfo.environment
+        await prepareWindow()
         if model.phase != .signedIn {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             capture(into: dir, name: "00-login")
@@ -101,8 +102,26 @@ enum Snapshots {
         NSApp.terminate(nil)
     }
 
+    /// WIRING_SNAPSHOT_EXTERNAL=1: full screen, print "SHOT <name>" and pause so an outside
+    /// `screencapture` can take a real screen image (Liquid Glass and vibrancy included).
+    static var external: Bool { ProcessInfo.processInfo.environment["WIRING_SNAPSHOT_EXTERNAL"] == "1" }
+
+    @MainActor
+    static func prepareWindow() async {
+        if ProcessInfo.processInfo.environment["WIRING_APPEARANCE"] == "light" { NSApp.appearance = NSAppearance(named: .aqua) }
+        guard external, let w = NSApp.windows.first(where: { $0.title == "WIRING" }) else { return }
+        if !w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil) }
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
+    }
+
     @MainActor
     static func capture(into dir: String, name: String, sheet: Bool = false) {
+        if external {
+            print("SHOT \(name)")
+            fflush(stdout)
+            RunLoop.current.run(until: Date().addingTimeInterval(3.5))
+            return
+        }
         let candidate = sheet
             ? NSApp.windows.first(where: { $0.isSheet && $0.isVisible })
             : NSApp.windows.first(where: { $0.isVisible && $0.contentView != nil && $0.title == "WIRING" })

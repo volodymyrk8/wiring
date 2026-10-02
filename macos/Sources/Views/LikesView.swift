@@ -18,7 +18,7 @@ struct LikesView: View {
                         if !plus {
                             Text("Кто тебя лайкнул — доступно с WIRING+.").foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.top, 16)
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 190, maximum: 260), spacing: 16)], spacing: 16) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 18)], spacing: 16) {
                             ForEach(likes) { p in tile(p) }
                         }
                         .padding(24)

@@ -38,8 +38,8 @@ struct ProfileView: View {
             }
         }
         .navigationTitle("Профиль")
-        .sheet(isPresented: Binding(get: { model.editingProfile }, set: { model.editingProfile = $0 })) { EditProfileView().frame(minWidth: 680, idealWidth: 760, minHeight: 640, idealHeight: 820) }
-        .sheet(isPresented: Binding(get: { model.editingVisibility }, set: { model.editingVisibility = $0 })) { VisibilityView().frame(minWidth: 620, minHeight: 560, idealHeight: 720) }
+        .sheet(isPresented: Binding(get: { model.editingProfile }, set: { model.editingProfile = $0 })) { EditProfileView().frame(minWidth: 720, idealWidth: 780, minHeight: 760, idealHeight: 820) }
+        .sheet(isPresented: Binding(get: { model.editingVisibility }, set: { model.editingVisibility = $0 })) { VisibilityView().frame(minWidth: 640, minHeight: 700, idealHeight: 760) }
         .task { await model.loadCatalog() }
         .confirmationDialog("Выйти из аккаунта?", isPresented: $confirmLogout) {
             Button("Выйти", role: .destructive) { Task { await model.logout() } }
