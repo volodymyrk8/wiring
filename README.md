@@ -1,173 +1,188 @@
 # WIRING
 
-Знакомства для нейроотличных. Свои фото, промпты, фильтры, свайп, кто лайкнул, мэтчи, переписка, блок и жалобы.
+WIRING — работающий сервис знакомств для нейроотличных людей от 18 лет. Анкеты с фотографиями и промптами, лента с фильтрами, лайки, мэтчи и переписка.
 
-Сайт: https://wiring.date/
+Сайт доступен в продакшене. Продукт развивается по полукоммерческой модели: в нём есть базовые возможности и платные функции WIRING+. В этом открытом репозитории находятся исходный код и документация для разработки.
 
-**Архитектура и принципы (KISS, минимум зависимостей):** [docs/architecture.md](docs/architecture.md). Карта миграции frontend: [docs/frontend-migration.md](docs/frontend-migration.md). Правила для AI coding agents: [AGENTS.md](AGENTS.md).
+[Сайт](https://wiring.date/) · [Репозиторий](https://github.com/volodymyrk8/wiring) · [Архитектура](docs/architecture.md) · [Правила для coding agents](AGENTS.md)
 
-## Local
+## Что есть в продукте
 
-**Dev URL (always the same):** http://127.0.0.1:5070/
+- **Анкета:** фотографии, описание, промпты, нейро- и вайб-теги, цели знакомства. Изменения сразу сохраняются в локальный черновик, затем отправляются на сервер; при ошибке можно повторить сохранение.
+- **Лента:** вертикальная прокрутка и фильтры. Прокрутка не ставит лайк и не скрывает человека — для этого есть отдельные действия. Фотографии переключаются свайпом, кнопками или стрелками клавиатуры.
+- **Знакомства и чат:** входящие лайки, мэтчи, ответы на сообщения, редактирование, голосовые сообщения и их расшифровка при настроенном серверном ключе.
+- **Контроль и безопасность:** блокировки, жалобы, архив собственных решений, управление согласиями и удаление аккаунта.
+- **Уведомления:** настройки в профиле, уведомления внутри сайта и добровольные Web Push.
+- **WIRING+:** премиум-функции, включая повторный показ доступных анкет после исчерпания ленты. Лайки, блокировки и постоянные исключения сохраняются.
 
-Local development uses port **5070** on purpose — bookmarks, Cursor browser, and nginx on the server all assume it. Do not pick another port unless you also change `DEV_PORT` in `app.py` and this section.
+Сайт, iOS и Android — один продукт с общим `/api/*`. Код приложений находится в `mobile/` на ветках `mobile/ios` и `mobile/android`; в текущей ветке `main` этой папки нет. Контракт мобильной авторизации, версий и push описан в [docs/mobile-api.md](docs/mobile-api.md).
+
+## Стек
+
+| Часть | Технологии |
+|---|---|
+| Сервер | Python, Flask, gunicorn |
+| База данных | PostgreSQL 16 — локально, в тестах и на сервере |
+| Интерфейс | TypeScript, Preact, Vite; координирующий shell на JavaScript |
+| Стили | CSS Modules в экранах, общие токены и совместимость в `public/styles.css` |
+| Продакшен | nginx, systemd, GitHub Actions |
+
+SQL выполняется через существующую обёртку в `database.py`, без ORM. SQLite не поддерживается.
+
+## Локальный запуск
+
+Нужны Python с `venv`, Node.js с npm и Docker с Compose. В CI используются Python 3.12 и Node.js 20. Docker Desktop должен быть запущен, если PostgreSQL поднимается через Compose.
+
+Постоянный адрес разработки: **http://127.0.0.1:5070/**. Локальная база доступна на `127.0.0.1:5433`.
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # Postgres on localhost:5433 (docker compose)
-npm install && npm run build   # app shell + Preact features → public/dist/
-./scripts/dev.sh       # postgres (if set) + rebuild client + seed users
+cp .env.example .env
+npm ci
+./scripts/dev.sh
 ```
 
-**Frontend (TypeScript + Preact + Vite):** sources in `src/` (industry layout). Application shell: `src/app/bootstrap.js` → `public/dist/app.js`; `public/app.js` is only a compatibility shim. New UI: `src/components/ui/`, features in `src/features/<name>/`, bundle entries in `src/entries/`. After editing `src/`, run `npm run build` (or `npm run dev:client` for watch).
+`dev.sh` подготавливает локальный вход в админку, проверяет PostgreSQL и при необходимости запускает контейнер, собирает клиент, создаёт тестовые аккаунты и запускает Flask на порту `5070`.
 
-```
-src/
-  components/ui/     # shared primitives (Button, FieldFloating, …)
-  app/               # shell, API client, inbox lifecycle, feature loaders
-  features/auth/     # auth screens + mountAuth()
-  features/chat/     # chats list, thread, polling and composer
-  features/likes/    # incoming likes, filters and WIRING+ gate
-  features/person/   # public profile, photo gallery and safety actions
-  features/deck/     # vertical feed, filters and explicit like/exclude actions
-  features/account/  # invite, onboarding and delete-account flows
-  features/profile/  # profile, notification settings, consents, decision archive, and WIRING+ screens
-  entries/app.ts      # application shell → public/dist/app.js
-  entries/auth.ts    # Vite entry → public/dist/auth.js
-  entries/router.ts  # → public/dist/router.js (URL ↔ view)
-  router/            # matchRoute, hrefFor, planRoute, syncViewToUrl
-  lib/               # small helpers
-```
+`.env` содержит локальные настройки и не коммитится. Значения по умолчанию в `.env.example` предназначены для разработки. Не используйте production-базу, реальные аккаунты или серверные секреты для локальных проверок.
 
-After `npm run build`, the application shell loads route-level feature bundles from `public/dist/`. Run `npm run typecheck` for the TypeScript contract check, `npm run test:router` to smoke-test routes, and `npm run test:profile` for profile autosave recovery and request ordering.
-
-Profile edits are written to local storage immediately and saved to the server after a pause in typing. The screen distinguishes confirmed saves from device-only drafts and offers retry after a failure; reconnecting also retries. Invalid or unfinished fields remain in the local draft until corrected. Pending saves and publication are serialized within the current app session. Concurrent editing in separate tabs or devices does not have a conflict-resolution protocol.
-
-**Database:** PostgreSQL 16 is the only supported database engine. Local dev uses **PostgreSQL 16** in Docker (`docker compose up -d postgres`). `./scripts/dev.sh` starts postgres, waits until ready, seeds test users, and boots the dev server.
-
-```sh
-docker compose down          # stop DB
-docker compose down -v       # stop and wipe dev data volume
-```
-
-Or manually (same port):
+Если база уже запущена и клиент собран, Flask можно запустить отдельно:
 
 ```sh
 PORT=5070 FLASK_DEBUG=1 python3 app.py
 ```
 
-Optional `.env` for local overrides (never commit secrets):
+Остановить локальную базу без удаления данных:
 
 ```sh
-cp .env.example .env
+docker compose down
 ```
 
-### Jev feed experiment
+### Тестовые аккаунты
 
-The Jev-ranked feed is an opt-in experiment, disabled unless `JEV_BETA_USER_ID` is set to exactly one account's numeric `users.id`. For the signed-in account, that ID is the `user.id` field in the authenticated `GET /api/me` response; do not identify the account by display name. Set `JEV_API_KEY` alongside it; the key is read only by Flask and is never sent to the browser. Locally, add both to the ignored `.env` file. For production, add them to `/etc/wiring.env` and restart the `wiring` service. Leave `JEV_BETA_USER_ID` blank until the intended account ID is confirmed. `JEV_MODEL` defaults to `jev-latest`.
+Для ручной проверки используйте существующие локальные аккаунты:
 
-The profile toggle is visible only to the allowlisted account. Jev receives structured pair signals: full lists of catalog neuro and vibe tag ids for viewer and candidate, shared tags, same-city flag, age-gap band and shared intent ids. Names, account IDs, photos, bio, prompts and messages are not sent. The API may attach an experimental match percentage and short reasons on each card; Jev only orders the feed — people still make every like and match.
+| Аккаунт | Почта | Пароль | Назначение |
+|---|---|---|---|
+| Дев | `dev@wiring.test` | `wiring-dev` | Основной аккаунт для проверки интерфейса |
+| Пир | `peer@wiring.test` | `wiring-dev` | Собеседник для чатов и мэтчей |
+
+Эти учётные данные открыты намеренно и действуют только локально. Скрипт создаёт взаимный лайк Дев ↔ Пир и приветственное сообщение. Дополнительно он создаёт десять заполненных профилей (`alma@wiring.test` … `jura@wiring.test`) с тем же паролем и семь переписок Дева по десять сообщений.
+
+Повторно подготовить аккаунты или только социальные данные:
+
+```sh
+python3 scripts/ensure_dev_user.py
+python3 scripts/seed_test_social.py
+```
+
+Второй скрипт требует уже созданного Дева. Гостевой режим (`POST /api/demo`), регистрация и подтверждение почты проверяются отдельно.
+
+Для локальной админки `dev.sh` создаёт отдельные учётные данные и сохраняет их только в игнорируемом `.env`. Этот вход доступен на loopback в debug/test.
+
+## Разработка и структура
+
+```text
+app.py                  HTTP-маршруты, сессии, запуск приложения
+database.py             PostgreSQL и обёртка для SQL
+*.py                    Доменные модули: лента, мэтчи, медиа, push и другие
+src/app/                Координация приложения, API-клиент, inbox, загрузка экранов
+src/features/           Preact-экраны, их типы и CSS Modules
+src/components/ui/      Общие компоненты: AppHeader, Modal, Button и другие
+src/router/             Маршруты, URL и переходы
+src/entries/            Точки входа для сборки Vite
+src/lib/                Общие клиентские утилиты
+templates/              HTML-shell, админка и юридические страницы
+public/                 Статика, общие стили и service worker
+public/dist/            Результат сборки; не редактировать и не коммитить
+scripts/                Локальный запуск, тесты и подготовка данных
+deploy/                 Конфигурации nginx и systemd
+tests/                  Тесты API, доменной логики и клиента
+docs/                   Архитектура и рабочая документация
+```
+
+`templates/index.html` загружает `public/dist/app.js`, собранный из `src/entries/app.ts` и `src/app/bootstrap.js`. Shell управляет маршрутами, сессией и взаимодействием с API; экранная разметка находится в `src/features/`. Общий API-клиент — `src/app/api.ts`, жизненный цикл inbox — `src/app/inbox.ts`.
+
+После изменения клиента выполните `npm run build`: команда собирает shell и все экранные бандлы. `npm run dev:client` следит только за основной Vite-сборкой; для изменений в остальных бандлах нужна полная сборка.
+
+Новый интерфейс пишется на TypeScript и Preact с существующими UI-компонентами. При добавлении SPA-пути обновляются Flask-маршрут, определения в `src/router/` и тесты. Перенос экрана или изменение точки входа сопровождаются правками README, архитектуры и документации роутера.
+
+Изменения экранов, навигации, текстов и тем включают соответствующую правку приложений либо конкретный мобильный follow-up. Темы общие для всех клиентов: `pastel` — утро, `mist` — день, `dusk` — сумерки, `night` — ночь, `slate` — полночь.
+
+## Проверки
+
+Полный набор, соответствующий CI:
+
+```sh
+. .venv/bin/activate
+./scripts/test.sh
+```
+
+Скрипт использует отдельную PostgreSQL-базу `wiring_test` на порту `5433` или адрес из `TEST_DATABASE_URL`. Он выполняет проверку типов, сборку, тесты роутера, тесты автосохранения профиля и Python-тесты.
+
+Для запуска проверок по отдельности, при уже подготовленной тестовой базе:
+
+```sh
+npm run typecheck
+npm run build
+npm run test:router
+npm run test:profile
+DATABASE_URL=postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test python3 -m unittest discover -s tests -q
+```
+
+Подробнее: [tests/README.md](tests/README.md) и [docs/router.md](docs/router.md).
+
+## Дополнительные настройки
 
 ### Web Push
 
-Likes, matches, and messages can wake a closed browser. The existing notification toggles stay voluntary: nothing asks for permission during registration. Turning on «пуш» in notification settings requests browser permission and stores a push subscription. Turning it off deletes that subscription. If the site tab is open, the usual in-app notice is enough and a second push is skipped.
+Разрешение запрашивается только при включении «пуш» в настройках уведомлений, а не при регистрации. Выключение удаляет подписку. Если пользователь недавно был активен на сайте, сервер пропускает push, чтобы не дублировать уведомления.
 
-The server creates a VAPID key pair in `push_vapid` on first use. To pin a key across restores, set `WEB_PUSH_VAPID_PRIVATE_KEY` (PEM) and optional `WEB_PUSH_VAPID_SUBJECT` in `.env` or `/etc/wiring.env`. iPhone delivers these pushes after the site is added to the Home Screen.
+На первом использовании сервер сохраняет пару VAPID-ключей в таблице `push_vapid`. Для постоянного ключа можно задать `WEB_PUSH_VAPID_PRIVATE_KEY` (PEM) и `WEB_PUSH_VAPID_SUBJECT`. На iPhone Web Push требует добавления сайта на домашний экран.
 
-### Тестирование сайта: вход
+### Голосовые сообщения
 
-При **ручной** проверке WIRING в браузере (локально, в Cursor, QA, демо фич) **всегда** авторизуемся одним и тем же тестовым аккаунтом — не регистрируем новых людей «на глаз» и не используем реальные прод-логины.
+`OPENAI_API_KEY` включает серверную расшифровку голосовых сообщений; модель задаётся через `OPENAI_TRANSCRIBE_MODEL` (по умолчанию `whisper-1`). Расшифровка сохраняется, но не включается в общую выдачу переписки: собеседник получает её только после собственного запроса.
 
-| | |
-|---|---|
-| **Имя в анкете** | Дев |
-| **Почта** | `dev@wiring.test` |
-| **Пароль** | `wiring-dev` |
-| **Где** | только **local**: http://127.0.0.1:5070/ (на production этих аккаунтов нет) |
+### Подарок WIRING+
 
-Пароль в доке открытый намеренно: это dev-аккаунты, не секреты.
+Пока `WIRING_SIGNUP_PLUS` не равен `0`, реальные новые аккаунты получают 90 дней WIRING+. Однократное обновление существующих аккаунтов продлевает доступ минимум до 90 дней от момента выполнения, не сокращая более длинные выдачи. Гости, seed- и demo-аккаунты исключены. Значение `0` останавливает только новые подарки и не отменяет уже выданный доступ.
 
-**Пир** — второй тестовый аккаунт (собеседник для чатов и мэтчей). Не живой человек, только local:
+### Эксперимент Jev
 
-| | |
-|---|---|
-| **Имя в анкете** | Пир |
-| **Почта** | `peer@wiring.test` |
-| **Пароль** | `wiring-dev` (тот же) |
+Ранжирование ленты включается только для одного аккаунта, указанного числовым `users.id` в `JEV_BETA_USER_ID`, и только после его согласия в профиле. ID доступен как `user.id` в авторизованном ответе `GET /api/me`. Пустой allowlist отключает доступ.
 
-Скрипт заводит взаимный лайк Дев ↔ Пир и одно приветственное сообщение в чате.
+Настройки: `JEV_API_KEY`, `JEV_BETA_USER_ID`, `JEV_MODEL` (по умолчанию `jev-latest`). Ключ остаётся на сервере. Jev получает структурированные сигналы пары: теги, общие интересы, совпадение города и диапазон разницы в возрасте; имена, ID аккаунтов, фотографии, свободные тексты и сообщения не отправляются. Ошибки провайдера сохраняют обычный порядок выдачи. Оценки экспериментальные; лайки и мэтчи создают сами люди.
 
-**Ещё 10 тестовых профилей** (`alma@wiring.test` … `jura@wiring.test`, пароль везде `wiring-dev`) — заполненные анкеты для ленты и фильтров. У **Дева** автоматически **7 чатов** с первыми семью из них, в каждом **10 сообщений** (фиктивные переписки для проверки UI).
+### Очередь из Telegram
 
-`./scripts/dev.sh` перед стартом создаёт всё это. Повторно: `python3 scripts/ensure_dev_user.py` или только соц-часть: `python3 scripts/seed_test_social.py` (нужен уже созданный Дев).
+Опциональный воркер читает одну приватную группу и создаёт черновики задач в админке. Публикация и выполнение начинаются после ручного одобрения. Настройка описана в [docs/telegram-triage.md](docs/telegram-triage.md).
 
-Для локальной админки `./scripts/dev.sh` также один раз создаёт в `.env` отдельный логин `LEX` и случайный пароль. Пароль не выводится в терминал: он остаётся в локальном `.env` с правами `0600`. Чтобы безопасно сбросить его, удалите строку `LOCAL_ADMIN_PASSWORD` из `.env` и перезапустите dev-сервер; скрипт создаст новый. Этот вход работает только на loopback в debug/test и не влияет на production; токен `ADMIN_TOKEN` продолжает работать отдельно.
+## Деплой
 
-**Исключения:** сценарии «гость» (`POST /api/demo`), регистрация и почтовое подтверждение — отдельные проверки со своими шагами.
+Push или merge в `main` запускает [GitHub Actions](.github/workflows/ci.yml): сначала полный набор проверок, затем сборку и `deploy.sh` в окружении `production`. Pull request запускает только проверки. Для деплоя нужен repository secret `DEPLOY_SSH_KEY`; параметры сервера описаны в [docs/github-actions.md](docs/github-actions.md).
+
+Ручной деплой из локальной копии:
 
 ```sh
 ./scripts/test.sh
-# or: npm run build && npm run test:router && python3 -m unittest discover -s tests -q
-```
-
-See [tests/README.md](tests/README.md) and [docs/router.md](docs/router.md).
-
-## Очередь задач из Telegram
-
-Папка `docs/telegram-triage.md` описывает безопасное подключение одной
-приватной группы. Воркер читает сообщения только для черновиков в админке;
-публикация и выполнение задач начинаются после ручного одобрения.
-
-## Deploy
-
-**Local (same as before):**
-
-```sh
-./scripts/test.sh   # optional
 ./deploy.sh
 ```
 
-**GitHub:** push/merge to `main` runs tests, then `./deploy.sh` via Actions. Set repository secret `DEPLOY_SSH_KEY` once — see [docs/github-actions.md](docs/github-actions.md).
+`deploy.sh` синхронизирует рабочее дерево на сервер, устанавливает зависимости и конфигурации, перезапускает `wiring.service` и проверяет `/health`. Перед ручным деплоем проверьте содержимое рабочей копии: синхронизация идёт с диска, а не из Git-коммита.
 
-Repo: https://github.com/volodymyrk8/wiring
+Production работает только с PostgreSQL. Серверные настройки, ключи интеграций, пользовательские загрузки и резервные копии хранятся вне репозитория. Для развёртывания своей копии нужны собственные база, секреты и инфраструктура.
 
-### PostgreSQL (production)
-PostgreSQL is the only supported database engine. Set `DATABASE_URL` in `/etc/wiring.env`:
+## Документация
 
-```sh
-sudo -u postgres psql -c "CREATE USER wiring_app WITH PASSWORD '…';"
-sudo -u postgres psql -c "CREATE DATABASE wiring OWNER wiring_app;"
-echo 'DATABASE_URL=postgresql://wiring_app:…@127.0.0.1:5432/wiring' | sudo tee -a /etc/wiring.env
-sudo systemctl restart wiring
-```
+- [Архитектура](docs/architecture.md) — слои, принципы, данные и поведение ленты.
+- [Роутер](docs/router.md) — URL-контракт и правила переходов.
+- [Миграция frontend](docs/frontend-migration.md) — владельцы экранов и границы shell.
+- [Мобильный API](docs/mobile-api.md) — токены, версии, push и сообщения.
+- [GitHub Actions](docs/github-actions.md) — CI и настройка деплоя.
+- [Telegram triage](docs/telegram-triage.md) — очередь черновиков задач.
+- [AGENTS.md](AGENTS.md) — обязательные правила изменения проекта.
 
-### Backups (production)
-`wiring-backup.timer` runs `deploy/wiring-backup.sh` (installed as `/usr/local/sbin/wiring-backup`) daily at 03:40 UTC. It writes a verified `pg_dump` custom-format archive to `/var/backups/wiring/db` (kept 30 days) and a tar of `/var/lib/wiring/uploads` to `/var/backups/wiring/uploads` (kept 7 days). Off-site copy: a developer Mac pulls them every 4 hours with `scripts/pull-prod-backups.sh` (launchd agent `deploy/date.wiring.backup-pull.plist`) into `~/Backups/wiring` — all dumps for 90 days, the 2 newest uploads snapshots; it shows a macOS notification if the newest dump is older than 3 days. The pull uses a dedicated key `~/.ssh/wiring-backup-pull` bound on the server to `command="/usr/local/sbin/wiring-backup-serve",restrict` (`deploy/wiring-backup-serve.sh`), which only allows `list` and `get <backup file>`. Log: `~/Library/Logs/wiring-backup-pull.log`.
-
-```sh
-sudo install -m 750 deploy/wiring-backup.sh /usr/local/sbin/wiring-backup
-sudo cp deploy/wiring-backup.{service,timer} /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now wiring-backup.timer
-sudo systemctl start wiring-backup.service   # run once now
-# restore
-sudo -u postgres pg_restore --clean --if-exists -d wiring < /var/backups/wiring/db/wiring-<stamp>.dump
-sudo tar -xf /var/backups/wiring/uploads/uploads-<stamp>.tar -C /
-```
-
-Server documents mount the same Preact `AppHeader` via `src/entries/server-header.tsx` → `public/dist/server-header.js`. Theme choice uses the shared `src/lib/theme.ts` helper.
-
-The `/feed` screen scrolls vertically without creating likes or passes. Like and permanent exclusion are explicit actions. Random delivery history is stored in PostgreSQL; see `docs/architecture.md` for reservation and prefetch semantics.
-
-Feed photos support horizontal swipes, numbered photo controls and Left/Right keys. The shared “Профиль” button opens the full profile, whose gallery uses the same gesture handling.
-
-WIRING+ users can replay eligible profiles from the exhausted feed after confirmation. Permanent exclusions and likes are retained; free accounts see a disabled replay button. The server enforces entitlement and retry safety.
-
-While the signup gift is on, every real account receives 90 days of WIRING+. A one-time backfill raises existing accounts to at least 90 days from deploy without shortening a longer grant. Set `WIRING_SIGNUP_PLUS=0` in the server environment and restart to stop granting it to new registrations. Guests, seed, and demo accounts are excluded.
-
-## Публичные стандарты защиты детей
-
-`/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
-
-Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.
+Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. Страница серверная (`legal_pages.py`, `templates/legal.html`), ссылка есть в юридическом подвале и sitemap. Для iOS и Android остаётся follow-up: добавить в юридический раздел или поддержку ссылку «Защита детей» на тот же адрес; новый API не нужен.
