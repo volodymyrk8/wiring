@@ -23,6 +23,8 @@ html[data-theme="mist"] {
   --overlay: rgba(36, 38, 56, 0.72);
   --tip: #f6f7fb;
   --chrome: #e9ebf3;
+  --btn: #3e457e;
+  --on-btn: #ffffff;
   --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --serif: "Fraunces", Georgia, "Times New Roman", serif;
 
@@ -58,6 +60,8 @@ html[data-theme="pastel"] {
   --overlay: rgba(48, 38, 30, 0.72);
   --tip: #fffaf4;
   --chrome: #f3eee6;
+  --btn: #4f6b38;
+  --on-btn: #ffffff;
 }
 
 html[data-theme="night"] {
@@ -84,6 +88,8 @@ html[data-theme="night"] {
   --overlay: rgba(10, 8, 6, 0.92);
   --tip: #1a1612;
   --chrome: #110e0c;
+  --btn: #d8ff3c;
+  --on-btn: #111111;
 }
 
 html[data-theme="slate"] {
@@ -110,6 +116,8 @@ html[data-theme="slate"] {
   --overlay: rgba(8, 11, 16, 0.92);
   --tip: #141a22;
   --chrome: #0b0f14;
+  --btn: #a9bfd4;
+  --on-btn: #0c1218;
 }
 
 html[data-theme="dusk"] {
@@ -136,6 +144,8 @@ html[data-theme="dusk"] {
   --overlay: rgba(42, 35, 64, 0.78);
   --tip: #4a4370;
   --chrome: #3c365c;
+  --btn: #efe8ff;
+  --on-btn: #241c3a;
 }
 
 * { box-sizing: border-box; }
@@ -592,7 +602,7 @@ a.brand,
   color: var(--ink);
 }
 .nav button.active, .nav a.active { background: var(--ink); color: var(--bg); }
-.solid { background: var(--lime); color: var(--on-accent); font-weight: 600; }
+.solid { background: var(--btn, var(--lime)); color: var(--on-btn, var(--on-accent)); font-weight: 600; }
 .danger { background: var(--coral); color: var(--on-danger); font-weight: 600; }
 .ghost.slim, .solid.slim { padding: 7px 11px; font-size: 13px; }
 .icon-btn {
@@ -1753,11 +1763,10 @@ body.support-page .legal,
 }
 
 .btn.solid {
-  background: var(--lime);
-  background: linear-gradient(135deg, var(--lime), color-mix(in srgb, var(--lime) 75%, var(--coral)));
-  color: var(--on-accent);
+  background: var(--btn, var(--lime));
+  color: var(--on-btn, var(--on-accent));
   box-shadow: 0 4px 16px var(--accent-soft), 0 1px 2px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid transparent;
 }
 
 .btn > span {
@@ -1771,16 +1780,6 @@ body.support-page .legal,
 
 .btn.solid span {
   color: inherit;
-}
-
-html[data-theme="pastel"] .btn.solid,
-html[data-theme="pastel"] .solid {
-  color: #ffffff;
-}
-
-html[data-theme="night"] .btn.solid,
-html[data-theme="night"] .btn.solid span {
-  color: #111111;
 }
 
 .btn.solid:hover:not(:disabled) {
