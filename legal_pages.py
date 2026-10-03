@@ -13,7 +13,7 @@ CHILD_SAFETY_HTML = """
 <p>Нельзя публиковать, отправлять или запрашивать материалы сексуального характера с участием несовершеннолетних, сексуализировать детей или вступать в контакт с несовершеннолетними с сексуальной целью. Эти запреты распространяются на анкеты, фотографии и переписку.</p>
 <h2>Как сообщить о нарушении</h2>
 <p>На сайте откройте профиль человека (из ленты — кнопка «Профиль») и выберите «Пожаловаться». Вы также можете заблокировать участника или обратиться через <a href="/support">поддержку</a>.</p>
-<p>Контакт по вопросам защиты детей: <a href="mailto:support@wiring.date">support@wiring.date</a>. Укажите аккаунт и обстоятельства нарушения. Не пересылайте подозрительные материалы и не сообщайте свой пароль.</p>
+<p>Контакт по вопросам защиты детей: <a href="/support">форма поддержки WIRING</a>. Укажите аккаунт и обстоятельства нарушения. Не пересылайте подозрительные материалы и не сообщайте свой пароль.</p>
 <h2>Реакция на нарушения</h2>
 <p>Сообщения о нарушениях направляются администрации для рассмотрения. Подтверждённые нарушения требуют ограничения доступа нарушителя и удаления запрещённого содержимого. О выявленных материалах CSAM необходимо сообщать компетентным органам в соответствии с применимым законом.</p>
 <h2>Профилактика</h2>
@@ -21,7 +21,7 @@ CHILD_SAFETY_HTML = """
 <section lang="en" aria-label="English summary">
 <h2>Child safety standards — English summary</h2>
 <p>WIRING is for adults (18+) only. We prohibit child sexual abuse and exploitation (CSAE), child sexual abuse material (CSAM), sexualization of children, and contacting minors for sexual purposes.</p>
-<p>On the website, open a person's profile to report or block them. You can also use the support form. Child safety contact: <a href="mailto:support@wiring.date">support@wiring.date</a>. Identify the account and circumstances; do not forward suspected abuse material or send your password.</p>
+<p>On the website, open a person's profile to report or block them. You can also use the WIRING support form. Identify the account and circumstances; do not forward suspected abuse material or send your password.</p>
 <p>Reports are submitted to the administration for review. Confirmed violations require restricting the offending account and removing prohibited content. Identified CSAM must be reported to competent authorities as required by applicable law.</p>
 </section>
 """
@@ -87,7 +87,7 @@ RULES_HTML = """
 
 PRIVACY_HTML = """
 <p>Эта политика объясняет, какие персональные данные обрабатывает сервис знакомств WIRING, зачем и какие у вас есть права. Использование сервиса означает, что вы ознакомились с политикой. Если вы не согласны с ней, не передавайте нам данные и не пользуйтесь сервисом.</p>
-<p>Политика применяется к данным, которые мы получаем при регистрации, заполнении анкеты, использовании ленты, лайков, чатов, поддержки и сайта wiring.date. Она не распространяется на сайты и приложения третьих лиц, на которые вы переходите по своей инициативе.</p>
+<p>Политика применяется к данным, которые мы получаем при регистрации, заполнении анкеты, использовании ленты, лайков, чатов, поддержки и сайта wiring.club. Она не распространяется на сайты и приложения третьих лиц, на которые вы переходите по своей инициативе.</p>
 <h2>1. Кто обрабатывает данные</h2>
 <p>Оператор — администрация сервиса WIRING. Вопросы о данных, доступ, исправление, удаление и отзыв согласия направляются через <a href="/support">форму поддержки</a>. Укажите почту аккаунта, если пишете не из него.</p>
 <h2>2. Какие данные</h2>

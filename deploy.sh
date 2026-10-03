@@ -50,6 +50,24 @@ SERVICE_NAME='$SERVICE_NAME'
 mkdir -p /var/lib/wiring/uploads
 chmod 750 /var/lib/wiring /var/lib/wiring/uploads
 
+for hostname in wiring.club www.wiring.club; do
+  if ! getent ahostsv4 "\$hostname" >/dev/null; then
+    echo "DNS for \$hostname is not resolving on the server; refusing to activate the new host."
+    exit 1
+  fi
+done
+
+mkdir -p /var/www/certbot
+if [ ! -s /etc/letsencrypt/live/wiring.club/fullchain.pem ] || [ ! -s /etc/letsencrypt/live/wiring.club/privkey.pem ]; then
+  install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring-acme.conf" /etc/nginx/sites-available/wiring-club-acme.conf
+  ln -sfn /etc/nginx/sites-available/wiring-club-acme.conf /etc/nginx/sites-enabled/wiring-club-acme.conf
+  nginx -t
+  systemctl reload nginx
+  certbot certonly --webroot --webroot-path /var/www/certbot --non-interactive --agree-tos \
+    --cert-name wiring.club -d wiring.club -d www.wiring.club
+  rm -f /etc/nginx/sites-enabled/wiring-club-acme.conf
+fi
+
 . /root/bots/bin/activate
 pip install -q -r "\$REMOTE_DIR/requirements.txt"
 if command -v npm >/dev/null && [ -f "\$REMOTE_DIR/package.json" ]; then
@@ -72,6 +90,25 @@ fi
 if ! grep -q '^ADMIN_TOKEN=' "\$ENV_FILE"; then
   printf 'ADMIN_TOKEN=%s\n' "\$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')" >> "\$ENV_FILE"
 fi
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/etc/wiring.env")
+lines = path.read_text().splitlines()
+updated = []
+site_url_written = False
+for line in lines:
+    if line.startswith("SITE_URL="):
+        if not site_url_written:
+            updated.append("SITE_URL=https://wiring.club")
+            site_url_written = True
+        continue
+    updated.append(line)
+if not site_url_written:
+    updated.append("SITE_URL=https://wiring.club")
+path.write_text("\n".join(updated) + "\n")
+path.chmod(0o600)
+PY
 
 if ! grep -q '^DATABASE_URL=' "\$ENV_FILE"; then
   if id -u postgres >/dev/null 2>&1; then
@@ -87,11 +124,11 @@ fi
 
 install -m 644 "\$REMOTE_DIR/deploy/wiring.service" /etc/systemd/system/\$SERVICE_NAME
 install -m 644 "\$REMOTE_DIR/deploy/nginx-dating.conf" /etc/nginx/snippets/dating.conf
-install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.date.conf" /etc/nginx/sites-available/wiring.date.conf
-ln -sfn /etc/nginx/sites-available/wiring.date.conf /etc/nginx/sites-enabled/wiring.date.conf
+install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.conf" /etc/nginx/sites-available/wiring.conf
+rm -f /etc/nginx/sites-enabled/wiring.date.conf /etc/nginx/sites-enabled/wiring-club-acme.conf
+ln -sfn /etc/nginx/sites-available/wiring.conf /etc/nginx/sites-enabled/wiring.conf
 systemctl daemon-reload
 systemctl enable "\$SERVICE_NAME"
-systemctl restart "\$SERVICE_NAME"
 
 NGINX_CONF=/etc/nginx/sites-available/lizaisyourfriend.lol.conf
 if ! grep -qF 'include /etc/nginx/snippets/dating.conf;' "\$NGINX_CONF"; then
@@ -112,6 +149,7 @@ else:
 PY
 fi
 nginx -t
+systemctl restart "\$SERVICE_NAME"
 systemctl reload nginx
 
 HEALTHY=0
@@ -136,6 +174,7 @@ systemctl --no-pager --full status "\$SERVICE_NAME" | head -20
 EOF
 
 echo "== Public check =="
-curl -sI "https://wiring.date/" | head -15
+curl --resolve wiring.club:443:188.166.105.108 -fsSI "https://wiring.club/" | head -15
+curl --resolve wiring.date:443:188.166.105.108 -fsSI "https://wiring.date/" | head -15
 echo
-echo "Deploy complete: https://wiring.date/"
+echo "Deploy complete: https://wiring.club/ (legacy domain wiring.date remains active)"

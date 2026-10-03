@@ -89,7 +89,7 @@ DB_PATH = DATABASE_URL
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "uploads"))
 THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY") or secrets.token_hex(32)
-SITE_URL = os.environ.get("SITE_URL", "https://wiring.date").rstrip("/")
+SITE_URL = os.environ.get("SITE_URL", "https://wiring.club").rstrip("/")
 GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "G-WH72XL7E2J").strip()
 YANDEX_METRIKA_ID = os.environ.get("YANDEX_METRIKA_ID", "").strip()
 

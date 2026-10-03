@@ -648,9 +648,9 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content_type.startswith("text/html"))
         text = response.get_data(as_text=True)
-        for expected in ("CSAE", "CSAM", "WIRING", "18+", "support@wiring.date", "Пожаловаться"):
+        for expected in ("CSAE", "CSAM", "WIRING", "18+", "/support", "Пожаловаться"):
             self.assertIn(expected, text)
-        self.assertIn('rel="canonical" href="https://wiring.date/child-safety"', text)
+        self.assertIn('rel="canonical" href="https://wiring.club/child-safety"', text)
         self.assertIn('href="/child-safety" aria-current="page"', text)
         self.assertNotIn('id="app"', text)
         self.assertEqual(self.client.head("/child-safety").status_code, 200)
