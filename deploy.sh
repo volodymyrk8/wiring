@@ -174,7 +174,7 @@ systemctl --no-pager --full status "\$SERVICE_NAME" | head -20
 EOF
 
 echo "== Public check =="
-curl -fsSI "https://wiring.club/" | head -15
-curl -fsSI "https://wiring.date/" | head -15
+curl --resolve wiring.club:443:188.166.105.108 -fsSI "https://wiring.club/" | head -15
+curl --resolve wiring.date:443:188.166.105.108 -fsSI "https://wiring.date/" | head -15
 echo
 echo "Deploy complete: https://wiring.club/ (legacy domain wiring.date remains active)"
