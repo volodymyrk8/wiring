@@ -149,6 +149,16 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const photos = photosFor(card);
   const changePhoto = (direction: number) => setPhotoIndex((index) => (index + direction + Math.max(photos.length, 1)) % Math.max(photos.length, 1));
   const gesture = usePhotoSwipe(changePhoto, onVertical);
+  const onCardClick = (event: JSX.TargetedMouseEvent<HTMLElement>) => {
+    if (photos.length < 2) return;
+    if ((event.target as HTMLElement).closest("button, a, input")) return;
+    const cardRect = event.currentTarget.getBoundingClientRect();
+    const body = event.currentTarget.querySelector(`.${styles.body}`);
+    if (body && event.clientY >= body.getBoundingClientRect().top) return;
+    const choices = event.currentTarget.querySelector(`.${styles.photoChoices}`);
+    if (choices && event.clientY <= choices.getBoundingClientRect().bottom) return;
+    changePhoto(event.clientX < cardRect.left + cardRect.width * 0.4 ? -1 : 1);
+  };
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
   const showGender = card.gender && card.gender !== "hidden" && card.gender !== "other" && card.gender !== "nb";
   const meta = [card.city, card.job, card.height ? `${card.height} см` : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
@@ -162,7 +172,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
     const label = labelForTag("neuro", id, host.catalog);
     return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
   });
-  return <article ref={cardRef} {...gesture} class={styles.card} tabIndex={active && photos.length > 1 ? 0 : -1}
+  return <article ref={cardRef} {...gesture} class={`${styles.card}${photos.length > 1 ? ` ${styles.cardMulti}` : ""}`} tabIndex={active && photos.length > 1 ? 0 : -1} onClick={onCardClick}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); }
