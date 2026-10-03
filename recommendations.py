@@ -14,6 +14,7 @@ from jev_ranker import _pair_signals, match_reasons, rank_profiles
 
 SHORTLIST_SIZE = 60
 SCAN_BATCH_SIZE = 256
+TASTE_MIN_LIKES = 3
 
 
 def recommendation_priority(viewer: dict, candidate: dict) -> int:
@@ -28,9 +29,39 @@ def recommendation_priority(viewer: dict, candidate: dict) -> int:
     )
 
 
+def _swipe_profiles(conn: Connection, viewer_id: int, direction: str, eligible: Callable[[Row], dict[str, Any] | None]) -> list[dict[str, Any]]:
+    rows = conn.execute("""
+        SELECT users.* FROM swipes
+        JOIN users ON users.id = swipes.to_id
+        WHERE swipes.from_id = ? AND swipes.direction = ?
+          AND COALESCE(users.deleted_at, 0) = 0
+        ORDER BY swipes.id DESC
+        LIMIT 40
+    """, (viewer_id, direction)).fetchall()
+    profiles = []
+    for row in rows:
+        card = eligible(row)
+        if card is not None:
+            profiles.append(card)
+    return profiles
+
+
+def _taste_priority(likes: list[dict], passes: list[dict], candidate: dict) -> int:
+    like_score = sum(recommendation_priority(liked, candidate) for liked in likes) / len(likes)
+    pass_score = sum(recommendation_priority(passed, candidate) for passed in passes) / len(passes) if passes else 0
+    return int(round(like_score * 10 - pass_score * 6))
+
+
+def _nearest_like(likes: list[dict], candidate: dict) -> dict:
+    return max(likes, key=lambda liked: (recommendation_priority(liked, candidate), -int(liked.get("id") or 0)))
+
+
 def select_recommendations(
     conn: Connection, viewer: dict, eligible: Callable[[Row], dict[str, Any] | None],
 ) -> tuple[list[dict[str, Any]], str]:
+    likes = _swipe_profiles(conn, int(viewer["id"]), "like", eligible)
+    passes = _swipe_profiles(conn, int(viewer["id"]), "pass", eligible) if len(likes) >= TASTE_MIN_LIKES else []
+    by_taste = len(likes) >= TASTE_MIN_LIKES
     shortlist = []
     cursor = 0
     while True:
@@ -51,18 +82,23 @@ def select_recommendations(
             card = eligible(row)
             if card is None:
                 continue
-            item = (recommendation_priority(viewer, card), -int(card["id"]), card)
+            priority = _taste_priority(likes, passes, card) if by_taste else recommendation_priority(viewer, card)
+            item = (priority, -int(card["id"]), card)
             if len(shortlist) < SHORTLIST_SIZE:
                 heapq.heappush(shortlist, item)
             elif item[:2] > shortlist[0][:2]:
                 heapq.heapreplace(shortlist, item)
     cards = [item[2] for item in sorted(shortlist, key=lambda item: item[:2], reverse=True)]
-    ranked = rank_profiles(viewer, cards)
-    source = "api" if ranked is not None else "local"
-    cards = ranked if ranked is not None else cards
+    if by_taste:
+        source = "taste"
+    else:
+        ranked = rank_profiles(viewer, cards)
+        source = "api" if ranked is not None else "local"
+        cards = ranked if ranked is not None else cards
     for card in cards:
         card.pop("jev_match_pct", None)
         card.pop("jev_match_reasons", None)
         card.pop("jev_match_source", None)
-        card["recommendation_reasons"] = match_reasons(viewer, card)
+        prototype = _nearest_like(likes, card) if by_taste else viewer
+        card["recommendation_reasons"] = match_reasons(prototype, card)
     return cards, source

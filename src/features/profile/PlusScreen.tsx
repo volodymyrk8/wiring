@@ -11,12 +11,40 @@ const plusUntil = (timestamp?: number) => {
   return new Date(timestamp * 1000).toLocaleDateString("ru", { day: "numeric", month: "long", year: "numeric" });
 };
 
+const iconProps = {
+  viewBox: "0 0 24 24",
+  width: 18,
+  height: 18,
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
 const features = [
-  ["👁️", "Видно, кто лайкнул", "Открывай входящие симпатии и выбирай, кому ответить взаимностью."],
-  ["🕶️", "Режим инкогнито", "Твоя анкета видна только тем людям, которых ты лайкнул сам."],
-  ["⏸️", "Пауза анкеты", "Скрой себя из ленты на время отдыха — текущие переписки и мэтчи сохранятся."],
-  ["📝", "Заметки и закладки", "Оставляй личные пометки к профилям — их видишь только ты."],
-] as const;
+  {
+    title: "Видно, кто лайкнул",
+    text: "Открывай входящие симпатии и выбирай, кому ответить взаимностью.",
+    icon: <svg {...iconProps}><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.4" /></svg>,
+  },
+  {
+    title: "Режим инкогнито",
+    text: "Твоя анкета видна только тем людям, которых ты лайкнул сам.",
+    icon: <svg {...iconProps}><path d="M12 3.5a5 5 0 0 0-5 5c0 2.2 1.2 3.8 2.2 5.2.6.8.8 1.5.8 2.3h4c0-.8.2-1.5.8-2.3 1-1.4 2.2-3 2.2-5.2a5 5 0 0 0-5-5z" /><path d="M9.5 19.5h5" /></svg>,
+  },
+  {
+    title: "Пауза анкеты",
+    text: "Скрой себя из ленты на время отдыха — текущие переписки и мэтчи сохранятся.",
+    icon: <svg {...iconProps}><rect x="7" y="5" width="3.2" height="14" rx="1" /><rect x="13.8" y="5" width="3.2" height="14" rx="1" /></svg>,
+  },
+  {
+    title: "Заметки и закладки",
+    text: "Оставляй личные пометки к профилям — их видишь только ты.",
+    icon: <svg {...iconProps}><path d="M8 3.5h7l4 4V20.5H8z" /><path d="M15 3.5V8h4" /><path d="M10.5 12.5h5M10.5 16h3.5" /></svg>,
+  },
+];
 
 export function PlusScreen({ host }: { host: ProfileHostBridge }) {
   const [user, setUser] = useState(host.user);
@@ -173,10 +201,10 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         </section>
 
         <section class={styles.featureList} aria-label="Возможности WIRING+">
-          {features.map(([icon, title, description]) => (
-            <article class={styles.feature} key={title}>
-              <span class={styles.featureIcon} aria-hidden="true">{icon}</span>
-              <div><strong>{title}</strong><p>{description}</p></div>
+          {features.map((feature) => (
+            <article class={styles.feature} key={feature.title}>
+              <span class={styles.featureIcon} aria-hidden="true">{feature.icon}</span>
+              <div><strong>{feature.title}</strong><p>{feature.text}</p></div>
             </article>
           ))}
         </section>

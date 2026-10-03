@@ -56,14 +56,14 @@ export type FeedPage = {
   liked?: number;
   likes_in?: number;
   unread?: number;
-  recommendation_source?: "api" | "local";
+  recommendation_source?: "api" | "local" | "taste";
   jev_ranked?: boolean;
   jev_scores?: "api" | "local" | "none";
 };
 
 export type DeckHostBridge = {
   recommendations?: boolean;
-  user: ProfileUser;
+  user: ProfileUser | null;
   catalog: DeckCatalog;
   cards: DeckCard[];
   index: number;

@@ -833,7 +833,7 @@ import { createInboxController } from "./inbox";
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "recommendations", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
+    if (!state.user && ["recommendations", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -1171,6 +1171,10 @@ import { createInboxController } from "./inbox";
       }
       if (state.view === "matches") {
         void renderChatFeature();
+        return;
+      }
+      if (state.view === "deck") {
+        void renderDeckFeature();
         return;
       }
       void renderHomeFeature();

@@ -3,12 +3,12 @@ type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "
 const FEATURE_FILES: Record<FeatureName, string> = {
   auth: "auth.js?v=13",
   home: "home.js?v=73",
-  profile: "profile.js?v=30",
-  likes: "likes.js?v=29",
-  person: "person.js?v=19",
-  deck: "deck.js?v=27",
-  account: "account.js?v=9",
-  chat: "chat.js?v=31",
+  profile: "profile.js?v=31",
+  likes: "likes.js?v=30",
+  person: "person.js?v=20",
+  deck: "deck.js?v=28",
+  account: "account.js?v=10",
+  chat: "chat.js?v=32",
   support: "support.js?v=8",
 };
 

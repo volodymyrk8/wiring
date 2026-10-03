@@ -94,7 +94,7 @@
 .body::-webkit-scrollbar { display: none; }
 
 .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.head h2 { min-width: 0; flex: 1; margin: 0 0 4px; color: var(--on-photo); font-family: var(--serif); font-size: clamp(24px, 5vw, 32px); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; text-shadow: 0 1px 10px rgba(0,0,0,.72); }
+.head h2 { min-width: 0; flex: 1; margin: 0 0 4px; color: var(--on-photo); font-family: var(--serif); font-size: clamp(22px, 4.6vw, 32px); font-weight: 500; letter-spacing: -.04em; line-height: 1.12; text-shadow: 0 1px 10px rgba(0,0,0,.72); overflow-wrap: anywhere; }
 .online { display: inline-block; width: 8px; height: 8px; margin: 0 7px 3px 0; border-radius: 50%; background: #9be34d; box-shadow: 0 0 0 3px rgba(155,227,77,.18); }
 
 .meta {
@@ -240,6 +240,17 @@
 .recommendationsRoot .header.header { position: relative; flex-shrink: 0; }
 
 .recommendationsRoot .slide { flex-direction: column; padding-top: 8px; gap: 8px; }
-.recommendationsRoot .card { flex-shrink: 0; }
+.recommendationsRoot .card {
+  flex-shrink: 0;
+  width: min(100%, 440px);
+  min-width: min(100%, 300px);
+  max-height: min(56dvh, 520px);
+}
+.guestGate { width: 100%; max-width: 420px; margin: auto; padding: 28px 18px 40px; box-sizing: border-box; display: grid; justify-items: center; text-align: center; gap: 14px; }
+.guestGate h2 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -.03em; }
+.guestCta { display: grid; gap: 10px; width: 100%; max-width: 340px; }
+.switchRow { display: flex; align-items: baseline; justify-content: center; gap: 4px; margin: 0; font-size: 15px; }
+.switchPrompt { color: var(--muted); }
+.switchLink { color: var(--ink); font-weight: 600; text-decoration: none; }
 .recommendationsRoot .recommendationIntro { width: 100%; max-width: 508px; margin: 0 auto; box-sizing: border-box; }
 .recommendationsRoot .recommendationSummary { width: 100%; box-sizing: border-box; margin-top: 0; }

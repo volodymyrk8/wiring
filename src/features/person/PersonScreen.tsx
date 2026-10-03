@@ -182,7 +182,10 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         {(person.prompts || []).map((prompt) => <div class={styles.prompt} key={prompt.id}><strong>{host.catalog.prompts?.find((item) => item.id === prompt.id)?.label || prompt.id}</strong><p>{prompt.answer}</p></div>)}
         <div class={styles.actions}>
           {isSelf ? (
-            <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
+            <>
+              <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
+              <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>Лайки и дизлайки</Button>
+            </>
           ) : null}
           {!isSelf && (host.personFrom === "deck" || host.personFrom === "recommendations" || host.personFrom === "likes") ? <>
             <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => setPassOpen(true)} aria-label="Скрыть — больше не показывать" title="Скрыть">{iconPass}</button>
@@ -200,7 +203,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       </div>
     </main>
     <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title="Больше не показывать?" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>Отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>Исключить</Button></>}>
-      <p class={styles.modalHint}>Эта анкета больше не появится в ленте. Вернуть её можно из профиля, в списке дизлайков. Чтобы просто закрыть анкету, нажми «назад».</p>
+      <p class={styles.modalHint}>Эта анкета больше не появится в ленте. Вернуть её можно в своём профиле, рядом с «Редактировать анкету». Чтобы просто закрыть анкету, нажми «назад».</p>
     </Modal>
     <Modal isOpen={confirm !== null} onClose={() => !busy && setConfirm(null)} title={confirm === "unmatch" ? "Убрать чат?" : "Скрыть человека?"} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setConfirm(null)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={confirmAction}>{confirm === "unmatch" ? "убрать чат" : "скрыть"}</Button></>}>
       <p class={styles.modalHint}>{confirm === "unmatch" ? "Переписка сохранится, но чат исчезнет из списка." : "Человек исчезнет из ленты и чатов."}</p>

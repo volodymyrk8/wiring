@@ -26,7 +26,7 @@ src/router/
 | `/chats/:id` | chat | Deep link |
 | `/me` | profile | |
 | `/notifications` | notifications | Preact profile bundle |
-| `/archive` | archive | Own likes, passes and blocks. Linked from the profile, not the tab bar |
+| `/archive` | archive | Own likes, passes and blocks. On your profile preview, next to «Редактировать анкету». Not a tab |
 | `/onboard` | onboard | |
 | `/p/:id` | person | Deep link |
 | `/r/:code` | register | Referral invite |

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, Checkbox, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
+import { AppHeader, Button, Checkbox, GuestFlowSteps, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
 import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
@@ -75,11 +75,11 @@ type DiscoveryDraft = {
 
 function discoveryFromUser(host: DeckHostBridge): DiscoveryDraft {
   const neuroIds = new Set((host.catalog.neuro || []).map((item) => item.id));
-  const hidden = host.user.hide_tags || [];
+  const hidden = host.user?.hide_tags || [];
   return {
-    seekMinAge: String(host.user.seek_min_age || 18),
-    seekMaxAge: String(host.user.seek_max_age || 99),
-    seekPlace: String(host.user.seek_place || ""),
+    seekMinAge: String(host.user?.seek_min_age || 18),
+    seekMaxAge: String(host.user?.seek_max_age || 99),
+    seekPlace: String(host.user?.seek_place || ""),
     hideNeuro: hidden.filter((id) => neuroIds.has(id)),
     hideVibe: hidden.filter((id) => !neuroIds.has(id)),
   };
@@ -157,7 +157,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   const jevReasons = (card.jev_match_reasons || []).slice(0, 2);
   const showJev = typeof card.jev_match_pct === "number";
   const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
-  const sharedNeuro = sharedNeuroIdSet(host.user.neuro, card.neuro, host.catalog);
+  const sharedNeuro = sharedNeuroIdSet(host.user?.neuro, card.neuro, host.catalog);
   const previewTags = split.neuro.slice(0, 2).flatMap((id) => {
     const label = labelForTag("neuro", id, host.catalog);
     return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
@@ -224,8 +224,35 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
   </article>;
 }
 
-export function DeckScreen({ host }: { host: DeckHostBridge }) {
-  const [source, setSource] = useState<"api" | "local" | undefined>();
+function DeckGuest({ host }: { host: DeckHostBridge }) {
+  const navigate = (view: string) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+    event.preventDefault();
+    host.navigate(view);
+  };
+  return <div class={styles.root}>
+    <AppHeader
+      homeHref={host.hrefFor("home")}
+      onHomeClick={navigate("home")}
+      sectionTitle="лента"
+      showThemeSwatches
+      onThemeSelect={host.onThemeSelect}
+    />
+    <main class={styles.guestGate}>
+      <h2>Лента анкет</h2>
+      <GuestFlowSteps variant="feed" />
+      <div class={styles.guestCta}>
+        <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+        <p class={styles.switchRow}>
+          <span class={styles.switchPrompt}>Уже есть профиль?</span>
+          <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
+        </p>
+      </div>
+    </main>
+  </div>;
+}
+
+function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHostBridge["user"]> } }) {
+  const [source, setSource] = useState<"api" | "local" | "taste" | undefined>();
   const [cards, setCards] = useState(host.cards);
   const [index, setIndex] = useState(host.index);
   const [hasMore, setHasMore] = useState(host.hasMore);
@@ -438,7 +465,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </Modal>
     <main class={styles.content} aria-label={host.recommendations ? "Для тебя" : "Лента"}>
-      {host.recommendations ? <p class={styles.recommendationIntro}>Анкеты со всего WIRING · подбор по отметкам и целям.{source === "local" ? " Jev сейчас недоступен: порядок по совпадениям анкет." : source === "api" ? " Jev ранжирует предварительный список." : ""}</p> : null}
+      {host.recommendations ? <p class={styles.recommendationIntro}>Анкеты со всего WIRING.{source === "taste" ? " Подбор по тем, кого ты лайкаешь." : source === "local" ? " Подбор по отметкам и целям. Jev сейчас недоступен: порядок по совпадениям анкет." : source === "api" ? " Подбор по отметкам и целям. Jev ранжирует предварительный список." : " Подбор по отметкам и целям."}</p> : null}
       <Modal isOpen={resetOpen} onClose={() => { if (!busy) setResetOpen(false); }} title="Показать анкеты ещё раз?"
         footer={<><Button variant="ghost" disabled={busy} onClick={() => setResetOpen(false)}>Отмена</Button><Button loading={busy} onClick={() => void repeatFeed()}>Показать ещё раз</Button></>}>
         <p>Ранее показанные анкеты снова появятся в ленте. Исключённые анкеты не вернутся; лайки и чаты сохранятся.</p>
@@ -461,7 +488,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
           <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
-          {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. Это совпадения в анкетах, а не гарантия совместимости.</p> : null}
+          {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. {source === "taste" ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия." : "Это совпадения в анкетах, а не гарантия совместимости."}</p> : null}
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
@@ -519,4 +546,9 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
       {error && !filtersOpen && !excludeOpen && !resetOpen ? <p class={styles.error} role="alert">{error}</p> : null}
     </main>
   </div>;
+}
+
+export function DeckScreen({ host }: { host: DeckHostBridge }) {
+  if (!host.user) return <DeckGuest host={host} />;
+  return <DeckFeed host={{ ...host, user: host.user }} />;
 }

@@ -579,7 +579,7 @@ export function ProfileScreen({ host }: Props) {
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Текст</h2></div>
               <Textarea label="О себе" name="bio" maxLength={1200} value={draft.bio} hint="специальный интерес, сенсорные лимиты, чего лучше не делать" onInput={(event) => setField("bio", event.currentTarget.value)} />
-              <Textarea label="Как тебе писать" name="communication" maxLength={280} value={draft.communication} hint="голосовые ок / нет, small talk — сразу в блок" onInput={(event) => setField("communication", event.currentTarget.value)} />
+              <Textarea label="Как тебе писать" name="communication" maxLength={500} value={draft.communication} hint="голосовые ок / нет, small talk — сразу в блок" onInput={(event) => setField("communication", event.currentTarget.value)} />
               <div class={styles.promptList}>
                 <div class={styles.subheading}><h3>Промпты</h3><span>до трёх</span></div>
                 {draft.prompts.map((prompt, index) => {
@@ -624,7 +624,6 @@ export function ProfileScreen({ host }: Props) {
               <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Опубликовать в ленте"}</Button>
               <Button variant="ghost" type="button" fullWidth disabled={busy} onClick={() => void saveDraftNow()}>Сохранить черновик</Button>
               <Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button>
-              <Button variant="ghost" type="button" className={styles.archiveLink} onClick={() => host.navigate("archive")}>Лайки, дизлайки и блок</Button>
               <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button>
             </div>
           </form>

@@ -1043,8 +1043,8 @@ def parse_profile(
         return None, "био до 1200 символов"
     if len(job) > 60:
         return None, "занятие до 60 символов"
-    if len(communication) > 280:
-        return None, "как тебе писать: до 280 символов"
+    if len(communication) > 500:
+        return None, "как тебе писать: до 500 символов"
     for label, value in (
         ("имя", name),
         ("о себе", bio),

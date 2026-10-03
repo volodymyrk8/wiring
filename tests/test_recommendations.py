@@ -8,12 +8,17 @@ from jev_ranker import rank_profiles
 
 
 class FakeConnection:
-    def __init__(self, cards):
+    def __init__(self, cards, likes=None, passes=None):
         self.cards = cards
+        self.likes = likes or []
+        self.passes = passes or []
         self.queries = []
 
     def execute(self, sql, params):
         self.queries.append(sql)
+        if "swipes.direction" in sql:
+            self.page = self.likes if params[-1] == "like" else self.passes
+            return self
         self.page = [card for card in self.cards if card["id"] > params[0]][:params[-1]]
         return self
 
@@ -60,3 +65,15 @@ class RecommendationsTests(unittest.TestCase):
         payload = request.call_args.args[0].data.decode()
         for private in ("8877", "7788", "7789", "PRIVATE_NAME", "PRIVATE_BIO", "PRIVATE_CITY", "PRIVATE_PHOTO"):
             self.assertNotIn(private, payload)
+
+    def test_three_likes_rank_people_like_those_likes(self):
+        viewer = {"id": 1, "age": 50, "vibe": ["quiet"], "intents": ["friends"], "neuro": [], "city": "Москва"}
+        liked = {"id": 9, "age": 30, "vibe": ["nonsmalltalk"], "intents": ["dating"], "neuro": ["asd"], "city": "Батуми"}
+        likes = [dict(liked, id=20 + index) for index in range(3)]
+        far = {"id": 2, "age": 50, "vibe": ["quiet"], "intents": ["friends"], "neuro": [], "city": "Москва"}
+        near = {"id": 3, "age": 31, "vibe": ["nonsmalltalk"], "intents": ["dating"], "neuro": ["asd"], "city": "Батуми"}
+        with patch("recommendations.rank_profiles", return_value=None) as rank:
+            result, source = select_recommendations(FakeConnection([far, near], likes=likes), viewer, lambda card: card)
+        self.assertEqual(source, "taste")
+        self.assertEqual(result[0]["id"], 3)
+        rank.assert_not_called()

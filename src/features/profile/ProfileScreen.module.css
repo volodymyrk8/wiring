@@ -109,5 +109,4 @@
   .heading { display: block; }
   .status { margin-top: 12px; }
   .submitRow > :not(:first-child) { flex: 1 1 calc(50% - 4px); }
-  .submitRow > .archiveLink { flex: 1 1 100%; }
 }
