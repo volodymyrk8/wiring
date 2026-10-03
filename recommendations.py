@@ -35,7 +35,7 @@ def _swipe_profiles(conn: Connection, viewer_id: int, direction: str, eligible: 
         JOIN users ON users.id = swipes.to_id
         WHERE swipes.from_id = ? AND swipes.direction = ?
           AND COALESCE(users.deleted_at, 0) = 0
-        ORDER BY swipes.id DESC
+        ORDER BY swipes.created_at DESC
         LIMIT 40
     """, (viewer_id, direction)).fetchall()
     profiles = []
