@@ -1131,6 +1131,9 @@ def parse_profile(
 
 
 def replace_tags(conn: Connection, user_id: int, neuro: list[str], vibe: list[str]) -> None:
+    from user_tags import normalize_user_tags
+
+    neuro, vibe = normalize_user_tags(neuro, vibe)
     conn.execute("DELETE FROM user_tags WHERE user_id = ?", (user_id,))
     for tag in neuro:
         conn.execute("INSERT INTO user_tags (user_id, kind, tag) VALUES (?, 'neuro', ?)", (user_id, tag))

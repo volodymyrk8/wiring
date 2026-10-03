@@ -1,5 +1,22 @@
 import type { CatalogItem } from "@/features/profile/types";
 
+const NEURO_COMBO = "audhd";
+const NEURO_COMBO_PARTS = new Set(["asd", "adhd"]);
+
+/** AuDHD already covers ASD and ADHD, so those tags do not stay selected with it. */
+export function settleNeuro(ids: string[]): string[] {
+  if (!ids.includes(NEURO_COMBO)) return ids;
+  return ids.filter((id) => !NEURO_COMBO_PARTS.has(id));
+}
+
+/** Selecting the combo clears its parts; selecting a part clears the combo. */
+export function applyNeuroToggle(previous: string[], next: string[]): string[] {
+  const added = next.find((id) => !previous.includes(id));
+  if (added === NEURO_COMBO) return next.filter((id) => !NEURO_COMBO_PARTS.has(id));
+  if (added && NEURO_COMBO_PARTS.has(added)) return next.filter((id) => id !== NEURO_COMBO);
+  return settleNeuro(next);
+}
+
 export function catalogIdSet(items: CatalogItem[] | undefined): Set<string> {
   return new Set((items || []).map((item) => item.id));
 }
@@ -35,7 +52,7 @@ export function splitCatalogTags(
       neuroOut.push(id);
     }
   }
-  return { neuro: neuroOut, vibe: vibeOut };
+  return { neuro: settleNeuro(neuroOut), vibe: vibeOut };
 }
 
 export function labelForTag(

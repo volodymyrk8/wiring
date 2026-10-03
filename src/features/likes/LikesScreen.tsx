@@ -4,7 +4,7 @@ import { AppHeader, Button, GuestFlowSteps, ProfileMenu, Select, TagPicker } fro
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
-import { splitCatalogTags } from "@/lib/catalog-tags";
+import { applyNeuroToggle, splitCatalogTags } from "@/lib/catalog-tags";
 import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
 import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
@@ -44,7 +44,7 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
     <div class={styles.filters}>
       <div class={styles.filterGroup}>
         <p class={styles.filterLabel}>диагнозы в лайках</p>
-        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
+        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} />
       </div>
       <div class={styles.filterGroup}>
         <p class={styles.filterLabel}>вайб</p>

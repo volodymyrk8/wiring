@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Checkbox, GuestFlowSteps, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
-import { labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
+import { applyNeuroToggle, labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -119,7 +119,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
         <Select className={styles.citySelect} label="Пол" id="deck-gender" options={[{ value: "", label: "Любой" }, { value: "woman", label: "Женщины" }, { value: "man", label: "Мужчины" }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel="Пол в ленте" />
         <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
         <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
-        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", value)} />
+        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} />
         <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>Скрыть анкеты без диагноза</Checkbox>
         <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
         <h3 class={styles.filterSection}>Кто может искать меня</h3>
@@ -129,7 +129,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
           <Input label="Возраст до" name="seek-max-age" type="number" inputMode="numeric" required min={Number(discovery.seekMinAge) || 18} max={99} value={discovery.seekMaxAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMaxAge: event.currentTarget.value }))} />
         </div>
         <Select className={styles.citySelect} label="Откуда" id="deck-seek-place" searchable searchPlaceholder="Город или страна" options={placeOptions} value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel="Откуда могут искать" />
-        <TagPicker label="Не показывать меня людям с этими особенностями" options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: value }))} />
+        <TagPicker label="Не показывать меня людям с этими особенностями" options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: applyNeuroToggle(current.hideNeuro, value) }))} />
         <TagPicker label="Не показывать меня людям с таким вайбом" options={host.catalog.vibe || []} selected={discovery.hideVibe} onChange={(value) => setDiscovery((current) => ({ ...current, hideVibe: value }))} tone="vibe" />
       </fieldset>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}

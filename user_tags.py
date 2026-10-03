@@ -9,6 +9,14 @@ from database import Connection
 
 ACTIVE_VIBE_IDS = {item["id"] for item in VIBE}
 ACTIVE_NEURO_IDS = {item["id"] for item in NEURO}
+NEURO_COMBO_PARTS = frozenset({"asd", "adhd"})
+
+
+def drop_combo_parts(tags: list[str]) -> list[str]:
+    """AuDHD already covers ASD and ADHD, so those tags do not stay selected with it."""
+    if "audhd" not in tags:
+        return tags
+    return [tag for tag in tags if tag not in NEURO_COMBO_PARTS]
 
 LEGACY_VIBE_CLEANUP_MIGRATION = "legacy_vibe_cleanup_2026_09"
 
@@ -35,7 +43,7 @@ def normalize_user_tags(neuro: list[str], vibe: list[str]) -> tuple[list[str], l
         if tag in NEURO_IDS and tag not in neuro_seen:
             neuro_seen.add(tag)
             neuro_out.append(tag)
-    return neuro_out, vibe_out
+    return drop_combo_parts(neuro_out), vibe_out
 
 
 def filter_hide_tags(items: list[str]) -> list[str]:
@@ -48,7 +56,7 @@ def filter_hide_tags(items: list[str]) -> list[str]:
         if item in allowed and item not in seen:
             seen.add(item)
             out.append(item)
-    return out
+    return drop_combo_parts(out)
 
 
 def _tags_for_user(conn: Connection, user_id: int) -> tuple[list[str], list[str]]:

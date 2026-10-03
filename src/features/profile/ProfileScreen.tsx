@@ -12,7 +12,7 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
+import { applyNeuroToggle, catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
 import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
@@ -570,7 +570,7 @@ export function ProfileScreen({ host }: Props) {
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Детали и предпочтения</h2><span>по желанию</span></div>
               <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
-              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", value); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
+              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
               <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
