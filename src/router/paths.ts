@@ -16,6 +16,7 @@ const PATH_BY_VIEW: Record<ViewId, string | ((extra: { id?: number }) => string)
   reset: SPA_PATHS.reset,
   verify: SPA_PATHS.verify,
   deck: SPA_PATHS.deck,
+  recommendations: SPA_PATHS.recommendations,
   likes: SPA_PATHS.likes,
   matches: SPA_PATHS.matches,
   chat: (extra) => (extra.id ? `/chats/${extra.id}` : SPA_PATHS.matches),

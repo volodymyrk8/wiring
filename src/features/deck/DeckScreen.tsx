@@ -59,7 +59,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
     showBetaBadge={false}
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
-    rightSlot={<IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
+    rightSlot={host.recommendations ? <span>Для тебя</span> : <IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
   />;
 }
 
@@ -225,6 +225,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
 }
 
 export function DeckScreen({ host }: { host: DeckHostBridge }) {
+  const [source, setSource] = useState<"api" | "local" | undefined>();
   const [cards, setCards] = useState(host.cards);
   const [index, setIndex] = useState(host.index);
   const [hasMore, setHasMore] = useState(host.hasMore);
@@ -270,7 +271,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     const viewport = viewportRef.current;
     if (!viewport) return;
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - 128));
+      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 140 : 128)));
       viewport.scrollTop = indexRef.current * viewport.clientHeight;
     };
     align();
@@ -285,7 +286,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
   }, [cards]);
 
   useEffect(() => {
-    if (!current || viewedRef.current.has(current.id)) return;
+    if (host.recommendations || !current || viewedRef.current.has(current.id)) return;
     const controller = new AbortController();
     void host.api("/api/feed/view", { method: "POST", signal: controller.signal, body: JSON.stringify({ target_id: current.id }) })
       .then(() => { viewedRef.current.add(current.id); })
@@ -326,9 +327,10 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     try {
       const response = await host.loadFeed(nextFilters, controller.signal, replace ? [] : cards.map((card) => card.id));
       if (controller.signal.aborted) return;
+      setSource(response.recommendation_source);
       setHasMore(response.has_more);
       setGeneration(response.generation);
-      setCards((previous) => replace ? response.cards : [...previous, ...response.cards.filter((card) => !previous.some((old) => old.id === card.id))]);
+      setCards((previous) => replace || host.recommendations ? response.cards : [...previous, ...response.cards.filter((card) => !previous.some((old) => old.id === card.id))]);
       if (replace) {
         setFilters(nextFilters); setIndex(0); indexRef.current = 0; setFiltersOpen(false);
         if (viewportRef.current) viewportRef.current.scrollTop = 0;
@@ -362,6 +364,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     try {
       const response = await host.api("/api/swipe", { method: "POST", signal: controller.signal, body: JSON.stringify({ target_id: targetId, direction }) });
       if (controller.signal.aborted) return;
+      host.onAction?.(targetId);
       const remaining = cards.filter((card) => card.id !== targetId);
       const nextIndex = Math.min(index, remaining.length);
       setCards(remaining); setIndex(nextIndex); setExcludeOpen(false);
@@ -426,7 +429,7 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
     if (Math.abs(distance) > 40) advance(distance > 0 ? 1 : -1);
   };
 
-  return <div class={styles.root}>
+  return <div class={`${styles.root}${host.recommendations ? ` ${styles.recommendationsRoot}` : ""}`}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
     {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
@@ -434,7 +437,8 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
       <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </Modal>
-    <main class={styles.content} aria-label="Лента">
+    <main class={styles.content} aria-label={host.recommendations ? "Для тебя" : "Лента"}>
+      {host.recommendations ? <p class={styles.recommendationIntro}>Анкеты со всего WIRING · подбор по отметкам и целям.{source === "local" ? " Jev сейчас недоступен: порядок по совпадениям анкет." : source === "api" ? " Jev ранжирует предварительный список." : ""}</p> : null}
       <Modal isOpen={resetOpen} onClose={() => { if (!busy) setResetOpen(false); }} title="Показать анкеты ещё раз?"
         footer={<><Button variant="ghost" disabled={busy} onClick={() => setResetOpen(false)}>Отмена</Button><Button loading={busy} onClick={() => void repeatFeed()}>Показать ещё раз</Button></>}>
         <p>Ранее показанные анкеты снова появятся в ленте. Исключённые анкеты не вернутся; лайки и чаты сохранятся.</p>
@@ -457,14 +461,15 @@ export function DeckScreen({ host }: { host: DeckHostBridge }) {
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
           <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
+          {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. Это совпадения в анкетах, а не гарантия совместимости.</p> : null}
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
-            <h2>{loading ? "Ищем новые анкеты…" : "Новых анкет пока нет"}</h2>
-            <p>{loading ? "Ещё немного." : filtered ? "Можно изменить фильтры." : "Загляни позже."}</p>
+            <h2>{loading ? "Ищем новые анкеты…" : host.recommendations ? "Подборка закончилась" : "Новых анкет пока нет"}</h2>
+            <p>{loading ? "Ещё немного." : !host.recommendations && filtered ? "Можно изменить фильтры." : "Загляни позже."}</p>
             {!loading && index >= cards.length ? <div class={styles.emptyActions}>
-              <Button variant="ghost" disabled={busy} onClick={() => void loadPage()}>{error ? "Повторить" : "Проверить новые"}</Button>
-              {!hasMore ? <>
+              <Button variant="ghost" disabled={busy} onClick={() => void loadPage(filters, Boolean(host.recommendations))}>{error ? "Повторить" : "Проверить новые"}</Button>
+              {!hasMore && !host.recommendations ? <>
                 <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}>Показать анкеты ещё раз</Button>
                 {!host.user.plus ? <p id="feed-plus-hint">Можно включить в профиле.</p> : null}
               </> : null}

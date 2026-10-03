@@ -11,6 +11,7 @@ SPA_SHELL_PATHS: tuple[str, ...] = (
     "/reset",
     "/verify",
     "/feed",
+    "/for-you",
     "/likes",
     "/chats",
     "/me",

@@ -7,6 +7,7 @@ export type ViewId =
   | "reset"
   | "verify"
   | "deck"
+  | "recommendations"
   | "likes"
   | "matches"
   | "chat"

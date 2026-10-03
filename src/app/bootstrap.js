@@ -1,5 +1,5 @@
 import { applyTheme, themeNow } from "../lib/theme";
-import { fetchFeed, resetFeed } from "./feed";
+import { fetchFeed, resetFeed, fetchRecommendations } from "./feed";
 import { createApi } from "./api";
 import { createFeatureLoader } from "./features";
 import { createInboxController } from "./inbox";
@@ -334,6 +334,9 @@ import { createInboxController } from "./inbox";
         state.view === "matches" || state.view === "chat" || (state.view === "person" && (from === "matches" || from === "chat")),
       ],
     ];
+    if (state.user?.jev_feed_beta && state.user?.jev_feed_enabled) {
+      items.splice(2, 0, ["recommendations", "Для тебя", ICONS.heart, state.view === "recommendations" || (state.view === "person" && from === "recommendations")]);
+    }
     if (isTab) {
       const isMe =
         state.view === "profile"
@@ -434,15 +437,15 @@ import { createInboxController } from "./inbox";
     }
     if (state.view === "person") {
       state.person = null;
-      state.view = state.personFrom === "likes" ? "likes" : state.personFrom === "archive" ? "archive" : "deck";
+      state.view = state.personFrom === "likes" ? "likes" : state.personFrom === "archive" ? "archive" : state.personFrom === "recommendations" ? "recommendations" : "deck";
       if (state.view === "likes") {
         await loadLikes();
         await refreshMe();
       } else {
-        if (!state.cards.length && state.feedHasMore) await loadFeed();
+        if (state.view === "deck" && !state.cards.length && state.feedHasMore) await loadFeed();
       }
     } else {
-      if (!state.cards.length && state.feedHasMore) await loadFeed();
+      if (state.view === "deck" && !state.cards.length && state.feedHasMore) await loadFeed();
     }
     state.busy = false;
     render();
@@ -490,7 +493,7 @@ import { createInboxController } from "./inbox";
 
   const loadFeed = async (filters = state.filters) => {
     state.filters = { ...state.filters, ...filters, intents: filters.intents || [] };
-    const data = await fetchFeed(api, state.filters, undefined, state.user?.jev_feed_enabled ? 10 : 2);
+    const data = await fetchFeed(api, state.filters, undefined, 2);
     state.feedHasMore = !!data.has_more;
     state.feedGeneration = data.generation;
     state.cards = data.cards || [];
@@ -581,6 +584,8 @@ import { createInboxController } from "./inbox";
     deletePhoto: (id) => api(`/api/photos/${id}`, { method: "DELETE" }).then(() => undefined),
     onUserUpdated: (user) => {
       state.user = user;
+      const nav = root.querySelector(".tabbar");
+      if (nav) { nav.innerHTML = navLinks("tab"); bindDataNavLinks(); }
     },
     refreshFeed: async () => {
       state.cards = [];
@@ -641,27 +646,35 @@ import { createInboxController } from "./inbox";
     onLogout: logout,
   });
 
-  const buildDeckHostBridge = () => ({
+  const buildDeckHostBridge = (recommendations = false) => ({
+    recommendations,
     user: state.user,
     catalog: state.catalog,
-    cards: state.cards,
-    index: state.index,
+    cards: recommendations ? [] : state.cards,
+    index: recommendations ? 0 : state.index,
     filters: state.filters,
     filtersOpen: state.filtersOpen,
-    hasMore: state.feedHasMore,
+    hasMore: recommendations ? true : state.feedHasMore,
     generation: state.feedGeneration,
     basePath: BASE,
     hrefFor,
     navigate: (view, params = {}) => {
       if (view === "person" && params.id) {
-        void openPerson(Number(params.id), "deck");
+        void openPerson(Number(params.id), recommendations ? "recommendations" : "deck");
         return;
       }
       void goToView(view);
     },
-    loadFeed: (filters, signal, skipIds) => fetchFeed(api, filters, signal, state.user?.jev_feed_enabled ? 10 : 2, skipIds || []),
+    loadFeed: (filters, signal, skipIds) => recommendations ? fetchRecommendations(api, signal) : fetchFeed(api, filters, signal, 2, skipIds || []),
     resetFeed: (generation, signal) => resetFeed(api, generation, signal),
+    onAction: (targetId) => {
+      const removedIndex = state.cards.findIndex(card => card.id === targetId);
+      state.cards = state.cards.filter(card => card.id !== targetId);
+      if (removedIndex >= 0 && removedIndex < state.index) state.index -= 1;
+      state.index = Math.min(state.index, state.cards.length);
+    },
     onFeedChange: (cards, index, filters, hasMore, generation) => {
+      if (recommendations) return;
       state.cards = cards;
       state.index = index;
       state.filters = filters;
@@ -820,7 +833,7 @@ import { createInboxController } from "./inbox";
       state.filters.neuro = [meta.neuro];
       persistFilters();
     }
-    if (!state.user && ["deck", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
+    if (!state.user && ["deck", "recommendations", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -854,8 +867,11 @@ import { createInboxController } from "./inbox";
     render();
   };
 
+  const boundNavigationElements = new WeakSet();
   const bindDataNavLinks = () => {
     root.querySelectorAll("[data-nav]").forEach((btn) => {
+      if (boundNavigationElements.has(btn)) return;
+      boundNavigationElements.add(btn);
       btn.addEventListener("click", async (e) => {
         if (btn.tagName === "A") e.preventDefault();
         const next = btn.dataset.nav;
@@ -984,6 +1000,8 @@ import { createInboxController } from "./inbox";
   };
 
   const renderDeckFeature = async () => {
+    const view = state.view;
+    const recommendations = view === "recommendations";
     deckFeatureUnmount?.();
     deckFeatureUnmount = null;
     root.innerHTML = '<div id="deck-feature-root"></div>' + tabbar();
@@ -992,8 +1010,8 @@ import { createInboxController } from "./inbox";
     if (!mountEl) return;
     try {
       const mod = await featureLoader.deck();
-      if (state.view !== "deck") return;
-      deckFeatureUnmount = mod.mountDeck(mountEl, buildDeckHostBridge());
+      if (state.view !== view) return;
+      deckFeatureUnmount = (recommendations ? mod.mountRecommendations : mod.mountDeck)(mountEl, buildDeckHostBridge(recommendations));
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
@@ -1097,7 +1115,7 @@ import { createInboxController } from "./inbox";
       personFeatureUnmount?.();
       personFeatureUnmount = null;
     }
-    if (state.view !== "deck") {
+    if (state.view !== "deck" && state.view !== "recommendations") {
       deckFeatureUnmount?.();
       deckFeatureUnmount = null;
     }
@@ -1174,7 +1192,12 @@ import { createInboxController } from "./inbox";
       void renderPersonFeature();
       return;
     }
-    else if (state.view === "deck") {
+    else if (state.view === "deck" || state.view === "recommendations") {
+      if (state.view === "recommendations" && !(state.user.jev_feed_beta && state.user.jev_feed_enabled)) {
+        state.view = "profile";
+        render();
+        return;
+      }
       void renderDeckFeature();
       return;
     }

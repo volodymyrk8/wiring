@@ -38,6 +38,7 @@ export type ProfileUser = {
   ref_count?: number;
   notify_enabled?: boolean;
   notify_push?: boolean;
+  jev_feed_unlocked?: boolean;
   jev_feed_beta?: boolean;
   jev_feed_available?: boolean;
   jev_feed_enabled?: boolean;

@@ -1,4 +1,4 @@
-"""Server-side Jev ranking for the single-account feed experiment."""
+"""Server-side Jev ranking and persisted recommendation access."""
 from __future__ import annotations
 
 import json
@@ -17,21 +17,12 @@ _VIBE_LABEL = {item["id"]: item["label"] for item in VIBE}
 _INTENT_LABEL = {item["id"]: item["label"] for item in INTENTS}
 
 
-def _configured_beta_user_id() -> int | None:
-    raw = (os.environ.get("JEV_BETA_USER_ID") or "").strip()
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return None
-    return value if value > 0 else None
-
-
-def jev_access(user_id: int) -> tuple[bool, bool]:
-    """Return (is_allowlisted, service_is_configured); fail closed by default."""
-    beta_user_id = _configured_beta_user_id()
-    allowlisted = beta_user_id is not None and beta_user_id == int(user_id)
+def jev_access(user: Any) -> tuple[bool, bool]:
+    """Return (promo_unlocked, service_configured); a beta ID never grants access."""
+    keys = set(user.keys()) if user is not None and hasattr(user, "keys") else set()
+    unlocked = bool("jev_recommendations_unlocked" in keys and int(user["jev_recommendations_unlocked"] or 0))
     configured = bool((os.environ.get("JEV_API_KEY") or "").strip())
-    return allowlisted, configured
+    return unlocked, configured
 
 
 def _tag_list(profile: Any, key: str) -> list[str]:
@@ -92,7 +83,7 @@ def match_reasons(viewer: Any, candidate: Any, *, max_items: int = 3) -> list[st
     if shared_neuro:
         labels = [_NEURO_LABEL.get(tag, tag) for tag in shared_neuro[:4]]
         suffix = f" (+{len(shared_neuro) - 4})" if len(shared_neuro) > 4 else ""
-        reasons.append(f"Общие диагнозы: {', '.join(labels)}{suffix}")
+        reasons.append(f"Общие отметки о диагнозах: {', '.join(labels)}{suffix}")
 
     shared_vibe = signals["shared_vibe"]
     if shared_vibe and len(reasons) < max_items:
@@ -111,7 +102,7 @@ def match_reasons(viewer: Any, candidate: Any, *, max_items: int = 3) -> list[st
         reasons.append("Близкий возраст")
 
     if not reasons:
-        reasons.append("Jev учёл сочетание ваших отметок в анкетах")
+        reasons.append("Анкета подходит под ваши взаимные предпочтения видимости")
 
     return reasons[:max_items]
 
@@ -172,7 +163,7 @@ def prepare_jev_feed(
 
 
 def rank_profiles(viewer: Any, cards: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
-    """Rank one delivered page; return None on any provider or response failure."""
+    """Rank a bounded candidate list; return None on provider or response failure."""
     if len(cards) < 2:
         return None
     api_key = (os.environ.get("JEV_API_KEY") or "").strip()

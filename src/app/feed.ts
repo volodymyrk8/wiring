@@ -5,7 +5,7 @@ export function resetFeed(api: ApiClient, generation: number, signal?: AbortSign
   return api("/api/feed/reset", { method: "POST", signal, body: JSON.stringify({ generation }) });
 }
 
-/** Normal pages reserve the current card and one upcoming card; Jev's opt-in experiment ranks a wider sample. */
+/** Normal pages reserve the current card and one upcoming card. */
 export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSignal, limit = 2, skipIds: number[] = []): Promise<FeedPage> {
   const query = new URLSearchParams({ limit: String(limit) });
   if (filters.neuro.length) query.set("neuro", filters.neuro.join(","));
@@ -19,4 +19,8 @@ export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSi
   if (filters.real_only) query.set("real", "1");
   if (skipIds.length) query.set("skip", skipIds.slice(0, 200).join(","));
   return api<FeedPage>(`/api/feed?${query}`, { signal, cache: "no-store" });
+}
+
+export function fetchRecommendations(api: ApiClient, signal?: AbortSignal): Promise<FeedPage> {
+  return api<FeedPage>("/api/recommendations", { signal, cache: "no-store" });
 }

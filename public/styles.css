@@ -865,7 +865,8 @@ html[data-theme="slate"] .badge-gem-icon {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   min-height: calc(54px + env(safe-area-inset-bottom));
   padding: 0 6px env(safe-area-inset-bottom) 6px;
   box-sizing: border-box;
@@ -1203,7 +1204,7 @@ a.solid, a.ghost { display: inline-block; text-align: center; text-decoration: n
   transform: translateX(-50%);
   pointer-events: none;
 }
-html[data-view="deck"] .toast-stack,
+html:is([data-view="deck"], [data-view="recommendations"]) .toast-stack,
 html[data-view="person"] .toast-stack {
   top: calc(64px + env(safe-area-inset-top, 0px));
   bottom: auto;
@@ -1236,7 +1237,7 @@ html[data-view="person"] .toast-stack {
   margin-bottom: 12px;
 }
 .panel { animation: in 0.35s ease; }
-html[data-view="deck"] .panel.deck-panel { animation: none; }
+html:is([data-view="deck"], [data-view="recommendations"]) .panel.deck-panel { animation: none; }
 html[data-view="profile"] .panel { animation: none; }
 @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
@@ -2485,10 +2486,10 @@ html[data-view="matches"] #chat-feature-root {
 }
 
 /* Feed: fill viewport so swipe buttons sit above the tabbar without a black gap. */
-html[data-view="deck"] body {
+html:is([data-view="deck"], [data-view="recommendations"]) body {
   overflow: hidden;
 }
-html[data-view="deck"] #app {
+html:is([data-view="deck"], [data-view="recommendations"]) #app {
   height: var(--vvh, 100dvh);
   min-height: 0;
   max-height: var(--vvh, 100dvh);
@@ -2498,17 +2499,17 @@ html[data-view="deck"] #app {
   padding-bottom: calc(var(--tabbar-clearance, 88px) + env(safe-area-inset-bottom) + 8px);
 }
 
-html[data-view="deck"][data-tabs] #app {
+html:is([data-view="deck"], [data-view="recommendations"])[data-tabs] #app {
   --tabbar-clearance: 96px;
 }
-html[data-view="deck"] #deck-feature-root {
+html:is([data-view="deck"], [data-view="recommendations"]) #deck-feature-root {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 @media (min-width: 768px) {
-  html[data-view="deck"] #app {
+  html:is([data-view="deck"], [data-view="recommendations"]) #app {
     padding-bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
@@ -2524,7 +2525,7 @@ html[data-view="deck"] #deck-feature-root {
   html[data-view="profile"][data-tabs] #app {
     --tabbar-clearance: 108px;
   }
-  html[data-view="deck"][data-tabs] #app {
+  html:is([data-view="deck"], [data-view="recommendations"])[data-tabs] #app {
     --tabbar-clearance: 112px;
     padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom) + 4px);
   }

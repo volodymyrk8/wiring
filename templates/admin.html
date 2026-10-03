@@ -196,9 +196,9 @@
         <button class="ghost" type="submit">создать код</button>
       </form>
       <table class="admin-table">
-        <tr><th>код</th><th>дни</th><th>использовали</th></tr>
+        <tr><th>код</th><th>доступ</th><th>использовали</th></tr>
         {% for c in codes %}
-        <tr><td>{{ c.code }}</td><td>{{ c.days }}</td><td>{{ c.uses }}{% if c.max_uses %} / {{ c.max_uses }}{% else %} / ∞{% endif %}</td></tr>
+        <tr><td>{{ c.code }}</td><td>{% if c.benefit == "recommendations" %}Для тебя{% else %}{{ c.days }} дней WIRING+{% endif %}</td><td>{{ c.uses }}{% if c.max_uses %} / {{ c.max_uses }}{% else %} / ∞{% endif %}</td></tr>
         {% else %}
         <tr><td colspan="3">нет кодов</td></tr>
         {% endfor %}

@@ -233,3 +233,13 @@
 @media (prefers-reduced-motion: reduce) { .actionPanel { transition: none; } }
 @media (min-width: 768px) { .controls { min-height: 72px; } .actionControl { min-width: 48px; } .actionCircle.actionCircle { width: 48px; min-width: 48px; height: 48px; min-height: 48px; } }
 @media (min-width: 1025px) { .controls { min-height: 74px; } .actionControl { min-width: 50px; } .actionCircle.actionCircle { width: 50px; min-width: 50px; height: 50px; min-height: 50px; } }
+
+.recommendationIntro { margin: 0; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+.recommendationSummary { max-width: 508px; margin: 8px auto 0; padding: 0 12px; font-size: 12px; line-height: 1.4; color: var(--ink); }
+
+.recommendationsRoot .header.header { position: relative; flex-shrink: 0; }
+
+.recommendationsRoot .slide { flex-direction: column; padding-top: 8px; gap: 8px; }
+.recommendationsRoot .card { flex-shrink: 0; }
+.recommendationsRoot .recommendationIntro { width: 100%; max-width: 508px; margin: 0 auto; box-sizing: border-box; }
+.recommendationsRoot .recommendationSummary { width: 100%; box-sizing: border-box; margin-top: 0; }

@@ -174,7 +174,7 @@ def send_user_push(
         private_pem, _public = vapid_keys(conn)
     except (ValueError, OSError):
         return
-    subject = (os.environ.get("WEB_PUSH_VAPID_SUBJECT") or "https://wiring.club").strip()
+    subject = (os.environ.get("WEB_PUSH_VAPID_SUBJECT") or "mailto:noreply@wiring.date").strip()
     payload = json.dumps(
         {"title": "WIRING", "body": body[:180], "url": url, "tag": tag[:80]},
         ensure_ascii=False,

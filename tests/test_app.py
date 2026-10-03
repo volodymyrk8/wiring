@@ -648,9 +648,9 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content_type.startswith("text/html"))
         text = response.get_data(as_text=True)
-        for expected in ("CSAE", "CSAM", "WIRING", "18+", "/support", "Пожаловаться"):
+        for expected in ("CSAE", "CSAM", "WIRING", "18+", "support@wiring.date", "Пожаловаться"):
             self.assertIn(expected, text)
-        self.assertIn('rel="canonical" href="https://wiring.club/child-safety"', text)
+        self.assertIn('rel="canonical" href="https://wiring.date/child-safety"', text)
         self.assertIn('href="/child-safety" aria-current="page"', text)
         self.assertNotIn('id="app"', text)
         self.assertEqual(self.client.head("/child-safety").status_code, 200)
@@ -658,6 +658,124 @@ class WiringTest(unittest.TestCase):
         self.assertIn('href="/child-safety"', self.client.get("/privacy").get_data(as_text=True))
         # The existing account-deletion confirmation remains a SPA document.
         self.assertIn(b'id="app"', self.client.get("/delete-account").data)
+
+    def test_recommendation_promo_cannot_be_forged_and_concurrent_redemption_counts_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        me = self._register()
+        forged = self.client.patch("/api/me", json={"draft": True, "jev_recommendations_unlocked": True, "jev_feed_enabled": True}).get_json()["user"]
+        self.assertFalse(forged["jev_feed_unlocked"])
+        self.assertFalse(forged["jev_feed_enabled"])
+        barrier = Barrier(2)
+        def redeem():
+            client = app.test_client()
+            with client.session_transaction() as session:
+                session["uid"] = me["id"]
+            barrier.wait(timeout=5)
+            return client.post("/api/premium/redeem", json={"code": "WIRINGFORYOU"}).status_code
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _: redeem(), range(2)))
+        self.assertEqual(sorted(results), [200, 400])
+        with app.app_context():
+            self.assertEqual(db().execute("SELECT uses FROM promo_codes WHERE code = ?", ("WIRINGFORYOU",)).fetchone()["uses"], 1)
+        self._logout()
+        self.client.post("/api/demo")
+        self.assertEqual(self.client.post("/api/premium/redeem", json={"code": "WIRINGFORYOU"}).status_code, 403)
+
+    def test_recommendation_promo_grants_every_real_account_without_plus_or_opt_in(self):
+        from premium import ensure_default_code
+        for index in range(2):
+            me = self._register(email=f"promo-{index}@example.com")
+            self.assertFalse(me["jev_feed_unlocked"])
+            self.assertFalse(me["jev_feed_enabled"])
+            # WIRING+ alone does not unlock recommendations.
+            plus = self.client.post("/api/premium/redeem", json={"code": "WIRINGPLUS"}).get_json()["user"]
+            self.assertFalse(plus["jev_feed_unlocked"])
+            until = plus["plus_until"]
+            self.assertEqual(self.client.get("/api/recommendations").status_code, 403)
+            self.assertEqual(self.client.post("/api/premium/redeem", json={"code": "wrong"}).status_code, 400)
+            result = self.client.post("/api/premium/redeem", json={"code": " wiringforyou "})
+            self.assertEqual(result.status_code, 200)
+            unlocked = result.get_json()["user"]
+            self.assertTrue(unlocked["jev_feed_unlocked"])
+            self.assertFalse(unlocked["jev_feed_enabled"])
+            self.assertEqual(unlocked["plus_until"], until)
+            self.assertEqual(self.client.get("/api/recommendations").status_code, 403)
+            self.assertEqual(self.client.post("/api/premium/redeem", json={"code": "WIRINGFORYOU"}).status_code, 400)
+            with patch.dict(os.environ, {"JEV_API_KEY": "test-key", "JEV_BETA_USER_ID": ""}):
+                self.assertEqual(self.client.post("/api/me/jev-feed", json={"enabled": True}).status_code, 200)
+            self._logout()
+            self.assertTrue(self._login(f"promo-{index}@example.com")["jev_feed_unlocked"])
+            self._logout()
+        with app.app_context():
+            ensure_default_code(db())
+            ensure_default_code(db())
+            row = db().execute("SELECT uses, benefit FROM promo_codes WHERE code = ?", ("WIRINGFORYOU",)).fetchone()
+            self.assertEqual(row["uses"], 2)
+            self.assertEqual(row["benefit"], "recommendations")
+            self.assertEqual(db().execute("SELECT COUNT(*) AS n FROM promo_redemptions WHERE code = ?", ("WIRINGFORYOU",)).fetchone()["n"], 2)
+
+    def test_recommendations_worldwide_opt_in_and_no_delivery_history(self):
+        me = self._register()
+        self._logout()
+        remote = self._register(email="remote@example.com", city="Белград", age=30)
+        self._logout()
+        self._login("ada@example.com")
+        self.assertEqual(self.client.get("/api/recommendations").status_code, 403)
+        with patch.dict(os.environ, {"JEV_BETA_USER_ID": str(me["id"]), "JEV_API_KEY": "test-key"}):
+            self.assertEqual(self.client.get("/api/recommendations").status_code, 403)
+            self.assertEqual(self.client.post("/api/me/jev-feed", json={"enabled": True}).status_code, 404)
+            self.assertEqual(self.client.post("/api/premium/redeem", json={"code": "WIRINGFORYOU"}).status_code, 200)
+            result = self.client.post("/api/me/jev-feed", json={"enabled": True})
+            self.assertEqual(result.status_code, 200)
+            self._logout()
+            self.assertTrue(self._login("ada@example.com")["jev_feed_enabled"])
+            with patch("recommendations.rank_profiles", return_value=None):
+                result = self.client.get("/api/recommendations?city=Нови-Сад")
+                self.assertEqual(result.status_code, 200)
+                payload = result.get_json()
+                self.assertEqual([c["id"] for c in payload["cards"]], [remote["id"]])
+                self.assertEqual(payload["recommendation_source"], "local")
+                self.assertIn("recommendation_reasons", payload["cards"][0])
+                self.assertNotIn("jev_match_pct", payload["cards"][0])
+                self.assertEqual(result.headers["Cache-Control"], "no-store")
+                with app.app_context():
+                    self.assertEqual(db().execute("SELECT COUNT(*) AS n FROM feed_history WHERE user_id = ?", (me["id"],)).fetchone()["n"], 0)
+                # Ordinary city narrowing is independent and still yields nothing.
+                self.assertEqual(self.client.get("/api/feed?city=Нови-Сад").get_json()["cards"], [])
+                self.client.post("/api/swipe", json={"target_id": remote["id"], "direction": "like"})
+                self.assertEqual(self.client.get("/api/recommendations").get_json()["cards"], [])
+            self.client.post("/api/me/jev-feed", json={"enabled": False})
+            self.assertEqual(self.client.get("/api/recommendations").status_code, 403)
+        with patch.dict(os.environ, {"JEV_BETA_USER_ID": "", "JEV_API_KEY": "test-key"}):
+            self.assertEqual(self.client.post("/api/me/jev-feed", json={"enabled": True}).status_code, 200)
+
+    def test_recommendations_apply_both_owners_visibility_and_exclusions(self):
+        me = self._register()
+        _rate.clear()  # Fixture registrations stay independent of the signup rate limit.
+        peers = self._peers(8)
+        self._login("ada@example.com")
+        with app.app_context():
+            conn = db()
+            conn.execute("UPDATE users SET jev_feed_enabled = 1, jev_recommendations_unlocked = 1, seek_max_age = 35 WHERE id = ?", (me["id"],))
+            conn.execute("UPDATE users SET age = 40 WHERE id = ?", (peers[0]["id"],))
+            conn.execute("UPDATE users SET seek_max_age = 25 WHERE id = ?", (peers[1]["id"],))
+            conn.execute("UPDATE users SET seek_place = 'Белград' WHERE id = ?", (peers[2]["id"],))
+            conn.execute("UPDATE users SET incognito = 1 WHERE id = ?", (peers[3]["id"],))
+            conn.execute("UPDATE users SET paused = 1 WHERE id = ?", (peers[4]["id"],))
+            conn.execute("INSERT INTO blocks (from_id, to_id, created_at) VALUES (?, ?, ?)", (peers[5]["id"], me["id"], int(time.time())))
+            conn.execute("INSERT INTO feed_history (user_id, other_id, delivered_at, excluded_at) VALUES (?, ?, ?, ?)", (me["id"], peers[6]["id"], 1, 1))
+            conn.commit()
+        with patch.dict(os.environ, {"JEV_BETA_USER_ID": str(me["id"])}), patch("recommendations.rank_profiles", return_value=None):
+            result = self.client.get("/api/recommendations")
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual([c["id"] for c in result.get_json()["cards"]], [peers[7]["id"]])
+            self.client.patch("/api/me", json={"seek_place": "Нови-Сад", "draft": True})
+            # The viewer's own place visibility boundary is preserved too.
+            with app.app_context():
+                db().execute("UPDATE users SET city = 'Белград' WHERE id = ?", (peers[7]["id"],))
+                db().commit()
+            self.assertEqual(self.client.get("/api/recommendations").get_json()["cards"], [])
 
     def _register(self, email="ada@example.com", **extra):
         name = extra.pop("name", "Ада")

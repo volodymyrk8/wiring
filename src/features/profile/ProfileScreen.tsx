@@ -277,6 +277,7 @@ export function ProfileScreen({ host }: Props) {
   const [serverError, setServerError] = useState("");
   const [jevError, setJevError] = useState("");
   const [jevBusy, setJevBusy] = useState(false);
+  const [recommendationsCode, setRecommendationsCode] = useState("");
   const [busy, setBusy] = useState(false);
   const signed = !user.guest;
   const [autosave] = useState(() => createDraftAutosave<Draft, { user: ProfileUser }>({
@@ -379,6 +380,21 @@ export function ProfileScreen({ host }: Props) {
     }
   };
 
+  const redeemRecommendations = async () => {
+    if (jevBusy || !recommendationsCode.trim()) return;
+    setJevBusy(true); setJevError("");
+    try {
+      const response = await host.api("/api/premium/redeem", {
+        method: "POST", body: JSON.stringify({ code: recommendationsCode.trim() }),
+      });
+      const nextUser = response.user as ProfileUser;
+      setUser(nextUser); host.onUserUpdated(nextUser); setRecommendationsCode("");
+      host.toast(nextUser.jev_feed_unlocked ? "Подбор открыт — включи вкладку «Для тебя»" : "Промокод активирован");
+    } catch (caught) {
+      setJevError(getErrorMessage(caught));
+    } finally { setJevBusy(false); }
+  };
+
   const setJevFeedEnabled = async (enabled: boolean) => {
     setJevError("");
     setJevBusy(true);
@@ -390,8 +406,8 @@ export function ProfileScreen({ host }: Props) {
       const nextUser = response.user as ProfileUser;
       setUser(nextUser);
       host.onUserUpdated(nextUser);
-      await host.refreshFeed?.();
-      host.toast(enabled ? "экспериментальная лента Jev включена" : "обычная лента включена");
+
+      host.toast(enabled ? "вкладка «Для тебя» включена" : "вкладка «Для тебя» выключена");
     } catch (caught) {
       setJevError(getErrorMessage(caught));
     } finally {
@@ -580,24 +596,28 @@ export function ProfileScreen({ host }: Props) {
               {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>Ещё {user.ref_days || 30} дней WIRING+ вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
             </section>
 
-            {user.jev_feed_beta ? (
-              <section class={styles.section}>
-                <div class={styles.sectionTitle}><h2>Экспериментальная лента</h2></div>
-                <Checkbox
+            <section class={styles.section}>
+                <div class={styles.sectionTitle}><h2>Для тебя</h2></div>
+                {user.jev_feed_unlocked ? <Checkbox
                   name="jev_feed_enabled"
                   checked={Boolean(user.jev_feed_enabled)}
                   disabled={jevBusy || (!user.jev_feed_available && !user.jev_feed_enabled)}
                   onChange={(enabled) => void setJevFeedEnabled(enabled)}
                 >
-                  Ранжировать анкеты с Jev
-                </Checkbox>
-                <p class={styles.experimentalHint}>
-                  Jev оценивает вероятность взаимного интереса, меняет порядок анкет и показывает процент на карточке. В TypeSafe уходят id всех ваших диагнозов и вайба, пересечения, город, возраст и цели — без имён, фото, bio и переписки. Процент и «почему» — эксперимент, не гарантия; лайки и мэтчи остаются за тобой.
+                  Включить вкладку «Для тебя»
+                </Checkbox> : <div role="group" aria-label="Активация рекомендаций" onKeyDown={(event) => {
+                  if (event.key === "Enter") { event.preventDefault(); void redeemRecommendations(); }
+                }}>
+                  <p class={styles.recommendationsHint}>Доступ открывается по промокоду. После активации можно включить подбор.</p>
+                  <Input name="recommendations_code" label="Промокод для рекомендаций" value={recommendationsCode} maxLength={24} autoComplete="off" onInput={(event) => setRecommendationsCode(event.currentTarget.value)} />
+                  <Button type="button" disabled={jevBusy || !recommendationsCode.trim()} loading={jevBusy} onClick={() => void redeemRecommendations()}>Активировать</Button>
+                </div>}
+                <p class={styles.recommendationsHint}>
+                  Подбираем анкеты со всего WIRING по вашим отметкам и целям, с учётом взаимных ограничений видимости. Jev ранжирует предварительный список; под каждой карточкой — конкретные совпадения. В TypeSafe передаются теги, их пересечения, совпадение города, диапазон разницы в возрасте и общие цели — без имён, ID аккаунтов, фото, свободных текстов и переписки. Совпадения не гарантируют взаимный интерес.
                 </p>
-                {!user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.experimentalHint}>Эксперимент заработает после настройки серверного ключа Jev.</p> : null}
+                {user.jev_feed_unlocked && !user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.recommendationsHint}>Подбор пока недоступен. Попробуй позже.</p> : null}
                 {jevError && <p class={styles.error} role="alert">{jevError}</p>}
               </section>
-            ) : null}
 
             {(serverError || errors.photos) && <div class={styles.serverError} role="alert">{serverError || errors.photos}</div>}
             <div class={styles.submitRow}>

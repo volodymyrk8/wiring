@@ -89,7 +89,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [reportDetails, setReportDetails] = useState("");
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
 
-  const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
+  const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "recommendations" ? "recommendations" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
   const go = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
     host.navigate(view, params);
@@ -110,7 +110,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       await host.api("/api/block", { method: "POST", body: JSON.stringify({ user_id: person.id }) });
       setConfirm(null);
       host.toast("в блоке");
-      host.navigate("deck");
+      host.navigate(backView);
     } else if (confirm === "unmatch") {
       await host.api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: person.id }) });
       setConfirm(null);
@@ -123,7 +123,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     await host.api("/api/report", { method: "POST", body: JSON.stringify({ user_id: person.id, reason: reportReason, details: reportDetails }) });
     setReportOpen(false);
     host.toast("жалоба отправлена, человек скрыт");
-    host.navigate("deck");
+    host.navigate(backView);
   });
   const onHeroClick = (event: JSX.TargetedMouseEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -184,7 +184,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
           {isSelf ? (
             <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
           ) : null}
-          {!isSelf && (host.personFrom === "deck" || host.personFrom === "likes") ? <>
+          {!isSelf && (host.personFrom === "deck" || host.personFrom === "recommendations" || host.personFrom === "likes") ? <>
             <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => setPassOpen(true)} aria-label="Скрыть — больше не показывать" title="Скрыть">{iconPass}</button>
             {host.user.plus ? <button type="button" class={`${styles.actionIcon} ${styles.snooze}`} disabled={busy} onClick={() => performSwipe("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconClock}</button> : null}
             <button type="button" class={`${styles.actionIcon} ${styles.like}`} disabled={busy} onClick={() => performSwipe("like")} aria-label="лайк" title="лайк">{iconLike}</button>

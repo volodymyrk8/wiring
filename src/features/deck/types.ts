@@ -16,6 +16,7 @@ export type DeckFilters = {
 
 export type DeckCard = {
   id: number;
+  recommendation_reasons?: string[];
   name?: string;
   age?: number | string;
   city?: string;
@@ -55,11 +56,13 @@ export type FeedPage = {
   liked?: number;
   likes_in?: number;
   unread?: number;
+  recommendation_source?: "api" | "local";
   jev_ranked?: boolean;
   jev_scores?: "api" | "local" | "none";
 };
 
 export type DeckHostBridge = {
+  recommendations?: boolean;
   user: ProfileUser;
   catalog: DeckCatalog;
   cards: DeckCard[];
@@ -74,6 +77,7 @@ export type DeckHostBridge = {
   loadFeed: (filters: DeckFilters, signal?: AbortSignal, skipIds?: number[]) => Promise<FeedPage>;
   resetFeed: (generation: number, signal?: AbortSignal) => Promise<{ reset: boolean; generation: number }>;
   onFeedChange: (cards: DeckCard[], index: number, filters: DeckFilters, hasMore: boolean, generation: number) => void;
+  onAction?: (targetId: number) => void;
   onMatch: (match: { id: number; name?: string }) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   toast: (message: string) => void;

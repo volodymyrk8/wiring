@@ -43,7 +43,8 @@ from catalog import (
 from cities import PLACES, catalog_city, country_of_city, is_catalog_city, normalize_city
 from devices import ensure_device_tables, track_device_visit, visitor_key_from_request
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
-from jev_ranker import jev_access, prepare_jev_feed
+from jev_ranker import jev_access
+from recommendations import select_recommendations
 from glossary import glossary_html
 from legal_pages import CHILD_SAFETY_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
@@ -89,7 +90,7 @@ DB_PATH = DATABASE_URL
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "uploads"))
 THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY") or secrets.token_hex(32)
-SITE_URL = os.environ.get("SITE_URL", "https://wiring.club").rstrip("/")
+SITE_URL = os.environ.get("SITE_URL", "https://wiring.date").rstrip("/")
 GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "G-WH72XL7E2J").strip()
 YANDEX_METRIKA_ID = os.environ.get("YANDEX_METRIKA_ID", "").strip()
 
@@ -482,6 +483,7 @@ def init_db() -> None:
         "hide_tags": "TEXT NOT NULL DEFAULT ''",
         "deleted_at": "INTEGER",
         "jev_feed_enabled": "INTEGER NOT NULL DEFAULT 0",
+        "jev_recommendations_unlocked": "INTEGER NOT NULL DEFAULT 0",
     }.items():
         _ensure_column(conn, "users", name, ddl)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_users_deleted ON users(deleted_at)")
@@ -801,9 +803,10 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         payload["paused"] = bool(int(row["paused"] or 0)) if "paused" in keys else False
         payload["notify_enabled"] = bool(int(row["notify_enabled"] if "notify_enabled" in keys else 1))
         payload["notify_push"] = bool(int(row["notify_push"] if "notify_push" in keys else 1))
-        jev_allowed, jev_configured = jev_access(int(row["id"]))
+        jev_allowed, jev_configured = jev_access(row)
         jev_allowed = bool(jev_allowed and not payload["guest"] and not int(row["is_seed"] or 0))
-        payload["jev_feed_beta"] = jev_allowed
+        payload["jev_feed_unlocked"] = jev_allowed
+        payload["jev_feed_beta"] = jev_allowed  # Compatibility for existing clients.
         payload["jev_feed_available"] = bool(jev_allowed and jev_configured)
         payload["jev_feed_enabled"] = bool(jev_allowed and int(row["jev_feed_enabled"] or 0)) if "jev_feed_enabled" in keys else False
         code = str(row["referral_code"] or "") if "referral_code" in keys else ""
@@ -1479,6 +1482,7 @@ def index():
 @app.get("/reset")
 @app.get("/verify")
 @app.get("/feed")
+@app.get("/for-you")
 @app.get("/likes")
 @app.get("/chats")
 @app.get("/chats/<int:chat_id>")
@@ -1519,15 +1523,17 @@ def api_me():
 @real_account_required
 def api_jev_feed_setting():
     uid = int(session["uid"])
-    allowed, configured = jev_access(uid)
+    user = db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    allowed, configured = jev_access(user)
+    allowed = bool(allowed and not int(user["is_seed"] or 0))
     if not allowed:
-        return jsonify({"ok": False, "error": "эксперимент недоступен"}), 404
+        return jsonify({"ok": False, "error": "сначала активируй промокод для рекомендаций"}), 404
     data = request.get_json(silent=True) or {}
     if not isinstance(data.get("enabled"), bool):
         return jsonify({"ok": False, "error": "укажи состояние переключателя"}), 400
     enabled = data["enabled"]
     if enabled and not configured:
-        return jsonify({"ok": False, "error": "эксперимент пока не настроен"}), 503
+        return jsonify({"ok": False, "error": "подбор пока недоступен"}), 503
     db().execute("UPDATE users SET jev_feed_enabled = ? WHERE id = ?", (int(enabled), uid))
     db().commit()
     return jsonify({"ok": True, "user": current_user()})
@@ -2090,6 +2096,36 @@ def _eligible_card(
     return card
 
 
+@app.get("/api/recommendations")
+@login_required
+@real_account_required
+def api_recommendations():
+    conn = db()
+    me = conn.execute("SELECT * FROM users WHERE id = ?", (session["uid"],)).fetchone()
+    allowed, _ = jev_access(me)
+    if not allowed or int(me["is_seed"] or 0) or not int(me["jev_feed_enabled"] or 0):
+        return jsonify({"ok": False, "error": "активируй промокод и включи подбор в профиле"}), 403
+    tags = tags_for(int(me["id"]))
+    viewer = {"id": int(me["id"]), "age": me["age"], "city": me["city"],
+              "intents": intents_of(me), "neuro": tags["neuro"], "vibe": tags["vibe"]}
+    blocked = blocked_ids(conn, me["id"])
+    hidden = snoozed_ids(conn, me["id"]) if is_premium(me) else set()
+    liked_me = {int(row["from_id"]) for row in conn.execute(
+        "SELECT from_id FROM swipes WHERE to_id = ? AND direction = 'like'", (me["id"],))}
+
+    def eligible(row):
+        # Both owners' visibility restrictions apply even in worldwide discovery.
+        if not discovery_allows(me, row):
+            return None
+        return _eligible_card(me, row, [], [], blocked, snoozed=hidden, liked_me=liked_me)
+
+    cards, source = select_recommendations(conn, viewer, eligible)
+    response = jsonify({"ok": True, "cards": cards, "has_more": False,
+                        "generation": 0, "recommendation_source": source})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.get("/api/feed")
 @login_required
 def api_feed():
@@ -2155,27 +2191,6 @@ def api_feed():
         city=city_q, gender=gender_q, limit=limit, eligible=eligible,
         skip_ids=skip_ids, include_delivered=narrowed, match_none=unknown_city,
     )
-    jev_ranked = False
-    jev_scores = "none"
-    jev_allowed, jev_configured = jev_access(int(me["id"]))
-    if (
-        jev_allowed
-        and not is_guest_email(str(me["email"]))
-        and not int(me["is_seed"] or 0)
-        and int(me["jev_feed_enabled"] or 0)
-        and cards
-    ):
-        viewer_tags = tags_for(int(me["id"]))
-        viewer_for_jev = {
-            "id": int(me["id"]),
-            "age": me["age"],
-            "city": me["city"],
-            "intent": me["intent"] if "intent" in set(me.keys()) else "dating",
-            "intents": intents_of(me),
-            "neuro": viewer_tags["neuro"],
-            "vibe": viewer_tags["vibe"],
-        }
-        cards, jev_ranked, jev_scores = prepare_jev_feed(viewer_for_jev, cards)
     liked = db().execute(
         "SELECT COUNT(*) AS n FROM swipes WHERE from_id = ? AND direction = 'like'",
         (me["id"],),
@@ -2192,8 +2207,8 @@ def api_feed():
             "has_more": has_more,
             "generation": generation,
             "recycled": False,
-            "jev_ranked": jev_ranked,
-            "jev_scores": jev_scores,
+            "jev_ranked": False,
+            "jev_scores": "none",
             "unseen": len(cards),
             "passed": int(passed_n),
             "liked": int(liked),

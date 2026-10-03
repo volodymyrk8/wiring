@@ -70,3 +70,8 @@ assert.equal(planRoute({ view: "support" }, member, "/support").kind, "show");
 assert.equal(planRoute({ view: "support" }, guest, "/support").kind, "show");
 
 console.log("router.test.mjs ok");
+
+assert.equal(hrefFor(BASE, "recommendations"), "/for-you");
+assert.deepEqual(matchRoute("/for-you", BASE), { view: "recommendations" });
+assert.equal(planRoute({ view: "recommendations" }, guest, "/for-you").kind, "login");
+assert.equal(planRoute({ view: "recommendations" }, member, "/for-you").kind, "show");

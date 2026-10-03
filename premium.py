@@ -6,12 +6,13 @@ import os
 import secrets
 import time
 
-from database import Connection, IntegrityError
+from database import Connection, IntegrityError, ensure_column
 from typing import Any
 
 DAY = 24 * 60 * 60
 SNOOZE_DAYS = 7
 DEFAULT_CODE = "WIRINGPLUS"
+RECOMMENDATIONS_CODE = "WIRINGFORYOU"
 DEFAULT_DAYS = 90
 REFERRAL_DAYS = 30
 BETA_PLUS_GIFT_DAYS = 90
@@ -54,12 +55,17 @@ def grant_premium(conn: Connection, uid: int, days: int) -> int:
 
 
 def ensure_default_code(conn: Connection) -> None:
-    if conn.execute("SELECT 1 FROM promo_codes LIMIT 1").fetchone():
-        return
-    conn.execute(
-        "INSERT INTO promo_codes (code, days, max_uses, uses) VALUES (?, ?, 0, 0)",
-        (DEFAULT_CODE, DEFAULT_DAYS),
-    )
+    ensure_column(conn, "promo_codes", "benefit", "TEXT NOT NULL DEFAULT 'plus'")
+    if not conn.execute("SELECT 1 FROM promo_codes LIMIT 1").fetchone():
+        conn.execute(
+            "INSERT INTO promo_codes (code, days, max_uses, uses) VALUES (?, ?, 0, 0)",
+            (DEFAULT_CODE, DEFAULT_DAYS),
+        )
+    # A distinct entitlement: neither WIRING+ nor opt-in is granted by this code.
+    conn.execute("""
+        INSERT INTO promo_codes (code, days, max_uses, uses, benefit)
+        VALUES (?, 0, 0, 0, 'recommendations') ON CONFLICT (code) DO NOTHING
+    """, (RECOMMENDATIONS_CODE,))
 
 
 def ensure_app_migrations(conn: Connection) -> None:
@@ -161,8 +167,8 @@ def ensure_beta_plus_three_months(conn: Connection) -> int:
 
 def list_codes(conn: Connection) -> list[dict[str, Any]]:
     return [
-        {"code": row["code"], "days": row["days"], "max_uses": row["max_uses"], "uses": row["uses"]}
-        for row in conn.execute("SELECT code, days, max_uses, uses FROM promo_codes ORDER BY code")
+        {"code": row["code"], "days": row["days"], "max_uses": row["max_uses"], "uses": row["uses"], "benefit": row["benefit"]}
+        for row in conn.execute("SELECT code, days, max_uses, uses, benefit FROM promo_codes ORDER BY code")
     ]
 
 
@@ -244,14 +250,23 @@ def redeem_code(conn: Connection, uid: int, raw: str) -> tuple[int | None, str |
     code = "".join(ch for ch in (raw or "").upper() if ch.isalnum() or ch in "-_")
     if not code:
         return None, "нужен код"
-    row = conn.execute("SELECT * FROM promo_codes WHERE code = ?", (code,)).fetchone()
+    row = conn.execute("SELECT * FROM promo_codes WHERE code = ? FOR UPDATE", (code,)).fetchone()
     if not row:
         return None, "нет такого кода"
     if row["max_uses"] and int(row["uses"]) >= int(row["max_uses"]):
         return None, "код уже израсходован"
     if conn.execute("SELECT 1 FROM promo_redemptions WHERE code = ? AND user_id = ?", (code, uid)).fetchone():
         return None, "этот код ты уже вводил(а)"
-    until = grant_premium(conn, uid, int(row["days"]))
+    if row["benefit"] == "recommendations":
+        user = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
+        if not user or int(user["is_seed"] or 0) or user["deleted_at"]:
+            return None, "промокод доступен только реальным аккаунтам"
+        conn.execute("UPDATE users SET jev_recommendations_unlocked = 1 WHERE id = ?", (uid,))
+        until = plus_until(user)
+    elif row["benefit"] == "plus":
+        until = grant_premium(conn, uid, int(row["days"]))
+    else:
+        return None, "этот промокод пока недоступен"
     conn.execute("UPDATE promo_codes SET uses = uses + 1 WHERE code = ?", (code,))
     conn.execute(
         "INSERT INTO promo_redemptions (code, user_id, created_at) VALUES (?, ?, ?)",

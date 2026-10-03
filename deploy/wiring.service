@@ -9,7 +9,7 @@ WorkingDirectory=/root/repos/dating
 Environment=HOST=127.0.0.1
 Environment=PORT=5070
 Environment=BASE_PATH=
-Environment=SITE_URL=https://wiring.club
+Environment=SITE_URL=https://wiring.date
 # PostgreSQL connection string must be defined in /etc/wiring.env:
 # DATABASE_URL=postgresql://wiring_app:PASSWORD@127.0.0.1:5432/wiring
 Environment=UPLOAD_DIR=/var/lib/wiring/uploads

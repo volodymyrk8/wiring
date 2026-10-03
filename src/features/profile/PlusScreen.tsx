@@ -67,9 +67,11 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
         method: "POST",
         body: JSON.stringify({ code: cleanCode }),
       });
-      updateUser(response.user as ProfileUser);
+      const nextUser = response.user as ProfileUser;
+      const recommendationsGranted = !user.jev_feed_unlocked && nextUser.jev_feed_unlocked;
+      updateUser(nextUser);
       setCode("");
-      host.toast("WIRING+ подключён");
+      host.toast(recommendationsGranted ? "Подбор открыт — включи «Для тебя» в профиле" : "WIRING+ подключён");
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -158,17 +160,15 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
               </div>
             </>
           ) : (
-            <>
-              <p class={styles.hint}>Спокойный режим: кто лайкнул, инкогнито, пауза, заметки и отложенные профили.</p>
-              <form class={styles.codeForm} onSubmit={redeem}>
-                <label class={styles.codeField}>
-                  промокод
-                  <input value={code} maxlength={24} placeholder="если есть код" autocomplete="off" onInput={(event) => setCode(event.currentTarget.value)} />
-                </label>
-                <Button type="submit" slim disabled={redeeming} loading={redeeming}>активировать</Button>
-              </form>
-            </>
+            <p class={styles.hint}>Спокойный режим: кто лайкнул, инкогнито, пауза, заметки и отложенные профили.</p>
           )}
+          <form class={styles.codeForm} onSubmit={redeem}>
+            <label class={styles.codeField}>
+              промокод
+              <input value={code} maxlength={24} placeholder="если есть код" autocomplete="off" onInput={(event) => setCode(event.currentTarget.value)} />
+            </label>
+            <Button type="submit" slim disabled={redeeming} loading={redeeming}>активировать</Button>
+          </form>
           {error && <p class={styles.error} role="alert">{error}</p>}
         </section>
 
