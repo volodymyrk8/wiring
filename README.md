@@ -4,7 +4,7 @@ WIRING — работающий сервис знакомств для нейр�
 
 Сайт доступен в продакшене. Продукт развивается по полукоммерческой модели: в нём есть базовые возможности и платные функции WIRING+. В этом открытом репозитории находятся исходный код и документация для разработки.
 
-[Сайт](https://wiring.date/) · [Репозиторий](https://github.com/volodymyrk8/wiring) · [Архитектура](docs/architecture.md) · [Правила для coding agents](AGENTS.md)
+[Сайт](https://wiring.club/) · [Репозиторий](https://github.com/volodymyrk8/wiring) · [Архитектура](docs/architecture.md) · [Правила для coding agents](AGENTS.md)
 
 ## Что есть в продукте
 
@@ -185,4 +185,4 @@ Production работает только с PostgreSQL. Серверные на�
 - [Telegram triage](docs/telegram-triage.md) — очередь черновиков задач.
 - [AGENTS.md](AGENTS.md) — обязательные правила изменения проекта.
 
-Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. Страница серверная (`legal_pages.py`, `templates/legal.html`), ссылка есть в юридическом подвале и sitemap. Для iOS и Android остаётся follow-up: добавить в юридический раздел или поддержку ссылку «Защита детей» на тот же адрес; новый API не нужен.
+Публичные [стандарты защиты детей](https://wiring.club/child-safety) доступны без входа и JavaScript по `/child-safety`. Страница серверная (`legal_pages.py`, `templates/legal.html`), ссылка есть в юридическом подвале и sitemap. Для iOS и Android остаётся follow-up: добавить в юридический раздел или поддержку ссылку «Защита детей» на тот же адрес; новый API не нужен.

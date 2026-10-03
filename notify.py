@@ -148,14 +148,14 @@ def notify_event(
     if kind == "like":
         body = f"{from_name} лайкнул(а) тебя"
         subject = "Тебя лайкнули на WIRING"
-        mail = f"{from_name} лайкнул(а) твою анкету. Открыть: https://wiring.date/"
+        mail = f"{from_name} лайкнул(а) твою анкету. Открыть: https://wiring.club/"
     elif kind == "message":
         snippet = " ".join((preview or "").split())
         if len(snippet) > 80:
             snippet = snippet[:79] + "…"
         body = f"{from_name}: {snippet}" if snippet else f"{from_name} написал(а)"
         subject = "Новое сообщение на WIRING"
-        mail = f"{from_name} написал(а) тебе. Открыть чат: https://wiring.date/"
+        mail = f"{from_name} написал(а) тебе. Открыть чат: https://wiring.club/"
         existing = conn.execute(
             "SELECT id FROM notifications WHERE user_id = ? AND kind = 'message' AND from_id = ? AND read = 0",
             (user_id, from_id),
@@ -177,7 +177,7 @@ def notify_event(
     else:
         body = f"взаимно с {from_name}"
         subject = "Мэтч на WIRING"
-        mail = f"Взаимно с {from_name}. Можно писать: https://wiring.date/"
+        mail = f"Взаимно с {from_name}. Можно писать: https://wiring.club/"
     add_notice(conn, user_id, kind, from_id, body)
     send_user_push(
         conn,
