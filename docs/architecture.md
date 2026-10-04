@@ -143,4 +143,10 @@ Mobile follow-up: profile promo redemption and opt-in, conditional «Для те
 
 `/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
 
-Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety`. Текст для всех клиентов один; новый `/api/*` не нужен. В текущем рабочем дереве `mobile/` отсутствует.
+Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety` и ссылку «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. Экран удаления по-прежнему вызывает `POST /api/me/delete` с паролем. В текущем рабочем дереве `mobile/` отсутствует.
+
+## Удаление аккаунта
+
+`/account-deletion` — серверная инструкция: шаги в профиле, немедленное скрытие анкеты, 7 суток на вход с тем же паролем, что убирается после этого и какая запись аккаунта остаётся. GET/HEAD без входа и JavaScript. Ссылка есть в юридическом подвале и sitemap.
+
+`/delete-account` остаётся SPA-экраном подтверждения. `POST /api/me/delete` ставит `users.deleted_at` и завершает сессию. Вход в течение `ACCOUNT_DELETE_GRACE` (7 суток) снимает пометку. `purge_user_aux_data` удаляет фото, переписку, свайпы и прочие вспомогательные записи, но не строку `users`. Этот вызов сейчас идёт из `_purge_old_guests` при `POST /api/demo`, не из отдельного таймера. Unmatch, block и report по-прежнему только скрывают сообщения через `messages.deleted_at`.

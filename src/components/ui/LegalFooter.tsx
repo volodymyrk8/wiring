@@ -25,6 +25,9 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
       <a class={styles.link} href="/child-safety" draggable={false}>
         Защита детей
       </a>
+      <a class={styles.link} href="/account-deletion" draggable={false}>
+        Удаление аккаунта и данных
+      </a>
       <a
         class={styles.link}
         href="/support"

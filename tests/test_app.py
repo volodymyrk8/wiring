@@ -659,6 +659,32 @@ class WiringTest(unittest.TestCase):
         # The existing account-deletion confirmation remains a SPA document.
         self.assertIn(b'id="app"', self.client.get("/delete-account").data)
 
+    def test_account_deletion_public_document(self):
+        response = self.client.get("/account-deletion")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.content_type.startswith("text/html"))
+        text = response.get_data(as_text=True)
+        for expected in (
+            "WIRING",
+            "Профиль",
+            "Удалить аккаунт",
+            "пароль",
+            "7 суток",
+            "support@wiring.date",
+            "анкета",
+        ):
+            self.assertIn(expected, text.lower() if expected == "анкета" else text)
+        self.assertIn("Анкета скрывается сразу", text)
+        self.assertIn('rel="canonical" href="https://wiring.date/account-deletion"', text)
+        self.assertIn('href="/account-deletion" aria-current="page"', text)
+        self.assertNotIn('id="app"', text)
+        self.assertEqual(self.client.head("/account-deletion").status_code, 200)
+        self.assertIn(b"/account-deletion", self.client.get("/sitemap.xml").data)
+        privacy = self.client.get("/privacy").get_data(as_text=True)
+        self.assertIn('href="/account-deletion"', privacy)
+        self.assertIn("срок её стирания не назначен", privacy)
+        self.assertIn(b'id="app"', self.client.get("/delete-account").data)
+
     def test_recommendation_promo_cannot_be_forged_and_concurrent_redemption_counts_once(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier

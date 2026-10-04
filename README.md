@@ -191,4 +191,4 @@ Production работает только с PostgreSQL. Серверные на�
 - [Telegram triage](docs/telegram-triage.md) — очередь черновиков задач.
 - [AGENTS.md](AGENTS.md) — обязательные правила изменения проекта.
 
-Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. Страница серверная (`legal_pages.py`, `templates/legal.html`), ссылка есть в юридическом подвале и sitemap. Для iOS и Android остаётся follow-up: добавить в юридический раздел или поддержку ссылку «Защита детей» на тот же адрес; новый API не нужен.
+Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. [Удаление аккаунта и данных](https://wiring.date/account-deletion) — такая же серверная страница. Обе собраны в `legal_pages.py` и `templates/legal.html`, ссылки есть в юридическом подвале и sitemap. `/delete-account` по-прежнему открывает экран подтверждения в приложении. Для iOS и Android остаётся follow-up: в юридический раздел или поддержку добавить «Защита детей» и «Удаление аккаунта и данных» на те же адреса; новый API не нужен.
