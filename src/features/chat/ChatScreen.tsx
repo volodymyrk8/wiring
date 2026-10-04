@@ -326,48 +326,89 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
   );
 }
 
+let activeVoice: HTMLAudioElement | null = null;
+
 function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const doneRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
   const [time, setTime] = useState(0);
   const total = Math.max(0, duration || 0);
+  const playSrc = `${src}${src.includes("?") ? "&" : "?"}play=1`;
+
+  const release = (element: HTMLAudioElement) => {
+    element.pause();
+    element.removeAttribute("src");
+    element.load();
+    if (activeVoice === element) activeVoice = null;
+    setPlaying(false);
+    setTime(0);
+  };
 
   useEffect(() => {
     const element = audioRef.current;
     if (!element) return;
-    const onTime = () => setTime(element.currentTime || 0);
-    const onEnd = () => { setPlaying(false); setTime(0); };
-    const onPause = () => setPlaying(false);
-    const onPlay = () => setPlaying(true);
-    const onError = () => setFailed(true);
-    element.addEventListener("timeupdate", onTime);
-    element.addEventListener("ended", onEnd);
-    element.addEventListener("pause", onPause);
-    element.addEventListener("play", onPlay);
-    element.addEventListener("error", onError);
-    return () => {
-      element.pause();
-      element.removeEventListener("timeupdate", onTime);
-      element.removeEventListener("ended", onEnd);
-      element.removeEventListener("pause", onPause);
-      element.removeEventListener("play", onPlay);
-      element.removeEventListener("error", onError);
+    const finish = () => {
+      if (doneRef.current) return;
+      doneRef.current = true;
+      release(element);
     };
-  }, [src]);
+    const onTime = () => {
+      if (doneRef.current) return;
+      const now = element.currentTime || 0;
+      if (element.paused) {
+        setPlaying(false);
+        return;
+      }
+      setTime(now);
+      if (Number.isFinite(element.duration) && element.duration > 0 && now >= element.duration - 0.15) finish();
+    };
+    const onPause = () => {
+      if (doneRef.current) return;
+      const atEnd = Number.isFinite(element.duration) && element.duration > 0 && element.currentTime >= element.duration - 0.2;
+      if (atEnd) finish();
+      else setPlaying(false);
+    };
+    element.addEventListener("timeupdate", onTime);
+    element.addEventListener("ended", finish);
+    element.addEventListener("pause", onPause);
+    element.addEventListener("play", () => { if (!doneRef.current) setPlaying(true); });
+    element.addEventListener("error", () => { if (!doneRef.current) { setFailed(true); setPlaying(false); } });
+    return () => {
+      doneRef.current = true;
+      element.pause();
+      element.removeAttribute("src");
+      if (activeVoice === element) activeVoice = null;
+    };
+  }, [playSrc]);
 
   const toggle = () => {
     const element = audioRef.current;
     if (!element) return;
-    if (element.paused) void element.play().catch(() => { setPlaying(false); setFailed(true); });
-    else element.pause();
+    if (playing && !element.paused) {
+      element.pause();
+      return;
+    }
+    doneRef.current = false;
+    if (activeVoice && activeVoice !== element) {
+      activeVoice.pause();
+      activeVoice.removeAttribute("src");
+      activeVoice.load();
+      activeVoice = null;
+    }
+    setFailed(false);
+    setTime(0);
+    element.src = playSrc;
+    activeVoice = element;
+    void element.play().catch(() => { setPlaying(false); setFailed(true); });
   };
 
   const shown = playing || time > 0 ? time : total;
   const progress = total > 0 && (playing || time > 0) ? Math.min(100, (time / total) * 100) : 0;
   return (
     <div class="voice-note">
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} preload="none" />
       <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? "пауза" : "слушать"}>{playing ? "❚❚" : "▶"}</button>
       <span class="voice-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
       <span class="voice-duration">{failed ? "не открывается" : clock(shown)}</span>
@@ -692,7 +733,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
           host.toast(errorMessage(caught, "не удалось отправить голосовое"));
         }).finally(() => setSending(false));
       };
-      recorder.start(250);
+      recorder.start();
       recTimerRef.current = window.setInterval(() => {
         const elapsed = Math.round((Date.now() - started) / 1000);
         setRecSeconds(elapsed);

@@ -3003,6 +3003,46 @@ def api_send_photo_message():
     return jsonify({"ok": True, "id": msg_id})
 
 
+def _listen_audio(rel: str) -> tuple[str, str]:
+    """AAC with the index at the front, so a phone can play the note and reach the end."""
+    import subprocess
+
+    source = _safe_media_path(UPLOAD_DIR, rel)
+    cache_rel = f"{rel}.listen.m4a"
+    cache = f"{source}.listen.m4a"
+    if os.path.isfile(cache) and os.path.getsize(cache) > 32 and os.path.getmtime(cache) >= os.path.getmtime(source):
+        return cache_rel, "audio/mp4"
+    tmp = f"{cache}.{os.getpid()}.tmp"
+    proc = None
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-i", source, "-vn", "-ac", "1", "-ar", "44100", "-c:a", "aac", "-b:a", "64k", "-movflags", "+faststart", tmp],
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        proc = None
+    if proc is not None and proc.returncode == 0 and os.path.isfile(tmp) and os.path.getsize(tmp) > 32:
+        os.replace(tmp, cache)
+        return cache_rel, "audio/mp4"
+    if os.path.isfile(tmp):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    mime = {
+        ".webm": "audio/webm",
+        ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".aac": "audio/aac",
+    }.get(os.path.splitext(rel)[1].lower(), "application/octet-stream")
+    return rel, mime
+
+
 @app.get("/api/messages/media/<int:message_id>")
 @login_required
 def api_message_media(message_id: int):
@@ -3035,7 +3075,10 @@ def api_message_media(message_id: int):
         ".wav": "audio/wav",
         ".aac": "audio/aac",
     }
-    mime = audio_types.get(os.path.splitext(rel)[1].lower()) if audio else None
+    if audio:
+        rel, mime = _listen_audio(rel)
+    else:
+        mime = None
     response = send_from_directory(UPLOAD_DIR, rel, conditional=True, **({"mimetype": mime} if mime else {}))
     response.headers["Cache-Control"] = "private, max-age=86400"
     response.headers["Accept-Ranges"] = "bytes"
