@@ -15,7 +15,7 @@ WIRING — работающий сервис знакомств для нейр�
 - **Уведомления:** настройки в профиле, уведомления внутри сайта и добровольные Web Push.
 - **WIRING+:** премиум-функции, включая повторный показ доступных анкет после исчерпания ленты. Лайки, блокировки и постоянные исключения сохраняются.
 
-Сайт, iOS и Android — один продукт с общим `/api/*`. Код приложений находится в `mobile/` на ветках `mobile/ios` и `mobile/android`; в текущей ветке `main` этой папки нет. Контракт мобильной авторизации, версий и push описан в [docs/mobile-api.md](docs/mobile-api.md).
+Сайт, iOS и Android — один продукт с общим `/api/*`. Код iOS и Android находится в отдельном общем репозитории [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile), в ветке `main`. Этот репозиторий содержит сайт и backend; старые ветки `mobile/ios` и `mobile/android` сохранены как история. Контракт мобильной авторизации, версий и push описан в [docs/mobile-api.md](docs/mobile-api.md).
 
 ## Стек
 
@@ -160,7 +160,7 @@ DATABASE_URL=postgresql://wiring_dev:wiring_dev@127.0.0.1:5433/wiring_test pytho
 
 Настройки: `JEV_API_KEY`, `JEV_MODEL` (по умолчанию `jev-latest`). Для первого включения нужен настроенный ключ; после включения временная недоступность сервиса допускает резервный подбор. Ключ остаётся на сервере. Jev получает структурированные теги пары, их пересечения, совпадение города, диапазон разницы в возрасте и общие цели; имена, ID аккаунтов, фотографии, свободные тексты и сообщения не отправляются.
 
-Мобильный follow-up (в этом дереве `mobile/` нет): на iOS и Android добавить в профиль всех реальных аккаунтов раздел «Для тебя», поле активации промокода и переключатель после активации; в основную навигацию — «Для тебя», под карточками — «Почему может подойти» с серверными причинами. Общего `/api/me`, `POST /api/premium/redeem`, `POST /api/me/jev-feed`, `GET /api/recommendations` и `/api/swipe` хватает; детали в `docs/mobile-api.md`.
+Мобильный follow-up (в отдельном `wiring-mobile`): на iOS и Android добавить в профиль всех реальных аккаунтов раздел «Для тебя», поле активации промокода и переключатель после активации; в основную навигацию — «Для тебя», под карточками — «Почему может подойти» с серверными причинами. Общего `/api/me`, `POST /api/premium/redeem`, `POST /api/me/jev-feed`, `GET /api/recommendations` и `/api/swipe` хватает; детали в `docs/mobile-api.md`.
 
 ### Очередь из Telegram
 
@@ -196,3 +196,7 @@ Production работает только с PostgreSQL. Серверные на�
 ### Вход через Google и Яндекс
 
 На входе и регистрации доступны OAuth-кнопки после настройки `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` и корректного `SITE_URL`. WIRING использует имя и адрес почты для создания аккаунта и входа. Настройка callback URL, безопасное связывание аккаунтов и мобильный follow-up: [docs/social-login.md](docs/social-login.md).
+
+## Нативное соответствие сайту
+
+Общие React Native экраны iOS/Android находятся в [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile); матрица страниц и статус проверки — `docs/web-parity.md` этого репозитория. Сервер поддерживает одноразовый PKCE OAuth handoff, выдачу native tokens при подтверждении почты и bearer на форме поддержки. Веб-аккаунты и PostgreSQL остаются общими. Подробности — [mobile-api.md](docs/mobile-api.md) и [social-login.md](docs/social-login.md).

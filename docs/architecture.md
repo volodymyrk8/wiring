@@ -4,9 +4,9 @@
 
 ## Сайт и приложения — один продукт
 
-iOS и Android — это тот же WIRING, что и сайт. Код приложений лежит в `mobile/` на ветках `mobile/ios` и `mobile/android`.
+iOS и Android — это тот же WIRING, что и сайт. Общий код приложений находится в [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile), ветка `main`; этот репозиторий содержит сайт и backend. Старые ветки `mobile/ios` и `mobile/android` сохранены как история.
 
-Изменение сайта, которое видно человеку (экран, текст, навигация, лента, чат, уведомления, тема), в той же задаче включает минимальный план для приложений: какой экран, какой текст, хватает ли текущего `/api/*`. Если `mobile/` есть в рабочем дереве, правка делается там же. Отдельный API «только для приложения» не заводится, пока сайт обходится общим контрактом. См. `docs/mobile-api.md`.
+Изменение сайта, которое видно человеку (экран, текст, навигация, лента, чат, уведомления, тема), в той же задаче включает минимальный план для приложений: какой экран, какой текст, хватает ли текущего `/api/*`. Если checkout `wiring-mobile` доступен в задаче, правка делается там; иначе фиксируется конкретный follow-up в этом репозитории. Отдельный API «только для приложения» не заводится, пока сайт обходится общим контрактом. См. `docs/mobile-api.md`.
 
 Темы одни на всех клиентах: `pastel` (утро), `mist` (день), `dusk` (сумерки), `night` (ночь), `slate` (полночь). Имена и id — `THEME_LIST` в `src/components/ui/AppHeader.tsx`, цвета шапки браузера — `src/lib/theme.ts`, токены — `public/styles.css` (`html[data-theme]`). Новая, переименованная или перекрашенная тема на сайте появляется в приложениях с теми же id, названиями и палитрой. Свой набор «светлая/тёмная» у приложений не держим.
 
@@ -137,13 +137,13 @@ Browsing recommendations makes no delivery/view history writes. Like and confirm
 
 `promo_codes.benefit` defaults to `plus` for existing codes. The dedicated code has benefit `recommendations`, zero premium days and no total use limit; it creates a normal `promo_redemptions` record and unlocks only recommendations. Redemption locks the code row, serializing duplicate submissions and use limits. Existing premium codes still grant only WIRING+. `GET /api/me` returns `jev_feed_unlocked`; legacy `jev_feed_beta` is an alias for compatibility. The code does not itself turn on the opt-in (an existing saved opt-in is preserved).
 
-Mobile follow-up: profile promo redemption and opt-in, conditional «Для тебя» navigation, cards with «Почему может подойти» summaries, fallback copy and the same explicit like/hide actions on both iOS and Android. `mobile/` is absent here; use the shared endpoints documented in `mobile-api.md`.
+Mobile follow-up: profile promo redemption and opt-in, conditional «Для тебя» navigation, cards with «Почему может подойти» summaries, fallback copy and the same explicit like/hide actions on both iOS and Android. The shared app lives in `wiring-mobile`; use the endpoints documented in `mobile-api.md`.
 
 ## Публичные стандарты защиты детей
 
 `/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
 
-Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety` и ссылку «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. Экран удаления по-прежнему вызывает `POST /api/me/delete` с паролем. В текущем рабочем дереве `mobile/` отсутствует.
+Мобильный follow-up: в `wiring-mobile` для iOS и Android добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety` и ссылку «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. Экран удаления по-прежнему вызывает `POST /api/me/delete` с паролем. Общий код приложений находится в `wiring-mobile`.
 
 ## Удаление аккаунта
 
@@ -154,3 +154,9 @@ Mobile follow-up: profile promo redemption and opt-in, conditional «Для те
 ## OAuth-вход
 
 `social_auth.py` владеет серверным Google/Яндекс Authorization Code flow с PKCE и одноразовыми browser-bound state в PostgreSQL (`oauth_flows`), привязками по provider subject (`oauth_identities`) и маршрутом callback. `app.py` предоставляет общий helper создания аккаунта с бонусами/приглашениями, cookie-сессию и удаляет OAuth-привязки при окончательной очистке. `src/features/auth/` получает доступных провайдеров через shared API/host bridge и показывает кнопки. Новые SPA-пути не вводятся. Настройка и мобильный follow-up описаны в `docs/social-login.md` и `docs/mobile-api.md`.
+
+## Общие нативные экраны
+
+`wiring-mobile` реализует React Native страницы сайта и те же пять CSS-палитр. Конкретная матрица и неподтверждённая device/visual проверка описаны в его `docs/web-parity.md`. Прежние мобильные follow-up в разделах выше теперь сопоставляются с этой матрицей.
+
+`social_auth.py` расширяет общий OAuth flow полями native challenge/state в `oauth_flows` и таблицей одноразовых хешированных результатов `oauth_native_codes` (TTL 60 с). `mobile_api.py` экспортирует issuer native-сессии через `app.extensions`, поэтому OAuth и email verify используют тот же refresh family/password fingerprint. Все данные остаются в существующей PostgreSQL; cookie-вход сайта сохраняется. Bearer также разрешён на общей форме `/support`. Ассоциации HTTP-ссылок — два публичных well-known JSON маршрута Flask, не новые SPA-страницы.
