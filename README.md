@@ -4,7 +4,7 @@ WIRING — работающий сервис знакомств для нейр�
 
 Сайт доступен в продакшене. Продукт развивается по полукоммерческой модели: в нём есть базовые возможности и платные функции WIRING+. В этом открытом репозитории находятся исходный код и документация для разработки.
 
-[Сайт](https://wiring.date/) · [Репозиторий](https://github.com/volodymyrk8/wiring) · [Архитектура](docs/architecture.md) · [Правила для coding agents](AGENTS.md)
+[Сайт](https://wiring.club/) · [Репозиторий](https://github.com/volodymyrk8/wiring) · [Архитектура](docs/architecture.md) · [Правила для coding agents](AGENTS.md)
 
 ## Что есть в продукте
 

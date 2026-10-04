@@ -87,8 +87,10 @@ fi
 
 install -m 644 "\$REMOTE_DIR/deploy/wiring.service" /etc/systemd/system/\$SERVICE_NAME
 install -m 644 "\$REMOTE_DIR/deploy/nginx-dating.conf" /etc/nginx/snippets/dating.conf
+install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.conf" /etc/nginx/sites-available/wiring.conf
+ln -sfn /etc/nginx/sites-available/wiring.conf /etc/nginx/sites-enabled/wiring.conf
 install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.date.conf" /etc/nginx/sites-available/wiring.date.conf
-ln -sfn /etc/nginx/sites-available/wiring.date.conf /etc/nginx/sites-enabled/wiring.date.conf
+rm -f /etc/nginx/sites-enabled/wiring.date.conf
 systemctl daemon-reload
 systemctl enable "\$SERVICE_NAME"
 systemctl restart "\$SERVICE_NAME"
@@ -136,6 +138,13 @@ systemctl --no-pager --full status "\$SERVICE_NAME" | head -20
 EOF
 
 echo "== Public check =="
-curl -sI "https://wiring.date/" | head -15
+date_headers="$(curl -sI "https://wiring.date/")"
+printf '%s\n' "$date_headers" | head -15
+printf '%s\n' "$date_headers" | grep -qi 'location: https://wiring.club/' || {
+  echo "wiring.date did not redirect to https://wiring.club/"
+  exit 1
+}
 echo
-echo "Deploy complete: https://wiring.date/"
+curl -sI "https://wiring.club/" | head -15
+echo
+echo "Deploy complete: https://wiring.club/"
