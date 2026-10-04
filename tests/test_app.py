@@ -56,6 +56,158 @@ class WiringTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def _oauth_start(self, provider="google", mode="register", **extra):
+        from urllib.parse import urlparse, parse_qs
+        result = self.client.post(f"/api/auth/{provider}/start", json={
+            "mode": mode, "age_confirm": True, "privacy_confirm": True, **extra,
+        })
+        self.assertEqual(result.status_code, 200, result.get_data(as_text=True))
+        query = parse_qs(urlparse(result.get_json()["url"]).query)
+        self.assertEqual(query["code_challenge_method"], ["S256"])
+        return query["state"][0]
+
+    def _oauth_callback(self, state, provider="google", identity=None):
+        identity = identity or ("subject-1", "social@gmail.com", "Ада", True)
+        with patch("social_auth.exchange_identity", return_value=identity) as exchange:
+            result = self.client.get(f"/api/auth/{provider}/callback", query_string={"state": state, "code": "fake-code"})
+        return result, exchange
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret"})
+    def test_oauth_registration_login_referral_and_single_use(self):
+        referrer = self._register()
+        self._logout()
+        with patch.dict(os.environ, {"WIRING_SIGNUP_PLUS": "1"}):
+            state = self._oauth_start(ref=referrer["ref"])
+            result, _ = self._oauth_callback(state)
+        self.assertEqual(result.location, "/me")
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertTrue(me["needs_profile"])
+        self.assertTrue(me["plus"])
+        uid = me["id"]
+        with app.app_context():
+            row = db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+            self.assertTrue(row["email_verified_at"])
+            self.assertTrue(row["privacy_accepted_at"])
+            self.assertIsNone(row["special_data_consent_at"])
+            self.assertIsNone(row["marketing_consent_at"])
+            self.assertTrue(db().execute("SELECT 1 FROM referrals WHERE referred_id = ?", (uid,)).fetchone())
+        self._logout()
+        result, exchange = self._oauth_callback(state)
+        exchange.assert_not_called()
+        self.assertEqual(result.location, "/login")
+        state = self._oauth_start(mode="login")
+        self._oauth_callback(state, identity=("subject-1", "changed@gmail.com", "Другое", True))
+        self.assertEqual(self.client.get("/api/me").get_json()["user"]["id"], uid)
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret"})
+    def test_oauth_consent_origin_and_browser_state(self):
+        bad = self.client.post("/api/auth/google/start", json={"mode": "register"})
+        self.assertEqual(bad.status_code, 400)
+        bad = self.client.post("/api/auth/google/start", json={"mode": "login"}, headers={"Origin": "https://evil.test"})
+        self.assertEqual(bad.status_code, 403)
+        state = self._oauth_start()
+        stranger = app.test_client()
+        with patch("social_auth.exchange_identity") as exchange:
+            stranger.get("/api/auth/google/callback", query_string={"state": state, "code": "code"})
+            exchange.assert_not_called()
+        # A foreign browser can't consume the real browser's flow.
+        result, _ = self._oauth_callback(state)
+        self.assertEqual(result.location, "/me")
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret", "YANDEX_CLIENT_ID": "test", "YANDEX_CLIENT_SECRET": "test"})
+    def test_oauth_expired_wrong_provider_cancelled_and_failure(self):
+        from social_auth import OAuthError
+        state = self._oauth_start()
+        result, exchange = self._oauth_callback(state, provider="yandex")
+        exchange.assert_not_called()
+        with app.app_context():
+            db().execute("UPDATE oauth_flows SET created_at = ?", (int(time.time()) - 601,))
+            db().commit()
+        result, exchange = self._oauth_callback(state)
+        exchange.assert_not_called()
+        self.assertEqual(result.location, "/register")
+        state = self._oauth_start()
+        result = self.client.get("/api/auth/google/callback", query_string={"state": state, "error": "access_denied"})
+        self.assertEqual(result.location, "/register")
+        message = self.client.get("/api/auth/providers").get_json()["error_message"]
+        self.assertIn("отменён", message)
+        self.assertEqual(self.client.get("/api/auth/providers").get_json()["error_message"], "")
+        state = self._oauth_start()
+        with patch("social_auth.exchange_identity", side_effect=OAuthError("Недоступен")):
+            self.client.get("/api/auth/google/callback", query_string={"state": state, "code": "fake"})
+        _, exchange = self._oauth_callback(state)
+        exchange.assert_not_called()
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret"})
+    def test_oauth_existing_account_linking_protection(self):
+        existing = self._register(email="existing@gmail.com")
+        self._logout()
+        state = self._oauth_start(mode="login")
+        self._oauth_callback(state, identity=("existing", "existing@gmail.com", "Ада", True))
+        self.assertEqual(self.client.get("/api/me").get_json()["user"]["id"], existing["id"])
+        self._logout()
+        # Can't replace a bound provider identity with another one.
+        state = self._oauth_start()
+        result, _ = self._oauth_callback(state, identity=("different", "existing@gmail.com", "Ада", True))
+        self.assertEqual(result.location, "/register")
+        for verified, authoritative in ((None, True), (123, False)):
+            with app.app_context():
+                db().execute("DELETE FROM oauth_identities")
+                db().execute("UPDATE users SET email_verified_at = ? WHERE id = ?", (verified, existing["id"]))
+                db().commit()
+            state = self._oauth_start(mode="login")
+            result, _ = self._oauth_callback(state, identity=("new", "existing@gmail.com", "Ада", authoritative))
+            self.assertEqual(result.location, "/login")
+            with self.client.session_transaction() as cookie:
+                self.assertNotIn("uid", cookie)
+
+    @patch.dict(os.environ, {"YANDEX_CLIENT_ID": "test-client", "YANDEX_CLIENT_SECRET": "test-secret"})
+    def test_oauth_yandex_unknown_login_and_deletion_lifecycle(self):
+        identity = ("yandex-1", "social@yandex.ru", "Ада", True)
+        state = self._oauth_start("yandex", "login")
+        result, _ = self._oauth_callback(state, "yandex", identity)
+        self.assertEqual(result.location, "/login")
+        state = self._oauth_start("yandex")
+        self._oauth_callback(state, "yandex", identity)
+        uid = self.client.get("/api/me").get_json()["user"]["id"]
+        with app.app_context():
+            db().execute("UPDATE users SET deleted_at = ? WHERE id = ?", (int(time.time()), uid))
+            db().commit()
+        self._logout()
+        state = self._oauth_start("yandex", "login")
+        self._oauth_callback(state, "yandex", identity)
+        self.assertEqual(self.client.get("/api/me").get_json()["user"]["id"], uid)
+        with app.app_context():
+            db().execute("UPDATE users SET deleted_at = ? WHERE id = ?", (int(time.time()) - 8 * 86400, uid))
+            db().commit()
+        self._logout()
+        state = self._oauth_start("yandex", "login")
+        result, _ = self._oauth_callback(state, "yandex", identity)
+        self.assertEqual(result.location, "/login")
+        from app import run_account_purge
+        with app.app_context():
+            run_account_purge()
+            self.assertFalse(db().execute("SELECT 1 FROM oauth_identities WHERE user_id = ?", (uid,)).fetchone())
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret",
+                            "OAUTH_ALLOWED_ORIGINS": "https://wiring.club,https://wiring.date"})
+    def test_oauth_callback_stays_on_allowlisted_starting_host(self):
+        from urllib.parse import urlparse, parse_qs
+        from app import SITE_URL, BASE_PATH
+        for origin in ("https://wiring.club", "https://wiring.date", "https://untrusted.test"):
+            result = self.client.post("/api/auth/google/start", base_url=origin, json={"mode": "login"})
+            self.assertEqual(result.status_code, 200)
+            callback = parse_qs(urlparse(result.get_json()["url"]).query)["redirect_uri"][0]
+            trusted_origin = origin if origin != "https://untrusted.test" else SITE_URL
+            self.assertEqual(callback, trusted_origin + BASE_PATH + "/api/auth/google/callback")
+            self.assertEqual(result.headers["Cache-Control"], "no-store")
+            self.assertEqual(result.headers["Referrer-Policy"], "no-referrer")
+
+    def test_oauth_unconfigured_provider(self):
+        with patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "", "YANDEX_CLIENT_ID": ""}):
+            self.assertEqual(self.client.get("/api/auth/providers").get_json()["providers"], [])
+            self.assertEqual(self.client.post("/api/auth/google/start", json={"mode": "login"}).status_code, 503)
+
     def test_beta_plus_three_months_gift(self):
         import time
 

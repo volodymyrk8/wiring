@@ -54,6 +54,7 @@ from moderation import moderate_photo
 from speech import MAX_AUDIO_SECONDS, SpeechError, audio_kind, transcribe_audio
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
 import mobile_api
+import social_auth
 from push import delete_subscription, delete_user_subscriptions, ensure_push_tables, public_key, save_subscription
 from premium import (
     REFERRAL_DAYS,
@@ -632,6 +633,7 @@ def init_db() -> None:
     ensure_legacy_vibe_cleanup(conn)
     ensure_push_tables(conn)
     mobile_api.ensure_mobile_tables(conn)
+    social_auth.ensure_tables(conn)
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
@@ -1404,6 +1406,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM oauth_identities WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM support_tickets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM device_visits WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM filter_events WHERE user_id = ?", (uid,))
@@ -1700,6 +1703,52 @@ def api_jev_feed_setting():
     return jsonify({"ok": True, "user": current_user()})
 
 
+def _create_registered_user(conn, email, password, name, consented_at, marketing_at, verified_at, ref):
+    cur = conn.execute(
+        """
+        INSERT INTO users (
+            email, password_hash, name, age, city, gender, looking_for, bio, photo,
+            job, intent, height, communication, privacy_accepted_at,
+            special_data_consent_at, photo_rights_consent_at, marketing_consent_at,
+            email_verified_at, onboard_done, is_seed, created_at, last_seen
+        )
+        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, ?, 0, 0, ?, ?)
+        """,
+        (
+            email,
+            generate_password_hash(password, method="pbkdf2:sha256"),
+            name,
+            consented_at,
+            marketing_at,
+            verified_at,
+            consented_at,
+            consented_at,
+        ),
+    )
+    uid = int(cur.lastrowid)
+    grant_signup_plus(conn, uid)
+    ensure_referral_code(conn, uid)
+    referrer_id = apply_referral(conn, uid, ref)
+    if referrer_id:
+        add_notice(
+            conn,
+            referrer_id,
+            "referral",
+            0,
+            f"по твоей ссылке зарегистрировались — ещё {REFERRAL_DAYS} дней WIRING+",
+        )
+    return uid
+
+
+def _create_social_user(conn, email, name, ref):
+    now = int(time.time())
+    return _create_registered_user(conn, email, secrets.token_urlsafe(48), name, now, None, now, ref)
+
+
+social_auth.install(app, db=db, prefix=prefix, site_url=SITE_URL,
+                    create_user=_create_social_user, too_many=too_many, grace=ACCOUNT_DELETE_GRACE)
+
+
 @app.post("/api/register")
 def api_register():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
@@ -1726,39 +1775,7 @@ def api_register():
     marketing_at = consented_at if data.get("marketing_consent") is True else None
     need_verify = email_verify_enforced()
     verified_at = None if need_verify else consented_at
-    cur = conn.execute(
-        """
-        INSERT INTO users (
-            email, password_hash, name, age, city, gender, looking_for, bio, photo,
-            job, intent, height, communication, privacy_accepted_at,
-            special_data_consent_at, photo_rights_consent_at, marketing_consent_at,
-            email_verified_at, onboard_done, is_seed, created_at, last_seen
-        )
-        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, ?, 0, 0, ?, ?)
-        """,
-        (
-            email,
-            generate_password_hash(password, method="pbkdf2:sha256"),
-            name,
-            consented_at,
-            marketing_at,
-            verified_at,
-            consented_at,
-            consented_at,
-        ),
-    )
-    uid = int(cur.lastrowid)
-    grant_signup_plus(conn, uid)
-    ensure_referral_code(conn, uid)
-    referrer_id = apply_referral(conn, uid, str(data.get("ref") or data.get("referral") or ""))
-    if referrer_id:
-        add_notice(
-            conn,
-            referrer_id,
-            "referral",
-            0,
-            f"по твоей ссылке зарегистрировались — ещё {REFERRAL_DAYS} дней WIRING+",
-        )
+    uid = _create_registered_user(conn, email, password, name, consented_at, marketing_at, verified_at, str(data.get("ref") or data.get("referral") or ""))
     if need_verify:
         issue_email_verification(conn, uid, email)
         conn.commit()

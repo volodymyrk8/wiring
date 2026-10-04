@@ -54,3 +54,5 @@ The feed’s “Профиль” Button link uses the existing `/p/:id` route. 
 `/child-safety` и `/account-deletion` — публичные серверные документы (`legal.html`), GET/HEAD без сессии; в SPA_PATHS не включаются. Переход из юридического подвала загружает документ полностью. `/delete-account` сохраняет существующий SPA-контракт: экран подтверждения удаления паролем.
 
 `/for-you` mounts the Preact recommendations feature using shared deck cards/actions and `GET /api/recommendations`. Unauthenticated deep links retain the login return path; authenticated accounts without redeemed promo access and enabled opt-in go to their profile. Navigation appears after the persisted profile toggle is enabled. `/p/:id` opened from this tab returns to it. Browsing sends no `/api/feed/view` and does not reserve ordinary feed history.
+
+OAuth использует серверные `POST /api/auth/{google|yandex}/start` и `GET /api/auth/{google|yandex}/callback`, а не новые SPA-пути. После callback: `/me` для новой анкеты или `/feed` для существующей; при ошибке `/login` или `/register`. Preact auth читает одноразовое сообщение из `/api/auth/providers`.

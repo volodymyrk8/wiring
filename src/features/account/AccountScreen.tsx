@@ -104,6 +104,7 @@ export function DeleteAccountScreen({ host }: { host: AccountHostBridge }) {
       <div class={styles.warning}><strong>Профиль сразу пропадёт из публичного доступа</strong><span>В момент удаления ты исчезнешь из ленты, поиска и чатов.</span><span><b>Восстановление:</b> профиль можно восстановить в течение 7 суток. После этого данные удалятся полностью.</span></div>
       <form onSubmit={submit}>
         <div class={styles.panel} style={{ padding: 0, border: 0, background: "transparent" }}>
+          <p class={styles.hint}>Если зарегистрировались через Google или Яндекс, сначала задайте пароль через <a href={host.hrefFor("forgot")} onClick={(event) => { event.preventDefault(); host.navigate("forgot"); }}>сброс пароля</a>.</p>
           <label>текущий пароль<input type="password" value={password} autocomplete="current-password" required onInput={(event) => setPassword(event.currentTarget.value)} /></label>
           <label class={styles.confirm}><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.currentTarget.checked)} /> <span>Подтверждаю удаление своего профиля</span></label>
           {error ? <p class={styles.error} role="alert">{error}</p> : null}

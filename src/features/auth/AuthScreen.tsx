@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import type { JSX } from "preact";
 import { Button, Input, LegalFooter } from "@/components/ui";
 import type { AuthHostBridge } from "@/features/auth/types";
@@ -31,6 +31,8 @@ export function AuthScreen({ host }: AuthScreenProps) {
   const [serverError, setServerError] = useState("");
   const [emailTaken, setEmailTaken] = useState(false);
   const [busy, setBusy] = useState(false);
+  const socialRequest = useRef<AbortController | null>(null);
+  const [providers, setProviders] = useState<string[]>([]);
   const [pickedNeuro, setPickedNeuro] = useState<string | null>(null);
 
   // Check for preselected neuro from landing
@@ -40,6 +42,40 @@ export function AuthScreen({ host }: AuthScreenProps) {
       if (p) setPickedNeuro(p);
     } catch (_) {}
   }, []);
+
+  useEffect(() => {
+    if (!isLogin && !isRegister) return;
+    if (socialRequest.current?.signal.aborted) setBusy(false);
+    let active = true;
+    const controller = new AbortController();
+    void host.api("/api/auth/providers", { signal: controller.signal }).then((raw) => {
+      if (!active) return;
+      const data = raw as { providers: string[]; error_message?: string };
+      setProviders(data.providers);
+      if (data.error_message) setServerError(data.error_message);
+    }).catch(() => { /* Password login remains available. */ });
+    return () => { active = false; controller.abort(); socialRequest.current?.abort(); };
+  }, [mode]);
+
+  const startSocialLogin = async (provider: string) => {
+    if (busy) return;
+    setBusy(true);
+    setServerError("");
+    const controller = new AbortController();
+    socialRequest.current = controller;
+    try {
+      const data = await host.api(`/api/auth/${provider}/start`, {
+        method: "POST",
+        signal: controller.signal,
+        body: JSON.stringify({ mode, age_confirm: isRegister, privacy_confirm: isRegister, ref: host.getReferralCode() }),
+      }) as { url: string };
+      if (!controller.signal.aborted) window.location.assign(data.url);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setServerError(getErrorMessage(error));
+      setBusy(false);
+    }
+  };
 
   const clearFieldError = (field: keyof FieldErrors) => {
     if (fieldErrors[field]) {
@@ -389,6 +425,22 @@ export function AuthScreen({ host }: AuthScreenProps) {
             </div>
           )}
         </>
+      )}
+
+      {providers.length > 0 && (
+        <div class={styles.socialActions}>
+          {providers.map((provider) => (
+            <Button key={provider} variant="ghost" fullWidth disabled={busy} onClick={() => void startSocialLogin(provider)}>
+              {isRegister ? "Зарегистрироваться" : "Войти"} через {provider === "google" ? "Google" : "Яндекс"}
+            </Button>
+          ))}
+          {isRegister && <p class={styles.legalDisclaimer}>
+            Нажимая кнопку регистрации через Google или Яндекс, ты подтверждаешь возраст 18+ и принимаешь{" "}
+            <a href={`${host.basePath}/rules`} target="_blank" rel="noopener noreferrer">пользовательское соглашение</a> и{" "}
+            <a href={`${host.basePath}/privacy`} target="_blank" rel="noopener noreferrer">политику конфиденциальности</a>.
+          </p>}
+          <p class={styles.socialSeparator}>или с почтой и паролем</p>
+        </div>
       )}
 
       <form class={styles.form} onSubmit={onSubmitLoginRegister} noValidate>

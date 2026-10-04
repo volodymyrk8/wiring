@@ -192,3 +192,7 @@ Production работает только с PostgreSQL. Серверные на�
 - [AGENTS.md](AGENTS.md) — обязательные правила изменения проекта.
 
 Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. [Удаление аккаунта и данных](https://wiring.date/account-deletion) — такая же серверная страница. Обе собраны в `legal_pages.py` и `templates/legal.html`, ссылки есть в юридическом подвале и sitemap. `/delete-account` по-прежнему открывает экран подтверждения в приложении. Для iOS и Android остаётся follow-up: в юридический раздел или поддержку добавить «Защита детей» и «Удаление аккаунта и данных» на те же адреса; новый API не нужен.
+
+### Вход через Google и Яндекс
+
+На входе и регистрации доступны OAuth-кнопки после настройки `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` и корректного `SITE_URL`. WIRING использует имя и адрес почты для создания аккаунта и входа. Настройка callback URL, безопасное связывание аккаунтов и мобильный follow-up: [docs/social-login.md](docs/social-login.md).
