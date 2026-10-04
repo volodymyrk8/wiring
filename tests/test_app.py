@@ -1925,13 +1925,29 @@ class WiringTest(unittest.TestCase):
         quote = next(item for item in gone if item["id"] == quoted["id"])
         self.assertEqual(quote["reply_to"]["body"], "сообщение удалено")
 
+    def test_legacy_host_stays_on_date_while_redirect_is_off(self):
+        from flask import session
+
+        from app import _bridge_legacy_host
+
+        user = self._register()
+        with patch("app.SITE_URL", "https://wiring.club"), patch("app._LEGACY_REDIRECT", False):
+            with app.test_request_context(
+                "/",
+                base_url="https://wiring.date",
+                headers={"Accept": "text/html", "Sec-Fetch-Dest": "document"},
+            ):
+                session["uid"] = user["id"]
+                self.assertIsNone(_bridge_legacy_host())
+                self.assertEqual(session.get("uid"), user["id"])
+
     def test_legacy_host_moves_the_session(self):
         from flask import session
 
         from app import _bridge_legacy_host
 
         user = self._register()
-        with patch("app.SITE_URL", "https://wiring.club"):
+        with patch("app.SITE_URL", "https://wiring.club"), patch("app._LEGACY_REDIRECT", True):
             with app.test_request_context(
                 "/",
                 base_url="https://wiring.date",

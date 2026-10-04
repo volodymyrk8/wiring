@@ -157,6 +157,8 @@ mobile_api.install(
 _DEVICE_SKIP_PREFIXES = ("/public/", "/media/", "/health", "/admin")
 _LEGACY_HOSTS = frozenset({"wiring.date", "www.wiring.date"})
 _HANDOFF_TTL = 120
+# Off while people still open the old address. Turn on to move a date login onto club.
+_LEGACY_REDIRECT = False
 
 
 def _request_host() -> str:
@@ -220,7 +222,9 @@ def _consume_handoff(conn: Connection, nonce: str) -> int | None:
 
 @app.before_request
 def _bridge_legacy_host():
-    """Move a wiring.date login onto wiring.club. Browsers will not send the old cookie across domains."""
+    """Move a wiring.date login onto wiring.club when _LEGACY_REDIRECT is on."""
+    if not _LEGACY_REDIRECT:
+        return None
     host = _request_host()
     canonical = _canonical_host()
     if not canonical:
