@@ -1856,13 +1856,13 @@ def api_email_verify():
         return jsonify({"ok": False, "error": "нет токена"}), 400
     conn = db()
     row = conn.execute(
-        "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ?",
+        "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ? FOR UPDATE",
         (token,),
     ).fetchone()
     if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 172800:
         return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
     user = conn.execute("SELECT * FROM users WHERE id = ?", (row["user_id"],)).fetchone()
-    if not user:
+    if not user or user["deleted_at"]:
         return jsonify({"ok": False, "error": "аккаунт не найден"}), 400
     now = int(time.time())
     conn.execute(
@@ -1871,6 +1871,8 @@ def api_email_verify():
     )
     conn.execute("UPDATE email_verifications SET used_at = ? WHERE token = ?", (now, token))
     conn.commit()
+    if data.get("mobile") is True:
+        return app.extensions["wiring_native_session"](int(row["user_id"]), "email verification")
     session.clear()
     session.permanent = True
     session["uid"] = row["user_id"]
@@ -4081,6 +4083,26 @@ def support():
         notice=notice,
         error=error,
     )
+
+
+@app.get("/.well-known/apple-app-site-association")
+def apple_app_site_association():
+    return jsonify({"applinks": {"details": [{"appIDs": ["G3T7684N3M.date.wiring.app"],
+        "components": [{"/": "/api/*", "exclude": True}, {"/": "/admin*", "exclude": True},
+                       {"/": "/public/*", "exclude": True}, {"/": "/uploads/*", "exclude": True},
+                       {"/": "/.well-known/*", "exclude": True}, {"/": "/*"}]}]}})
+
+
+@app.get("/.well-known/assetlinks.json")
+def android_asset_links():
+    # Release signing fingerprints are public, configured separately from signing keys.
+    fingerprints = [value.strip().upper() for value in os.environ.get("ANDROID_APP_LINK_SHA256", "").split(",")
+                    if re.fullmatch(r"(?:[0-9a-fA-F]{2}:){31}[0-9a-fA-F]{2}", value.strip())]
+    if not fingerprints:
+        return jsonify([])
+    return jsonify([{"relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {"namespace": "android_app", "package_name": "date.wiring.app",
+                   "sha256_cert_fingerprints": fingerprints}}])
 
 
 @app.get("/robots.txt")

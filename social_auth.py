@@ -12,7 +12,7 @@ from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from flask import jsonify, redirect, request, session
+from flask import current_app, jsonify, redirect, request, session
 from database import IntegrityError
 
 PROVIDERS = {
@@ -46,6 +46,12 @@ def ensure_tables(conn):
             redirect_uri TEXT NOT NULL, created_at BIGINT NOT NULL
         );
     ''')
+    conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS native_challenge TEXT")
+    conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS native_state TEXT")
+    conn.execute('''CREATE TABLE IF NOT EXISTS oauth_native_codes (
+        code_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id),
+        challenge TEXT NOT NULL, created_at BIGINT NOT NULL
+    )''')
 
 
 def _json_request(url, *, data=None, headers=None):
@@ -88,14 +94,16 @@ def exchange_identity(provider, code, redirect_uri, verifier):
 
 
 def install(app, *, db, prefix, site_url, create_user, too_many, grace):
-    def failure(message, mode='login'):
+    def failure(message, mode='login', native_state=None):
+        if native_state:
+            return redirect('wiring://oauth?' + urlencode(dict(error=message, state=native_state)))
         session['oauth_error'] = message
         return redirect(prefix('/register' if mode == 'register' else '/login'))
 
     @app.after_request
     def protect_oauth_response(response):
         endpoint = (request.endpoint or '').removesuffix('__prefixed')
-        if endpoint in {'auth_providers', 'auth_start', 'auth_callback'}:
+        if endpoint in {'auth_providers', 'auth_start', 'auth_callback', 'auth_native_browser', 'auth_native_exchange'}:
             response.headers['Cache-Control'] = 'no-store'
             response.headers['Referrer-Policy'] = 'no-referrer'
         return response
@@ -123,6 +131,11 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
             return jsonify(ok=False, error='Выбери вход или регистрацию.'), 400
         if mode == 'register' and (data.get('age_confirm') is not True or data.get('privacy_confirm') is not True):
             return jsonify(ok=False, error='Подтверди возраст 18+ и согласие с правилами.'), 400
+        native = data.get('native') is True
+        challenge, native_state = data.get('code_challenge'), data.get('native_state')
+        if native and (not isinstance(challenge, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', challenge)
+                       or not isinstance(native_state, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,100}', native_state)):
+            return jsonify(ok=False, error='Некорректное подтверждение приложения.'), 400
         # Keep the browser cookie on its starting host, but only for explicitly trusted origins.
         allowed_origins = {value.strip().rstrip('/') for value in
                            os.environ.get('OAUTH_ALLOWED_ORIGINS', site_url).split(',') if value.strip()}
@@ -132,18 +145,54 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         state, browser, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(32), secrets.token_urlsafe(48)
         conn = db()
         conn.execute('DELETE FROM oauth_flows WHERE created_at < ?', (int(time.time()) - TTL,))
-        conn.execute('INSERT INTO oauth_flows VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        conn.execute('INSERT INTO oauth_flows (state_hash, browser, provider, verifier, mode, referral, redirect_uri, created_at, native_challenge, native_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                      (hashlib.sha256(state.encode()).hexdigest(), browser, provider, verifier, mode,
-                      str(data.get('ref') or '')[:100], callback, int(time.time())))
+                      str(data.get('ref') or '')[:100], callback, int(time.time()), challenge if native else None, native_state if native else None))
         conn.commit()
-        session['oauth_browser'] = browser
+        if not native:
+            session['oauth_browser'] = browser
         auth_url, _, _, scope = PROVIDERS[provider]
         params = dict(response_type='code', client_id=credentials(provider)[0], redirect_uri=callback, state=state, scope=scope)
         params.update(code_challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode(),
                           code_challenge_method='S256')
         if provider == 'google':
             params['prompt'] = 'select_account'
+        if native:
+            return jsonify(ok=True, url=callback_origin + prefix('/api/auth/native/browser') + '?' + urlencode(dict(state=state, ticket=browser)))
         return jsonify(ok=True, url=auth_url + '?' + urlencode(params))
+
+    @app.get('/api/auth/native/browser')
+    def auth_native_browser():
+        state, ticket = request.args.get('state', ''), request.args.get('ticket', '')
+        flow = db().execute('SELECT * FROM oauth_flows WHERE state_hash = ?', (hashlib.sha256(state.encode()).hexdigest(),)).fetchone()
+        if not flow or not flow['native_challenge'] or int(time.time()) - flow['created_at'] > TTL or not secrets.compare_digest(ticket, flow['browser']):
+            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+        session['oauth_browser'] = flow['browser']
+        provider = flow['provider']
+        auth_url, _, _, scope = PROVIDERS[provider]
+        params = dict(response_type='code', client_id=credentials(provider)[0], redirect_uri=flow['redirect_uri'], state=state, scope=scope,
+                      code_challenge=base64.urlsafe_b64encode(hashlib.sha256(flow['verifier'].encode()).digest()).rstrip(b'=').decode(), code_challenge_method='S256')
+        if provider == 'google':
+            params['prompt'] = 'select_account'
+        return redirect(auth_url + '?' + urlencode(params))
+
+    @app.post('/api/auth/native/exchange')
+    def auth_native_exchange():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify(ok=False, error='Некорректный запрос.'), 400
+        code, verifier = str(data.get('code') or ''), str(data.get('code_verifier') or '')
+        if not re.fullmatch(r'[A-Za-z0-9._~-]{43,128}', verifier) or not code:
+            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+        conn = db()
+        found = conn.execute('SELECT * FROM oauth_native_codes WHERE code_hash = ? FOR UPDATE', (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()
+        challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
+        if not found or int(time.time()) - found['created_at'] > 60 or not secrets.compare_digest(challenge, found['challenge']):
+            conn.rollback()
+            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+        conn.execute('DELETE FROM oauth_native_codes WHERE code_hash = ?', (found['code_hash'],))
+        # The session issuer commits the one-time consumption with the refresh token.
+        return current_app.extensions['wiring_native_session'](int(found['user_id']), 'native OAuth')
 
     @app.get('/api/auth/<provider>/callback')
     def auth_callback(provider):
@@ -162,9 +211,9 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         session.pop('oauth_browser', None)
         mode = flow['mode']
         if int(time.time()) - flow['created_at'] > TTL:
-            return failure('Вход устарел. Начни заново.', mode)
+            return failure('Вход устарел. Начни заново.', mode, flow['native_state'])
         if request.args.get('error') or not request.args.get('code'):
-            return failure('Вход отменён. Можно попробовать снова.', mode)
+            return failure('Вход отменён. Можно попробовать снова.', mode, flow['native_state'])
         try:
             subject, email, name, authoritative = exchange_identity(provider, request.args['code'], flow['redirect_uri'], flow['verifier'])
             # Serialize registration/linking by email; constraints also guard provider identity races.
@@ -187,7 +236,14 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
             conn.commit()
         except (OAuthError, IntegrityError) as exc:
             conn.rollback()
-            return failure(str(exc) if isinstance(exc, OAuthError) else 'Этот аккаунт уже связан с другим входом. Используй прежний способ входа.', mode)
+            return failure(str(exc) if isinstance(exc, OAuthError) else 'Этот аккаунт уже связан с другим входом. Используй прежний способ входа.', mode, flow['native_state'])
+        if flow['native_challenge']:
+            code = secrets.token_urlsafe(32)
+            conn.execute('DELETE FROM oauth_native_codes WHERE created_at < ?', (int(time.time()) - 60,))
+            conn.execute('INSERT INTO oauth_native_codes (code_hash, user_id, challenge, created_at) VALUES (?, ?, ?, ?)',
+                         (hashlib.sha256(code.encode()).hexdigest(), row['id'], flow['native_challenge'], int(time.time())))
+            conn.commit()
+            return redirect('wiring://oauth?' + urlencode(dict(code=code, state=flow['native_state'])))
         session.clear()
         session.permanent = True
         session['uid'] = row['id']

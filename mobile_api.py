@@ -129,7 +129,7 @@ def install(
 
     @app.before_request
     def _mobile_gate():
-        if not request.path.startswith("/api/"):
+        if not request.path.startswith("/api/") and request.path != "/support":
             return None
         minimum = (os.environ.get("MOBILE_MIN_VERSION") or "").strip()
         client_version = request.headers.get("X-App-Version", "")
@@ -160,6 +160,23 @@ def install(
             "refresh_token": issue_refresh(conn, int(row["id"]), str(row["password_hash"]), family, device),
             "expires_in": ACCESS_TTL,
         }
+
+    def issue_native_session(user_id: int, device: str = ""):
+        conn = db()
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row or row["deleted_at"]:
+            return _error("аккаунт недоступен", 401)
+        payload = _login_payload(conn, row, secrets.token_hex(12), device)
+        conn.commit()
+        session.clear()
+        session["uid"] = int(row["id"])
+        session.modified = False
+        payload["user"] = current_user()
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    app.extensions["wiring_native_session"] = issue_native_session
 
     @app.post("/api/auth/token")
     def api_auth_token():

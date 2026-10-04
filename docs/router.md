@@ -58,3 +58,5 @@ The feed’s “Профиль” Button link uses the existing `/p/:id` route. 
 OAuth использует серверные `POST /api/auth/{google|yandex}/start` и `GET /api/auth/{google|yandex}/callback`, а не новые SPA-пути. После callback: `/me` для новой анкеты или `/feed` для существующей; при ошибке `/login` или `/register`. Preact auth читает одноразовое сообщение из `/api/auth/providers`.
 
 Мобильная навигация Expo Router находится в отдельном [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile/blob/main/docs/router.md). Выделение репозитория не меняет веб-URL или общий `/api/*`.
+
+Native redirect остаётся `wiring://oauth` и обменивает одноразовый результат через `/api/auth/native/exchange`. Universal/App Links ассоциации обслуживает Flask по `/.well-known/apple-app-site-association` и `/.well-known/assetlinks.json`; это публичные JSON документы, не SPA_PATHS. API callback исключён из перехвата Universal Links. Перевод canonical профиля/чата/referral/email ссылок выполняется `src/routes.ts` мобильного клиента. Веб-URL и маршруты Preact не менялись.

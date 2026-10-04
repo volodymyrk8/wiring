@@ -66,3 +66,15 @@
 ## Google/Яндекс: мобильный follow-up
 
 В этой ветке добавлен серверный OAuth code flow для веб-cookie: `/api/auth/providers`, `POST /api/auth/{provider}/start` и callback. Он не выдаёт мобильную пару access/refresh. На обеих мобильных ветках нужны одинаковые кнопки входа/регистрации, текст подтверждения 18+ и правил и ссылка сброса пароля на удалении. Для нативного OAuth нужен общий защищённый обмен одноразового результата на существующую пару токенов в `mobile_api.py`; текущего email/password `/api/auth/token` недостаточно. Подробный контракт и ограничение: [social-login.md](social-login.md). Не вводить отдельные аккаунты или app-only API.
+
+## Нативное соответствие сайту — общий контракт
+
+React Native клиент перенесён на пользовательские страницы сайта: вертикальная лента и отдельные like/pass, рекомендации, архив, полный профиль/черновики, лайки/сортировка, reply/edit/delete/photo/audio/transcribe, настройки, поддержку и юридические документы. Матрица и статус устройства/визуальной проверки: [wiring-mobile/docs/web-parity.md](https://github.com/volodymyrk8/wiring-mobile/blob/main/docs/web-parity.md). Старые follow-up выше описывают прежние расхождения; актуальный статус — в матрице.
+
+- Native OAuth использует расширенный общий start/callback и одноразовый `/api/auth/native/exchange`; протокол в [social-login.md](social-login.md).
+- `POST /api/email/verify` с `mobile: true` после обычной проверки proof выдаёт access/refresh/user без cookie; веб-ответ без этого флага сохранён. Proof расходуется под row lock, удалённый аккаунт не авторизуется.
+- `POST /support` теперь принимает действующий bearer и связывает обращение с тем же account id.
+- `/.well-known/apple-app-site-association` идентифицирует существующее приложение `G3T7684N3M.date.wiring.app`, исключает API/admin/static из Universal Links. `/.well-known/assetlinks.json` использует `ANDROID_APP_LINK_SHA256`: список публичных SHA-256 отпечатков release-сертификата через запятую. Если не настроен, список ассоциаций пуст; ключи подписи не публикуются.
+- Для links нужно развернуть server association на доменах `wiring.date` и `wiring.club`, пересобрать приложения и проверить открытие email/referral/profile/chat ссылок на устройствах.
+
+Здесь нет отдельной app-only модели аккаунта, ленты или переписки. Unmatch/block/report сохраняют строки сообщений с `deleted_at`. Нативные сборки и визуальная проверка ещё не подтверждены; JS export не заменяет их.

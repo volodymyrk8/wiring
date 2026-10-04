@@ -154,3 +154,9 @@ Mobile follow-up: profile promo redemption and opt-in, conditional «Для те
 ## OAuth-вход
 
 `social_auth.py` владеет серверным Google/Яндекс Authorization Code flow с PKCE и одноразовыми browser-bound state в PostgreSQL (`oauth_flows`), привязками по provider subject (`oauth_identities`) и маршрутом callback. `app.py` предоставляет общий helper создания аккаунта с бонусами/приглашениями, cookie-сессию и удаляет OAuth-привязки при окончательной очистке. `src/features/auth/` получает доступных провайдеров через shared API/host bridge и показывает кнопки. Новые SPA-пути не вводятся. Настройка и мобильный follow-up описаны в `docs/social-login.md` и `docs/mobile-api.md`.
+
+## Общие нативные экраны
+
+`wiring-mobile` реализует React Native страницы сайта и те же пять CSS-палитр. Конкретная матрица и неподтверждённая device/visual проверка описаны в его `docs/web-parity.md`. Прежние мобильные follow-up в разделах выше теперь сопоставляются с этой матрицей.
+
+`social_auth.py` расширяет общий OAuth flow полями native challenge/state в `oauth_flows` и таблицей одноразовых хешированных результатов `oauth_native_codes` (TTL 60 с). `mobile_api.py` экспортирует issuer native-сессии через `app.extensions`, поэтому OAuth и email verify используют тот же refresh family/password fingerprint. Все данные остаются в существующей PostgreSQL; cookie-вход сайта сохраняется. Bearer также разрешён на общей форме `/support`. Ассоциации HTTP-ссылок — два публичных well-known JSON маршрута Flask, не новые SPA-страницы.
