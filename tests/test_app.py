@@ -682,7 +682,12 @@ class WiringTest(unittest.TestCase):
         self.assertIn(b"/account-deletion", self.client.get("/sitemap.xml").data)
         privacy = self.client.get("/privacy").get_data(as_text=True)
         self.assertIn('href="/account-deletion"', privacy)
-        self.assertIn("срок её стирания не назначен", privacy)
+        self.assertIn("в течение суток после этих 7 суток", text)
+        self.assertIn("Номер аккаунта остаётся, без почты и полей анкеты", text)
+        self.assertNotIn("срок её стирания не назначен", text)
+        self.assertIn("в течение суток после этих 7 суток", privacy)
+        self.assertIn("Номер аккаунта остаётся, без почты и полей анкеты", privacy)
+        self.assertNotIn("срок её стирания не назначен", privacy)
         self.assertIn(b'id="app"', self.client.get("/delete-account").data)
 
     def test_recommendation_promo_cannot_be_forged_and_concurrent_redemption_counts_once(self):
@@ -1817,6 +1822,73 @@ class WiringTest(unittest.TestCase):
         self._register("viewer@example.com")
         p = self.client.get(f"/api/people/{uid}")
         self.assertEqual(p.status_code, 404)
+
+    def test_expired_deletion_scrubs_personal_data_and_keeps_the_row(self):
+        from werkzeug.security import check_password_hash
+
+        from app import run_account_purge
+
+        res = self.client.post(
+            "/api/register",
+            json={
+                "email": "scrub-me@example.com",
+                "password": "mysecretpassword",
+                "name": "Игорь",
+                "age_confirm": True,
+                "privacy_confirm": True,
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        uid = res.get_json()["user"]["id"]
+        recent = self.client.post(
+            "/api/register",
+            json={
+                "email": "still-mine@example.com",
+                "password": "mysecretpassword",
+                "name": "Маша",
+                "age_confirm": True,
+                "privacy_confirm": True,
+            },
+        )
+        recent_id = recent.get_json()["user"]["id"]
+        with app.app_context():
+            db().execute(
+                "UPDATE users SET name = ?, bio = ?, city = ?, deleted_at = ? WHERE id = ?",
+                ("Игорь", "секретный текст", "Рига", int(time.time()) - 8 * 86400, uid),
+            )
+            db().execute(
+                "INSERT INTO messages (from_id, to_id, body, created_at) VALUES (?, ?, ?, ?)",
+                (uid, uid, "секрет", int(time.time())),
+            )
+            db().execute(
+                "UPDATE users SET deleted_at = ? WHERE id = ?",
+                (int(time.time()) - 86400, recent_id),
+            )
+            db().commit()
+
+        self.assertEqual(run_account_purge(), 1)
+        with app.app_context():
+            row = db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+            self.assertIsNotNone(row, "User row in database must not be deleted!")
+            self.assertGreater(row["deleted_at"], 0)
+            self.assertEqual(row["email"], f"deleted-{uid}@deleted.wiring")
+            self.assertEqual(row["name"], "")
+            self.assertEqual(row["bio"], "")
+            self.assertEqual(row["city"], "")
+            self.assertFalse(check_password_hash(row["password_hash"], "mysecretpassword"))
+            left = db().execute("SELECT COUNT(*) AS n FROM messages WHERE from_id = ?", (uid,)).fetchone()
+            self.assertEqual(left["n"], 0)
+            kept = db().execute("SELECT email, name, deleted_at FROM users WHERE id = ?", (recent_id,)).fetchone()
+            self.assertEqual(kept["email"], "still-mine@example.com")
+            self.assertEqual(kept["name"], "Маша")
+            self.assertGreater(kept["deleted_at"], 0)
+        self.assertEqual(run_account_purge(), 0)
+
+        gone = self.client.post(
+            "/api/login",
+            json={"email": "scrub-me@example.com", "password": "mysecretpassword"},
+        )
+        self.assertEqual(gone.status_code, 401)
 
     def test_archive_lists_and_revises_own_decisions(self):
         self._register()

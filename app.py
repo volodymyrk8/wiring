@@ -1404,6 +1404,11 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?", (uid, uid))
     conn.execute("DELETE FROM password_resets WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM email_verifications WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM support_tickets WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM device_visits WHERE user_id = ?", (uid,))
+    conn.execute("DELETE FROM filter_events WHERE user_id = ?", (uid,))
+    _ensure_session_handoffs(conn)
+    conn.execute("DELETE FROM session_handoffs WHERE user_id = ?", (uid,))
     delete_user_subscriptions(conn, uid)
     mobile_api.delete_user_devices(conn, uid)
     folder = os.path.join(UPLOAD_DIR, str(uid))
@@ -1411,17 +1416,66 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
         shutil.rmtree(folder, ignore_errors=True)
 
 
-def _purge_deleted_users_data(conn: Connection) -> None:
-    """Full auxiliary data wipe for accounts deleted > 7 days (604800s) ago.
-    The user row in 'users' is NEVER deleted, keeping the deleted_at flag.
+def _deleted_account_email(uid: int) -> str:
+    return f"deleted-{uid}@deleted.wiring"
+
+
+def _scrub_deleted_user_row(conn: Connection, uid: int) -> None:
+    """Blank the account row. The row itself stays so the id is not reused."""
+    conn.execute(
+        """
+        UPDATE users SET
+            email = ?,
+            password_hash = ?,
+            name = '',
+            age = 0,
+            city = '',
+            gender = 'hidden',
+            looking_for = '',
+            bio = '',
+            photo = '',
+            job = '',
+            intent = '',
+            height = NULL,
+            communication = '',
+            last_seen = 0,
+            premium_until = 0,
+            referral_code = NULL,
+            seek_place = '',
+            hide_tags = '',
+            email_verified_at = NULL
+        WHERE id = ?
+        """,
+        (
+            _deleted_account_email(uid),
+            generate_password_hash(secrets.token_urlsafe(18), method="pbkdf2:sha256"),
+            uid,
+        ),
+    )
+
+
+def _purge_deleted_users_data(conn: Connection) -> int:
+    """Erase personal data for accounts past the 7-day restore window.
+
+    The users row stays, with id and deleted_at only. Already scrubbed rows are skipped.
     """
     cutoff = int(time.time()) - ACCOUNT_DELETE_GRACE
     rows = conn.execute(
-        "SELECT id FROM users WHERE deleted_at IS NOT NULL AND deleted_at > 0 AND deleted_at < ?",
+        """
+        SELECT id, email FROM users
+        WHERE deleted_at IS NOT NULL AND deleted_at > 0 AND deleted_at < ?
+        """,
         (cutoff,),
     ).fetchall()
+    n = 0
     for r in rows:
-        purge_user_aux_data(conn, int(r["id"]))
+        uid = int(r["id"])
+        if str(r["email"] or "") == _deleted_account_email(uid):
+            continue
+        purge_user_aux_data(conn, uid)
+        _scrub_deleted_user_row(conn, uid)
+        n += 1
+    return n
 
 
 def wipe_user(conn: Connection, uid: int) -> None:
@@ -4026,6 +4080,17 @@ def sitemap():
     return app.response_class(xml, mimetype="application/xml")
 
 
+def run_account_purge() -> int:
+    """Daily job: erase data for accounts past the 7-day restore window."""
+    conn = open_request_connection()
+    try:
+        n = _purge_deleted_users_data(conn)
+        conn.commit()
+        return n
+    finally:
+        conn.close()
+
+
 def _register_prefixed_routes() -> None:
     if not BASE_PATH:
         return
@@ -4042,6 +4107,12 @@ def _register_prefixed_routes() -> None:
 
 
 _register_prefixed_routes()
+
+# Restart catches accounts already past the window. The daily timer covers the days between restarts.
+try:
+    run_account_purge()
+except Exception:
+    app.logger.exception("account purge on startup failed")
 
 
 if __name__ == "__main__":

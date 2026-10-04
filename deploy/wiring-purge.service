@@ -1,0 +1,12 @@
+[Unit]
+Description=Erase WIRING accounts past the restore window
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/repos/dating
+Environment=UPLOAD_DIR=/var/lib/wiring/uploads
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/wiring.env
+ExecStart=/root/bots/bin/python -c "import app; app.run_account_purge()"
