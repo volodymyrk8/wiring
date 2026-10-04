@@ -9,7 +9,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from media import MediaError, make_thumb
+from media import MediaError, make_thumb, process_image
 from moderation import blocked_labels, moderate_photo
 
 
@@ -116,6 +116,16 @@ class LogicTest(unittest.TestCase):
         with patch("icebreakers._openai_openers", return_value=fake):
             lines = openers_for({"job": "x", "bio": "", "prompts": [], "vibe": [], "neuro": []})
         self.assertEqual(lines, fake)
+
+    def test_profile_photo_uses_one_portrait_frame(self):
+        wide = BytesIO()
+        Image.new("RGB", (900, 300), (8, 16, 24)).save(wide, format="JPEG")
+        cropped = process_image(wide.getvalue(), portrait=True)
+        with Image.open(BytesIO(cropped)) as image:
+            self.assertAlmostEqual(image.size[0] / image.size[1], 0.75, places=2)
+        plain = process_image(wide.getvalue())
+        with Image.open(BytesIO(plain)) as image:
+            self.assertGreater(image.size[0] / image.size[1], 2)
 
     def test_make_thumb_is_small(self):
         buf = BytesIO()

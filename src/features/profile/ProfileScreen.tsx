@@ -1,9 +1,10 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import {
   AppHeader,
   Button,
   Input,
+  PhotoCropper,
   LegalFooter,
   ProfileMenu,
   Select,
@@ -119,6 +120,10 @@ function PhotoManager({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [consentError, setConsentError] = useState(false);
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
+  const [cropError, setCropError] = useState("");
+  const batchRef = useRef(1);
+  const cropLock = useRef(false);
   const photos = allPhotos(user);
   const name = valueOf(user.name, "Профиль");
   const needsPhotoConsent = Boolean(user.needs_photo_consent);
@@ -133,16 +138,28 @@ function PhotoManager({
       setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
       return;
     }
-    setBusy(true);
     setError("");
     setConsentError(false);
+    setCropError("");
+    batchRef.current = files.length;
+    setCropQueue(files);
+  };
+
+  const acceptCrop = async (file: File) => {
+    if (cropLock.current) return;
+    cropLock.current = true;
+    setBusy(true);
+    setCropError("");
     try {
-      for (const file of files) await host.uploadPhoto(file, consent);
+      await host.uploadPhoto(file, consent);
       await refresh();
-      host.toast(files.length > 1 ? "фото добавлены" : "фото добавлено");
+      const rest = cropQueue.slice(1);
+      setCropQueue(rest);
+      if (!rest.length) host.toast(batchRef.current > 1 ? "фото добавлены" : "фото добавлено");
     } catch (caught) {
-      setError(getErrorMessage(caught));
+      setCropError(getErrorMessage(caught));
     } finally {
+      cropLock.current = false;
       setBusy(false);
     }
   };
@@ -206,10 +223,20 @@ function PhotoManager({
         ))}
         <label class={`${styles.photoAdd}${busy ? ` ${styles.disabled}` : ""}`}>
           <span aria-hidden="true">+</span>
-          <input type="file" accept="image/*" multiple disabled={busy} onChange={upload} />
+          <input type="file" accept="image/*" multiple disabled={busy || cropQueue.length > 0} onChange={upload} />
         </label>
       </div>
       {error && <p class={styles.error} role="alert">{error}</p>}
+      {cropQueue[0] ? (
+        <PhotoCropper
+          file={cropQueue[0]}
+          title={batchRef.current > 1 ? `Кадр · ${batchRef.current - cropQueue.length + 1} из ${batchRef.current}` : "Кадр"}
+          busy={busy}
+          error={cropError}
+          onCancel={() => { setCropQueue([]); setCropError(""); }}
+          onConfirm={(file) => { void acceptCrop(file); }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -365,19 +392,6 @@ export function ProfileScreen({ host }: Props) {
     if (!draft.neuro.length) next.neuro = "Укажи хотя бы одну особенность";
     setErrors(next);
     return Object.keys(next).length === 0;
-  };
-
-  const saveDraftNow = async () => {
-    setServerError("");
-    setBusy(true);
-    try {
-      await autosave.save();
-      host.toast(user.needs_profile ? "черновик сохранён · анкета ещё не в ленте" : "сохранено");
-    } catch (caught) {
-      setServerError(getErrorMessage(caught));
-    } finally {
-      setBusy(false);
-    }
   };
 
   const redeemRecommendations = async () => {
@@ -622,7 +636,6 @@ export function ProfileScreen({ host }: Props) {
             {(serverError || errors.photos) && <div class={styles.serverError} role="alert">{serverError || errors.photos}</div>}
             <div class={styles.submitRow}>
               <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Опубликовать в ленте"}</Button>
-              <Button variant="ghost" type="button" fullWidth disabled={busy} onClick={() => void saveDraftNow()}>Сохранить черновик</Button>
               <div class={styles.accountActions}>
                 <Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button>
                 <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button>

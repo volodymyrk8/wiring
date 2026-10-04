@@ -10,6 +10,7 @@ export * from "./Tooltip";
 export * from "./AccordionRow";
 export * from "./Select";
 export * from "./Modal";
+export * from "./PhotoCropper";
 export * from "./BrandSection";
 export * from "./ProfileAvatarIcon";
 export * from "./ProfileMenu";

@@ -1,6 +1,6 @@
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, Checkbox, LegalFooter, ProfileMenu } from "@/components/ui";
+import { AppHeader, Button, Checkbox, LegalFooter, PhotoCropper, ProfileMenu } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { AccountHostBridge } from "./types";
@@ -164,6 +164,8 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
   const [promptAnswer, setPromptAnswer] = useState(String(initialPrompt.answer || ""));
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
+  const batchRef = useRef(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [photoConsent, setPhotoConsent] = useState(!host.user.needs_photo_consent);
@@ -177,9 +179,14 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
       setError("Сначала отметь галочку про свои фото — ниже, над кнопкой «+».");
       return;
     }
-    setFiles((current) => [...current, ...next]);
-    setPreviews((current) => [...current, ...next.map((file) => URL.createObjectURL(file))]);
     event.currentTarget.value = "";
+    batchRef.current = next.length;
+    setCropQueue(next);
+  };
+  const acceptCrop = (file: File) => {
+    setFiles((current) => [...current, file]);
+    setPreviews((current) => [...current, URL.createObjectURL(file)]);
+    setCropQueue((queue) => queue.slice(1));
   };
   const skip = async () => {
     if (busy) return;
@@ -230,7 +237,8 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
               Загружаю только свои фото и разрешаю показывать их участникам WIRING
             </Checkbox>
           ) : null}
-          <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy} onChange={addFiles} /></label></div>
+          <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || "Профиль"))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt="новое фото" /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy || cropQueue.length > 0} onChange={addFiles} /></label></div>
+          {cropQueue[0] ? <PhotoCropper file={cropQueue[0]} title={batchRef.current > 1 ? `Кадр · ${batchRef.current - cropQueue.length + 1} из ${batchRef.current}` : "Кадр"} onCancel={() => setCropQueue([])} onConfirm={acceptCrop} /> : null}
         </div>
         <label>город <span class={styles.subtle}>(необязательно)</span><select value={city} onChange={(event) => setCity(event.currentTarget.value)}><option value="">не указывать</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label>как тебе писать<textarea maxlength={500} placeholder="сразу по делу, голосовые ок / нет" value={communication} onInput={(event) => setCommunication(event.currentTarget.value)} /></label>

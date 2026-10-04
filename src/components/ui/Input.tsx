@@ -23,6 +23,7 @@ export type InputProps = {
   hint?: string;
   showStrength?: boolean;
   onInput?: (e: JSX.TargetedEvent<HTMLInputElement, Event>) => void;
+  onKeyDown?: (e: JSX.TargetedKeyboardEvent<HTMLInputElement>) => void;
   onChange?: (e: JSX.TargetedEvent<HTMLInputElement, Event>) => void;
   onFocus?: (e: JSX.TargetedFocusEvent<HTMLInputElement>) => void;
   onBlur?: (e: JSX.TargetedFocusEvent<HTMLInputElement>) => void;
@@ -64,6 +65,7 @@ export function Input({
   hint,
   showStrength = false,
   onInput,
+  onKeyDown,
   onChange,
   onFocus,
   onBlur,
@@ -127,6 +129,7 @@ export function Input({
               : undefined
           }
           onInput={handleInput}
+          onKeyDown={onKeyDown}
           onChange={onChange}
           onFocus={handleFocus}
           onBlur={handleBlur}

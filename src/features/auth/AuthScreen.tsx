@@ -433,13 +433,18 @@ export function AuthScreen({ host }: AuthScreenProps) {
           type="password"
           autoComplete={isLogin ? "current-password" : "new-password"}
           showStrength={!isLogin}
-          enterKeyHint={isLogin ? "done" : "next"}
+          enterKeyHint={isLogin ? "go" : "next"}
           value={password}
           error={fieldErrors.password}
           onInput={(e) => {
             setPassword((e.currentTarget as HTMLInputElement).value);
             clearFieldError("password");
           }}
+          onKeyDown={isLogin ? (event) => {
+            if (event.key !== "Enter" || busy) return;
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          } : undefined}
         />
 
         {serverError && (

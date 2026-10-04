@@ -3471,7 +3471,7 @@ def api_upload_photo():
     if count >= MAX_PHOTOS:
         return jsonify({"ok": False, "error": f"не больше {MAX_PHOTOS} фото"}), 400
     try:
-        jpeg = read_upload(request.files.get("file"))
+        jpeg = read_upload(request.files.get("file"), portrait=True)
         moderate_photo(jpeg)
     except MediaError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
