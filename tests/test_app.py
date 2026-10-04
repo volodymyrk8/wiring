@@ -1925,6 +1925,35 @@ class WiringTest(unittest.TestCase):
         quote = next(item for item in gone if item["id"] == quoted["id"])
         self.assertEqual(quote["reply_to"]["body"], "сообщение удалено")
 
+    def test_legacy_host_moves_the_session(self):
+        from flask import session
+
+        from app import _bridge_legacy_host
+
+        user = self._register()
+        with patch("app.SITE_URL", "https://wiring.club"):
+            with app.test_request_context(
+                "/",
+                base_url="https://wiring.date",
+                headers={"Accept": "text/html", "Sec-Fetch-Dest": "document"},
+            ):
+                session["uid"] = user["id"]
+                response = _bridge_legacy_host()
+            self.assertIsNotNone(response)
+            self.assertEqual(response.status_code, 302)
+            location = response.headers["Location"]
+            self.assertTrue(location.startswith("https://wiring.club/?handoff="), location)
+            nonce = location.split("handoff=", 1)[1]
+            with app.test_request_context(f"/?handoff={nonce}", base_url="https://wiring.club"):
+                accepted = _bridge_legacy_host()
+                self.assertEqual(accepted.status_code, 302)
+                self.assertEqual(accepted.headers["Location"], "/")
+                self.assertEqual(session.get("uid"), user["id"])
+            with app.test_request_context(f"/feed?handoff={nonce}", base_url="https://wiring.club"):
+                again = _bridge_legacy_host()
+                self.assertEqual(again.headers["Location"], "/feed")
+                self.assertIsNone(session.get("uid"))
+
     def _me_id(self, email):
         conn = open_request_connection()
         try:

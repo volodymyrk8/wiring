@@ -86,7 +86,7 @@
   padding: 28px 14px 10px;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   scrollbar-width: none;
   background: linear-gradient(to top, rgba(17,14,12,.94) 0%, rgba(17,14,12,.78) 42%, rgba(17,14,12,.35) 78%, transparent 100%);
   pointer-events: auto;

@@ -11,6 +11,7 @@ import shutil
 import time
 from functools import wraps
 from typing import Any
+from urllib.parse import urlencode, urlparse
 
 from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -154,6 +155,104 @@ mobile_api.install(
 
 
 _DEVICE_SKIP_PREFIXES = ("/public/", "/media/", "/health", "/admin")
+_LEGACY_HOSTS = frozenset({"wiring.date", "www.wiring.date"})
+_HANDOFF_TTL = 120
+
+
+def _request_host() -> str:
+    return request.host.split(":", 1)[0].strip("[]").lower()
+
+
+def _canonical_host() -> str:
+    return (urlparse(SITE_URL).hostname or "").lower()
+
+
+def _document_navigation() -> bool:
+    dest = (request.headers.get("Sec-Fetch-Dest") or "").lower()
+    if dest:
+        return dest == "document"
+    return "text/html" in (request.headers.get("Accept") or "")
+
+
+def _ensure_session_handoffs(conn: Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS session_handoffs (
+            nonce TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        )
+        """
+    )
+
+
+def _mint_handoff(conn: Connection, user_id: int) -> str:
+    _ensure_session_handoffs(conn)
+    nonce = secrets.token_urlsafe(24)
+    now = int(time.time())
+    conn.execute("DELETE FROM session_handoffs WHERE expires_at < ?", (now,))
+    conn.execute(
+        "INSERT INTO session_handoffs (nonce, user_id, expires_at) VALUES (?, ?, ?)",
+        (nonce, user_id, now + _HANDOFF_TTL),
+    )
+    conn.commit()
+    return nonce
+
+
+def _consume_handoff(conn: Connection, nonce: str) -> int | None:
+    if not nonce or len(nonce) > 80:
+        return None
+    _ensure_session_handoffs(conn)
+    row = conn.execute(
+        "SELECT user_id, expires_at FROM session_handoffs WHERE nonce = ?",
+        (nonce,),
+    ).fetchone()
+    if not row:
+        return None
+    conn.execute("DELETE FROM session_handoffs WHERE nonce = ?", (nonce,))
+    conn.commit()
+    if int(row["expires_at"]) < int(time.time()):
+        return None
+    if not conn.execute("SELECT id FROM users WHERE id = ?", (int(row["user_id"]),)).fetchone():
+        return None
+    return int(row["user_id"])
+
+
+@app.before_request
+def _bridge_legacy_host():
+    """Move a wiring.date login onto wiring.club. Browsers will not send the old cookie across domains."""
+    host = _request_host()
+    canonical = _canonical_host()
+    if not canonical:
+        return None
+    nonce = str(request.args.get("handoff") or "")
+    if host == canonical and nonce:
+        uid = _consume_handoff(db(), nonce)
+        if uid:
+            session.permanent = True
+            session["uid"] = uid
+        args = request.args.to_dict(flat=True)
+        args.pop("handoff", None)
+        query = urlencode(args)
+        return redirect(request.path + (f"?{query}" if query else ""), 302)
+    if host not in _LEGACY_HOSTS or host == canonical:
+        return None
+    path = request.full_path or "/"
+    if path.endswith("?") and not request.query_string:
+        path = path[:-1]
+    if request.method == "GET" and _document_navigation():
+        uid = session.get("uid")
+        token = ""
+        if uid:
+            try:
+                token = _mint_handoff(db(), int(uid))
+            except (TypeError, ValueError):
+                token = ""
+        if token:
+            path = f"{path}{'&' if '?' in path else '?'}handoff={token}"
+        return redirect(f"https://{canonical}{path}", 302)
+    code = 307 if request.method != "GET" else 301
+    return redirect(f"https://{canonical}{path}", code)
 
 
 @app.before_request
@@ -450,6 +549,7 @@ def init_db() -> None:
         """
     )
     ensure_feed_history(conn)
+    _ensure_session_handoffs(conn)
     ensure_filter_tables(conn)
     ensure_device_tables(conn)
     ensure_task_tables(conn)

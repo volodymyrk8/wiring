@@ -359,7 +359,7 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   const toggle = () => {
     const element = audioRef.current;
     if (!element) return;
-    if (element.paused) void element.play().catch(() => setPlaying(false));
+    if (element.paused) void element.play().catch(() => { setPlaying(false); setFailed(true); });
     else element.pause();
   };
 
@@ -656,8 +656,15 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
-      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find((type) => {
+        try { return MediaRecorder.isTypeSupported(type); } catch { return false; }
+      }) || "";
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
       chunksRef.current = [];
       discardRecRef.current = false;
       streamRef.current = stream;
@@ -675,13 +682,17 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         const seconds = Math.max(1, Math.round((Date.now() - started) / 1000));
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         chunksRef.current = [];
-        if (discardRecRef.current || blob.size < 800) return;
+        if (discardRecRef.current) return;
+        if (blob.size < 64) {
+          host.toast("не получилось записать звук");
+          return;
+        }
         setSending(true);
         void sendVoiceBlob(blob, seconds).catch((caught) => {
           host.toast(errorMessage(caught, "не удалось отправить голосовое"));
         }).finally(() => setSending(false));
       };
-      recorder.start();
+      recorder.start(250);
       recTimerRef.current = window.setInterval(() => {
         const elapsed = Math.round((Date.now() - started) / 1000);
         setRecSeconds(elapsed);

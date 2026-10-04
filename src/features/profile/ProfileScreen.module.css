@@ -95,6 +95,7 @@
 
 .submitRow { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 12px; }
 .submitRow > :first-child { flex: 1 1 100%; }
+.accountActions { flex: 1 1 100%; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .guestCard { width: 100%; max-width: var(--container-app, 540px); margin: auto auto; padding: 26px 16px; box-sizing: border-box; }
 .guestCard .actions { margin-top: 22px; }
 .actions { display: grid; gap: 10px; }
@@ -108,5 +109,5 @@
   .photoGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .heading { display: block; }
   .status { margin-top: 12px; }
-  .submitRow > :not(:first-child) { flex: 1 1 calc(50% - 4px); }
+  .submitRow > :not(:first-child):not(.accountActions) { flex: 1 1 calc(50% - 4px); }
 }

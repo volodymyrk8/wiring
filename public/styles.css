@@ -3291,7 +3291,16 @@ button.bubble-quote {
   gap: 8px;
   min-width: 168px;
 }
-.voice-note audio { display: none; }
+.voice-note audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .voice-play {
   display: grid;
   place-items: center;

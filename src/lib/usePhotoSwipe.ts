@@ -9,6 +9,7 @@ export function usePhotoSwipe(onPhoto: (direction: number) => void, onVertical?:
     suppressClick.current = false;
     if (!event.isPrimary || event.button !== 0 || (event.target as HTMLElement).closest("button, a, input, select, textarea")) return;
     gesture.current = { x: event.clientX, y: event.clientY, axis: null };
+    if (event.pointerType !== "mouse") return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture(event.pointerId);
   };
