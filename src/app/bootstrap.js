@@ -11,11 +11,17 @@ import { createInboxController } from "./inbox";
   const featureLoader = createFeatureLoader(BASE);
   const pinChatHeight = () => {
     const port = window.visualViewport;
-    const height = Math.round(port ? port.height : window.innerHeight);
+    const layoutH = window.innerHeight;
     const top = Math.round(port ? port.offsetTop : 0);
-    const keyboard = Boolean(port && window.innerHeight - port.height > 80);
+    const height = Math.round(port ? port.height : layoutH);
+    const keyboard = Boolean(port && layoutH - port.height > 80);
+    let bottomInset = Math.max(0, Math.round(layoutH - top - height));
+    if (!keyboard && bottomInset < 12 && /Android/i.test(navigator.userAgent)) {
+      bottomInset = 40;
+    }
     document.documentElement.style.setProperty("--vvh", `${height}px`);
     document.documentElement.style.setProperty("--vvt", `${top}px`);
+    document.documentElement.style.setProperty("--vvb", keyboard ? "0px" : `${bottomInset}px`);
     document.documentElement.classList.toggle("keyboard", keyboard);
     if (document.documentElement.dataset.view === "chat") {
       window.scrollTo(0, 0);
