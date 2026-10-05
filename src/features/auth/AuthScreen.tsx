@@ -6,6 +6,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import styles from "./AuthScreen.module.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PROVIDER_LABELS: Record<string, string> = { google: "Google", yandex: "Яндекс", apple: "Apple" };
 const CYRILLIC_RE = /[а-яё]/i;
 
 type AuthScreenProps = { host: AuthHostBridge };
@@ -51,7 +52,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
     void host.api("/api/auth/providers", { signal: controller.signal }).then((raw) => {
       if (!active) return;
       const data = raw as { providers: string[]; error_message?: string };
-      setProviders(data.providers);
+      setProviders(data.providers.filter((provider) => Object.hasOwn(PROVIDER_LABELS, provider)));
       if (data.error_message) setServerError(data.error_message);
     }).catch(() => { /* Password login remains available. */ });
     return () => { active = false; controller.abort(); socialRequest.current?.abort(); };
@@ -431,11 +432,11 @@ export function AuthScreen({ host }: AuthScreenProps) {
         <div class={styles.socialActions}>
           {providers.map((provider) => (
             <Button key={provider} variant="ghost" fullWidth disabled={busy} onClick={() => void startSocialLogin(provider)}>
-              {isRegister ? "Зарегистрироваться" : "Войти"} через {provider === "google" ? "Google" : "Яндекс"}
+              {isRegister ? "Зарегистрироваться" : "Войти"} через {PROVIDER_LABELS[provider]}
             </Button>
           ))}
           {isRegister && <p class={styles.legalDisclaimer}>
-            Нажимая кнопку регистрации через Google или Яндекс, ты подтверждаешь возраст 18+ и принимаешь{" "}
+            Нажимая кнопку регистрации через внешний сервис, ты подтверждаешь возраст 18+ и принимаешь{" "}
             <a href={`${host.basePath}/rules`} target="_blank" rel="noopener noreferrer">пользовательское соглашение</a> и{" "}
             <a href={`${host.basePath}/privacy`} target="_blank" rel="noopener noreferrer">политику конфиденциальности</a>.
           </p>}

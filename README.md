@@ -196,3 +196,7 @@ Production работает только с PostgreSQL. Серверные на�
 ### Вход через Google и Яндекс
 
 На входе и регистрации доступны OAuth-кнопки после настройки `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` и корректного `SITE_URL`. WIRING использует имя и адрес почты для создания аккаунта и входа. Настройка callback URL, безопасное связывание аккаунтов и мобильный follow-up: [docs/social-login.md](docs/social-login.md).
+
+### Вход через Apple
+
+На входе и регистрации доступен Apple после настройки `APPLE_CLIENT_ID` (Services ID) и `APPLE_CLIENT_SECRET` (подписанный JWT). Настройка callback, срока действия секрета и Private Email Relay — в [docs/social-login.md](docs/social-login.md). Мобильный follow-up: кнопки «Войти через Apple» / «Зарегистрироваться через Apple» на iOS и Android и общий обмен OAuth-результата на мобильные токены, описанный в [docs/mobile-api.md](docs/mobile-api.md).

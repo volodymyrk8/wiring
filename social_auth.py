@@ -12,6 +12,7 @@ from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+import jwt
 from flask import jsonify, redirect, request, session
 from database import IntegrityError
 
@@ -20,6 +21,8 @@ PROVIDERS = {
                'https://openidconnect.googleapis.com/v1/userinfo', 'openid email profile'),
     'yandex': ('https://oauth.yandex.ru/authorize', 'https://oauth.yandex.ru/token',
                'https://login.yandex.ru/info?format=json', 'login:email login:info'),
+    'apple': ('https://appleid.apple.com/auth/authorize', 'https://appleid.apple.com/auth/token',
+              '', 'email'),
 }
 TTL = 600
 
@@ -45,6 +48,7 @@ def ensure_tables(conn):
             verifier TEXT NOT NULL, mode TEXT NOT NULL, referral TEXT NOT NULL,
             redirect_uri TEXT NOT NULL, created_at BIGINT NOT NULL
         );
+        ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS callback_payload TEXT;
     ''')
 
 
@@ -60,18 +64,42 @@ def _json_request(url, *, data=None, headers=None):
         raise OAuthError('Сервис входа временно недоступен. Попробуй ещё раз.') from exc
 
 
+def _apple_identity(token, client_id, nonce):
+    try:
+        header = jwt.get_unverified_header(token)
+        keys = _json_request('https://appleid.apple.com/auth/keys').get('keys', [])
+        if not isinstance(keys, list):
+            raise ValueError('invalid keys')
+        key = next(k for k in keys if isinstance(k, dict) and k.get('kid') == header.get('kid') and k.get('kty') == 'RSA')
+        info = jwt.decode(token, jwt.PyJWK.from_dict(key, algorithm='RS256').key,
+                          algorithms=['RS256'], audience=client_id, issuer='https://appleid.apple.com',
+                          options={'require': ['exp', 'iat', 'sub', 'nonce', 'email', 'email_verified']})
+        if not isinstance(info['nonce'], str) or not secrets.compare_digest(info['nonce'], nonce):
+            raise ValueError('nonce mismatch')
+        if info['email_verified'] is not True and info['email_verified'] != 'true':
+            raise ValueError('email not verified')
+        return info
+    except (jwt.PyJWTError, ValueError, TypeError, KeyError, StopIteration) as exc:
+        raise OAuthError('Не удалось проверить аккаунт Apple. Начни вход заново.') from exc
+
+
 def exchange_identity(provider, code, redirect_uri, verifier):
     client_id, client_secret = credentials(provider)
     _, token_url, info_url, _ = PROVIDERS[provider]
     data = dict(grant_type='authorization_code', code=code, client_id=client_id,
                 client_secret=client_secret, redirect_uri=redirect_uri)
-    data['code_verifier'] = verifier
-    token = _json_request(token_url, data=data).get('access_token')
-    if not isinstance(token, str) or not token:
-        raise OAuthError('Не удалось войти. Попробуй ещё раз.')
-    info = _json_request(info_url, headers={'Authorization': f'{"Bearer" if provider == "google" else "OAuth"} {token}'})
-    email = str(info.get('email' if provider == 'google' else 'default_email') or '').strip().lower()
-    subject = str(info.get('sub' if provider == 'google' else 'id') or '').strip()
+    if provider != 'apple':
+        data['code_verifier'] = verifier
+    tokens = _json_request(token_url, data=data)
+    if provider == 'apple':
+        info = _apple_identity(tokens.get('id_token'), client_id, verifier)
+    else:
+        token = tokens.get('access_token')
+        if not isinstance(token, str) or not token:
+            raise OAuthError('Не удалось войти. Попробуй ещё раз.')
+        info = _json_request(info_url, headers={'Authorization': f'{"Bearer" if provider == "google" else "OAuth"} {token}'})
+    email = str(info.get('default_email' if provider == 'yandex' else 'email') or '').strip().lower()
+    subject = str(info.get('id' if provider == 'yandex' else 'sub') or '').strip()
     if not subject or len(subject) > 255 or not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
         raise OAuthError('Сервис входа не передал адрес почты. Разреши доступ к почте и повтори вход.')
     if email.endswith(('@wiring.guest', '@wiring.demo', '@deleted.wiring')) or email == 'demo@wiring.app':
@@ -81,7 +109,7 @@ def exchange_identity(provider, code, redirect_uri, verifier):
     if provider == 'yandex' and info.get('client_id') != client_id:
         raise OAuthError('Не удалось проверить аккаунт Яндекса.')
     # Third-party addresses in Google accounts aren't authoritative for linking.
-    authoritative = (email.endswith('@gmail.com') or bool(info.get('hd'))) if provider == 'google' else email.rsplit('@', 1)[1] in {
+    authoritative = (email.endswith('@gmail.com') or bool(info.get('hd'))) if provider == 'google' else provider == 'yandex' and email.rsplit('@', 1)[1] in {
         'yandex.ru', 'yandex.com', 'ya.ru', 'yandex.by', 'yandex.kz', 'yandex.ua', 'yandex.com.tr'}
     name = str(info.get('given_name' if provider == 'google' else 'first_name') or info.get('display_name') or 'Участник').strip()[:32]
     return subject, email, name if len(name) >= 2 else 'Участник', authoritative
@@ -132,24 +160,41 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         state, browser, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(32), secrets.token_urlsafe(48)
         conn = db()
         conn.execute('DELETE FROM oauth_flows WHERE created_at < ?', (int(time.time()) - TTL,))
-        conn.execute('INSERT INTO oauth_flows VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        conn.execute('INSERT INTO oauth_flows (state_hash, browser, provider, verifier, mode, referral, redirect_uri, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                      (hashlib.sha256(state.encode()).hexdigest(), browser, provider, verifier, mode,
                       str(data.get('ref') or '')[:100], callback, int(time.time())))
         conn.commit()
         session['oauth_browser'] = browser
         auth_url, _, _, scope = PROVIDERS[provider]
         params = dict(response_type='code', client_id=credentials(provider)[0], redirect_uri=callback, state=state, scope=scope)
-        params.update(code_challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode(),
+        if provider == 'apple':
+            params.update(response_mode='form_post', nonce=verifier)
+        else:
+            params.update(code_challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode(),
                           code_challenge_method='S256')
         if provider == 'google':
             params['prompt'] = 'select_account'
         return jsonify(ok=True, url=auth_url + '?' + urlencode(params))
 
-    @app.get('/api/auth/<provider>/callback')
+    @app.route('/api/auth/<provider>/callback', methods=['GET', 'POST'])
     def auth_callback(provider):
         if provider not in PROVIDERS or not all(credentials(provider)):
             return failure('Этот способ входа пока не настроен.')
-        state = request.args.get('state', '')
+        # Apple posts cross-site, where SameSite=Lax omits our browser cookie.
+        # Hold the response server-side, then require that cookie on a same-site GET.
+        if request.method == 'POST':
+            if provider != 'apple':
+                return jsonify(ok=False, error='Некорректный запрос.'), 405
+            state = request.form.get('state', '')[:512]
+            payload = json.dumps({key: request.form.get(key, '')[:4096] for key in ('code', 'error')})
+            conn = db()
+            stored = conn.execute('UPDATE oauth_flows SET callback_payload = ? WHERE state_hash = ? AND provider = ? AND created_at >= ? AND callback_payload IS NULL',
+                                  (payload, hashlib.sha256(state.encode()).hexdigest(), provider, int(time.time()) - TTL)).rowcount
+            conn.commit()
+            if not stored:
+                return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+            return redirect(prefix('/api/auth/apple/callback') + '?' + urlencode({'state': state}), 303)
+        state = request.args.get('state', '')[:512]
         conn = db()
         flow = conn.execute('SELECT * FROM oauth_flows WHERE state_hash = ? FOR UPDATE',
                             (hashlib.sha256(state.encode()).hexdigest(),)).fetchone()
@@ -163,10 +208,13 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         mode = flow['mode']
         if int(time.time()) - flow['created_at'] > TTL:
             return failure('Вход устарел. Начни заново.', mode)
-        if request.args.get('error') or not request.args.get('code'):
+        payload = json.loads(flow['callback_payload']) if provider == 'apple' and flow['callback_payload'] else request.args
+        if provider == 'apple' and not flow['callback_payload']:
+            return failure('Вход устарел. Начни заново.', mode)
+        if payload.get('error') or not payload.get('code'):
             return failure('Вход отменён. Можно попробовать снова.', mode)
         try:
-            subject, email, name, authoritative = exchange_identity(provider, request.args['code'], flow['redirect_uri'], flow['verifier'])
+            subject, email, name, authoritative = exchange_identity(provider, payload['code'], flow['redirect_uri'], flow['verifier'])
             # Serialize registration/linking by email; constraints also guard provider identity races.
             conn.execute('SELECT pg_advisory_xact_lock(hashtext(?))', (email,))
             row = conn.execute('SELECT u.* FROM users u JOIN oauth_identities i ON i.user_id = u.id WHERE i.provider = ? AND i.subject = ? FOR UPDATE OF u', (provider, subject)).fetchone()

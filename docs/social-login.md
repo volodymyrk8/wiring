@@ -1,6 +1,6 @@
-# Вход через Google и Яндекс
+# Вход через Google, Яндекс и Apple
 
-Один серверный OAuth Authorization Code flow с PKCE S256, одноразовым state и существующей cookie-сессией WIRING. Пароль обычного аккаунта продолжает работать. Доступ к письмам не запрашивается: адрес почты и данные профиля: код WIRING сохраняет только имя и адрес. Пакет `login:info` Яндекса также разрешает получить фамилию и пол, но они не используются. Токены провайдеров используются только на сервере и не сохраняются.
+Общий серверный OAuth Authorization Code flow (Google/Яндекс с PKCE S256, Apple с nonce и проверкой подписанного ID token), одноразовым state и существующей cookie-сессией WIRING. Пароль обычного аккаунта продолжает работать. Доступ к письмам не запрашивается: адрес почты и данные профиля: код WIRING сохраняет только имя и адрес. Пакет `login:info` Яндекса также разрешает получить фамилию и пол, но они не используются. Токены провайдеров используются только на сервере и не сохраняются.
 
 ## Настройка
 
@@ -12,10 +12,12 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 YANDEX_CLIENT_ID=...
 YANDEX_CLIENT_SECRET=...
+APPLE_CLIENT_ID=...
+APPLE_CLIENT_SECRET=...
 OAUTH_ALLOWED_ORIGINS=https://wiring.club,https://wiring.date
 ```
 
-Также нужны стабильный `APP_SECRET_KEY` и `SESSION_COOKIE_SECURE=1` в production. После изменения окружения перезапустите Flask/gunicorn. Без полной пары ID/Secret кнопка соответствующего провайдера скрыта. По умолчанию callback использует `SITE_URL`. Для нескольких адресов сайта задайте `OAUTH_ALLOWED_ORIGINS` и зарегистрируйте callback каждого адреса у обоих провайдеров: тогда возвращение происходит на тот же разрешённый origin, где начался вход, и cookie сохраняется. Произвольный Host не может подменить callback.
+Также нужны стабильный `APP_SECRET_KEY` и `SESSION_COOKIE_SECURE=1` в production. После изменения окружения перезапустите Flask/gunicorn. Без полной пары ID/Secret кнопка соответствующего провайдера скрыта. По умолчанию callback использует `SITE_URL`. Для нескольких адресов сайта задайте `OAUTH_ALLOWED_ORIGINS` и зарегистрируйте callback каждого адреса у всех включённых провайдеров: тогда возвращение происходит на тот же разрешённый origin, где начался вход, и cookie сохраняется. Произвольный Host не может подменить callback.
 
 1. В [Google Cloud Console](https://console.cloud.google.com/apis/credentials) настройте OAuth consent screen и создайте OAuth client типа Web application. Разрешённый redirect URI: `https://wiring.club/api/auth/google/callback`; для второго домена также `https://wiring.date/api/auth/google/callback`. Области: `openid email profile`. В режиме Testing добавьте тестовых пользователей; для публичного запуска настройте публикацию consent screen по требованиям Google.
 2. В [Яндекс OAuth](https://oauth.yandex.ru/) создайте приложение с веб-платформой, правами `login:email` и `login:info`. Redirect URI: `https://wiring.club/api/auth/yandex/callback`; для второго домена также `https://wiring.date/api/auth/yandex/callback`. Проверьте статус приложения и требования верификации Яндекса.
@@ -41,3 +43,16 @@ OAUTH_ALLOWED_ORIGINS=https://wiring.club,https://wiring.date
 `mobile/` отсутствует в этой ветке. На iOS и Android добавить на экраны входа/регистрации «Войти через Google» / «Войти через Яндекс» и «Зарегистрироваться через Google» / «Зарегистрироваться через Яндекс», тот же текст 18+ и согласия. На удалении — ссылку «Задать пароль через сброс пароля».
 
 Общий `/api/auth/providers` и `/api/auth/{provider}/start` уже покрывает веб-вход через системный браузер, но callback пока создаёт cookie-сессию. Для полноценного входа в нативное приложение существующего `/api/auth/token` (email/password) недостаточно: нужен общий обмен одноразового результата OAuth на действующую пару access/refresh в `mobile_api.py` с привязкой к PKCE приложения и разрешённым app callback. Не копировать cookie и не создавать второй app-only вариант аккаунтов/API. До этого приложения могут использовать существующий вход с паролем после его задания через сброс.
+
+## Настройка Apple
+
+1. В Apple Developer включить Sign in with Apple у основного App ID, создать связанный **Services ID** для сайта. `APPLE_CLIENT_ID` — этот Services ID, не Bundle ID приложения. Зарегистрировать домены и Return URL `https://wiring.club/api/auth/apple/callback` (также `https://wiring.date/api/auth/apple/callback`, если используется; с `BASE_PATH` при необходимости).
+2. Создать ключ Sign in with Apple. Сгенерировать ES256 client-secret JWT: заголовок `kid` — Key ID, `iss` — Team ID, `sub` — Services ID, `aud` — `https://appleid.apple.com`, `iat` и `exp` — Unix time. Срок не более шести месяцев. Сохранить JWT в `APPLE_CLIENT_SECRET`, отслеживать срок и заменить до истечения; приватный `.p8` в репозиторий не помещать. Без ID/секрета кнопка скрыта.
+3. Apple требует HTTPS Return URL с доменом: localhost/IP для этого flow не подходят. Для ручной проверки нужен отдельный тестовый HTTPS-домен и отдельная конфигурация, без production-аккаунтов и секретов.
+4. Для доставки писем на `privaterelay.appleid.com` зарегистрировать отправителя/домены в Private Email Relay и настроить SPF/DKIM. Скрытая почта поддерживается как адрес аккаунта; Apple не связывается автоматически с существующим аккаунтом по совпадению почты. Пользователь должен войти с прежним паролем или восстановить его.
+
+Запрашивается только `email`; имя не запрашивается и новый профиль получает «Участник», которое можно изменить в анкете. Код обменивается на сервере; ID token проверяется по Apple JWKS (RS256), issuer, Services ID audience, exp, nonce и verified email. `PyJWT[crypto]` добавлен для стандартной проверки подписи без собственной криптографии. Токены не сохраняются. Apple POST callback временно сохраняет только code/error в PostgreSQL flow, затем 303 GET восстанавливает SameSite=Lax browser cookie; без исходного браузера вход не завершается. Flow расходуется однократно, временные данные очищаются вместе с ним, state живёт 10 минут. Это не требует ослаблять SameSite всех сессий.
+
+Мобильный follow-up: «Войти через Apple» / «Зарегистрироваться через Apple» на входе/регистрации обеих платформ, общий обмен результата на существующие мобильные токены и связанная группа App ID/Services ID; текущий cookie-flow сам по себе этого обмена не предоставляет.
+
+Официальная документация: [веб-конфигурация](https://developer.apple.com/documentation/signinwithapple/configuring-your-webpage-for-sign-in-with-apple), [проверка пользователя](https://developer.apple.com/documentation/signinwithapple/verifying-a-user), [настройка окружения и relay](https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple).

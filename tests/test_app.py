@@ -66,6 +66,56 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(query["code_challenge_method"], ["S256"])
         return query["state"][0]
 
+    @patch.dict(os.environ, {"APPLE_CLIENT_ID": "apple-client", "APPLE_CLIENT_SECRET": "test-secret"})
+    def test_apple_post_callback_browser_binding_and_replay(self):
+        from urllib.parse import urlparse, parse_qs
+        start = self.client.post("/api/auth/apple/start", json={
+            "mode": "register", "age_confirm": True, "privacy_confirm": True,
+        })
+        query = parse_qs(urlparse(start.get_json()["url"]).query)
+        self.assertEqual(query["response_mode"], ["form_post"])
+        self.assertEqual(query["scope"], ["email"])
+        self.assertNotIn("code_challenge", query)
+        state = query["state"][0]
+        # Simulate Apple cross-site POST without the SameSite=Lax session cookie.
+        post_client = app.test_client()
+        posted = post_client.post("/api/auth/apple/callback", data={"state": state, "code": "apple-code"})
+        self.assertEqual(posted.status_code, 303)
+        self.assertNotIn("apple-code", posted.location)
+        self.assertNotIn("Set-Cookie", posted.headers)
+        self.assertEqual(posted.headers["Referrer-Policy"], "no-referrer")
+        with patch("social_auth.exchange_identity", return_value=("apple-sub", "relay@privaterelay.appleid.com", "Участник", False)) as exchange:
+            wrong_browser = post_client.get(posted.location)
+            self.assertEqual(wrong_browser.location, "/login")
+            exchange.assert_not_called()
+            result = self.client.get(posted.location)
+            self.assertEqual(result.location, "/me")
+            self.assertEqual(exchange.call_args.args, ("apple", "apple-code", query["redirect_uri"][0], query["nonce"][0]))
+        with self.client.session_transaction() as sess:
+            uid = sess["uid"]
+        with app.app_context():
+            identity = db().execute("SELECT * FROM oauth_identities WHERE user_id = ?", (uid,)).fetchone()
+            self.assertEqual(identity["provider"], "apple")
+        with patch("social_auth.exchange_identity") as exchange:
+            self.client.get(posted.location)
+            exchange.assert_not_called()
+        self.assertEqual(post_client.post("/api/auth/apple/callback", data={"state": state, "code": "apple-code"}).status_code, 400)
+
+    @patch.dict(os.environ, {"APPLE_CLIENT_ID": "apple-client", "APPLE_CLIENT_SECRET": "test-secret"})
+    def test_apple_cancellation_and_direct_get_rejected(self):
+        from urllib.parse import urlparse, parse_qs
+        for cancelled in (True, False):
+            start = self.client.post("/api/auth/apple/start", json={"mode": "login"})
+            state = parse_qs(urlparse(start.get_json()["url"]).query)["state"][0]
+            with patch("social_auth.exchange_identity") as exchange:
+                if cancelled:
+                    posted = app.test_client().post("/api/auth/apple/callback", data={"state": state, "error": "user_cancelled_authorize"})
+                    result = self.client.get(posted.location)
+                else:
+                    result = self.client.get("/api/auth/apple/callback", query_string={"state": state, "code": "code"})
+                self.assertEqual(result.location, "/login")
+                exchange.assert_not_called()
+
     def _oauth_callback(self, state, provider="google", identity=None):
         identity = identity or ("subject-1", "social@gmail.com", "Ада", True)
         with patch("social_auth.exchange_identity", return_value=identity) as exchange:
