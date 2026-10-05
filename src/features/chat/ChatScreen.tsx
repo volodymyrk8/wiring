@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
+import {
+  chatSendModeHint,
+  readChatSendMode,
+  shouldSendOnComposerKey,
+  toggleChatSendMode,
+  type ChatSendMode,
+} from "@/lib/chat-send-mode";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
@@ -152,10 +159,12 @@ function ChatHeader({ host }: { host: ChatHostBridge }) {
             consentsHref={host.hrefFor("consents")}
             plusHref={host.hrefFor("plus")}
             notificationsHref={host.hrefFor("notifications")}
+            archiveHref={host.hrefFor("archive")}
             onProfileClick={navigate("profile")}
             onConsentsClick={navigate("consents")}
             onPlusClick={navigate("plus")}
             onNotificationsClick={navigate("notifications")}
+            onArchiveClick={navigate("archive")}
             onLogout={host.onLogout}
           />
         )
@@ -474,6 +483,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const [error, setError] = useState("");
+  const [sendMode, setSendMode] = useState<ChatSendMode>(() => readChatSendMode());
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
@@ -631,6 +641,19 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     setReplyTo(null);
     setEditing(null);
     if (wasEditing) restoreDraft();
+  };
+
+  const submitDraft = () => {
+    const form = inputRef.current?.form;
+    if (form instanceof HTMLFormElement) form.requestSubmit();
+  };
+
+  const onComposerKeyDown = (event: JSX.TargetedKeyboardEvent<HTMLTextAreaElement>) => {
+    if (!shouldSendOnComposerKey(sendMode, event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (sending || recording || !draft.trim()) return;
+    submitDraft();
   };
 
   const sendMessage = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
@@ -874,6 +897,16 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 <button type="button" class="reply-cancel" onClick={cancelComposeMode} aria-label="Отменить">×</button>
               </div>
             ) : null}
+            {!recording ? (
+              <button
+                type="button"
+                class="composer-key-hint"
+                onClick={() => setSendMode(toggleChatSendMode(sendMode))}
+                aria-label="Сменить способ отправки сообщения"
+              >
+                {chatSendModeHint(sendMode)} · <span class="composer-key-hint-action">сменить</span>
+              </button>
+            ) : null}
             {recording ? (
               <div class="composer is-recording" role="status">
                 <button type="button" class="composer-text" onClick={() => stopRecording(true)}>Отмена</button>
@@ -887,7 +920,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={sendPhotos} />
                 </label>
                 <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
-                <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" disabled={sending} />
+                <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} onKeyDown={onComposerKeyDown} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" disabled={sending} />
                 <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : "Отправить сообщение"} title={editing ? "Сохранить" : "Отправить"} disabled={sending || !draft.trim()} onMouseDown={(event) => event.preventDefault()}><SendIcon /></button>
               </form>
             )}

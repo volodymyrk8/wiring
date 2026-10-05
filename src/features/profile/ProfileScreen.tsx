@@ -124,6 +124,8 @@ function PhotoManager({
   const [cropError, setCropError] = useState("");
   const batchRef = useRef(1);
   const cropLock = useRef(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const makePrimaryAfterCrop = useRef(false);
   const photos = allPhotos(user);
   const name = valueOf(user.name, "Профиль");
   const needsPhotoConsent = Boolean(user.needs_photo_consent);
@@ -145,17 +147,44 @@ function PhotoManager({
     setCropQueue(files);
   };
 
+  const pickAvatar = () => {
+    if (needsPhotoConsent && !consent) {
+      setConsentError(true);
+      setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
+      return;
+    }
+    setError("");
+    setConsentError(false);
+    avatarInputRef.current?.click();
+  };
+
+  const uploadAvatar = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    makePrimaryAfterCrop.current = true;
+    batchRef.current = 1;
+    setCropQueue([file]);
+  };
+
   const acceptCrop = async (file: File) => {
     if (cropLock.current) return;
     cropLock.current = true;
     setBusy(true);
     setCropError("");
     try {
-      await host.uploadPhoto(file, consent);
+      const replaceAvatar = makePrimaryAfterCrop.current;
+      const uploaded = await host.uploadPhoto(file, consent);
+      if (replaceAvatar && uploaded.photo?.id) {
+        await host.setPrimaryPhoto(uploaded.photo.id);
+      }
+      makePrimaryAfterCrop.current = false;
       await refresh();
       const rest = cropQueue.slice(1);
       setCropQueue(rest);
-      if (!rest.length) host.toast(batchRef.current > 1 ? "фото добавлены" : "фото добавлено");
+      if (!rest.length) {
+        host.toast(replaceAvatar ? "аватар обновлён" : batchRef.current > 1 ? "фото добавлены" : "фото добавлено");
+      }
     } catch (caught) {
       setCropError(getErrorMessage(caught));
     } finally {
@@ -211,6 +240,11 @@ function PhotoManager({
         </Checkbox>
         </div>
       ) : null}
+      <div class={styles.photoToolbar}>
+        <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>Изменить аватар</Button>
+        <p class={styles.photoHint}>Аватар — главное фото в ленте. Нажми на другое фото, чтобы сделать его аватаром.</p>
+      </div>
+      <input ref={avatarInputRef} class={styles.srOnly} type="file" accept="image/*" disabled={busy || cropQueue.length > 0} onChange={uploadAvatar} />
       <div class={styles.photoGrid}>
         {photos.map((photo) => (
           <div key={photo.id} class={`${styles.photoCell}${photo.is_primary ? ` ${styles.primary}` : ""}`}>
@@ -480,9 +514,12 @@ export function ProfileScreen({ host }: Props) {
             consentsHref={host.hrefFor("consents")}
             plusHref={host.hrefFor("plus")}
             notificationsHref={host.hrefFor("notifications")}
+            archiveHref={host.hrefFor("archive")}
             onProfileClick={handleNav("profile")}
             onConsentsClick={handleNav("consents")}
             onPlusClick={handleNav("plus")}
+            onNotificationsClick={handleNav("notifications")}
+            onArchiveClick={handleNav("archive")}
             onLogout={host.onLogout}
           />
         ) : null}

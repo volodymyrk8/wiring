@@ -38,6 +38,25 @@ const iconPass = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const iconProfile = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8" /></svg>;
 const iconLike = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" /></svg>;
 
+function jumpReel(viewport: HTMLElement, top: number, lock: { pinning: boolean; token: number }, force = false) {
+  if (!force && Math.abs(viewport.scrollTop - top) < 1) return;
+  const token = ++lock.token;
+  lock.pinning = true;
+  const previousSnap = viewport.style.scrollSnapType;
+  viewport.style.scrollSnapType = "none";
+  viewport.scrollTop = top;
+  requestAnimationFrame(() => {
+    if (lock.token !== token) return;
+    viewport.scrollTop = top;
+    requestAnimationFrame(() => {
+      if (lock.token !== token) return;
+      viewport.scrollTop = top;
+      viewport.style.scrollSnapType = previousSnap;
+      lock.pinning = false;
+    });
+  });
+}
+
 const labels = (catalog: DeckHostBridge["catalog"], kind: "genders" | "looking_for" | "intents", values: unknown) => {
   const ids = Array.isArray(values) ? values : values ? [values] : [];
   return ids.map((id) => catalog[kind]?.find((item) => item.id === id)?.label || String(id)).filter(Boolean);
@@ -85,7 +104,7 @@ function discoveryFromUser(host: DeckHostBridge): DiscoveryDraft {
   };
 }
 
-function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: DeckHostBridge; filters: DeckFilters; busy: boolean; error: string; onApply: (filters: DeckFilters, discovery: DiscoveryDraft) => void; onClose: () => void }) {
+function FilterPanel({ host, filters, applying, error, onApply, onClose }: { host: DeckHostBridge; filters: DeckFilters; applying: boolean; error: string; onApply: (filters: DeckFilters, discovery: DiscoveryDraft) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(filters);
   const [minAge, setMinAge] = useState(String(filters.min_age));
   const [maxAge, setMaxAge] = useState(String(filters.max_age));
@@ -104,12 +123,12 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
     setMaxAge("99");
   };
   return <Modal isOpen onClose={onClose} title="Фильтры" responsiveSheet
-    footer={<><Button variant="ghost" disabled={busy} onClick={reset}>Сбросить</Button><Button type="button" disabled={busy} loading={busy} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>Применить</Button></>}>
+    footer={<><Button variant="ghost" disabled={applying} onClick={reset}>Сбросить</Button><Button type="button" disabled={applying} loading={applying} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>Применить</Button></>}>
     <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
       event.preventDefault();
-      if (!busy) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
+      if (!applying) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
     }}>
-      <fieldset class={styles.filterFields} disabled={busy}>
+      <fieldset class={styles.filterFields} disabled={applying}>
         <h3 class={styles.filterSection}>Кого ищу я</h3>
         <p class={styles.filterIntro}>Кого показывать в твоей ленте.</p>
         <div class={styles.range}>
@@ -118,7 +137,7 @@ function FilterPanel({ host, filters, busy, error, onApply, onClose }: { host: D
         </div>
         <Select className={styles.citySelect} label="Пол" id="deck-gender" options={[{ value: "", label: "Любой" }, { value: "woman", label: "Женщины" }, { value: "man", label: "Мужчины" }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel="Пол в ленте" />
         <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
-        <TagPicker label="Формат знакомства" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
+        <TagPicker label="Цель поиска" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
         <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} />
         <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>Скрыть анкеты без диагноза</Checkbox>
         <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
@@ -278,6 +297,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const [scrolling, setScrolling] = useState(false);
   const [panelHold, setPanelHold] = useState(false);
   const [error, setError] = useState("");
+  const [applyingFilters, setApplyingFilters] = useState(false);
   const [cardHeight, setCardHeight] = useState(640);
   const viewportRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -289,6 +309,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const panelDragRef = useRef<{ id: number; y: number; scroll: number; moved: boolean } | null>(null);
   const panelMovedRef = useRef(false);
   const scrollTimerRef = useRef<number | null>(null);
+  const reelLock = useRef({ pinning: false, token: 0 });
   const current = cards[index];
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
 
@@ -309,7 +330,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     if (!viewport) return;
     const align = () => {
       setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 140 : 128)));
-      viewport.scrollTop = indexRef.current * viewport.clientHeight;
+      jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
     };
     align();
     const observer = new ResizeObserver(align);
@@ -319,7 +340,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
-    if (viewport) viewport.scrollTop = indexRef.current * viewport.clientHeight;
+    if (viewport) jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current, true);
   }, [cards]);
 
   useEffect(() => {
@@ -347,13 +368,18 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
 
   const applyFilters = async (nextFilters: DeckFilters, discovery: DiscoveryDraft) => {
     setError("");
+    setApplyingFilters(true);
     try {
       await saveDiscovery(discovery);
+      requestRef.current?.abort();
+      requestRef.current = null;
+      await loadPage(nextFilters, true);
+      setFiltersOpen(false);
     } catch (caught) {
       setError(getErrorMessage(caught));
-      return;
+    } finally {
+      setApplyingFilters(false);
     }
-    await loadPage(nextFilters, true);
   };
 
   const loadPage = async (nextFilters = filters, replace = false) => {
@@ -370,7 +396,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       setCards((previous) => replace || host.recommendations ? response.cards : [...previous, ...response.cards.filter((card) => !previous.some((old) => old.id === card.id))]);
       if (replace) {
         setFilters(nextFilters); setIndex(0); indexRef.current = 0; setFiltersOpen(false);
-        if (viewportRef.current) viewportRef.current.scrollTop = 0;
+        if (viewportRef.current) jumpReel(viewportRef.current, 0, reelLock.current);
       }
     } catch (caught) {
       if (!controller.signal.aborted) setError(getErrorMessage(caught));
@@ -425,7 +451,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       setGeneration(reset.generation); setCards([]); setIndex(0); indexRef.current = 0;
       viewedRef.current.clear(); setHasMore(true); setResetOpen(false);
       host.onFeedChange([], 0, filters, true, reset.generation);
-      if (viewportRef.current) viewportRef.current.scrollTop = 0;
+      if (viewportRef.current) jumpReel(viewportRef.current, 0, reelLock.current);
       const response = await host.loadFeed(filters, controller.signal);
       if (controller.signal.aborted) return;
       indexRef.current = 0; setIndex(0);
@@ -468,7 +494,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
 
   return <div class={`${styles.root}${host.recommendations ? ` ${styles.recommendationsRoot}` : ""}`}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
-    {filtersOpen ? <FilterPanel host={host} filters={filters} busy={loading || busy} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!loading) setFiltersOpen(false); }} /> : null}
+    {filtersOpen ? <FilterPanel host={host} filters={filters} applying={applyingFilters} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!applyingFilters) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>
       <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
@@ -483,7 +509,12 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       </Modal>
       {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
       <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
-        onScroll={(event) => { settleScroll(); setIndex(Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)))); }}
+        onScroll={(event) => {
+          const next = Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)));
+          if (reelLock.current.pinning) { setIndex(next); return; }
+          settleScroll();
+          setIndex(next);
+        }}
         onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("button, a, input")) return;
           if (["ArrowDown", "PageDown", " "].includes(event.key)) { event.preventDefault(); advance(1); }

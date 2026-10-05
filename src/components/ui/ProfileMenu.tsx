@@ -14,11 +14,13 @@ export type ProfileMenuProps = {
   plusHref?: string;
   supportHref?: string;
   notificationsHref?: string;
+  archiveHref?: string;
   onProfileClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onConsentsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onPlusClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onSupportClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onNotificationsClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
+  onArchiveClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => void;
   onLogout?: () => void;
   className?: string;
 };
@@ -32,11 +34,13 @@ export function ProfileMenu({
   plusHref = "/plus",
   supportHref = "/support",
   notificationsHref = "/notifications",
+  archiveHref,
   onProfileClick,
   onConsentsClick,
   onPlusClick,
   onSupportClick,
   onNotificationsClick,
+  onArchiveClick,
   onLogout,
   className,
 }: ProfileMenuProps) {
@@ -187,6 +191,27 @@ export function ProfileMenu({
             </span>
             <span class={styles.itemText}>Уведомления</span>
           </a>
+
+          {archiveHref ? (
+            <a
+              href={archiveHref}
+              data-nav="archive"
+              class={styles.menuItem}
+              onClick={(e) => {
+                setIsOpen(false);
+                onArchiveClick?.(e);
+              }}
+              role="menuitem"
+            >
+              <span class={styles.itemIcon}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" />
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </span>
+              <span class={styles.itemText}>Лайки, дизлайки, блок</span>
+            </a>
+          ) : null}
 
           <div class={styles.divider} />
 

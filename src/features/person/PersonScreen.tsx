@@ -66,10 +66,12 @@ function PersonHeader({ host }: { host: PersonHostBridge }) {
       consentsHref={host.hrefFor("consents")}
       plusHref={host.hrefFor("plus")}
       notificationsHref={host.hrefFor("notifications")}
+      archiveHref={host.hrefFor("archive")}
       onProfileClick={navigate("profile")}
       onConsentsClick={navigate("consents")}
       onPlusClick={navigate("plus")}
       onNotificationsClick={navigate("notifications")}
+      onArchiveClick={navigate("archive")}
       onLogout={host.onLogout}
     />}
   />;
@@ -184,7 +186,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
           {isSelf ? (
             <>
               <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
-              <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>Лайки и дизлайки</Button>
+              <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>Лайки, дизлайки, блок</Button>
             </>
           ) : null}
           {!isSelf && (host.personFrom === "deck" || host.personFrom === "recommendations" || host.personFrom === "likes") ? <>

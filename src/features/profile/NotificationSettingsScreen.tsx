@@ -80,10 +80,12 @@ export function NotificationSettingsScreen({ host }: { host: ProfileHostBridge }
           consentsHref={host.hrefFor("consents")}
           plusHref={host.hrefFor("plus")}
           notificationsHref={host.hrefFor("notifications")}
+          archiveHref={host.hrefFor("archive")}
           onProfileClick={navigate("profile")}
           onConsentsClick={navigate("consents")}
           onPlusClick={navigate("plus")}
           onNotificationsClick={navigate("notifications")}
+          onArchiveClick={navigate("archive")}
           onLogout={host.onLogout}
         />}
       />

@@ -108,7 +108,7 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
         showBack
         backHref={host.hrefFor("profile")}
         onBackClick={navigate("profile")}
-        sectionTitle="решения"
+        sectionTitle="Лайки, дизлайки, блок"
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={!host.user.guest ? <ProfileMenu
@@ -119,16 +119,18 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
           consentsHref={host.hrefFor("consents")}
           plusHref={host.hrefFor("plus")}
           notificationsHref={host.hrefFor("notifications")}
+          archiveHref={host.hrefFor("archive")}
           onProfileClick={navigate("profile")}
           onConsentsClick={navigate("consents")}
           onPlusClick={navigate("plus")}
           onNotificationsClick={navigate("notifications")}
+          onArchiveClick={navigate("archive")}
           onLogout={host.onLogout}
         /> : null}
       />
       <main class={styles.content}>
         <div class={styles.heading}>
-          <h1>Лайки, дизлайки и блок</h1>
+          <h1>Лайки, дизлайки, блок</h1>
           <p>Сюда можно зайти, когда хочется передумать. В ленте и чатах этого списка нет.</p>
         </div>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
