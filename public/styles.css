@@ -2011,7 +2011,8 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
 .legal-nav a:hover,
 .legal-footer-bar a:hover,
 .legal-nav a[aria-current="page"],
-.legal-footer-bar a[aria-current="page"] {
+.legal-footer-bar a[aria-current="page"],
+.legal-footer-bar a[aria-current="location"] {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -3043,26 +3044,6 @@ html[data-view="chat"] #app {
   white-space: nowrap;
 }
 .bubble.has-photo .time { margin: 8px 2px 0; }
-.composer-key-hint {
-  display: block;
-  width: min(780px, 100%);
-  margin: 0 auto 6px;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 11px;
-  line-height: 1.35;
-  text-align: left;
-  cursor: pointer;
-  pointer-events: auto;
-}
-.composer-key-hint-action {
-  color: var(--lime);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 .composer-dock {
   flex-shrink: 0;
   width: 100%;

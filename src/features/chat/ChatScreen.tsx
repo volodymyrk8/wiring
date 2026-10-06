@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
-import {
-  chatSendModeHint,
-  readChatSendMode,
-  shouldSendOnComposerKey,
-  toggleChatSendMode,
-  type ChatSendMode,
-} from "@/lib/chat-send-mode";
+import { readChatSendMode, shouldSendOnComposerKey, type ChatSendMode } from "@/lib/chat-send-mode";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import styles from "./ChatScreen.module.css";
@@ -483,7 +477,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
   const [error, setError] = useState("");
-  const [sendMode, setSendMode] = useState<ChatSendMode>(() => readChatSendMode());
+  const [sendMode] = useState<ChatSendMode>(() => readChatSendMode());
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
@@ -896,16 +890,6 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 </span>
                 <button type="button" class="reply-cancel" onClick={cancelComposeMode} aria-label="Отменить">×</button>
               </div>
-            ) : null}
-            {!recording ? (
-              <button
-                type="button"
-                class="composer-key-hint"
-                onClick={() => setSendMode(toggleChatSendMode(sendMode))}
-                aria-label="Сменить способ отправки сообщения"
-              >
-                {chatSendModeHint(sendMode)} · <span class="composer-key-hint-action">сменить</span>
-              </button>
             ) : null}
             {recording ? (
               <div class="composer is-recording" role="status">
