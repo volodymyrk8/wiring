@@ -230,7 +230,7 @@ function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }
     const label = labelForTag("neuro", id, host.catalog);
     return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
   });
-  return <article ref={cardRef} {...gesture} class={`${styles.card}${photos.length > 1 ? ` ${styles.cardMulti}` : ""}`} tabIndex={active && photos.length > 1 ? 0 : -1} onClick={onCardClick}
+  return <article ref={cardRef} {...gesture} class={`${styles.card}${host.recommendations ? ` ${styles.cardRecommendations}` : ""}${photos.length > 1 ? ` ${styles.cardMulti}` : ""}`} tabIndex={active && photos.length > 1 ? 0 : -1} onClick={onCardClick}
     onPointerDown={() => setStoryHold(true)} onPointerUp={() => setStoryHold(false)} onPointerCancel={() => setStoryHold(false)}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -400,7 +400,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const viewport = viewportRef.current;
     if (!viewport) return;
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 96 : 128)));
+      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 20 : 128)));
       jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
     };
     align();

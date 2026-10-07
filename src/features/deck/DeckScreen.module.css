@@ -246,21 +246,27 @@
 
 .recommendationsRoot .header.header { position: relative; flex-shrink: 0; }
 
-.recommendationsRoot .reels { scroll-behavior: auto; }
+.recommendationsRoot .reels {
+  scroll-behavior: auto;
+  flex: 0 0 min(50dvh, 460px);
+  height: min(50dvh, 460px);
+  min-height: 260px;
+}
 
 .recommendationsRoot .slide {
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
-  padding-top: 8px;
+  padding: 6px 10px 4px;
   gap: 0;
 }
 
-.recommendationsRoot .card {
-  align-self: center;
-  width: min(100%, 440px);
-  min-width: min(100%, 300px);
+.recommendationsRoot .cardRecommendations {
+  aspect-ratio: unset;
+  height: min(100%, var(--card-height-limit));
   max-height: min(100%, var(--card-height-limit));
+  width: min(100%, 440px, calc(var(--card-height-limit) * var(--photo-aspect)));
+  max-width: 100%;
 }
 .guestGate { width: 100%; max-width: 420px; margin: auto; padding: 28px 18px 40px; box-sizing: border-box; display: grid; justify-items: center; text-align: center; gap: 14px; }
 .guestGate h2 { margin: 0; color: var(--ink); font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -.03em; }
@@ -270,13 +276,14 @@
 .switchLink { color: var(--ink); font-weight: 600; text-decoration: none; }
 .recommendationsRoot .recommendationIntro { width: 100%; max-width: 508px; margin: 0 auto; box-sizing: border-box; }
 .recommendationPanel {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
   width: 100%;
   max-width: 508px;
   margin: 0 auto;
-  padding: 8px 14px 4px;
+  padding: 4px 14px 2px;
   box-sizing: border-box;
-  max-height: min(30vh, 220px);
+  max-height: min(28dvh, 200px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
