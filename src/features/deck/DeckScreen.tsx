@@ -96,6 +96,14 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
 
 const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "", real_only: false, hide_undiagnosed: true });
 
+const recommendationCopy = (card: DeckCard, source: "api" | "local" | "taste" | undefined) => {
+  const reasons = (card.recommendation_reasons || []).map((item) => String(item).trim()).filter(Boolean);
+  const footnote = source === "taste"
+    ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия."
+    : "Это совпадения в анкетах, а не гарантия совместимости.";
+  return reasons.length ? `${reasons.join(". ")}. ${footnote}` : footnote;
+};
+
 type DiscoveryDraft = {
   seekMinAge: string;
   seekMaxAge: string;
@@ -392,7 +400,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const viewport = viewportRef.current;
     if (!viewport) return;
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 248 : 128)));
+      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 96 : 128)));
       jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
     };
     align();
@@ -594,7 +602,6 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
           <DeckCardView host={host} card={card} active={cardIndex === index} autoStory={!host.recommendations && cardIndex === index && !scrolling && !dragging && !panelHold && !filtersOpen && !excludeOpen && !resetOpen && !busy} heightLimit={cardHeight} onVertical={advance} />
-          {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. {source === "taste" ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия." : "Это совпадения в анкетах, а не гарантия совместимости."}</p> : null}
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
@@ -610,6 +617,12 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
           </div>
         </section>
       </div>
+      {host.recommendations && current ? (
+        <section class={styles.recommendationPanel} aria-labelledby="recommendation-why">
+          <strong id="recommendation-why" class={styles.recommendationPanelTitle}>Почему может подойти</strong>
+          <p class={styles.recommendationPanelBody}>{recommendationCopy(current, source)}</p>
+        </section>
+      ) : null}
       <div
         class={`${styles.controls} ${styles.actionPanel}${scrolling || !current ? ` ${styles.actionPanelHidden}` : ""}${panelHold ? ` ${styles.actionPanelHolding}` : ""}`}
         aria-hidden={(scrolling || !current) && !panelHold}
