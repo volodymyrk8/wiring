@@ -38,6 +38,10 @@ const iconPass = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const iconProfile = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8" /></svg>;
 const iconLike = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" /></svg>;
 
+const PHOTO_STORY_MS = 4800;
+
+const reelScrollBehavior = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
+
 function jumpReel(viewport: HTMLElement, top: number, lock: { pinning: boolean; token: number }, force = false) {
   if (!force && Math.abs(viewport.scrollTop - top) < 1) return;
   const token = ++lock.token;
@@ -55,6 +59,14 @@ function jumpReel(viewport: HTMLElement, top: number, lock: { pinning: boolean; 
       lock.pinning = false;
     });
   });
+}
+
+function snapReelNearest(viewport: HTMLElement, smooth: boolean) {
+  const height = viewport.clientHeight;
+  if (!height) return;
+  const target = Math.round(viewport.scrollTop / height) * height;
+  if (Math.abs(viewport.scrollTop - target) < 3) return;
+  viewport.scrollTo({ top: target, behavior: smooth ? reelScrollBehavior() : "instant" });
 }
 
 const labels = (catalog: DeckHostBridge["catalog"], kind: "genders" | "looking_for" | "intents", values: unknown) => {
@@ -156,16 +168,34 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   </Modal>;
 }
 
-function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
+function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; autoStory: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
+  const [storyHold, setStoryHold] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
+  const onVerticalRef = useRef(onVertical);
+  onVerticalRef.current = onVertical;
   useLayoutEffect(() => {
     if (!active && cardRef.current?.contains(document.activeElement)) {
       cardRef.current.closest<HTMLElement>('[role="region"]')?.focus({ preventScroll: true });
     }
   }, [active]);
+  useEffect(() => {
+    if (active) setPhotoIndex(0);
+  }, [active, card.id]);
   const photos = photosFor(card);
+  const storyOn = autoStory && !storyHold && photos.length > 0;
+  useEffect(() => {
+    if (!storyOn) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      if (photoIndex < photos.length - 1) setPhotoIndex((current) => current + 1);
+      else onVerticalRef.current(1);
+    }, PHOTO_STORY_MS);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [storyOn, photoIndex, photos.length, card.id]);
   const changePhoto = (direction: number) => setPhotoIndex((index) => (index + direction + Math.max(photos.length, 1)) % Math.max(photos.length, 1));
   const gesture = usePhotoSwipe(changePhoto, onVertical);
   const onCardClick = (event: JSX.TargetedMouseEvent<HTMLElement>) => {
@@ -192,6 +222,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
     return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
   });
   return <article ref={cardRef} {...gesture} class={`${styles.card}${photos.length > 1 ? ` ${styles.cardMulti}` : ""}`} tabIndex={active && photos.length > 1 ? 0 : -1} onClick={onCardClick}
+    onPointerDown={() => setStoryHold(true)} onPointerUp={() => setStoryHold(false)} onPointerCancel={() => setStoryHold(false)}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); }
@@ -212,7 +243,9 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
       </button>
     </div> : null}
     {photos.length > 1 ? <div class={styles.photoChoices}>
-      <div class={styles.photoSegments} aria-hidden="true">{photos.map((_, index) => <span key={index} class={index === photoIndex ? styles.photoSegmentActive : undefined} />)}</div>
+      <div class={styles.photoSegments} style={{ "--photo-story-ms": `${PHOTO_STORY_MS}ms` }} aria-hidden="true">{photos.map((_, index) => (
+        <span key={index} class={index < photoIndex ? styles.photoSegmentDone : index === photoIndex ? styles.photoSegmentActive : undefined} />
+      ))}</div>
       <input class={styles.photoSelector} type="range" min={0} max={photos.length - 1} step={1} value={photoIndex} tabIndex={active ? 0 : -1}
         aria-label="Фотографии" aria-valuetext={`Фото ${photoIndex + 1} из ${photos.length}`} onInput={(event) => setPhotoIndex(Number(event.currentTarget.value))} />
     </div> : null}
@@ -309,7 +342,10 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const panelDragRef = useRef<{ id: number; y: number; scroll: number; moved: boolean } | null>(null);
   const panelMovedRef = useRef(false);
   const scrollTimerRef = useRef<number | null>(null);
+  const snapTimerRef = useRef<number | null>(null);
   const reelLock = useRef({ pinning: false, token: 0 });
+  const snapBlockRef = useRef(false);
+  snapBlockRef.current = dragging || panelHold || filtersOpen || excludeOpen || resetOpen;
   const current = cards[index];
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
 
@@ -317,7 +353,33 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     host.onFeedChange(cards, index, filters, hasMore, generation);
   }, [cards, index, filters, hasMore, generation]);
 
-  useEffect(() => () => { requestRef.current?.abort(); actionRef.current?.abort(); if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current); }, []);
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    actionRef.current?.abort();
+    if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current);
+    if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+  }, []);
+
+  const scheduleReelSnap = () => {
+    if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      snapTimerRef.current = null;
+      const viewport = viewportRef.current;
+      if (!viewport || reelLock.current.pinning || snapBlockRef.current) return;
+      snapReelNearest(viewport, true);
+    }, 90);
+  };
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const onScrollEnd = () => {
+      if (reelLock.current.pinning || snapBlockRef.current) return;
+      snapReelNearest(viewport, true);
+    };
+    viewport.addEventListener("scrollend", onScrollEnd);
+    return () => viewport.removeEventListener("scrollend", onScrollEnd);
+  }, []);
 
   const settleScroll = () => {
     setScrolling(true);
@@ -415,7 +477,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const last = cards.length; // Final slide can load new candidates or explain exhaustion.
     const next = Math.max(0, Math.min(last, indexRef.current + direction));
     settleScroll();
-    viewport.scrollTo({ top: next * viewport.clientHeight, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+    viewport.scrollTo({ top: next * viewport.clientHeight, behavior: reelScrollBehavior() });
   };
 
   const act = async (direction: "like" | "pass") => {
@@ -479,7 +541,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const viewport = viewportRef.current;
     if (start?.moved && viewport?.clientHeight) {
       const nearest = Math.round(viewport.scrollTop / viewport.clientHeight);
-      viewport.scrollTo({ top: nearest * viewport.clientHeight, behavior: "auto" });
+      viewport.scrollTo({ top: nearest * viewport.clientHeight, behavior: reelScrollBehavior() });
     }
     setPanelHold(false);
   };
@@ -490,6 +552,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     dragRef.current = null; setDragging(false);
     const distance = start.y - event.clientY;
     if (Math.abs(distance) > 40) advance(distance > 0 ? 1 : -1);
+    else scheduleReelSnap();
   };
 
   return <div class={`${styles.root}${host.recommendations ? ` ${styles.recommendationsRoot}` : ""}`}>
@@ -514,6 +577,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
           if (reelLock.current.pinning) { setIndex(next); return; }
           settleScroll();
           setIndex(next);
+          scheduleReelSnap();
         }}
         onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -528,7 +592,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
-          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
+          <DeckCardView host={host} card={card} active={cardIndex === index} autoStory={cardIndex === index && !scrolling && !dragging && !panelHold && !filtersOpen && !excludeOpen && !resetOpen && !busy} heightLimit={cardHeight} onVertical={advance} />
           {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. {source === "taste" ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия." : "Это совпадения в анкетах, а не гарантия совместимости."}</p> : null}
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
