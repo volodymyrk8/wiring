@@ -8,7 +8,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
   person: "person.js?v=24",
   deck: "deck.js?v=37",
   account: "account.js?v=13",
-  chat: "chat.js?v=37",
+  chat: "chat.js?v=38",
   support: "support.js?v=10",
 };
 

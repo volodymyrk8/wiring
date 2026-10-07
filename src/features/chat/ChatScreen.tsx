@@ -917,9 +917,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               <Button variant="ghost" slim disabled={sending} onClick={() => setPendingDelete(null)}>отмена</Button>
               <Button variant="solid" slim disabled={sending} loading={sending} onClick={() => void removeMessage()}>Удалить</Button>
             </>}
-          >
-            <p class={styles.modalHint}>Оно пропадёт из переписки у вас обоих. Голосовое при этом стирается.</p>
-          </Modal>
+          >{null}</Modal>
         </>
       )}
     </section>
