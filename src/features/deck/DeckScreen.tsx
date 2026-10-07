@@ -169,6 +169,7 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
 }
 
 function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; autoStory: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
+  const storyProfiles = !host.recommendations;
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
   const [storyHold, setStoryHold] = useState(false);
@@ -192,7 +193,7 @@ function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }
     const timer = window.setTimeout(() => {
       if (cancelled) return;
       if (photoIndex < photos.length - 1) setPhotoIndex((current) => current + 1);
-      else onVerticalRef.current(1);
+      else if (storyProfiles) onVerticalRef.current(1);
     }, PHOTO_STORY_MS);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [storyOn, photoIndex, photos.length, card.id]);
@@ -391,7 +392,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const viewport = viewportRef.current;
     if (!viewport) return;
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 140 : 128)));
+      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 248 : 128)));
       jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
     };
     align();
@@ -592,7 +593,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
-          <DeckCardView host={host} card={card} active={cardIndex === index} autoStory={cardIndex === index && !scrolling && !dragging && !panelHold && !filtersOpen && !excludeOpen && !resetOpen && !busy} heightLimit={cardHeight} onVertical={advance} />
+          <DeckCardView host={host} card={card} active={cardIndex === index} autoStory={!host.recommendations && cardIndex === index && !scrolling && !dragging && !panelHold && !filtersOpen && !excludeOpen && !resetOpen && !busy} heightLimit={cardHeight} onVertical={advance} />
           {host.recommendations ? <p class={styles.recommendationSummary}><strong>Почему может подойти</strong><br />{card.recommendation_reasons?.join(". ")}. {source === "taste" ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия." : "Это совпадения в анкетах, а не гарантия совместимости."}</p> : null}
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
