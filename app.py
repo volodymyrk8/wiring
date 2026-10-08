@@ -47,7 +47,7 @@ from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access
 from recommendations import select_recommendations
 from glossary import glossary_html
-from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
+from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
@@ -3995,6 +3995,18 @@ def privacy():
     )
 
 
+@app.get("/legal")
+def legal_index():
+    return render_template(
+        "legal.html",
+        title="Документы и безопасность",
+        description="Соглашение, конфиденциальность, рассылка, защита детей и удаление аккаунта WIRING.",
+        path="/legal",
+        site_url=SITE_URL,
+        body=LEGAL_INDEX_HTML,
+    )
+
+
 @app.get("/rules")
 def rules():
     return render_template(
@@ -4097,7 +4109,7 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
-    urls = ["/", "/rules", "/privacy", "/marketing", "/support", "/child-safety", "/account-deletion"]
+    urls = ["/", "/legal", "/rules", "/privacy", "/marketing", "/support", "/child-safety", "/account-deletion"]
     items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype="application/xml")
