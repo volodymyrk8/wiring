@@ -883,7 +883,7 @@ class WiringTest(unittest.TestCase):
         self.assertNotIn('id="app"', text)
         self.assertEqual(self.client.head("/child-safety").status_code, 200)
         self.assertIn(b"/child-safety", self.client.get("/sitemap.xml").data)
-        self.assertIn('href="/child-safety"', self.client.get("/privacy").get_data(as_text=True))
+        self.assertIn('href="/legal#safety"', self.client.get("/privacy").get_data(as_text=True))
         # The existing account-deletion confirmation remains a SPA document.
         self.assertIn(b'id="app"', self.client.get("/delete-account").data)
 
