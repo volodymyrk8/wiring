@@ -3,6 +3,7 @@ import type { JSX } from "preact";
 import { Button, Input, LegalFooter } from "@/components/ui";
 import type { AuthHostBridge } from "@/features/auth/types";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { registrationCreated } from "@/app/registration-analytics";
 import styles from "./AuthScreen.module.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -152,14 +153,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
         body: JSON.stringify(body),
       })) as Record<string, unknown>;
 
+      if (isRegister) registrationCreated();
       if (isRegister && data.needs_email_verify) {
         host.onRegisterVerify(String(data.email || trimmedEmail));
         return;
-      }
-      if (isRegister) {
-        try {
-          localStorage.setItem("wiring-analytics-consent", "granted");
-        } catch (_) {}
       }
       await host.onAuthSuccess(isRegister ? "register" : "login", data);
     } catch (error) {

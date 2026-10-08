@@ -45,6 +45,8 @@ flowchart LR
 
 ## Оценка текущей архитектуры
 
+`src/app/registration-analytics.ts` координирует одноразовые события успешной регистрации и готовность счётчика из `public/analytics.js`. Preact auth сообщает о создании аккаунта после успешного `/api/register`, до перехода к подтверждению почты. OAuth callback ставит одноразовый флаг только при создании пользователя; `_spa()` потребляет его и отдаёт некешируемый HTML. Цель `registration_success` отправляется через существующий `YANDEX_METRIKA_ID` только с добровольным согласием; персональные поля и постоянное хранилище событий не используются.
+
 **Сильные стороны**
 
 - **Мало движущихся частей**: один процесс приложения, одна БД, понятный деплой (`deploy.sh`).
@@ -100,6 +102,8 @@ flowchart LR
 `src/features/deck/` owns vertical scroll snap, mouse dragging, keyboard navigation, explicit likes and confirmed exclusions. Scrolling never creates a swipe. Previously loaded cards can be revisited within the current SPA session; acted-on cards are removed from that cache, including actions on the person screen. `src/app/feed.ts` requests two cards at a time through the shared API and cancellable requests.
 
 The gesture viewport fills the available feed width and height, including space beside and below each card. A vertical drag that starts on the action row scrolls the same feed; a tap on Скрыть, Профиль or Лайк still clicks. Interactive targets keep their own clicks. Images retain their natural aspect ratio with a 508px width cap and a viewport-dependent height limit; like/exclude sit in a compact separate panel below the card. The scroll container has no focus outline; interactive buttons retain `:focus-visible`. Reduced-motion navigation uses instant scrolling. No visible swipe instruction or reserved instruction row is rendered.
+
+Touch scrolling remains native during a gesture. On release, a vertical swipe over 40px settles on the adjacent card relative to the gesture's starting index, so momentum cannot skip profiles. The action row uses the same threshold and one-card step; horizontal gestures remain photo navigation. Pending touch settlement is cancelled on a new gesture, touch cancellation and unmount. This also applies to «Для тебя», which shares the deck. `npm run test:deck` covers directions, thresholds, axis locking and feed boundaries.
 
 `src/lib/usePhotoSwipe.ts` locks the first clear pointer axis for both deck and person galleries. Horizontal swipes change only the photo; touch vertical scrolling stays native (`touch-action: pan-y`), while vertical mouse drags on a deck card delegate to feed navigation. Interactive elements are excluded from gesture capture and completed drags suppress accidental clicks. Numbered photo buttons/thumbnails and Left/Right keys provide alternatives; the deck announces the current photo and moves focus out of a card when it becomes inactive. A shared Button link in the external action panel is the only profile-opening control for each card. Person photos also retain their natural proportions; reduced motion disables the gallery entrance animation.
 

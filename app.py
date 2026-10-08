@@ -13,7 +13,7 @@ from functools import wraps
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
-from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, send_from_directory, session
+from flask import Flask, Response, abort, g, jsonify, make_response, redirect, render_template, request, send_file, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -1627,8 +1627,14 @@ def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
     clear_openers(conn, uid, other_id)
 
 
-def _spa() -> str:
-    return render_template("index.html", base_path=BASE_PATH, site_url=SITE_URL)
+def _spa() -> Response:
+    response = make_response(render_template(
+        "index.html", base_path=BASE_PATH, site_url=SITE_URL,
+        registration_created=bool(session.pop("registration_created", False)),
+    ))
+    # OAuth registration is a one-shot signal, never replayed from cached HTML.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/")

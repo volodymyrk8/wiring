@@ -130,6 +130,10 @@ class WiringTest(unittest.TestCase):
             state = self._oauth_start(ref=referrer["ref"])
             result, _ = self._oauth_callback(state)
         self.assertEqual(result.location, "/me")
+        shell = self.client.get(result.location)
+        self.assertIn('data-registration-created="true"', shell.get_data(as_text=True))
+        self.assertEqual(shell.headers["Cache-Control"], "no-store")
+        self.assertIn('data-registration-created="false"', self.client.get("/me").get_data(as_text=True))
         me = self.client.get("/api/me").get_json()["user"]
         self.assertTrue(me["needs_profile"])
         self.assertTrue(me["plus"])
@@ -148,6 +152,21 @@ class WiringTest(unittest.TestCase):
         state = self._oauth_start(mode="login")
         self._oauth_callback(state, identity=("subject-1", "changed@gmail.com", "Другое", True))
         self.assertEqual(self.client.get("/api/me").get_json()["user"]["id"], uid)
+        self.assertIn('data-registration-created="false"', self.client.get("/me").get_data(as_text=True))
+
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret"})
+    def test_oauth_existing_account_register_mode_is_not_new_registration(self):
+        self._register(email="existing@gmail.com")
+        self._logout()
+        state = self._oauth_start(mode="register")
+        result, _ = self._oauth_callback(state, identity=("existing", "existing@gmail.com", "Ада", True))
+        self.assertIn('data-registration-created="false"', self.client.get(result.location).get_data(as_text=True))
+
+    @patch.dict(os.environ, {"YANDEX_CLIENT_ID": "test-client", "YANDEX_CLIENT_SECRET": "test-secret"})
+    def test_oauth_failed_registration_has_no_creation_marker(self):
+        state = self._oauth_start("yandex")
+        result = self.client.get("/api/auth/yandex/callback", query_string={"state": state, "error": "access_denied"})
+        self.assertIn('data-registration-created="false"', self.client.get(result.location).get_data(as_text=True))
 
     @patch.dict(os.environ, {"GOOGLE_CLIENT_ID": "test-client", "GOOGLE_CLIENT_SECRET": "test-secret"})
     def test_oauth_consent_origin_and_browser_state(self):

@@ -8,7 +8,9 @@
     "typecheck": "tsc --noEmit",
     "dev:client": "vite build --watch",
     "test:router": "node tests/router.test.mjs",
-    "test:profile": "node --test tests/profile-autosave.test.mjs"
+    "test:profile": "node --test tests/profile-autosave.test.mjs",
+    "test:deck": "node --test tests/deck-gesture.test.mjs",
+    "test:analytics": "node --test tests/registration-analytics.test.mjs"
   },
   "dependencies": {
     "preact": "^10.26.4"

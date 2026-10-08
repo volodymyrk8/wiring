@@ -23,6 +23,8 @@ if [[ -f package.json ]]; then
   npm run build
   npm run test:router
   npm run test:profile
+  npm run test:deck
+  npm run test:analytics
 fi
 
 if [[ -x .venv/bin/python ]]; then

@@ -51,6 +51,7 @@
   const loadAnalytics = () => {
     if (hasGa) loadGa();
     if (hasYm) loadYm();
+    document.dispatchEvent(new Event("wiring:analytics-change"));
   };
 
   const page = (path) => {
@@ -74,9 +75,10 @@
     try { localStorage.setItem(consentKey, value); } catch (_) {}
     removeBanner();
     if (value === "granted") loadAnalytics();
+    else document.dispatchEvent(new Event("wiring:analytics-change"));
   };
 
-  window.WIRING_ANALYTICS = { page, setConsent, removeBanner };
+  window.WIRING_ANALYTICS = { page, setConsent, removeBanner, requestConsent: () => showBanner(true) };
 
   const isAuthPage = () => {
     const p = location.pathname;
@@ -91,9 +93,9 @@
     );
   };
 
-  const showBanner = () => {
+  const showBanner = (afterRegistration = false) => {
     if (document.querySelector(".analytics-consent")) return;
-    if (isAuthPage()) return; // Don't block registration/login conversion
+    if (!afterRegistration && isAuthPage()) return; // Don't block registration/login conversion
     const banner = document.createElement("aside");
     banner.className = "analytics-consent";
     banner.setAttribute("role", "dialog");
@@ -117,7 +119,8 @@
   try { stored = localStorage.getItem(consentKey) || ""; } catch (_) {}
   if (stored === "granted") loadAnalytics();
   else if (!stored) {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", showBanner, { once: true });
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => showBanner(), { once: true });
     else showBanner();
   }
+  document.dispatchEvent(new Event("wiring:analytics-change"));
 })();

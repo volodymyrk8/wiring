@@ -3,8 +3,10 @@ import { fetchFeed, resetFeed, fetchRecommendations } from "./feed";
 import { createApi } from "./api";
 import { createFeatureLoader } from "./features";
 import { createInboxController } from "./inbox";
+import { initRegistrationAnalytics } from "./registration-analytics";
 
 (() => {
+  initRegistrationAnalytics(window, document);
   const root = document.getElementById("app");
   const BASE = root.dataset.base || "";
   const api = createApi(BASE);

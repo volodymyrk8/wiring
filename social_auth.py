@@ -213,6 +213,7 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
             return failure('Вход устарел. Начни заново.', mode)
         if payload.get('error') or not payload.get('code'):
             return failure('Вход отменён. Можно попробовать снова.', mode)
+        created = False
         try:
             subject, email, name, authoritative = exchange_identity(provider, payload['code'], flow['redirect_uri'], flow['verifier'])
             # Serialize registration/linking by email; constraints also guard provider identity races.
@@ -226,6 +227,7 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
                     if mode != 'register':
                         raise OAuthError('Аккаунта ещё нет. Открой «Создать профиль» и зарегистрируйся через этот сервис.')
                     uid = create_user(conn, email, name, flow['referral'])
+                    created = True
                     row = conn.execute('SELECT * FROM users WHERE id = ?', (uid,)).fetchone()
                 conn.execute('INSERT INTO oauth_identities (provider, subject, user_id) VALUES (?, ?, ?)', (provider, subject, row['id']))
             deleted = int(row['deleted_at'] or 0)
@@ -239,4 +241,6 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         session.clear()
         session.permanent = True
         session['uid'] = row['id']
+        if created:
+            session['registration_created'] = True
         return redirect(prefix('/me' if not row['onboard_done'] else '/feed'))

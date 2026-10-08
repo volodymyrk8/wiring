@@ -161,7 +161,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
         </div>
       </section>
 
-      <LegalFooter showTopBorder={false} className={styles.homeFooter} onSupportClick={() => navigate("support")} />
+      <LegalFooter showTopBorder={false} className={styles.homeFooter} onSupportClick={() => navigate("support")} showCommunityLinks />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { sharedNeuroIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
+import { feedSwipeTarget, lockFeedSwipeAxis, type FeedSwipe } from "./vertical-swipe";
 import styles from "./DeckScreen.module.css";
 
 const photoUrl = (basePath: string, photo: unknown, name = "?") => {
@@ -329,7 +330,9 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const indexRef = useRef(index);
   indexRef.current = index;
   const dragRef = useRef<{ y: number } | null>(null);
-  const panelDragRef = useRef<{ id: number; y: number; scroll: number; moved: boolean } | null>(null);
+  const touchRef = useRef<FeedSwipe | null>(null);
+  const touchFrameRef = useRef<number | null>(null);
+  const panelDragRef = useRef<(FeedSwipe & { id: number; scroll: number; moved: boolean }) | null>(null);
   const panelMovedRef = useRef(false);
   const scrollTimerRef = useRef<number | null>(null);
   const snapTimerRef = useRef<number | null>(null);
@@ -349,6 +352,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     actionRef.current?.abort();
     if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current);
     if (snapTimerRef.current) window.clearTimeout(snapTimerRef.current);
+    if (touchFrameRef.current !== null) cancelAnimationFrame(touchFrameRef.current);
   }, []);
 
   const scheduleReelSnap = () => {
@@ -487,11 +491,11 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     if (!filtersOpen && !excludeOpen && !resetOpen && !busy && !error && hasMore && index >= cards.length - 1) void loadPage();
   }, [index, cards.length, hasMore, filtersOpen, excludeOpen, resetOpen, busy, error]);
 
-  const advance = (direction: number) => {
+  const advance = (direction: number, fromIndex = indexRef.current) => {
     const viewport = viewportRef.current;
     if (!viewport || filtersOpen || excludeOpen || resetOpen) return;
     const last = cards.length; // Final slide can load new candidates or explain exhaustion.
-    const next = Math.max(0, Math.min(last, indexRef.current + direction));
+    const next = Math.max(0, Math.min(last, fromIndex + direction));
     settleScroll();
     viewport.scrollTo({ top: next * viewport.clientHeight, behavior: reelScrollBehavior() });
   };
@@ -551,13 +555,14 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     finally { if (!controller.signal.aborted) { actionRef.current = null; setBusy(false); } }
   };
 
-  const releasePanel = () => {
+  const releasePanel = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
     const start = panelDragRef.current;
+    if (!start || event.pointerId !== start.id) return;
     panelDragRef.current = null;
     const viewport = viewportRef.current;
-    if (start?.moved && viewport?.clientHeight) {
-      const nearest = Math.round(viewport.scrollTop / viewport.clientHeight);
-      viewport.scrollTo({ top: nearest * viewport.clientHeight, behavior: reelScrollBehavior() });
+    if (start.moved && viewport?.clientHeight) {
+      const target = feedSwipeTarget(start, event.clientX, event.clientY, cards.length) ?? start.index;
+      advance(target - start.index, start.index);
     }
     setPanelHold(false);
   };
@@ -608,6 +613,35 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
           dragRef.current = { y: event.clientY };
           event.currentTarget.setPointerCapture(event.pointerId); setDragging(true); settleScroll(); event.currentTarget.focus();
         }}
+        onTouchStart={(event) => {
+          if (touchFrameRef.current !== null) { cancelAnimationFrame(touchFrameRef.current); touchFrameRef.current = null; }
+          if (event.touches.length !== 1) { touchRef.current = null; return; }
+          const touch = event.touches[0];
+          touchRef.current = { x: touch.clientX, y: touch.clientY, index: indexRef.current, axis: null };
+        }}
+        onTouchMove={(event) => {
+          const start = touchRef.current;
+          if (!start || event.touches.length !== 1) { touchRef.current = null; return; }
+          const touch = event.touches[0];
+          lockFeedSwipeAxis(start, touch.clientX, touch.clientY);
+        }}
+        onTouchEnd={(event) => {
+          const start = touchRef.current;
+          touchRef.current = null;
+          if (!start || event.touches.length || event.changedTouches.length !== 1) return;
+          const touch = event.changedTouches[0];
+          const target = feedSwipeTarget(start, touch.clientX, touch.clientY, cards.length);
+          if (target === null) return;
+          if (touchFrameRef.current !== null) cancelAnimationFrame(touchFrameRef.current);
+          touchFrameRef.current = requestAnimationFrame(() => {
+            touchFrameRef.current = null;
+            advance(target - start.index, start.index);
+          });
+        }}
+        onTouchCancel={() => {
+          touchRef.current = null;
+          if (touchFrameRef.current !== null) { cancelAnimationFrame(touchFrameRef.current); touchFrameRef.current = null; }
+        }}
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
@@ -636,19 +670,21 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       <div
         class={`${styles.controls} ${styles.actionPanel}${scrolling || !current ? ` ${styles.actionPanelHidden}` : ""}${panelHold ? ` ${styles.actionPanelHolding}` : ""}`}
         aria-hidden={(scrolling || !current) && !panelHold}
+        onDragStart={(event) => event.preventDefault()}
         onPointerDown={(event) => {
-          if (event.button !== 0) return;
+          if (!event.isPrimary || event.button !== 0) return;
           const viewport = viewportRef.current;
           if (!viewport) return;
           panelMovedRef.current = false;
-          panelDragRef.current = { id: event.pointerId, y: event.clientY, scroll: viewport.scrollTop, moved: false };
+          panelDragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, index: indexRef.current, axis: null, scroll: viewport.scrollTop, moved: false };
         }}
         onPointerMove={(event) => {
           const start = panelDragRef.current;
           const viewport = viewportRef.current;
           if (!start || !viewport || event.pointerId !== start.id) return;
+          lockFeedSwipeAxis(start, event.clientX, event.clientY);
           const dy = start.y - event.clientY;
-          if (!start.moved && Math.abs(dy) < 10) return;
+          if (start.axis !== "y") return;
           if (!start.moved) {
             start.moved = true;
             panelMovedRef.current = true;
