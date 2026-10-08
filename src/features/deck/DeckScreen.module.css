@@ -189,12 +189,11 @@
   .photoNavBtn:hover { background: rgba(17, 14, 12, 0.72); }
 }
 .photoChoices { position: absolute; top: 0; left: 0; right: 0; height: 44px; padding: 0 12px; border-radius: 26px 26px 0 0; background: linear-gradient(rgba(17,14,12,.6), transparent); z-index: 2; }
-.photoSegments { display: flex; align-items: center; gap: 4px; height: 100%; pointer-events: none; --photo-story-ms: 4.8s; }
+.photoSegments { display: flex; align-items: center; gap: 4px; height: 100%; pointer-events: none; }
 .photoSegments span { position: relative; flex: 1; min-width: 0; height: 4px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.38); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
 .photoSegments span::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--lime); box-shadow: 0 0 8px rgba(216,255,60,.28); transform: scaleX(0); transform-origin: left center; }
-.photoSegmentDone::after { transform: scaleX(1); }
-.photoSegmentActive::after { animation: photoStoryFill var(--photo-story-ms, 4.8s) linear forwards; }
-@keyframes photoStoryFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.photoSegmentDone::after,
+.photoSegmentActive::after { transform: scaleX(1); }
 .photoSelector { position: absolute; inset: 0 12px; width: calc(100% - 24px); height: 44px; margin: 0; opacity: 0; cursor: pointer; touch-action: pan-x; }
 .photoChoices:has(.photoSelector:focus-visible) .photoSegments { outline: 2px solid white; outline-offset: -8px; border-radius: 12px; }
 

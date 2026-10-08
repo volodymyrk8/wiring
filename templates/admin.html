@@ -225,6 +225,23 @@
         <p class="hint">все живые хотя бы раз свайпнули</p>
       {% endif %}
 
+      <h2>жалобы</h2>
+      <p class="hint">Кто пожаловался → на кого. При отправке жалобы человек автоматически блокируется у заявителя, мэтч снимается. Разбор — вручную: предупреждение, скрытие анкеты, удаление аккаунта; при underage/CSAM — по правилам и закону.</p>
+      <table class="admin-table">
+        <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th></tr>
+        {% for r in s.report_queue %}
+        <tr>
+          <td>{{ r.created_at }}</td>
+          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}<br><span class="hint">{{ r.target_email }}</span></td>
+          <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
+          <td>{{ r.reason }}</td>
+          <td>{{ r.details or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">пока пусто</td></tr>
+        {% endfor %}
+      </table>
+
       <h2>поддержка</h2>
       <table class="admin-table">
         <tr><th>кто</th><th>контакт</th><th>текст</th></tr>

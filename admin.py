@@ -8,7 +8,7 @@ import time
 from database import Connection
 from typing import Any, Iterable
 
-from catalog import INTENTS, NEURO, VIBE
+from catalog import INTENTS, NEURO, REPORT_REASONS, VIBE
 from devices import device_usage_stats
 
 
@@ -29,6 +29,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "vibe": {item["id"]: item["label"] for item in VIBE},
     "intent": {item["id"]: item["label"] for item in INTENTS},
 }
+_REPORT_LABELS = {item["id"]: item["label"] for item in REPORT_REASONS}
 
 
 def _label(kind: str, value: str) -> str:
@@ -153,6 +154,50 @@ def _top_for_kind(conn: Connection, kind: str, since: int, limit: int = 12) -> l
         }
         for row in rows
     ]
+
+
+def recent_reports(conn: Connection, limit: int = 50) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT
+            r.id,
+            r.from_id,
+            r.to_id,
+            r.reason,
+            r.details,
+            r.created_at,
+            reporter.name AS reporter_name,
+            reporter.email AS reporter_email,
+            target.name AS target_name,
+            target.email AS target_email,
+            target.is_seed AS target_seed
+        FROM reports r
+        JOIN users reporter ON reporter.id = r.from_id
+        JOIN users target ON target.id = r.to_id
+        ORDER BY r.created_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        created = int(row["created_at"] or 0)
+        out.append(
+            {
+                "id": int(row["id"]),
+                "created_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(created)) if created else "—",
+                "reason": _REPORT_LABELS.get(str(row["reason"]), str(row["reason"])),
+                "details": str(row["details"] or "").strip(),
+                "reporter_id": int(row["from_id"]),
+                "reporter_name": row["reporter_name"],
+                "reporter_email": row["reporter_email"],
+                "target_id": int(row["to_id"]),
+                "target_name": row["target_name"],
+                "target_email": row["target_email"],
+                "target_seed": bool(row["target_seed"]),
+            }
+        )
+    return out
 
 
 def filter_usage_stats(conn: Connection) -> dict[str, Any]:
@@ -294,6 +339,7 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "messages": len(messages),
         "reports": reports,
         "blocks": blocks,
+        "report_queue": recent_reports(conn),
         "silent": [{"name": u["name"], "city": u["city"], "age": u["age"]} for u in silent],
         "days": day_rows,
         "recent": recent,

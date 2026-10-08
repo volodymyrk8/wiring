@@ -847,8 +847,14 @@ import { createInboxController } from "./inbox";
       render();
       return;
     }
-    if (state.view === "person" && next === "deck") {
-      state.view = "deck";
+    if (state.view === "person" && (next === "deck" || next === "recommendations")) {
+      state.person = null;
+      state.view = next;
+      const url = hrefFor(next);
+      if (location.pathname !== url) {
+        history.replaceState({ view: next }, "", url);
+        urlSyncState.lastUrl = url;
+      }
       render();
       return;
     }
@@ -1289,8 +1295,9 @@ import { createInboxController } from "./inbox";
       return;
     }
     if (plan.kind === "feed") {
+      state.person = null;
       state.view = "deck";
-      await loadFeed();
+      if (!state.cards.length && state.feedHasMore) await loadFeed();
       render();
       return;
     }
@@ -1314,7 +1321,7 @@ import { createInboxController } from "./inbox";
     state.view = plan.view;
     state.chatId = null;
     state.photoIndex = 0;
-    if (state.view === "deck") await loadFeed();
+    if (state.view === "deck" && !state.cards.length && state.feedHasMore) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
       state.matches = data.matches;

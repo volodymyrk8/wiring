@@ -38,8 +38,6 @@ const iconPass = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const iconProfile = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2" /><path d="M5.2 19c1.4-3.2 4-4.8 6.8-4.8s5.4 1.6 6.8 4.8" /></svg>;
 const iconLike = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" /></svg>;
 
-const PHOTO_STORY_MS = 4800;
-
 const reelScrollBehavior = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth");
 
 function jumpReel(viewport: HTMLElement, top: number, lock: { pinning: boolean; token: number }, force = false) {
@@ -176,14 +174,10 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   </Modal>;
 }
 
-function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; autoStory: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
-  const storyProfiles = !host.recommendations;
+function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoAspect, setPhotoAspect] = useState(3 / 4);
-  const [storyHold, setStoryHold] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
-  const onVerticalRef = useRef(onVertical);
-  onVerticalRef.current = onVertical;
   useLayoutEffect(() => {
     if (!active && cardRef.current?.contains(document.activeElement)) {
       cardRef.current.closest<HTMLElement>('[role="region"]')?.focus({ preventScroll: true });
@@ -193,18 +187,6 @@ function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }
     if (active) setPhotoIndex(0);
   }, [active, card.id]);
   const photos = photosFor(card);
-  const storyOn = autoStory && !storyHold && photos.length > 0;
-  useEffect(() => {
-    if (!storyOn) return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
-      if (photoIndex < photos.length - 1) setPhotoIndex((current) => current + 1);
-      else if (storyProfiles) onVerticalRef.current(1);
-    }, PHOTO_STORY_MS);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [storyOn, photoIndex, photos.length, card.id]);
   const changePhoto = (direction: number) => setPhotoIndex((index) => (index + direction + Math.max(photos.length, 1)) % Math.max(photos.length, 1));
   const gesture = usePhotoSwipe(changePhoto, onVertical);
   const onCardClick = (event: JSX.TargetedMouseEvent<HTMLElement>) => {
@@ -231,7 +213,6 @@ function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }
     return label ? [{ id: `neuro-${id}`, label, shared: sharedNeuro.has(id) }] : [];
   });
   return <article ref={cardRef} {...gesture} class={`${styles.card}${host.recommendations ? ` ${styles.cardRecommendations}` : ""}${photos.length > 1 ? ` ${styles.cardMulti}` : ""}`} tabIndex={active && photos.length > 1 ? 0 : -1} onClick={onCardClick}
-    onPointerDown={() => setStoryHold(true)} onPointerUp={() => setStoryHold(false)} onPointerCancel={() => setStoryHold(false)}
     onKeyDown={(event) => {
       if ((event.target as HTMLElement).closest("button, a, input")) return;
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); }
@@ -252,7 +233,7 @@ function DeckCardView({ host, card, active, autoStory, onVertical, heightLimit }
       </button>
     </div> : null}
     {photos.length > 1 ? <div class={styles.photoChoices}>
-      <div class={styles.photoSegments} style={{ "--photo-story-ms": `${PHOTO_STORY_MS}ms` }} aria-hidden="true">{photos.map((_, index) => (
+      <div class={styles.photoSegments} aria-hidden="true">{photos.map((_, index) => (
         <span key={index} class={index < photoIndex ? styles.photoSegmentDone : index === photoIndex ? styles.photoSegmentActive : undefined} />
       ))}</div>
       <input class={styles.photoSelector} type="range" min={0} max={photos.length - 1} step={1} value={photoIndex} tabIndex={active ? 0 : -1}
@@ -583,7 +564,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
         onScroll={(event) => {
           const next = Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)));
-          if (reelLock.current.pinning) { setIndex(next); return; }
+          if (reelLock.current.pinning) return;
           settleScroll();
           setIndex(next);
           scheduleReelSnap();
@@ -601,7 +582,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
-          <DeckCardView host={host} card={card} active={cardIndex === index} autoStory={!host.recommendations && cardIndex === index && !scrolling && !dragging && !panelHold && !filtersOpen && !excludeOpen && !resetOpen && !busy} heightLimit={cardHeight} onVertical={advance} />
+          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
