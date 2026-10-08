@@ -5,6 +5,26 @@ typical Russian dating-service pack (user agreement, privacy policy, mailing
 consent). They are not a copy of any third-party agreement.
 """
 
+LEGAL_INDEX_HTML = """
+<p>Условия использования WIRING, ваши данные и безопасность — в одном месте.</p>
+<section aria-labelledby="documents">
+<h2 id="documents">Документы</h2>
+<ul>
+  <li><a href="/rules">Пользовательское соглашение</a> — правила сервиса и условия использования.</li>
+  <li><a href="/privacy">Политика конфиденциальности</a> — какие данные мы обрабатываем и какие у вас есть права.</li>
+  <li><a href="/marketing">Согласие на рассылку</a> — добровольная подписка и как её отключить.</li>
+</ul>
+</section>
+<section aria-labelledby="safety">
+<h2 id="safety">Безопасность и аккаунт</h2>
+<ul>
+  <li><a href="/child-safety">Защита детей</a> — стандарты WIRING, запреты и как сообщить о нарушении.</li>
+  <li><a href="/account-deletion">Удаление аккаунта и данных</a> — как удалить аккаунт, сроки и что происходит с данными.</li>
+</ul>
+<p>Если нужна помощь, <a href="/support">напишите в поддержку</a>.</p>
+</section>
+"""
+
 ACCOUNT_DELETION_HTML = """
 <p>WIRING — сервис знакомств. Аккаунт можно удалить самому, если вы можете в него войти.</p>
 <h2>Как удалить</h2>
