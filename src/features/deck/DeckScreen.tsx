@@ -334,6 +334,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const scrollTimerRef = useRef<number | null>(null);
   const snapTimerRef = useRef<number | null>(null);
   const reelLock = useRef({ pinning: false, token: 0 });
+  const restoreRef = useRef(true);
   const snapBlockRef = useRef(false);
   snapBlockRef.current = dragging || panelHold || filtersOpen || excludeOpen || resetOpen;
   const current = cards[index];
@@ -380,19 +381,44 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return;
+    restoreRef.current = true;
+    indexRef.current = host.index;
+    setIndex(host.index);
+    let restoreObserver: ResizeObserver | null = null;
+    const finishRestore = () => {
+      restoreRef.current = false;
+      restoreObserver?.disconnect();
+      restoreObserver = null;
+    };
+    const restoreScroll = () => {
+      const height = viewport.clientHeight;
+      if (height < 1) return;
+      jumpReel(viewport, indexRef.current * height, reelLock.current, true);
+      requestAnimationFrame(() => requestAnimationFrame(finishRestore));
+    };
     const align = () => {
       setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 20 : 128)));
-      jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
+      if (restoreRef.current) restoreScroll();
+      else jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
     };
     align();
+    restoreObserver = new ResizeObserver(() => {
+      if (restoreRef.current) restoreScroll();
+    });
+    restoreObserver.observe(viewport);
     const observer = new ResizeObserver(align);
     observer.observe(viewport);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      restoreObserver?.disconnect();
+      restoreRef.current = false;
+    };
   }, []);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
-    if (viewport) jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current, true);
+    if (!viewport || restoreRef.current) return;
+    if (viewport.clientHeight > 0) jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current, true);
   }, [cards]);
 
   useEffect(() => {
@@ -563,8 +589,11 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
       <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
         onScroll={(event) => {
-          const next = Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / event.currentTarget.clientHeight)));
-          if (reelLock.current.pinning) return;
+          if (restoreRef.current || reelLock.current.pinning) return;
+          const height = event.currentTarget.clientHeight;
+          if (height < 1) return;
+          const next = Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / height)));
+          if (next === indexRef.current) return;
           settleScroll();
           setIndex(next);
           scheduleReelSnap();

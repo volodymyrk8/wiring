@@ -400,9 +400,14 @@ import { createInboxController } from "./inbox";
   };
 
   const openPerson = async (id, from) => {
+    const origin = from || "deck";
+    if (origin === "deck" || origin === "recommendations") {
+      const at = state.cards.findIndex((card) => card.id === id);
+      if (at >= 0) state.index = at;
+    }
     const data = await api(`/api/people/${id}`);
     state.person = data.person;
-    state.personFrom = from || "deck";
+    state.personFrom = origin;
     state.photoIndex = 0;
     state.view = "person";
     render();
