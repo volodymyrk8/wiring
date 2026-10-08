@@ -809,6 +809,13 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(login.status_code, 200)
 
     def test_legal_and_sitemap(self):
+        legal = self.client.get("/legal")
+        self.assertEqual(legal.status_code, 200)
+        legal_text = legal.get_data(as_text=True)
+        self.assertIn('id="documents"', legal_text)
+        self.assertIn('id="safety"', legal_text)
+        self.assertIn("Чат Поддержка", legal_text)
+        self.assertIn(b"/legal", self.client.get("/sitemap.xml").data)
         self.assertEqual(self.client.get("/privacy").status_code, 200)
         self.assertEqual(self.client.get("/rules").status_code, 200)
         self.assertEqual(self.client.get("/marketing").status_code, 200)
@@ -872,7 +879,7 @@ class WiringTest(unittest.TestCase):
         for expected in ("CSAE", "CSAM", "WIRING", "18+", "support@wiring.date", "Пожаловаться"):
             self.assertIn(expected, text)
         self.assertIn('rel="canonical" href="https://wiring.date/child-safety"', text)
-        self.assertIn('href="/child-safety" aria-current="page"', text)
+        self.assertIn('href="/legal#safety" aria-current="location"', text)
         self.assertNotIn('id="app"', text)
         self.assertEqual(self.client.head("/child-safety").status_code, 200)
         self.assertIn(b"/child-safety", self.client.get("/sitemap.xml").data)
@@ -897,7 +904,7 @@ class WiringTest(unittest.TestCase):
             self.assertIn(expected, text.lower() if expected == "анкета" else text)
         self.assertIn("Анкета скрывается сразу", text)
         self.assertIn('rel="canonical" href="https://wiring.date/account-deletion"', text)
-        self.assertIn('href="/account-deletion" aria-current="page"', text)
+        self.assertIn('href="/legal#safety" aria-current="location"', text)
         self.assertNotIn('id="app"', text)
         self.assertEqual(self.client.head("/account-deletion").status_code, 200)
         self.assertIn(b"/account-deletion", self.client.get("/sitemap.xml").data)
