@@ -35,6 +35,7 @@
   color: #1a1c24;
   text-align: left;
   user-select: text;
+  overflow-wrap: anywhere;
 }
 
 /* Hover bridge between trigger and popover to prevent accidental close */
