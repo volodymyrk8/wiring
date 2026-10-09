@@ -9,7 +9,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
   deck: "deck.js?v=41",
   account: "account.js?v=17",
   chat: "chat.js?v=39",
-  support: "support.js?v=14",
+  support: "support.js?v=15",
 };
 
 /** Lazy, cached loaders for route-level feature bundles. */

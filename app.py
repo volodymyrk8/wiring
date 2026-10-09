@@ -51,6 +51,12 @@ from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HT
 from matchmaker import pack_profile, seed_decides_like
 from media import MediaError, make_thumb, read_upload
 from moderation import moderate_photo
+from report_moderation import (
+    REPORT_BAN_USER_MESSAGE,
+    apply_report_ban_if_needed,
+    clear_report_ban,
+    is_report_banned,
+)
 from speech import MAX_AUDIO_SECONDS, SpeechError, audio_kind, transcribe_audio
 from notify import add_notice, mark_notices_read, notify_event, notify_support, send_mail, unread_notices
 import mobile_api
@@ -587,6 +593,7 @@ def init_db() -> None:
         "seek_place": "TEXT NOT NULL DEFAULT ''",
         "hide_tags": "TEXT NOT NULL DEFAULT ''",
         "deleted_at": "INTEGER",
+        "report_banned_at": "INTEGER",
         "jev_feed_enabled": "INTEGER NOT NULL DEFAULT 0",
         "jev_recommendations_unlocked": "INTEGER NOT NULL DEFAULT 0",
     }.items():
@@ -907,6 +914,9 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         payload["plus_until"] = plus_until(row)
         payload["incognito"] = bool(int(row["incognito"] or 0)) if "incognito" in keys else False
         payload["paused"] = bool(int(row["paused"] or 0)) if "paused" in keys else False
+        payload["report_banned"] = is_report_banned(row)
+        if payload["report_banned"]:
+            payload["report_ban_message"] = REPORT_BAN_USER_MESSAGE
         payload["notify_enabled"] = bool(int(row["notify_enabled"] if "notify_enabled" in keys else 1))
         payload["notify_push"] = bool(int(row["notify_push"] if "notify_push" in keys else 1))
         jev_allowed, jev_configured = jev_access(row)
@@ -993,15 +1003,30 @@ def touch_seen(uid: int) -> None:
     db().commit()
 
 
+def _report_ban_json():
+    return jsonify({"ok": False, "error": REPORT_BAN_USER_MESSAGE, "report_banned": True}), 403
+
+
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if not session.get("uid"):
+        uid = session.get("uid")
+        if not uid:
             return jsonify({"ok": False, "error": "нужна сессия"}), 401
-        touch_seen(session["uid"])
+        if not getattr(fn, "_report_ban_exempt", False):
+            row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (uid,)).fetchone()
+            if row and is_report_banned(row):
+                return _report_ban_json()
+        touch_seen(uid)
         return fn(*args, **kwargs)
 
     return wrapper
+
+
+def report_ban_exempt(fn):
+    """Allow banned accounts (e.g. account deletion)."""
+    fn._report_ban_exempt = True
+    return fn
 
 
 def real_account_required(fn):
@@ -2006,6 +2031,7 @@ def api_logout():
 @app.post("/api/me/delete")
 @app.delete("/api/me")
 @login_required
+@report_ban_exempt
 def api_delete_me():
     uid = session["uid"]
     conn = db()
@@ -2248,6 +2274,8 @@ def _eligible_card(
     if "deleted_at" in keys and row["deleted_at"]:
         return None
     if "paused" in keys and int(row["paused"] or 0):
+        return None
+    if is_report_banned(row):
         return None
     if int(row["is_seed"] or 0) if "is_seed" in keys else 0:
         return None
@@ -2604,6 +2632,8 @@ def api_person(other_id: int):
         return jsonify({"ok": False, "error": "этот человек скрыт"}), 404
     row = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not row or ("deleted_at" in row.keys() and row["deleted_at"]) or (other_id != uid and is_guest_email(str(row["email"]))):
+        return jsonify({"ok": False, "error": "человек не найден"}), 404
+    if other_id != uid and is_report_banned(row):
         return jsonify({"ok": False, "error": "человек не найден"}), 404
     payload = user_public(row, include_email=(other_id == uid), detail=True)
     payload["matched"] = other_id != uid and _is_match(conn, uid, other_id)
@@ -3463,6 +3493,15 @@ def api_report():
         (uid, other_id, int(time.time())),
     )
     _unmatch_pair(conn, uid, other_id)
+    newly_banned = apply_report_ban_if_needed(conn, other_id)
+    if newly_banned:
+        target = conn.execute("SELECT name, email FROM users WHERE id = ?", (other_id,)).fetchone()
+        who = str(target["name"] or f"#{other_id}") if target else f"#{other_id}"
+        email = str(target["email"] or "") if target else ""
+        notify_support(
+            f"WIRING auto-ban · {who}",
+            f"{who} · {email}\n\nАккаунт скрыт после второй жалобы. Проверь очередь в /admin.",
+        )
     conn.commit()
     return jsonify({"ok": True})
 
@@ -3904,6 +3943,19 @@ def admin_premium():
     grant_premium(conn, int(row["id"]), days)
     conn.commit()
     return redirect("/admin")
+
+
+@app.post("/admin/users/<int:user_id>/report-ban-clear")
+def admin_clear_report_ban(user_id: int):
+    if not _admin_ready():
+        abort(403)
+    conn = db()
+    row = conn.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        return _admin_view("человека нет", 404)
+    clear_report_ban(conn, user_id)
+    conn.commit()
+    return redirect("/admin#reports")
 
 
 @app.get("/admin/export/marketing-audience")

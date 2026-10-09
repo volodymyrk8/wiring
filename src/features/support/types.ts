@@ -5,6 +5,8 @@ export type SupportUser = {
   guest?: boolean;
   photo?: string;
   plus?: boolean | number;
+  report_banned?: boolean;
+  report_ban_message?: string;
 } | null;
 
 export type SupportHostBridge = {

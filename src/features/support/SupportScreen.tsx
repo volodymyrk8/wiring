@@ -17,6 +17,8 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const sendingRef = useRef(false);
+  const reportBanned = Boolean(host.user?.report_banned);
+  const banMessage = String(host.user?.report_ban_message || "");
 
   const sendMessage = async () => {
     if (sendingRef.current) return;
@@ -107,6 +109,12 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
       <main class={styles.content}>
         <h1 class={styles.title}>Поддержка</h1>
         <div class={styles.intro}>
+          {reportBanned ? (
+            <div class={styles.banNotice} role="status">
+              <strong>Аккаунт временно ограничен</strong>
+              <p>{banMessage || "После жалоб анкета скрыта. Напиши ниже, если хочешь оспорить решение."}</p>
+            </div>
+          ) : null}
           <p>
             Напиши сюда — это единственный способ связаться с нами. Почту в сообщении указывать не
             обязательно: если укажешь, ответим туда. Если ты в аккаунте, увидим, кто пишет.

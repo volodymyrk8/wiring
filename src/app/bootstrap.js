@@ -313,11 +313,30 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     return data;
   };
 
+  const REPORT_BAN_ALLOWED_VIEWS = new Set([
+    "support",
+    "home",
+    "login",
+    "register",
+    "forgot",
+    "reset",
+    "verify",
+    "onboard",
+    "invite",
+    "delete-account",
+  ]);
+  const reportBanActive = () => Boolean(state.user?.report_banned);
+  const enforceReportBanView = () => {
+    if (!reportBanActive()) return;
+    if (!REPORT_BAN_ALLOWED_VIEWS.has(state.view)) state.view = "support";
+  };
+
   const refreshMe = async () => {
     const me = await api("/api/me");
     state.user = me.user;
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread || 0;
+    enforceReportBanView();
   };
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
@@ -845,6 +864,14 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if (meta.neuro && next === "deck") {
       state.filters.neuro = [meta.neuro];
       persistFilters();
+    }
+    if (
+      reportBanActive()
+      && !REPORT_BAN_ALLOWED_VIEWS.has(next)
+    ) {
+      state.view = "support";
+      render();
+      return;
     }
     if (!state.user && ["recommendations", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
       let pending = hrefFor(next);

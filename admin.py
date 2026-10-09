@@ -9,6 +9,7 @@ from database import Connection
 from typing import Any, Iterable
 
 from catalog import INTENTS, NEURO, REPORT_REASONS, VIBE
+from report_moderation import report_count_against, report_reporter_count_against
 from devices import device_usage_stats
 
 
@@ -170,7 +171,8 @@ def recent_reports(conn: Connection, limit: int = 50) -> list[dict[str, Any]]:
             reporter.email AS reporter_email,
             target.name AS target_name,
             target.email AS target_email,
-            target.is_seed AS target_seed
+            target.is_seed AS target_seed,
+            target.report_banned_at AS target_banned_at
         FROM reports r
         JOIN users reporter ON reporter.id = r.from_id
         JOIN users target ON target.id = r.to_id
@@ -195,6 +197,9 @@ def recent_reports(conn: Connection, limit: int = 50) -> list[dict[str, Any]]:
                 "target_name": row["target_name"],
                 "target_email": row["target_email"],
                 "target_seed": bool(row["target_seed"]),
+                "target_banned": bool(row["target_banned_at"]),
+                "target_report_count": report_count_against(conn, int(row["to_id"])),
+                "target_reporter_count": report_reporter_count_against(conn, int(row["to_id"])),
             }
         )
     return out
@@ -280,6 +285,9 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
 
     messages = conn.execute("SELECT from_id, to_id, created_at FROM messages").fetchall()
     reports = conn.execute("SELECT COUNT(*) AS n FROM reports").fetchone()["n"]
+    report_banned = conn.execute(
+        "SELECT COUNT(*) AS n FROM users WHERE report_banned_at IS NOT NULL AND COALESCE(deleted_at, 0) = 0"
+    ).fetchone()["n"]
     blocks = conn.execute("SELECT COUNT(*) AS n FROM blocks").fetchone()["n"]
 
     swipes_by_user: dict[int, int] = {}
@@ -338,6 +346,7 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "match_chats_real": match_chats_real,
         "messages": len(messages),
         "reports": reports,
+        "report_banned": int(report_banned or 0),
         "blocks": blocks,
         "report_queue": recent_reports(conn),
         "silent": [{"name": u["name"], "city": u["city"], "age": u["age"]} for u in silent],

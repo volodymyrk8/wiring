@@ -53,7 +53,7 @@
         <div class="prompt-card"><div class="q">мэтчи</div><p>{{ s.matches_total }} <span class="hint">живые {{ s.matches_real }} · с сидами {{ s.matches_seed }}</span></p></div>
         <div class="prompt-card"><div class="q">разговоры после мэтча</div><p>{{ s.match_chats }} <span class="hint">живые {{ s.match_chats_real }} · из {{ s.matches_total }} мэтчей</span></p></div>
         <div class="prompt-card"><div class="q">сообщения</div><p>{{ s.messages }}</p></div>
-        <div class="prompt-card"><div class="q">жалобы / блоки</div><p>{{ s.reports }} / {{ s.blocks }}</p></div>
+        <div class="prompt-card"><div class="q">жалобы / блоки</div><p>{{ s.reports }} / {{ s.blocks }} <span class="hint">автобан {{ s.report_banned }}</span></p></div>
         <div class="prompt-card"><div class="q">WIRING+</div><p>{{ s.users_plus }}</p></div>
         <div class="prompt-card"><div class="q">фильтры 7д</div><p>{{ s.filter_sessions_7d }} <span class="hint">сессий</span></p></div>
         <div class="prompt-card"><div class="q">фильтры 30д</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }} чел.</span></p></div>
@@ -229,14 +229,14 @@
         <p class="hint">все живые хотя бы раз свайпнули</p>
       {% endif %}
 
-      <h2>жалобы</h2>
-      <p class="hint">Кто пожаловался → на кого. При отправке жалобы человек автоматически блокируется у заявителя, мэтч снимается. Разбор — вручную: предупреждение, скрытие анкеты, удаление аккаунта; при underage/CSAM — по правилам и закону.</p>
+      <h2 id="reports">жалобы</h2>
+      <p class="hint">Кто пожаловался → на кого. После жалоб от <strong>двух разных участников</strong> анкета автоматически скрывается; человек может оспорить через <a href="/support">поддержку</a>. При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.</p>
       <table class="admin-table">
         <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th></tr>
         {% for r in s.report_queue %}
         <tr>
           <td>{{ r.created_at }}</td>
-          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}<br><span class="hint">{{ r.target_email }}</span></td>
+          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear" class="inline-grant"><button class="ghost slim" type="submit">снять автобан</button></form>{% endif %}</td>
           <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
           <td>{{ r.reason }}</td>
           <td>{{ r.details or "—" }}</td>

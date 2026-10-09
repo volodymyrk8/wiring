@@ -1773,6 +1773,65 @@ class WiringTest(unittest.TestCase):
         me = self.client.get("/api/me").get_json()["user"]
         self.assertTrue(me["plus"])
 
+    def test_two_reports_from_same_user_do_not_auto_ban(self):
+        target = self._register(email="same-rep@wiring.test", name="Цель")
+        target_id = target["id"]
+        self.client.post("/api/logout")
+        self._register(email="one-rep@wiring.test", name="Один")
+        self.assertEqual(
+            self.client.post("/api/report", json={"user_id": target_id, "reason": "spam"}).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post("/api/report", json={"user_id": target_id, "reason": "fake"}).status_code,
+            200,
+        )
+        with app.app_context():
+            row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (target_id,)).fetchone()
+            self.assertIsNone(row["report_banned_at"])
+
+    def test_two_reports_auto_ban_support_and_admin_clear(self):
+        target = self._register(email="reported@wiring.test", name="Цель")
+        target_id = target["id"]
+        self.client.post("/api/logout")
+        self._register(email="rep-a@wiring.test", name="ЖалобщикА")
+        self.assertEqual(
+            self.client.post("/api/report", json={"user_id": target_id, "reason": "spam"}).status_code,
+            200,
+        )
+        with app.app_context():
+            row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (target_id,)).fetchone()
+            self.assertIsNone(row["report_banned_at"])
+        self.client.post("/api/logout")
+        self._register(email="rep-b@wiring.test", name="ЖалобщикБ")
+        self.assertEqual(
+            self.client.post("/api/report", json={"user_id": target_id, "reason": "fake"}).status_code,
+            200,
+        )
+        with app.app_context():
+            row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (target_id,)).fetchone()
+            self.assertTrue(row["report_banned_at"])
+        self.client.post("/api/logout")
+        self.client.post("/api/login", json={"email": "reported@wiring.test", "password": "secret1"})
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertTrue(me["report_banned"])
+        denied = self.client.get("/api/feed")
+        self.assertEqual(denied.status_code, 403)
+        self.assertTrue(denied.get_json().get("report_banned"))
+        appeal = self.client.post(
+            "/support",
+            json={"body": "это ошибка, прошу разблокировать аккаунт"},
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(appeal.status_code, 200)
+        self.client.post("/api/logout")
+        self.client.post("/admin", data={"token": "test-admin-token"})
+        cleared = self.client.post(f"/admin/users/{target_id}/report-ban-clear", follow_redirects=True)
+        self.assertEqual(cleared.status_code, 200)
+        with app.app_context():
+            row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (target_id,)).fetchone()
+            self.assertIsNone(row["report_banned_at"])
+
     def test_admin_marketing_audience_export_is_email_then_name_tsv(self):
         self._register(email="mailing@wiring.test", name="Маша")
         self.client.post("/api/logout")
