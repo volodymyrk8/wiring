@@ -1048,6 +1048,16 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const renderDeckFeature = async () => {
     const view = state.view;
     const recommendations = view === "recommendations";
+    const existingMount = root.querySelector("#deck-feature-root");
+    if (deckFeatureUnmount && existingMount?.childElementCount) {
+      const tab = root.querySelector(".tabbar");
+      if (tab) {
+        tab.outerHTML = tabbar();
+        bindDataNavLinks();
+      }
+      syncUrl();
+      return;
+    }
     deckFeatureUnmount?.();
     deckFeatureUnmount = null;
     root.innerHTML = '<div id="deck-feature-root"></div>' + tabbar();

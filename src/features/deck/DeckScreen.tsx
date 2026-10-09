@@ -331,6 +331,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   indexRef.current = index;
   const dragRef = useRef<{ y: number } | null>(null);
   const touchRef = useRef<FeedSwipe | null>(null);
+  const touchScrollRef = useRef<{ top: number; native: boolean } | null>(null);
   const touchFrameRef = useRef<number | null>(null);
   const panelDragRef = useRef<(FeedSwipe & { id: number; scroll: number; moved: boolean }) | null>(null);
   const panelMovedRef = useRef(false);
@@ -401,9 +402,16 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       requestAnimationFrame(() => requestAnimationFrame(finishRestore));
     };
     const align = () => {
-      setCardHeight(Math.max(120, viewport.clientHeight - (host.recommendations ? 20 : 128)));
+      const height = viewport.clientHeight;
+      setCardHeight(Math.max(120, height - (host.recommendations ? 20 : 128)));
+      if (height < 1) return;
+      const target = indexRef.current * height;
       if (restoreRef.current) restoreScroll();
-      else jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current);
+      else if (Math.abs(viewport.scrollTop - target) > height * 0.45) {
+        jumpReel(viewport, target, reelLock.current, true);
+      } else if (Math.abs(viewport.scrollTop - target) > 2) {
+        jumpReel(viewport, target, reelLock.current, false);
+      }
     };
     align();
     restoreObserver = new ResizeObserver(() => {
@@ -422,8 +430,9 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport || restoreRef.current) return;
-    if (viewport.clientHeight > 0) jumpReel(viewport, indexRef.current * viewport.clientHeight, reelLock.current, true);
-  }, [cards]);
+    const height = viewport.clientHeight;
+    if (height > 0) jumpReel(viewport, indexRef.current * height, reelLock.current, true);
+  }, [cards.length, index]);
 
   useEffect(() => {
     if (host.recommendations || !current || viewedRef.current.has(current.id)) return;
@@ -512,7 +521,10 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       host.onAction?.(targetId);
       const remaining = cards.filter((card) => card.id !== targetId);
       const nextIndex = Math.min(index, remaining.length);
-      setCards(remaining); setIndex(nextIndex); setExcludeOpen(false);
+      indexRef.current = nextIndex;
+      setCards(remaining);
+      setIndex(nextIndex);
+      setExcludeOpen(false);
       host.onFeedChange(remaining, nextIndex, filters, hasMore, generation);
       if (response.matched && response.match) host.onMatch(response.match);
       else host.toast(direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
@@ -600,8 +612,8 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
           const next = Math.min(cards.length, Math.max(0, Math.round(event.currentTarget.scrollTop / height)));
           if (next === indexRef.current) return;
           settleScroll();
+          indexRef.current = next;
           setIndex(next);
-          scheduleReelSnap();
         }}
         onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("button, a, input")) return;
@@ -615,23 +627,38 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         }}
         onTouchStart={(event) => {
           if (touchFrameRef.current !== null) { cancelAnimationFrame(touchFrameRef.current); touchFrameRef.current = null; }
-          if (event.touches.length !== 1) { touchRef.current = null; return; }
+          if (event.touches.length !== 1) { touchRef.current = null; touchScrollRef.current = null; return; }
           const touch = event.touches[0];
+          const viewport = event.currentTarget;
+          touchScrollRef.current = { top: viewport.scrollTop, native: false };
           touchRef.current = { x: touch.clientX, y: touch.clientY, index: indexRef.current, axis: null };
         }}
         onTouchMove={(event) => {
           const start = touchRef.current;
+          const scrollStart = touchScrollRef.current;
           if (!start || event.touches.length !== 1) { touchRef.current = null; return; }
           const touch = event.touches[0];
           lockFeedSwipeAxis(start, touch.clientX, touch.clientY);
+          if (scrollStart && Math.abs(event.currentTarget.scrollTop - scrollStart.top) > 10) {
+            scrollStart.native = true;
+          }
         }}
         onTouchEnd={(event) => {
           const start = touchRef.current;
+          const scrollStart = touchScrollRef.current;
           touchRef.current = null;
+          touchScrollRef.current = null;
           if (!start || event.touches.length || event.changedTouches.length !== 1) return;
+          if (scrollStart?.native) {
+            scheduleReelSnap();
+            return;
+          }
           const touch = event.changedTouches[0];
           const target = feedSwipeTarget(start, touch.clientX, touch.clientY, cards.length);
-          if (target === null) return;
+          if (target === null) {
+            scheduleReelSnap();
+            return;
+          }
           if (touchFrameRef.current !== null) cancelAnimationFrame(touchFrameRef.current);
           touchFrameRef.current = requestAnimationFrame(() => {
             touchFrameRef.current = null;
@@ -640,6 +667,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         }}
         onTouchCancel={() => {
           touchRef.current = null;
+          touchScrollRef.current = null;
           if (touchFrameRef.current !== null) { cancelAnimationFrame(touchFrameRef.current); touchFrameRef.current = null; }
         }}
         onPointerUp={finishDrag}
