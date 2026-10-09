@@ -229,6 +229,32 @@
         <p class="hint">все живые хотя бы раз свайпнули</p>
       {% endif %}
 
+      <h2 id="bans">разбан после жалоб</h2>
+      <p class="hint">Снимает автобан (скрытие анкеты после двух жалоб от разных людей). Почта, id или точное имя — как в блоке WIRING+.</p>
+      <form class="form" method="post" action="/admin/report-ban-clear">
+        <label>кто<input name="who" required placeholder="id, почта или имя"></label>
+        <button class="solid" type="submit">разбанить</button>
+      </form>
+      {% if s.report_banned_users %}
+      <table class="admin-table">
+        <tr><th>кто</th><th>когда скрыли</th><th>жалобы</th><th></th></tr>
+        {% for u in s.report_banned_users %}
+        <tr>
+          <td><strong>{{ u.name }}</strong> <span class="hint">#{{ u.id }}</span><br><span class="hint">{{ u.email }}</span></td>
+          <td>{{ u.banned_at }}</td>
+          <td>{{ u.report_count }} · от {{ u.reporter_count }} чел.</td>
+          <td>
+            <form method="post" action="/admin/users/{{ u.id }}/report-ban-clear" class="inline-grant">
+              <button class="ghost slim" type="submit">разбанить</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <p class="hint">Сейчас никого с автобаном.</p>
+      {% endif %}
+
       <h2 id="reports">жалобы</h2>
       <p class="hint">Кто пожаловался → на кого. После жалоб от <strong>двух разных участников</strong> анкета автоматически скрывается; человек может оспорить через <a href="/support">поддержку</a>. При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.</p>
       <table class="admin-table">
@@ -236,7 +262,7 @@
         {% for r in s.report_queue %}
         <tr>
           <td>{{ r.created_at }}</td>
-          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear" class="inline-grant"><button class="ghost slim" type="submit">снять автобан</button></form>{% endif %}</td>
+          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear" class="inline-grant"><button class="ghost slim" type="submit">разбанить</button></form>{% endif %}</td>
           <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
           <td>{{ r.reason }}</td>
           <td>{{ r.details or "—" }}</td>

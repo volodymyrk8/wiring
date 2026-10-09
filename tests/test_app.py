@@ -1826,8 +1826,13 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(appeal.status_code, 200)
         self.client.post("/api/logout")
         self.client.post("/admin", data={"token": "test-admin-token"})
-        cleared = self.client.post(f"/admin/users/{target_id}/report-ban-clear", follow_redirects=True)
+        cleared = self.client.post(
+            "/admin/report-ban-clear",
+            data={"who": "reported@wiring.test"},
+            follow_redirects=True,
+        )
         self.assertEqual(cleared.status_code, 200)
+        self.assertIn("разбан после жалоб", cleared.get_data(as_text=True))
         with app.app_context():
             row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (target_id,)).fetchone()
             self.assertIsNone(row["report_banned_at"])

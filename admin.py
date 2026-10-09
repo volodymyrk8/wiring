@@ -157,6 +157,35 @@ def _top_for_kind(conn: Connection, kind: str, since: int, limit: int = 12) -> l
     ]
 
 
+def report_banned_users(conn: Connection, limit: int = 80) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT id, name, email, report_banned_at
+        FROM users
+        WHERE report_banned_at IS NOT NULL
+          AND COALESCE(deleted_at, 0) = 0
+        ORDER BY report_banned_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        banned_at = int(row["report_banned_at"] or 0)
+        uid = int(row["id"])
+        out.append(
+            {
+                "id": uid,
+                "name": row["name"],
+                "email": row["email"],
+                "banned_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(banned_at)) if banned_at else "—",
+                "report_count": report_count_against(conn, uid),
+                "reporter_count": report_reporter_count_against(conn, uid),
+            }
+        )
+    return out
+
+
 def recent_reports(conn: Connection, limit: int = 50) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
@@ -349,6 +378,7 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "report_banned": int(report_banned or 0),
         "blocks": blocks,
         "report_queue": recent_reports(conn),
+        "report_banned_users": report_banned_users(conn),
         "silent": [{"name": u["name"], "city": u["city"], "age": u["age"]} for u in silent],
         "days": day_rows,
         "recent": recent,

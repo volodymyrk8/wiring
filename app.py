@@ -3917,6 +3917,20 @@ def admin_page():
     return _admin_view()
 
 
+def _admin_resolve_user(conn: Connection, who: str) -> Row | None:
+    who = str(who or "").strip()
+    if not who:
+        return None
+    row = None
+    if who.isdigit():
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (int(who),)).fetchone()
+    if row is None:
+        row = conn.execute("SELECT * FROM users WHERE lower(email) = ?", (who.lower(),)).fetchone()
+    if row is None:
+        row = conn.execute("SELECT * FROM users WHERE name = ? AND is_seed = 0", (who,)).fetchone()
+    return row
+
+
 @app.post("/admin/premium")
 def admin_premium():
     if not _admin_ready():
@@ -3929,13 +3943,7 @@ def admin_premium():
     if not who:
         return _admin_view("укажи почту или id", 400)
     conn = db()
-    row = None
-    if who.isdigit():
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (int(who),)).fetchone()
-    if row is None:
-        row = conn.execute("SELECT * FROM users WHERE lower(email) = ?", (who.lower(),)).fetchone()
-    if row is None:
-        row = conn.execute("SELECT * FROM users WHERE name = ? AND is_seed = 0", (who,)).fetchone()
+    row = _admin_resolve_user(conn, who)
     if not row:
         return _admin_view("человека нет", 404)
     if is_guest_email(str(row["email"])) or int(row["is_seed"] or 0):
@@ -3945,17 +3953,37 @@ def admin_premium():
     return redirect("/admin")
 
 
+@app.post("/admin/report-ban-clear")
+def admin_report_ban_clear_by_who():
+    if not _admin_ready():
+        abort(403)
+    who = str(request.form.get("who") or "").strip()
+    if not who:
+        return _admin_view("укажи почту или id", 400)
+    conn = db()
+    row = _admin_resolve_user(conn, who)
+    if not row:
+        return _admin_view("человека нет", 404)
+    if not is_report_banned(row):
+        return _admin_view("автобана нет — анкета уже доступна", 400)
+    clear_report_ban(conn, int(row["id"]))
+    conn.commit()
+    return redirect("/admin#bans")
+
+
 @app.post("/admin/users/<int:user_id>/report-ban-clear")
 def admin_clear_report_ban(user_id: int):
     if not _admin_ready():
         abort(403)
     conn = db()
-    row = conn.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
         return _admin_view("человека нет", 404)
+    if not is_report_banned(row):
+        return redirect("/admin#bans")
     clear_report_ban(conn, user_id)
     conn.commit()
-    return redirect("/admin#reports")
+    return redirect("/admin#bans")
 
 
 @app.get("/admin/export/marketing-audience")
