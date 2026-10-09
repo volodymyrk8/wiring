@@ -343,6 +343,7 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
         "silent": [{"name": u["name"], "city": u["city"], "age": u["age"]} for u in silent],
         "days": day_rows,
         "recent": recent,
+        "audience_export_count": len(marketing_audience_rows(conn)),
     }
     payload.update(filter_usage_stats(conn))
     payload.update(device_usage_stats(conn))
@@ -350,17 +351,16 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
 
 
 def marketing_audience_rows(conn: Connection) -> list[dict[str, str]]:
-    """Live accounts that opted into marketing mailings (for audience upload: email, name)."""
+    """All live registered accounts (same cohort as «живые» in stats): email, name."""
     rows = conn.execute(
         """
         SELECT email, name
         FROM users
-        WHERE marketing_consent_at IS NOT NULL
-          AND deleted_at IS NULL
+        WHERE deleted_at IS NULL
           AND COALESCE(is_seed, 0) = 0
           AND email NOT LIKE '%@wiring.guest'
           AND email <> 'demo@wiring.app'
-          AND email_verified_at IS NOT NULL
+          AND TRIM(COALESCE(email, '')) <> ''
         ORDER BY LOWER(email)
         """
     ).fetchall()

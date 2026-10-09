@@ -3908,7 +3908,7 @@ def admin_premium():
 
 @app.get("/admin/export/marketing-audience")
 def admin_export_marketing_audience():
-    """Tab-separated audience file: column 1 email, column 2 name (Yandex Audience and similar)."""
+    """Tab-separated audience file: column 1 email, column 2 name — all live registered users."""
     if not _admin_ready():
         abort(403)
     body = marketing_audience_tsv(db())

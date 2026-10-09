@@ -1772,21 +1772,21 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(me["plus"])
 
     def test_admin_marketing_audience_export_is_email_then_name_tsv(self):
-        user = self._register(email="mailing@wiring.test", name="Маша")
+        self._register(email="mailing@wiring.test", name="Маша")
         self.client.post("/api/logout")
-        with app.app_context():
-            conn = db()
-            conn.execute(
-                "UPDATE users SET marketing_consent_at = 1 WHERE id = ?",
-                (user["id"],),
-            )
-            conn.commit()
         denied = self.client.get("/admin/export/marketing-audience")
         self.assertEqual(denied.status_code, 403)
         self.client.post("/admin", data={"token": "test-admin-token"})
         body = self.client.get("/admin/export/marketing-audience").get_data(as_text=True)
         self.assertEqual(body.splitlines()[0], "email\tname")
         self.assertIn("mailing@wiring.test\tМаша", body)
+        with app.app_context():
+            from admin import collect_stats, marketing_audience_rows
+
+            conn = db()
+            self.assertEqual(collect_stats(conn)["audience_export_count"], len(marketing_audience_rows(conn)))
+        admin = self.client.get("/admin").get_data(as_text=True)
+        self.assertIn("скачать TSV", admin)
 
     def test_spa_shell_routes_return_html(self):
         for path in SPA_SHELL_PATHS:
