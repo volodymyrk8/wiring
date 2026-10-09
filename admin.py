@@ -347,3 +347,39 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
     payload.update(filter_usage_stats(conn))
     payload.update(device_usage_stats(conn))
     return payload
+
+
+def marketing_audience_rows(conn: Connection) -> list[dict[str, str]]:
+    """Live accounts that opted into marketing mailings (for audience upload: email, name)."""
+    rows = conn.execute(
+        """
+        SELECT email, name
+        FROM users
+        WHERE marketing_consent_at IS NOT NULL
+          AND deleted_at IS NULL
+          AND COALESCE(is_seed, 0) = 0
+          AND email NOT LIKE '%@wiring.guest'
+          AND email <> 'demo@wiring.app'
+          AND email_verified_at IS NOT NULL
+        ORDER BY LOWER(email)
+        """
+    ).fetchall()
+    out: list[dict[str, str]] = []
+    for row in rows:
+        email = str(row["email"] or "").strip()
+        name = str(row["name"] or "").strip()
+        if not email:
+            continue
+        out.append({"email": email, "name": name})
+    return out
+
+
+def _tsv_cell(value: str) -> str:
+    return value.replace("\t", " ").replace("\r", " ").replace("\n", " ").strip()
+
+
+def marketing_audience_tsv(conn: Connection) -> str:
+    lines = ["email\tname"]
+    for row in marketing_audience_rows(conn):
+        lines.append(f"{_tsv_cell(row['email'])}\t{_tsv_cell(row['name'])}")
+    return "\n".join(lines) + "\n"

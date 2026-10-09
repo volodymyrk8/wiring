@@ -17,7 +17,7 @@ from flask import Flask, Response, abort, g, jsonify, make_response, redirect, r
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from admin import collect_stats, ensure_filter_tables, track_filters
+from admin import collect_stats, ensure_filter_tables, marketing_audience_tsv, track_filters
 from database import (
     Connection,
     IntegrityError,
@@ -3904,6 +3904,19 @@ def admin_premium():
     grant_premium(conn, int(row["id"]), days)
     conn.commit()
     return redirect("/admin")
+
+
+@app.get("/admin/export/marketing-audience")
+def admin_export_marketing_audience():
+    """Tab-separated audience file: column 1 email, column 2 name (Yandex Audience and similar)."""
+    if not _admin_ready():
+        abort(403)
+    body = marketing_audience_tsv(db())
+    return Response(
+        body,
+        mimetype="text/tab-separated-values; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="wiring-marketing-audience.tsv"'},
+    )
 
 
 @app.post("/admin/promo")

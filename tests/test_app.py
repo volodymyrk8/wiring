@@ -909,7 +909,7 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(self.client.head("/account-deletion").status_code, 200)
         self.assertIn(b"/account-deletion", self.client.get("/sitemap.xml").data)
         privacy = self.client.get("/privacy").get_data(as_text=True)
-        self.assertIn('href="/account-deletion"', privacy)
+        self.assertIn('href="/legal#safety"', privacy)
         self.assertIn("в течение суток после этих 7 суток", text)
         self.assertIn("Номер аккаунта остаётся, без почты и полей анкеты", text)
         self.assertNotIn("срок её стирания не назначен", text)
@@ -1770,6 +1770,23 @@ class WiringTest(unittest.TestCase):
         self.client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
         me = self.client.get("/api/me").get_json()["user"]
         self.assertTrue(me["plus"])
+
+    def test_admin_marketing_audience_export_is_email_then_name_tsv(self):
+        user = self._register(email="mailing@wiring.test", name="Маша")
+        self.client.post("/api/logout")
+        with app.app_context():
+            conn = db()
+            conn.execute(
+                "UPDATE users SET marketing_consent_at = 1 WHERE id = ?",
+                (user["id"],),
+            )
+            conn.commit()
+        denied = self.client.get("/admin/export/marketing-audience")
+        self.assertEqual(denied.status_code, 403)
+        self.client.post("/admin", data={"token": "test-admin-token"})
+        body = self.client.get("/admin/export/marketing-audience").get_data(as_text=True)
+        self.assertEqual(body.splitlines()[0], "email\tname")
+        self.assertIn("mailing@wiring.test\tМаша", body)
 
     def test_spa_shell_routes_return_html(self):
         for path in SPA_SHELL_PATHS:
