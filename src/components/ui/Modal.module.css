@@ -107,6 +107,18 @@
   overscroll-behavior: contain;
 }
 
+.body input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  max-width: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  accent-color: var(--lime, #c6f135);
+  appearance: auto;
+  -webkit-appearance: radio;
+}
+
 .footer {
   display: flex;
   align-items: center;

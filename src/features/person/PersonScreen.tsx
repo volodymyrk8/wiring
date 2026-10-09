@@ -213,7 +213,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     <Modal isOpen={reportOpen} onClose={() => !busy && setReportOpen(false)} title="Пожаловаться" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(false)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy || !reportReason} onClick={submitReport}>отправить</Button></>}>
       <div class={styles.reportForm}>
         <div class={styles.reportReasons}>{reportReasons.map((reason) => <label class={styles.reason} key={reason.id}><input type="radio" name="person-report-reason" value={reason.id} checked={reportReason === reason.id} onChange={() => setReportReason(reason.id)} /> <span>{reason.label}</span></label>)}</div>
-        <label>коротко, если нужно<textarea maxlength={280} rows={3} value={reportDetails} onInput={(event) => setReportDetails(event.currentTarget.value)} /></label>
+        <label class={styles.reportDetailsLabel}>коротко, если нужно<textarea maxlength={280} rows={3} value={reportDetails} onInput={(event) => setReportDetails(event.currentTarget.value)} /></label>
       </div>
     </Modal>
   </div>;

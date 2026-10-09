@@ -53,9 +53,36 @@
 .modalHint { margin: 0; color: var(--muted); line-height: 1.5; }
 .reportForm { display: grid; gap: 12px; }
 .reportReasons { display: grid; gap: 7px; }
-.reason { display: flex; gap: 9px; align-items: flex-start; padding: 10px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font-size: 13px; line-height: 1.35; cursor: pointer; }
-.reason input { margin-top: 2px; accent-color: var(--lime); }
-.reportForm label:last-child { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.reason {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  column-gap: 9px;
+  align-items: start;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.reason input[type="radio"] {
+  grid-column: 1;
+  margin-top: 1px;
+}
+
+.reason span {
+  grid-column: 2;
+}
+
+.reportDetailsLabel {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
 .reportForm textarea { width: 100%; min-height: 76px; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); font: inherit; resize: vertical; }
 .reportForm textarea:focus { border-color: var(--lime); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 
