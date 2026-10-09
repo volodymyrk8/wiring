@@ -21,10 +21,10 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
     >
       <span class={styles.badge18}>18+</span>
       <a class={styles.link} href="/legal#documents" draggable={false}>
-        документы
+        Документы
       </a>
       <a class={styles.link} href="/legal#safety" draggable={false}>
-        безопасность
+        Безопасность
       </a>
       <span class={styles.supportLinks}>
         <a class={styles.link} href={COMMUNITY_CHANNEL_URL} {...externalTelegram}>
