@@ -2024,6 +2024,17 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
   outline-offset: 2px;
 }
 
+.legal-footer-bar a.footer-telegram-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legal-footer-bar a.footer-telegram-link svg {
+  flex-shrink: 0;
+  opacity: 0.88;
+}
+
 .legal .abbr {
   background: var(--bg-2);
   border: 1px solid var(--line);

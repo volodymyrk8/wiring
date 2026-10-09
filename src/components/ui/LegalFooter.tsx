@@ -13,6 +13,12 @@ const externalTelegram = {
   draggable: false as const,
 };
 
+const telegramIcon = (
+  <svg class={styles.telegramIcon} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M21.7 3.4 18.5 20c-.2 1.2-.9 1.5-1.9.9l-4.8-3.6-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.9L17.7 7c.4-.3-.1-.5-.6-.2l-11 7-4.7-1.5c-1-.3-1-1 .2-1.5L20 3.7c.9-.3 1.7-.2 1.7-.3Z" />
+  </svg>
+);
+
 export function LegalFooter({ className, showTopBorder = true, onSupportClick }: LegalFooterProps = {}) {
   return (
     <footer
@@ -27,11 +33,13 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
         Безопасность
       </a>
       <span class={styles.supportLinks}>
-        <a class={styles.link} href={COMMUNITY_CHANNEL_URL} {...externalTelegram}>
-          Канал
+        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHANNEL_URL} {...externalTelegram} title="Канал WIRING в Telegram">
+          {telegramIcon}
+          <span>Канал</span>
         </a>
-        <a class={styles.link} href={COMMUNITY_CHAT_URL} {...externalTelegram}>
-          Чат
+        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHAT_URL} {...externalTelegram} title="Чат WIRING в Telegram">
+          {telegramIcon}
+          <span>Чат</span>
         </a>
         <a
           class={styles.link}
