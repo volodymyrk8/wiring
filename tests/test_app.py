@@ -816,6 +816,7 @@ class WiringTest(unittest.TestCase):
         self.assertIn('id="safety"', legal_text)
         self.assertIn("ger6KkmL2NZkMGNi", legal_text)
         self.assertIn("wiringclubsupport", legal_text)
+        self.assertIn(">Чат</span>", legal_text)
         self.assertIn(">Поддержка</a>", legal_text)
         self.assertIn(b"/legal", self.client.get("/sitemap.xml").data)
         self.assertEqual(self.client.get("/privacy").status_code, 200)
