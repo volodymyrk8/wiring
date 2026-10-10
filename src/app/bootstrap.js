@@ -551,6 +551,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   let likesFeatureUnmount = null;
   let personFeatureUnmount = null;
   let deckFeatureUnmount = null;
+  /** @type {"deck" | "recommendations" | null} */
+  let deckFeatureMode = null;
   let accountFeatureUnmount = null;
   let supportFeatureUnmount = null;
   const ACCOUNT_FEATURE_VIEWS = new Set(["invite", "delete-account", "onboard"]);
@@ -1048,8 +1050,9 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const renderDeckFeature = async () => {
     const view = state.view;
     const recommendations = view === "recommendations";
+    const mode = recommendations ? "recommendations" : "deck";
     const existingMount = root.querySelector("#deck-feature-root");
-    if (deckFeatureUnmount && existingMount?.childElementCount) {
+    if (deckFeatureUnmount && deckFeatureMode === mode && existingMount?.childElementCount) {
       const tab = root.querySelector(".tabbar");
       if (tab) {
         tab.outerHTML = tabbar();
@@ -1060,6 +1063,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     }
     deckFeatureUnmount?.();
     deckFeatureUnmount = null;
+    deckFeatureMode = null;
     root.innerHTML = '<div id="deck-feature-root"></div>' + tabbar();
     bindDataNavLinks();
     const mountEl = root.querySelector("#deck-feature-root");
@@ -1067,6 +1071,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     try {
       const mod = await featureLoader.deck();
       if (state.view !== view) return;
+      deckFeatureMode = mode;
       deckFeatureUnmount = (recommendations ? mod.mountRecommendations : mod.mountDeck)(mountEl, buildDeckHostBridge(recommendations));
       bindDataNavLinks();
       syncUrl();
@@ -1174,6 +1179,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if (state.view !== "deck" && state.view !== "recommendations") {
       deckFeatureUnmount?.();
       deckFeatureUnmount = null;
+      deckFeatureMode = null;
     }
     if (!ACCOUNT_FEATURE_VIEWS.has(state.view) && !cityGateActive()) {
       accountFeatureUnmount?.();

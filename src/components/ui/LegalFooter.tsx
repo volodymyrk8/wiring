@@ -37,9 +37,9 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
           {telegramIcon}
           <span>Канал</span>
         </a>
-        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHAT_URL} {...externalTelegram} title="Группа тестировщиков WIRING в Telegram">
+        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHAT_URL} {...externalTelegram} title="Чат поддержки WIRING в Telegram">
           {telegramIcon}
-          <span>Группа тестировщиков</span>
+          <span>@wiringclubsupport</span>
         </a>
         <a
           class={styles.link}
