@@ -86,7 +86,7 @@
   padding: 28px 14px 10px;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: auto;
+  overscroll-behavior-y: contain;
   scrollbar-width: none;
   background: linear-gradient(to top, rgba(17,14,12,.94) 0%, rgba(17,14,12,.78) 42%, rgba(17,14,12,.35) 78%, transparent 100%);
   pointer-events: auto;
@@ -149,7 +149,7 @@
   touch-action: none;
 }
 
-.reels { flex: 1; min-height: 180px; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; scroll-behavior: smooth; overflow-anchor: none; overscroll-behavior-y: contain; scrollbar-width: none; touch-action: pan-y; cursor: grab; }
+.reels { flex: 1; min-height: 180px; overflow-y: auto; overflow-x: hidden; scroll-snap-type: y mandatory; scroll-behavior: auto; overflow-anchor: none; overscroll-behavior-y: contain; scrollbar-width: none; touch-action: pan-y; cursor: grab; }
 .freeScroll { scroll-snap-type: none; }
 .reels::-webkit-scrollbar { display: none; }
 .reels:focus { outline: none; }
@@ -233,8 +233,8 @@
 .actionCircle :global(span) { display: inline-flex; align-items: center; justify-content: center; }
 .actionCircle svg { width: 18px; height: 18px; }
 .actionCircle.actionCircle:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.actionPanel { align-self: center; transition: opacity 140ms ease, transform 140ms ease; transform-origin: center; }
-.actionPanelHidden { opacity: 0; transform: translateY(8px) scale(.98); pointer-events: none; }
+.actionPanel { align-self: center; transition: opacity 160ms ease; }
+.actionPanelHidden { opacity: 0; pointer-events: none; }
 .actionPanelHolding { opacity: 1; transform: none; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .actionPanel { transition: none; } }
 @media (min-width: 768px) { .controls { min-height: 72px; } .actionControl { min-width: 48px; } .actionCircle.actionCircle { width: 48px; min-width: 48px; height: 48px; min-height: 48px; } }
