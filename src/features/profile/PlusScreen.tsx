@@ -160,7 +160,7 @@ export function PlusScreen({ host }: { host: ProfileHostBridge }) {
             </svg>
           </span>
           <h1>WIRING+</h1>
-          <p>Спокойный и комфортный режим знакомств без лишней спешки и ограничений.</p>
+          <p>Спокойный и комфортный режим без лишней спешки и ограничений.</p>
         </header>
 
         <section class={`${styles.panel}${user.plus ? ` ${styles.panelActive}` : ""}`}>

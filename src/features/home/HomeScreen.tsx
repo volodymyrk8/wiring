@@ -1,5 +1,6 @@
 import type { JSX } from "preact";
 import { AppHeader, LegalFooter, Button, ProfileMenu } from "@/components/ui";
+import { SITE_TAGLINE } from "@/lib/site-branding";
 import type { HomeHostBridge } from "./types";
 import styles from "./HomeScreen.module.css";
 
@@ -74,7 +75,7 @@ export function HomeScreen({ host }: HomeScreenProps) {
             <h1 class={styles.title}>
               <span class={styles.titleAccent}>Отличные</span> люди рядом
             </h1>
-            <p class={styles.sub}>Знакомства для нейроотличных</p>
+            <p class={styles.sub}>{SITE_TAGLINE}</p>
           </header>
 
           {signed ? (

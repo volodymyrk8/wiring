@@ -1,7 +1,7 @@
 {
   "name": "WIRING",
   "short_name": "WIRING",
-  "description": "Знакомства для нейроотличных",
+  "description": "Общение для нейроотличных",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#e9ebf3",

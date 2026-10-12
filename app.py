@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""WIRING — dating for neurodivergent people."""
+"""WIRING — communication for neurodivergent people."""
 
 from __future__ import annotations
 
@@ -84,6 +84,7 @@ from premium import (
     unsnooze,
 )
 from profanity import has_profanity
+from site_branding import SITE_META_DESCRIPTION, SITE_OG_DESCRIPTION, SITE_PAGE_TITLE
 from support_triage import ensure_task_tables, list_tasks, task_counts, task_threshold, triage_support_tickets
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1654,7 +1655,12 @@ def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
 
 def _spa() -> Response:
     response = make_response(render_template(
-        "index.html", base_path=BASE_PATH, site_url=SITE_URL,
+        "index.html",
+        base_path=BASE_PATH,
+        site_url=SITE_URL,
+        page_title=SITE_PAGE_TITLE,
+        meta_description=SITE_META_DESCRIPTION,
+        og_description=SITE_OG_DESCRIPTION,
         registration_created=bool(session.pop("registration_created", False)),
     ))
     # OAuth registration is a one-shot signal, never replayed from cached HTML.
