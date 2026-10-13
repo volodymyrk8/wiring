@@ -628,8 +628,8 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Текст</h2></div>
-              <Textarea label="О себе" name="bio" maxLength={1200} value={draft.bio} hint="специальный интерес, сенсорные лимиты, чего лучше не делать" onInput={(event) => setField("bio", event.currentTarget.value)} />
+              <div class={styles.sectionTitle}><h2>О себе</h2></div>
+              <Textarea label="Био" name="bio" maxLength={1200} value={draft.bio} hint="специальный интерес, сенсорные лимиты, чего лучше не делать" onInput={(event) => setField("bio", event.currentTarget.value)} />
               <Textarea label="Как тебе писать" name="communication" maxLength={500} value={draft.communication} hint="голосовые ок / нет, small talk — сразу в блок" onInput={(event) => setField("communication", event.currentTarget.value)} />
               <div class={styles.promptList}>
                 <div class={styles.subheading}><h3>Промпты</h3><span>до трёх</span></div>

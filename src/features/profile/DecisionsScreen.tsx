@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
-import { AppHeader, Button, LegalFooter, Modal, ProfileMenu } from "@/components/ui";
+import { AppHeader, Button, IconButton, LegalFooter, Modal, ProfileMenu } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileHostBridge } from "./types";
@@ -48,6 +48,17 @@ const COPY: Record<Action, { title: string; body: string; confirm: string }> = {
   },
 };
 
+const iconLike = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20.8 8.8c0 5.2-8.8 10.1-8.8 10.1S3.2 14 3.2 8.8A4.7 4.7 0 0 1 12 6.2a4.7 4.7 0 0 1 8.8 2.6Z" />
+  </svg>
+);
+const iconPass = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m6 6 12 12M18 6 6 18" />
+  </svg>
+);
+
 const photoSrc = (person: DecisionPerson) => {
   const value = person.photo || "";
   if (!value) return "";
@@ -77,6 +88,29 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
     return () => { cancelled = true; };
   }, [host]);
 
+  const reloadArchive = () => host.api("/api/archive").then((response: Archive) => {
+    setArchive({ likes: response.likes || [], passes: response.passes || [], blocks: response.blocks || [] });
+  });
+
+  const quickSwipe = async (person: DecisionPerson, direction: "like" | "pass") => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await host.api("/api/swipe", {
+        method: "POST",
+        body: JSON.stringify({ target_id: person.id, direction }),
+      });
+      await reloadArchive();
+      if (response.matched) host.toast(`взаимно с ${person.name || "собой"}. Чат в разделе «Чаты».`);
+      else host.toast(direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+    } catch (caught) {
+      setError(getErrorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const apply = async () => {
     if (!pending || busy) return;
     setBusy(true);
@@ -99,6 +133,8 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
     event.preventDefault();
     host.navigate("person", { id: person.id });
   };
+
+  const oneWayLikes = archive?.likes.filter((person) => !person.matched) || [];
 
   return (
     <div class={styles.root}>
@@ -136,25 +172,25 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
         {!archive ? <p class={styles.empty}>Загружаем…</p> : (
           <>
-            <Section title="Лайки" empty="Лайков пока нет." count={archive.likes.length}>
-              {archive.likes.map((person) => (
+            <Section title="Лайки" empty="Лайков пока нет. Взаимные — в разделе «Чаты»." count={oneWayLikes.length}>
+              {oneWayLikes.map((person) => (
                 <Row key={person.id} person={person} href={host.hrefFor("person", { id: person.id })} onOpen={openPerson(person)}>
-                  {person.matched ? <span class={styles.badge}>взаимно</span> : null}
-                  <Button
-                    variant="ghost"
-                    slim
-                    type="button"
-                    onClick={() => setPending({ person, action: person.matched ? "unmatch" : "unlike" })}
-                  >
-                    {person.matched ? "убрать из чатов" : "убрать лайк"}
-                  </Button>
+                  <div class={styles.quickActions}>
+                    <IconButton class={`${styles.quickBtn} ${styles.quickLikeActive}`} type="button" disabled aria-label="Лайк уже отправлен" title="Лайк уже отправлен">{iconLike}</IconButton>
+                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label="Скрыть из ленты" title="Скрыть из ленты" onClick={() => void quickSwipe(person, "pass")}>{iconPass}</IconButton>
+                  </div>
+                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "unlike" })}>убрать лайк</Button>
                 </Row>
               ))}
             </Section>
             <Section title="Дизлайки" empty="Скрытых анкет пока нет." count={archive.passes.length}>
               {archive.passes.map((person) => (
                 <Row key={person.id} person={person} href={host.hrefFor("person", { id: person.id })} onOpen={openPerson(person)}>
-                  <Button variant="ghost" slim type="button" onClick={() => setPending({ person, action: "restore" })}>вернуть в ленту</Button>
+                  <div class={styles.quickActions}>
+                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label="Лайк" title="Лайк" onClick={() => void quickSwipe(person, "like")}>{iconLike}</IconButton>
+                    <IconButton class={`${styles.quickBtn} ${styles.quickPassActive}`} type="button" disabled aria-label="Скрыто из ленты" title="Скрыто из ленты">{iconPass}</IconButton>
+                  </div>
+                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "restore" })}>только в ленту</Button>
                 </Row>
               ))}
             </Section>

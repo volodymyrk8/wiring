@@ -38,13 +38,13 @@ export function Textarea({
   return (
     <div class={`${styles.wrap}${hasError ? ` ${styles.hasError}` : ""}`}>
       <label class={styles.field} htmlFor={inputId}>
+        <span class={styles.label}>{label}</span>
         <textarea
           id={inputId}
           name={name}
           rows={rows}
           required={required}
           maxLength={maxLength}
-          placeholder=" "
           value={value}
           defaultValue={defaultValue}
           class={styles.input}
@@ -55,7 +55,6 @@ export function Textarea({
           onInput={onInput}
           onChange={onChange}
         />
-        <span class={styles.label}>{label}</span>
       </label>
       {typeof error === "string" && error ? (
         <span id={errorId} class={styles.errorText} role="alert">{error}</span>

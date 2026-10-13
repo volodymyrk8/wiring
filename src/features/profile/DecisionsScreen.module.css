@@ -13,7 +13,12 @@
 .fallback { display: grid; place-items: center; color: var(--lime); font-family: var(--serif); }
 .who strong { display: block; font-size: 14px; font-weight: 600; }
 .who small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
-.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.quickActions { display: inline-flex; align-items: center; gap: 6px; }
+.quickBtn { width: 40px !important; height: 40px !important; min-width: 40px; min-height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.quickBtn:disabled { opacity: 1; cursor: default; }
+.quickLikeActive svg { fill: var(--glow-2); stroke: var(--lime); }
+.quickPassActive svg { stroke: var(--muted); opacity: 0.72; }
 .badge { color: var(--lime); font-size: 12px; }
 .empty { margin: 0; font-size: 13px; }
 @media (min-width: 768px) { .content { padding-top: 44px; padding-bottom: 48px; } }
