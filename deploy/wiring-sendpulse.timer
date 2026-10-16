@@ -1,0 +1,9 @@
+[Unit]
+Description=Sync WIRING contacts to SendPulse every five minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target

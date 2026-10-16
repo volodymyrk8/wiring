@@ -38,11 +38,16 @@ OAUTH_ALLOWED_ORIGINS=https://wiring.club,https://wiring.date
 
 На отдельных тестовых аккаунтах каждого провайдера: регистрация → анкета; выход → повторный вход в тот же ID; отмена доступа; отказ в доступе к почте; существующий подтверждённый адрес; сброс пароля и удаление/восстановление. Автоматические тесты используют моки ответов провайдеров и отдельную PostgreSQL `wiring_test`; они не проверяют настройки внешних OAuth-приложений.
 
-## Мобильный follow-up
+## Нативный вход iOS/Android
 
-`mobile/` отсутствует в этой ветке. На iOS и Android добавить на экраны входа/регистрации «Войти через Google» / «Войти через Яндекс» и «Зарегистрироваться через Google» / «Зарегистрироваться через Яндекс», тот же текст 18+ и согласия. На удалении — ссылку «Задать пароль через сброс пароля».
+Мобильный клиент [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile) показывает те же Google/Яндекс кнопки и подтверждения 18+/правил. Использует системную браузерную auth-сессию; аккаунты, привязки и provider callback общие с сайтом.
 
-Общий `/api/auth/providers` и `/api/auth/{provider}/start` уже покрывает веб-вход через системный браузер, но callback пока создаёт cookie-сессию. Для полноценного входа в нативное приложение существующего `/api/auth/token` (email/password) недостаточно: нужен общий обмен одноразового результата OAuth на действующую пару access/refresh в `mobile_api.py` с привязкой к PKCE приложения и разрешённым app callback. Не копировать cookie и не создавать второй app-only вариант аккаунтов/API. До этого приложения могут использовать существующий вход с паролем после его задания через сброс.
+1. Приложение генерирует собственный PKCE verifier, S256 challenge и случайный native_state. `POST /api/auth/{provider}/start` принимает обычный mode/consents/ref и `native: true`, `code_challenge`, `native_state`. Callback провайдера остаётся зарегистрированным веб-callback; произвольный app redirect не принимается.
+2. В ответе URL `GET /api/auth/native/browser?state=...&ticket=...` для системного браузера. Он проверяет launch ticket/TTL и связывает существующий flow с браузерной cookie до перенаправления провайдеру. State по-прежнему расходуется один раз перед provider exchange. Не логировать query этой bootstrap-страницы; ответы `no-store` / `no-referrer`.
+3. После общего account lifecycle callback возвращает `wiring://oauth?code=...&state=...`. Это одноразовый непрозрачный код на 60 секунд; в PostgreSQL хранится его SHA-256 и challenge. Access/refresh и provider tokens не передаются в URL. Отмена/ошибка возвращает native state с error.
+4. `POST /api/auth/native/exchange` принимает code и code_verifier. Проверяет S256/TTL под row lock, расходует код и создаёт refresh family одним commit. Ответ — существующий формат native session `{access_token, refresh_token, expires_in, user}`, без `Set-Cookie`, с `Cache-Control: no-store`.
+
+Тесты `tests/test_native_auth.py` используют только локальную тестовую БД и mocked provider identity. Реальный OAuth через оба системных браузера требует signed native build и отдельного тестового OAuth-приложения.
 
 ## Настройка Apple
 
@@ -53,6 +58,6 @@ OAUTH_ALLOWED_ORIGINS=https://wiring.club,https://wiring.date
 
 Запрашивается только `email`; имя не запрашивается и новый профиль получает «Участник», которое можно изменить в анкете. Код обменивается на сервере; ID token проверяется по Apple JWKS (RS256), issuer, Services ID audience, exp, nonce и verified email. `PyJWT[crypto]` добавлен для стандартной проверки подписи без собственной криптографии. Токены не сохраняются. Apple POST callback временно сохраняет только code/error в PostgreSQL flow, затем 303 GET восстанавливает SameSite=Lax browser cookie; без исходного браузера вход не завершается. Flow расходуется однократно, временные данные очищаются вместе с ним, state живёт 10 минут. Это не требует ослаблять SameSite всех сессий.
 
-Мобильный follow-up: «Войти через Apple» / «Зарегистрироваться через Apple» на входе/регистрации обеих платформ, общий обмен результата на существующие мобильные токены и связанная группа App ID/Services ID; текущий cookie-flow сам по себе этого обмена не предоставляет.
+Мобильный follow-up: «Войти через Apple» / «Зарегистрироваться через Apple» на входе/регистрации обеих платформ, использование общего native handoff с PKCE, существующих мобильных токенов и связанной группы App ID/Services ID.
 
 Официальная документация: [веб-конфигурация](https://developer.apple.com/documentation/signinwithapple/configuring-your-webpage-for-sign-in-with-apple), [проверка пользователя](https://developer.apple.com/documentation/signinwithapple/verifying-a-user), [настройка окружения и relay](https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple).

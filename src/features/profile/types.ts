@@ -7,6 +7,7 @@ export type ProfilePhoto = {
 export type ProfileUser = {
   id?: number;
   name?: string;
+  name_change_available_at?: number;
   age?: number | string;
   city?: string;
   gender?: string;

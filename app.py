@@ -46,6 +46,7 @@ from devices import ensure_device_tables, track_device_visit, visitor_key_from_r
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access
 from recommendations import select_recommendations
+from sendpulse_sync import ensure_sync_table
 from glossary import glossary_html
 from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
@@ -83,6 +84,8 @@ from premium import (
     snoozed_ids,
     unsnooze,
 )
+from profile_policy import name_change_available_at, name_change_error
+from support_replies import ensure_reply_tables, save_reply, admin_reply_history, user_replies, purge_user_replies
 from profanity import has_profanity
 from site_branding import SITE_META_DESCRIPTION, SITE_OG_DESCRIPTION, SITE_PAGE_TITLE
 from support_triage import ensure_task_tables, list_tasks, task_counts, task_threshold, triage_support_tickets
@@ -372,6 +375,7 @@ def _replace_prompts(conn: Connection, user_id: int, prompts: list[dict[str, str
 def init_db() -> None:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     conn = db_connect()
+    ensure_sync_table(conn)
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -560,6 +564,7 @@ def init_db() -> None:
         );
         """
     )
+    ensure_reply_tables(conn)
     ensure_feed_history(conn)
     _ensure_session_handoffs(conn)
     ensure_filter_tables(conn)
@@ -573,6 +578,7 @@ def init_db() -> None:
         "CREATE INDEX IF NOT EXISTS idx_filter_events_user ON filter_events(user_id, fingerprint, created_at)"
     )
     for name, ddl in {
+        "name_changed_at": "INTEGER",
         "job": "TEXT NOT NULL DEFAULT ''",
         "intent": "TEXT NOT NULL DEFAULT 'dating'",
         "height": "INTEGER",
@@ -663,6 +669,7 @@ def init_db() -> None:
         conn.execute("DELETE FROM photos WHERE user_id = ?", (uid,))
         conn.execute("DELETE FROM albums WHERE user_id = ?", (uid,))
         conn.execute("DELETE FROM blocks WHERE from_id = ? OR to_id = ?", (uid, uid))
+        purge_user_replies(conn, uid)
         conn.execute("DELETE FROM reports WHERE from_id = ? OR to_id = ?", (uid, uid))
         conn.execute("DELETE FROM reads WHERE user_id = ? OR other_id = ?", (uid, uid))
         conn.execute("DELETE FROM notifications WHERE user_id = ? OR from_id = ?", (uid, uid))
@@ -903,6 +910,7 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
     if detail:
         payload["albums"] = albums_for(row["id"])
     if include_email:
+        payload["name_change_available_at"] = name_change_available_at(row)
         payload["email"] = row["email"]
         payload["guest"] = is_guest_email(str(row["email"]))
         complete = profile_complete(row, tags, photos)
@@ -958,6 +966,7 @@ def inbox_stats(uid: int) -> dict[str, int]:
             continue
         likes += 1
     unread = 0
+    unread_chats = 0
     for row in conn.execute(
         """
         SELECT u.id FROM users u
@@ -969,8 +978,10 @@ def inbox_stats(uid: int) -> dict[str, int]:
     ):
         if row["id"] in blocked:
             continue
-        unread += unread_count(conn, uid, row["id"])
-    return {"likes_in": likes, "unread": unread}
+        count = unread_count(conn, uid, row["id"])
+        unread += count
+        unread_chats += int(count > 0)
+    return {"likes_in": likes, "unread": unread, "unread_chats": unread_chats}
 
 
 def current_user() -> dict[str, Any] | None:
@@ -1415,6 +1426,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     """Purges auxiliary user data (photos, messages, etc.).
     Database requirement: The user record in 'users' is NEVER deleted!
     """
+    conn.execute("DELETE FROM sendpulse_contacts WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM feed_history WHERE user_id = ? OR other_id = ?", (uid, uid))
@@ -1423,6 +1435,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     conn.execute("DELETE FROM photos WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM albums WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM blocks WHERE from_id = ? OR to_id = ?", (uid, uid))
+    purge_user_replies(conn, uid)
     conn.execute("DELETE FROM reports WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM reads WHERE user_id = ? OR other_id = ?", (uid, uid))
     conn.execute("DELETE FROM notifications WHERE user_id = ? OR from_id = ?", (uid, uid))
@@ -1893,13 +1906,13 @@ def api_email_verify():
         return jsonify({"ok": False, "error": "нет токена"}), 400
     conn = db()
     row = conn.execute(
-        "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ?",
+        "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ? FOR UPDATE",
         (token,),
     ).fetchone()
     if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 172800:
         return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
     user = conn.execute("SELECT * FROM users WHERE id = ?", (row["user_id"],)).fetchone()
-    if not user:
+    if not user or user["deleted_at"]:
         return jsonify({"ok": False, "error": "аккаунт не найден"}), 400
     now = int(time.time())
     conn.execute(
@@ -1908,6 +1921,8 @@ def api_email_verify():
     )
     conn.execute("UPDATE email_verifications SET used_at = ? WHERE token = ?", (now, token))
     conn.commit()
+    if data.get("mobile") is True:
+        return app.extensions["wiring_native_session"](int(row["user_id"]), "email verification")
     session.clear()
     session.permanent = True
     session["uid"] = row["user_id"]
@@ -2095,10 +2110,10 @@ def api_patch_me():
     draft = bool(data.get("draft"))
     uid = session["uid"]
     conn = db()
-    me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+    me = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
     if not me:
         return jsonify({"ok": False, "error": "нет профиля"}), 401
-    payload_in = _merge_me_for_draft(me, data) if draft else {**data}
+    payload_in = _merge_me_for_draft(me, data) if draft else {"name": me["name"], **data}
     # An uploaded photo lives on the photos row. It is not a seed portrait, and a
     # filter save must not fail just because that path is still on the profile.
     if str(payload_in.get("photo") or "") not in SEED_PHOTOS:
@@ -2112,6 +2127,11 @@ def api_patch_me():
     if err or parsed is None:
         return jsonify({"ok": False, "error": err}), 400
     now = int(time.time())
+    blocked_name = name_change_error(me, parsed["name"], now)
+    if blocked_name:
+        message, available = blocked_name
+        return jsonify({"ok": False, "error": message, "name_change_available_at": available}), 409
+    changed_at = now if parsed["name"] != me["name"] else me["name_changed_at"]
     special_at = me["special_data_consent_at"] if "special_data_consent_at" in me.keys() else None
     photo_at = me["photo_rights_consent_at"] if "photo_rights_consent_at" in me.keys() else None
     if _consent_yes(data.get("special_data_consent")):
@@ -2135,7 +2155,7 @@ def api_patch_me():
         hide = hide_tags_of(me)
     conn.execute(
         """
-        UPDATE users SET name = ?, age = ?, city = ?, gender = ?, looking_for = ?, bio = ?,
+        UPDATE users SET name = ?, name_changed_at = ?, age = ?, city = ?, gender = ?, looking_for = ?, bio = ?,
             job = ?, intent = ?, height = ?, communication = ?,
             special_data_consent_at = ?, photo_rights_consent_at = ?,
             seek_min_age = ?, seek_max_age = ?, seek_place = ?, hide_tags = ?
@@ -2143,6 +2163,7 @@ def api_patch_me():
         """,
         (
             parsed["name"],
+            changed_at,
             parsed["age"],
             parsed["city"],
             parsed["gender"],
@@ -3472,6 +3493,14 @@ def api_archive_revise():
     return jsonify({"ok": True, **_archive_lists(conn, uid)})
 
 
+def _notify_report_support(subject, body):
+    try:
+        if not notify_support(subject, body):
+            app.logger.warning("Report email was not confirmed; check SUPPORT_INBOX and mail transport")
+    except Exception:
+        app.logger.warning("Report notification transport failed; the report remains in the admin queue")
+
+
 @app.post("/api/report")
 @login_required
 def api_report():
@@ -3490,7 +3519,9 @@ def api_report():
     conn = db()
     if not conn.execute("SELECT id FROM users WHERE id = ?", (other_id,)).fetchone():
         return jsonify({"ok": False, "error": "человек не найден"}), 404
-    conn.execute(
+    if too_many(f"report:{uid}", 5, 3600):
+        return jsonify({"ok": False, "error": "Слишком много жалоб — подожди немного"}), 429
+    report_insert = conn.execute(
         "INSERT INTO reports (from_id, to_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)",
         (uid, other_id, reason, details, int(time.time())),
     )
@@ -3500,15 +3531,16 @@ def api_report():
     )
     _unmatch_pair(conn, uid, other_id)
     newly_banned = apply_report_ban_if_needed(conn, other_id)
-    if newly_banned:
-        target = conn.execute("SELECT name, email FROM users WHERE id = ?", (other_id,)).fetchone()
-        who = str(target["name"] or f"#{other_id}") if target else f"#{other_id}"
-        email = str(target["email"] or "") if target else ""
-        notify_support(
-            f"WIRING auto-ban · {who}",
-            f"{who} · {email}\n\nАккаунт скрыт после второй жалобы. Проверь очередь в /admin.",
-        )
     conn.commit()
+    _notify_report_support(
+        f"WIRING · новая жалоба #{report_insert.lastrowid}",
+        f"Новая жалоба #{report_insert.lastrowid}: участник #{uid} на участника #{other_id}. Причина: {reason}.\nРазобрать: {SITE_URL}/admin#reports",
+    )
+    if newly_banned:
+        _notify_report_support(
+            f"WIRING auto-ban · #{other_id}",
+            f"Аккаунт #{other_id} скрыт после второй жалобы от разных участников. Проверь очередь: {SITE_URL}/admin#bans",
+        )
     return jsonify({"ok": True})
 
 
@@ -3886,6 +3918,9 @@ def _admin_view(error: str | None = None, status: int = 200):
             task_threshold=task_threshold(),
             error=error,
             local_admin_login=local_login,
+            reply_csrf=session.setdefault("admin_reply_csrf", secrets.token_urlsafe(32)),
+            reply_nonce=lambda: secrets.token_urlsafe(24),
+            reply_history=admin_reply_history(conn),
         ),
         status,
     )
@@ -3935,6 +3970,38 @@ def _admin_resolve_user(conn: Connection, who: str) -> Row | None:
     if row is None:
         row = conn.execute("SELECT * FROM users WHERE name = ? AND is_seed = 0", (who,)).fetchone()
     return row
+
+
+@app.post("/admin/replies/<kind>/<int:source_id>")
+def admin_reply(kind, source_id):
+    if not _admin_ready():
+        abort(403)
+    expected = session.get("admin_reply_csrf") or ""
+    if not expected or not _token_ok(str(request.form.get("csrf") or ""), expected):
+        abort(403)
+    if too_many(f"admin-reply:{expected}", 20, 3600):
+        return _admin_view("Слишком много ответов — подожди немного", 429)
+    conn = db()
+    try:
+        save_reply(conn, kind, source_id, request.form.get("body"), request.form.get("request_id"), send_mail, SITE_URL)
+    except ValueError as err:
+        conn.rollback()
+        return _admin_view(str(err), 400)
+    except LookupError as err:
+        conn.rollback()
+        return _admin_view(str(err), 404)
+    except IntegrityError:
+        conn.rollback()
+        return _admin_view("Запрос уже обработан; обнови страницу", 409)
+    conn.commit()
+    return redirect("/admin#reports" if kind == "report" else "/admin#support")
+
+
+@app.get("/api/support/replies")
+@login_required
+@report_ban_exempt
+def api_support_replies():
+    return jsonify({"ok": True, "replies": user_replies(db(), session["uid"])})
 
 
 @app.post("/admin/premium")
@@ -4179,7 +4246,7 @@ def support():
             who = name or (f"#{uid}" if uid else "гость")
             contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
             notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
-            notice = "отправили. ответим на почту, если её указал, или найдём тебя по аккаунту"
+            notice = "отправили. Ответ появится в разделе «Поддержка» твоего аккаунта. Если указана почта, отправим и туда." if uid else "отправили. Ответим на почту, если ты её указал."
 
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
         if error:
@@ -4198,6 +4265,26 @@ def support():
         notice=notice,
         error=error,
     )
+
+
+@app.get("/.well-known/apple-app-site-association")
+def apple_app_site_association():
+    return jsonify({"applinks": {"details": [{"appIDs": ["G3T7684N3M.date.wiring.app"],
+        "components": [{"/": "/api/*", "exclude": True}, {"/": "/admin*", "exclude": True},
+                       {"/": "/public/*", "exclude": True}, {"/": "/uploads/*", "exclude": True},
+                       {"/": "/.well-known/*", "exclude": True}, {"/": "/*"}]}]}})
+
+
+@app.get("/.well-known/assetlinks.json")
+def android_asset_links():
+    # Release signing fingerprints are public, configured separately from signing keys.
+    fingerprints = [value.strip().upper() for value in os.environ.get("ANDROID_APP_LINK_SHA256", "").split(",")
+                    if re.fullmatch(r"(?:[0-9a-fA-F]{2}:){31}[0-9a-fA-F]{2}", value.strip())]
+    if not fingerprints:
+        return jsonify([])
+    return jsonify([{"relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {"namespace": "android_app", "package_name": "date.wiring.app",
+                   "sha256_cert_fingerprints": fingerprints}}])
 
 
 @app.get("/robots.txt")

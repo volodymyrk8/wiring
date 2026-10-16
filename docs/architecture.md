@@ -4,9 +4,9 @@
 
 ## Сайт и приложения — один продукт
 
-iOS и Android — это тот же WIRING, что и сайт. Код приложений лежит в `mobile/` на ветках `mobile/ios` и `mobile/android`.
+iOS и Android — это тот же WIRING, что и сайт. Общий код приложений находится в [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile), ветка `main`; этот репозиторий содержит сайт и backend. Старые ветки `mobile/ios` и `mobile/android` сохранены как история.
 
-Изменение сайта, которое видно человеку (экран, текст, навигация, лента, чат, уведомления, тема), в той же задаче включает минимальный план для приложений: какой экран, какой текст, хватает ли текущего `/api/*`. Если `mobile/` есть в рабочем дереве, правка делается там же. Отдельный API «только для приложения» не заводится, пока сайт обходится общим контрактом. См. `docs/mobile-api.md`.
+Изменение сайта, которое видно человеку (экран, текст, навигация, лента, чат, уведомления, тема), в той же задаче включает минимальный план для приложений: какой экран, какой текст, хватает ли текущего `/api/*`. Если checkout `wiring-mobile` доступен в задаче, правка делается там; иначе фиксируется конкретный follow-up в этом репозитории. Отдельный API «только для приложения» не заводится, пока сайт обходится общим контрактом. См. `docs/mobile-api.md`.
 
 Темы одни на всех клиентах: `pastel` (утро), `mist` (день), `dusk` (сумерки), `night` (ночь), `slate` (полночь). Имена и id — `THEME_LIST` в `src/components/ui/AppHeader.tsx`, цвета шапки браузера — `src/lib/theme.ts`, токены — `public/styles.css` (`html[data-theme]`). Новая, переименованная или перекрашенная тема на сайте появляется в приложениях с теми же id, названиями и палитрой. Свой набор «светлая/тёмная» у приложений не держим.
 
@@ -139,17 +139,17 @@ A heap keeps at most 60 eligible profiles by deterministic structured-signal pri
 
 The external payload remains catalog tag IDs, intersections, same-city boolean, age-gap band and shared intent IDs; no account IDs, names, raw city, photos, free text or messages. The new response adds `recommendation_reasons` and top-level `recommendation_source: api | local`, never probability percentages. Reasons are generated locally from real pair signals; shared diagnoses are profile marks, not a guarantee of emotional compatibility. On missing key, timeout or invalid provider response, the deterministic shortlist order remains and the UI explicitly labels the WIRING fallback. The old hash-jitter probability helper is not used in recommendations.
 
-Browsing recommendations makes no delivery/view history writes. Like and confirmed exclusion use `/api/swipe`, with ordinary match and permanent-exclusion semantics. Recommendation actions remove the same profile from the ordinary SPA card cache. Opening a person uses `/p/:id` and returns to recommendations; each remount fetches a fresh shortlist. No message lifecycle is changed.
+Browsing recommendations makes no delivery/view history writes. Like and confirmed exclusion use `/api/swipe`, with ordinary match and permanent-exclusion semantics. Recommendation actions remove the same profile from the ordinary SPA card cache. Opening a person uses `/p/:id` and returns to recommendations; each remount fetches a fresh shortlist. A session-memory anchor retains the current profile ID and fallback index across profile/tab navigation; after the fresh response, the deck restores that profile even if ranking changed, or the nearest remaining position if it disappeared. The exhausted slide stays exhausted on return. Loading/errors do not erase the anchor, explicit «Проверить новые» starts at the beginning, and logout clears the anchor. No candidate data is persisted or reused before eligibility is rechecked. No message lifecycle is changed.
 
 `promo_codes.benefit` defaults to `plus` for existing codes. The dedicated code has benefit `recommendations`, zero premium days and no total use limit; it creates a normal `promo_redemptions` record and unlocks only recommendations. Redemption locks the code row, serializing duplicate submissions and use limits. Existing premium codes still grant only WIRING+. `GET /api/me` returns `jev_feed_unlocked`; legacy `jev_feed_beta` is an alias for compatibility. The code does not itself turn on the opt-in (an existing saved opt-in is preserved).
 
-Mobile follow-up: profile promo redemption and opt-in, conditional «Для тебя» navigation, cards with «Почему может подойти» summaries, fallback copy and the same explicit like/hide actions on both iOS and Android. `mobile/` is absent here; use the shared endpoints documented in `mobile-api.md`.
+Mobile follow-up: profile promo redemption and opt-in, conditional «Для тебя» navigation, cards with «Почему может подойти» summaries, fallback copy and the same explicit like/hide actions on both iOS and Android. The shared app lives in `wiring-mobile`; use the endpoints documented in `mobile-api.md`.
 
 ## Публичные стандарты защиты детей
 
 `/child-safety` — серверная HTML-страница стандартов WIRING (18+, запреты CSAE/CSAM, способы жалобы и контакт). GET/HEAD доступны без входа и JavaScript; ссылка есть в юридическом подвале и sitemap. Страница использует `legal_pages.py` и `templates/legal.html`, не SPA-роутер.
 
-Мобильный follow-up: на `mobile/ios` и `mobile/android` добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety` и ссылку «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. Экран удаления по-прежнему вызывает `POST /api/me/delete` с паролем. В текущем рабочем дереве `mobile/` отсутствует.
+Мобильный follow-up: в `wiring-mobile` для iOS и Android добавить в существующий юридический раздел/поддержку ссылку «Защита детей» → `https://wiring.date/child-safety` и ссылку «Удаление аккаунта и данных» → `https://wiring.date/account-deletion`. Текст для всех клиентов один; новый `/api/*` не нужен. Экран удаления по-прежнему вызывает `POST /api/me/delete` с паролем. Общий код приложений находится в `wiring-mobile`.
 
 ## Удаление аккаунта
 
@@ -157,6 +157,34 @@ Mobile follow-up: profile promo redemption and opt-in, conditional «Для те
 
 `/delete-account` остаётся SPA-экраном подтверждения. `POST /api/me/delete` ставит `users.deleted_at` и завершает сессию. Вход в течение `ACCOUNT_DELETE_GRACE` (7 суток) снимает пометку. После этого срока `run_account_purge` вызывает `purge_user_aux_data` и затирает личные поля строки `users` (почта становится `deleted-{id}@deleted.wiring`, пароль заменяется, имя, текст и город пустые). Строка остаётся: `id` и `deleted_at`. Повторный запуск такие строки пропускает. Очистка идёт при старте процесса и раз в сутки через `deploy/wiring-purge.timer`, а также по-прежнему из `_purge_old_guests` при `POST /api/demo`. Unmatch, block и report по-прежнему только скрывают сообщения через `messages.deleted_at`.
 
+## SendPulse
+
+`sendpulse_sync.py` владеет чтением двух настроек (`SENDPULSE_API_KEY`, `SENDPULSE_ADDRESSBOOK_ID`), клиентом HTTPS с Bearer-ключом и таймаутом, отбором подтверждённых адресов с маркетинговым согласием и журналом импорта `sendpulse_contacts` в PostgreSQL. `init_db()` создаёт таблицу, `purge_user_aux_data()` удаляет записи после срока восстановления. Журнал хранит SHA-256 нормализованного email, ID пользователя/книги, время успеха и состояние повторных попыток; адреса и ключи в нём не дублируются.
+
+`scripts/sync_sendpulse.py --validate` проверяет только метаданные книги, без импорта Flask и подключения к БД. Обычный запуск синхронизирует до 25 аккаунтов; session advisory lock не допускает параллельных запусков. Перед импортом повторно проверяются согласие, почта и удаление аккаунта. Контакты, уже находящиеся в книге с любым статусом, не изменяются; завершённые импорты не повторяются. Ошибки сохраняют задержку повторной попытки; ошибочный адрес не блокирует остальные. Сбой авторизации прекращает запуск. Секреты и ответы провайдера не журналируются, HTTP-редиректы запрещены.
+
+`deploy/wiring-sendpulse.service` и `.timer`, устанавливаемые `deploy.sh`, выполняют задачу раз в пять минут после завершения предыдущей. Регистрация и подтверждение почты не зависят от доступности SendPulse. Общая БД покрывает сайт и приложения; новый API или экран не требуется. Автоматическое удаление контактов из внешней книги и отправка кампаний в эту интеграцию не входят.
+
 ## OAuth-вход
 
 `social_auth.py` владеет серверным Google/Яндекс Authorization Code flow с PKCE и Apple code flow с проверкой подписи JWT и nonce и одноразовыми browser-bound state в PostgreSQL (`oauth_flows`), привязками по provider subject (`oauth_identities`) и маршрутом callback. `app.py` предоставляет общий helper создания аккаунта с бонусами/приглашениями, cookie-сессию и удаляет OAuth-привязки при окончательной очистке. `src/features/auth/` получает доступных провайдеров через shared API/host bridge и показывает кнопки. Новые SPA-пути не вводятся. Настройка и мобильный follow-up описаны в `docs/social-login.md` и `docs/mobile-api.md`.
+
+### Inbox badges and incoming like actions
+
+`inbox_stats` exposes additive `unread_chats` alongside the unchanged message total `unread`; thread rows still use `matches[].unread`. `src/app/inbox.ts` drives tab/title counts from unread conversations and refreshes the chat list when message totals increase within the same conversation. Chat row badges use feature CSS Modules so legacy `.unread` positioning does not affect centering. Visible incoming like previews offer explicit like and confirmed permanent exclusion via the existing `/api/swipe`; success removes the profile from both local incoming likes and ordinary feed caches, then refreshes inbox counts. Hidden subscription-gated previews expose neither action. The profile editor uses the shared searchable country Select, and person screens share the same origin-aware back navigation at top and bottom. Mobile follow-up and unchanged endpoint contracts are documented in `mobile-api.md`.
+
+### Moderation replies and name cooldown
+
+`support_replies.py` owns reply persistence, server-resolved recipients, source row locking, request idempotency, mail attempts and account history. Additive `support_replies` rows reference the original report/ticket and recipient account; cleanup follows the existing account lifecycle. Reports still soft-delete chat messages through existing unmatch logic. A reply does not close or resolve a moderation case. Failed mail keeps the response and one support notice; retry uses the original request id, while successful replays send nothing. Transport acceptance is not proof of receipt; crashes or ambiguous SMTP failures cannot guarantee exactly-once external delivery.
+
+`/admin/replies/<kind>/<id>` requires the admin session, reply-specific session CSRF token, bounded body, idempotency token and per-session rate limit. Recipients cannot be supplied by the browser. Existing `/admin` serves both queues on all configured domains. `src/entries/server-header.tsx` mounts small Preact reply composers into server-template hosts without a new SPA path. `GET /api/support/replies` returns only the current account's responses and supports existing mobile authorization, including report-banned accounts. `ReplyHistory.tsx` owns guarded polling and cancellation; inbox support notices open that screen.
+
+`profile_policy.py` defines the 14-day interval. Nullable `users.name_changed_at` preserves the first change for old accounts. `/api/me` updates lock the user row before reading the cooldown and atomically store the name/timestamp; unchanged parsed names do not extend it. Private user payloads expose the next available time. `NameEditor.tsx` isolates confirmed name changes from autosave, using the existing serialized profile queue so delayed responses cannot restore an old name. The server enforces the same rule for web, drafts and mobile. See `mobile-api.md` for screen/copy parity.
+
+Ordinary draft and publish requests omit `name`; the profile handler defaults an omitted name to the current locked row. Thus a stale draft or a second device editing another field cannot inadvertently rename the account or trigger the cooldown. Restored browser drafts take their name from the server. Only the separate confirmed operation supplies a new name.
+
+## Общие нативные экраны
+
+`wiring-mobile` реализует React Native страницы сайта и те же пять CSS-палитр. Конкретная матрица и неподтверждённая device/visual проверка описаны в его `docs/web-parity.md`. Прежние мобильные follow-up в разделах выше теперь сопоставляются с этой матрицей.
+
+`social_auth.py` расширяет общий OAuth flow полями native challenge/state в `oauth_flows` и таблицей одноразовых хешированных результатов `oauth_native_codes` (TTL 60 с). `mobile_api.py` экспортирует issuer native-сессии через `app.extensions`, поэтому OAuth и email verify используют тот же refresh family/password fingerprint. Все данные остаются в существующей PostgreSQL; cookie-вход сайта сохраняется. Bearer также разрешён на общей форме `/support`. Ассоциации HTTP-ссылок — два публичных well-known JSON маршрута Flask, не новые SPA-страницы.

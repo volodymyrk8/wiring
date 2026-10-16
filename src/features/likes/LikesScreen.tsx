@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { AppHeader, Button, GuestFlowSteps, ProfileMenu, Select, TagPicker } from "@/components/ui";
+import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu, Select, TagPicker } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
@@ -127,6 +127,30 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pendingPass, setPendingPass] = useState<LikeCard | null>(null);
+  const actionRef = useRef<AbortController | null>(null);
+  useEffect(() => () => actionRef.current?.abort(), []);
+  const act = async (item: LikeCard, direction: "like" | "pass") => {
+    if (!item.id || item.hidden || busy || actionRef.current) return;
+    const controller = new AbortController();
+    actionRef.current = controller;
+    setBusy(true); setError("");
+    try {
+      const response = await host.api("/api/swipe", {
+        method: "POST", signal: controller.signal,
+        body: JSON.stringify({ target_id: item.id, direction }),
+      });
+      if (controller.signal.aborted) return;
+      setLikes((current) => current.filter((card) => card.id !== item.id));
+      setPendingPass(null);
+      host.onAction(item.id);
+      host.toast(response.matched ? `Взаимно с ${item.name || "тобой"}. Чат в разделе «Чаты».` : direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+    } catch (caught) {
+      if (!controller.signal.aborted) setError(getErrorMessage(caught));
+    } finally {
+      if (!controller.signal.aborted) { actionRef.current = null; setBusy(false); }
+    }
+  };
   const hasFilters = activeFilters(filters);
   const sortedLikes = useMemo(() => sortLikeCards(likes, sort), [likes, sort]);
   const sortLabel = LIKES_SORT_OPTIONS.find((option) => option.id === sort)?.label || "Сначала новые";
@@ -141,6 +165,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
   };
 
   const apply = async (next: LikesFilters) => {
+    if (actionRef.current) return;
     setBusy(true);
     setError("");
     try {
@@ -262,7 +287,13 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
           </section>
         ) : null}
         {filtersOpen ? <FilterPanel host={host} filters={filters} onApply={(next) => void apply(next)} onClear={clear} /> : null}
-        {likes.length ? <div class={styles.cards}>{sortedLikes.map((item, index) => <LikeCardView key={`${item.id || "hidden"}-${index}`} host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />)}</div> : (
+        {likes.length ? <div class={styles.cards}>{sortedLikes.map((item, index) => <div key={item.id || `hidden-${index}`}>
+          <LikeCardView host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />
+          {item.id && !item.hidden ? <div class={styles.cardActions}>
+            <Button variant="ghost" slim disabled={busy} ariaLabel={`Скрыть: ${item.name || "анкету"}`} onClick={() => { setError(""); setPendingPass(item); }}>Скрыть</Button>
+            <Button slim disabled={busy} ariaLabel={`Лайк: ${item.name || "анкету"}`} onClick={() => void act(item, "like")}>Лайк</Button>
+          </div> : null}
+        </div>)}</div> : (
           <section class={styles.empty}>
             <span class={styles.emptyIcon}>{emptyFiltered ? iconFilter : iconLike}</span>
             <h2>
@@ -297,6 +328,11 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
         )}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </main>
+      <Modal isOpen={pendingPass !== null} onClose={() => { if (!busy) setPendingPass(null); }} title="Больше не показывать?" responsiveSheet
+        footer={<><Button variant="ghost" disabled={busy} onClick={() => setPendingPass(null)}>Отмена</Button><Button disabled={busy} loading={busy} onClick={() => pendingPass && void act(pendingPass, "pass")}>Исключить</Button></>}>
+        <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
+        {error ? <p class={styles.error} role="alert">{error}</p> : null}
+      </Modal>
     </div>
   );
 }

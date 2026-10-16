@@ -114,3 +114,5 @@
   .status { margin-top: 12px; }
   .submitRow > :not(:first-child):not(.accountActions) { flex: 1 1 calc(50% - 4px); }
 }
+
+.nameEditor { display: grid; align-content: start; gap: 10px; min-width: 0; }
