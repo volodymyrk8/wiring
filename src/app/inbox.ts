@@ -97,11 +97,13 @@ export function createInboxController({
   const applyInbox = async (data: any, { announce = true } = {}) => {
     const prevLikes = state.likesIn || 0;
     const prevUnread = state.unread || 0;
+    const prevMessages = state.user?.unread || 0;
     state.likesIn = data.likes_in || 0;
-    state.unread = data.unread || 0;
+    state.unread = data.unread_chats ?? data.unread ?? 0;
     if (state.user) {
       state.user.likes_in = state.likesIn;
-      state.user.unread = state.unread;
+      state.user.unread = data.unread || 0;
+      state.user.unread_chats = state.unread;
     }
     syncChrome();
     const fresh = (data.notices || []).filter((note: Notice) => !seenNotices.has(note.id));
@@ -125,7 +127,7 @@ export function createInboxController({
     }
     if (announce && state.view === "matches") {
       const gotMatch = fresh.some((note: Notice) => note.kind === "match");
-      if (gotMatch || state.unread > prevUnread) {
+      if (gotMatch || fresh.some((note: Notice) => note.kind === "message") || (data.unread || 0) > prevMessages || state.unread > prevUnread) {
         const matches = await api<{ matches?: any[] }>("/api/matches");
         state.matches = matches.matches || [];
         render();

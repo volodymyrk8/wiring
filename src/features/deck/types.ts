@@ -1,4 +1,5 @@
 import type { CatalogItem, PlaceBlock, ProfileUser } from "@/features/profile/types";
+import type { RecommendationPosition } from "./recommendation-position";
 
 export type DeckFilters = {
   neuro: string[];
@@ -56,6 +57,7 @@ export type FeedPage = {
   liked?: number;
   likes_in?: number;
   unread?: number;
+  unread_chats?: number;
   recommendation_source?: "api" | "local" | "taste";
   jev_ranked?: boolean;
   jev_scores?: "api" | "local" | "none";
@@ -63,6 +65,7 @@ export type FeedPage = {
 
 export type DeckHostBridge = {
   recommendations?: boolean;
+  recommendationPosition?: RecommendationPosition | null;
   user: ProfileUser | null;
   catalog: DeckCatalog;
   cards: DeckCard[];

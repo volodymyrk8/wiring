@@ -53,6 +53,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     view: "home",
     cards: [],
     feedHasMore: true,
+    recommendationPosition: null,
     feedGeneration: 0,
     index: 0,
     photoIndex: 0,
@@ -335,7 +336,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const me = await api("/api/me");
     state.user = me.user;
     state.likesIn = me.user?.likes_in || 0;
-    state.unread = me.user?.unread || 0;
+    state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
     enforceReportBanView();
   };
 
@@ -343,7 +344,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const QUIET_VIEWS = new Set(["register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
   const showsTabbar = () => !QUIET_VIEWS.has(state.view);
   const countSlot = (kind) => {
-    const n = kind === "likes" ? state.user?.likes_in || state.likesIn || 0 : state.user?.unread || state.unread || 0;
+    const n = kind === "likes" ? state.user?.likes_in || state.likesIn || 0 : state.unread || 0;
     return `<span class="pip-slot" data-count="${kind}">${pip(n)}</span>`;
   };
 
@@ -413,6 +414,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     } catch (_) {}
     state.user = null;
     state.cards = [];
+    state.recommendationPosition = null;
     state.index = 0;
     state.feedHasMore = true;
     state.view = "home";
@@ -536,10 +538,11 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     state.passed = data.passed || 0;
     state.liked = data.liked || 0;
     state.likesIn = data.likes_in || 0;
-    state.unread = data.unread || 0;
+    state.unread = data.unread_chats ?? data.unread ?? 0;
     if (state.user) {
       state.user.likes_in = state.likesIn;
-      state.user.unread = state.unread;
+      state.user.unread = data.unread || 0;
+      state.user.unread_chats = state.unread;
     }
     return data;
   };
@@ -637,6 +640,14 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     catalog: state.catalog,
     likes: state.likes,
     matchesCount: (state.matches || []).length,
+    onAction: (targetId) => {
+      state.likes = state.likes.filter(card => card.id !== targetId);
+      const removedIndex = state.cards.findIndex(card => card.id === targetId);
+      state.cards = state.cards.filter(card => card.id !== targetId);
+      if (removedIndex >= 0 && removedIndex < state.index) state.index -= 1;
+      state.index = Math.min(state.index, state.cards.length);
+      void pollInbox();
+    },
     filters: state.likesFilters,
     basePath: BASE,
     hrefFor,
@@ -653,7 +664,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     onUserUpdated: (user) => {
       state.user = user;
       state.likesIn = user.likes_in || 0;
-      state.unread = user.unread || 0;
+      state.unread = user.unread_chats ?? user.unread ?? 0;
     },
     onThemeSelect: (theme) => applyTheme(theme),
     onLogout: logout,
@@ -682,6 +693,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const buildDeckHostBridge = (recommendations = false) => ({
     recommendations,
+    recommendationPosition: state.recommendationPosition,
     user: state.user,
     catalog: state.catalog,
     cards: recommendations ? [] : state.cards,
@@ -708,7 +720,11 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       state.index = Math.min(state.index, state.cards.length);
     },
     onFeedChange: (cards, index, filters, hasMore, generation) => {
-      if (recommendations) return;
+      if (recommendations) {
+        // Do not erase the anchor while the fresh shortlist is still loading.
+        if (cards.length || !hasMore) state.recommendationPosition = { cardId: cards[index]?.id ?? null, index };
+        return;
+      }
       state.cards = cards;
       state.index = index;
       state.filters = filters;
@@ -1387,10 +1403,10 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const me = await api("/api/me");
     state.user = me.user;
     state.likesIn = me.user?.likes_in || 0;
-    state.unread = me.user?.unread || 0;
+    state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
     if (me.user) {
       await applyInbox(
-        { likes_in: me.user.likes_in, unread: me.user.unread, notices: me.user.notices || [] },
+        { likes_in: me.user.likes_in, unread: me.user.unread, unread_chats: me.user.unread_chats, notices: me.user.notices || [] },
         { announce: true }
       );
       startInbox();

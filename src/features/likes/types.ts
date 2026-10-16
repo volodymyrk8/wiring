@@ -45,6 +45,7 @@ export type LikesHostBridge = {
   navigate: (view: string, params?: Record<string, string | number>) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   loadLikes: (filters: LikesFilters) => Promise<{ likes?: LikeCard[]; plus?: boolean; user?: ProfileUser }>;
+  onAction: (targetId: number) => void;
   toast: (message: string) => void;
   onUserUpdated: (user: ProfileUser) => void;
   onThemeSelect?: (theme: string) => void;

@@ -958,6 +958,7 @@ def inbox_stats(uid: int) -> dict[str, int]:
             continue
         likes += 1
     unread = 0
+    unread_chats = 0
     for row in conn.execute(
         """
         SELECT u.id FROM users u
@@ -969,8 +970,10 @@ def inbox_stats(uid: int) -> dict[str, int]:
     ):
         if row["id"] in blocked:
             continue
-        unread += unread_count(conn, uid, row["id"])
-    return {"likes_in": likes, "unread": unread}
+        count = unread_count(conn, uid, row["id"])
+        unread += count
+        unread_chats += int(count > 0)
+    return {"likes_in": likes, "unread": unread, "unread_chats": unread_chats}
 
 
 def current_user() -> dict[str, Any] | None:

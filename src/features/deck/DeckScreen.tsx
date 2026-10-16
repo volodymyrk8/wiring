@@ -8,6 +8,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
 import { feedSwipeTarget, lockFeedSwipeAxis, type FeedSwipe } from "./vertical-swipe";
+import { recommendationIndex } from "./recommendation-position";
 import styles from "./DeckScreen.module.css";
 
 const photoUrl = (basePath: string, photo: unknown, name = "?") => {
@@ -361,6 +362,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   const reelLock = useRef<ReelLock>({ pinning: false, token: 0, frame: null, previousSnap: null });
   const restoreRef = useRef(true);
   const prevCardsLengthRef = useRef(cards.length);
+  const recommendationRestoreRef = useRef(Boolean(host.recommendations && !host.cards.length));
   const snapBlockRef = useRef(false);
   snapBlockRef.current = dragging || panelHold || filtersOpen || excludeOpen || resetOpen;
   const current = cards[index];
@@ -381,7 +383,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   };
   const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     host.onFeedChange(cards, index, filters, hasMore, generation);
   }, [cards, index, filters, hasMore, generation]);
 
@@ -464,9 +466,11 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     const viewport = viewportRef.current;
     const prevLength = prevCardsLengthRef.current;
     prevCardsLengthRef.current = cards.length;
-    if (!viewport || restoreRef.current || gestureActive() || cards.length === prevLength) return;
+    if (!viewport || gestureActive() || cards.length === prevLength) return;
     const height = viewport.clientHeight;
     if (height < 1) return;
+    // Fresh recommendations can arrive before initial restoration finishes. Align
+    // them now too, cancelling the pending jump for the old (empty) slide list.
     // Appending cards while browsing earlier slides must not yank scroll position.
     if (cards.length > prevLength && indexRef.current < prevLength) return;
     jumpReel(viewport, indexRef.current * height, reelLock.current, true);
@@ -522,6 +526,12 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       setSource(response.recommendation_source);
       setHasMore(response.has_more);
       setGeneration(response.generation);
+      if (recommendationRestoreRef.current && !replace) {
+        const restored = recommendationIndex(response.cards, host.recommendationPosition);
+        indexRef.current = restored;
+        setIndex(restored);
+      }
+      recommendationRestoreRef.current = false;
       setCards((previous) => replace || host.recommendations ? response.cards : [...previous, ...response.cards.filter((card) => !previous.some((old) => old.id === card.id))]);
       if (replace) {
         setFilters(nextFilters); setIndex(0); indexRef.current = 0; setFiltersOpen(false);
@@ -747,7 +757,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
             <h2>{loading ? "Ищем новые анкеты…" : host.recommendations ? "Подборка закончилась" : "Новых анкет пока нет"}</h2>
             <p>{loading ? "Ещё немного." : !host.recommendations && filtered ? "Можно изменить фильтры." : "Загляни позже."}</p>
             {!loading && index >= cards.length ? <div class={styles.emptyActions}>
-              <Button variant="ghost" disabled={busy} onClick={() => void loadPage(filters, Boolean(host.recommendations))}>{error ? "Повторить" : "Проверить новые"}</Button>
+              <Button variant="ghost" disabled={busy} onClick={() => void loadPage(filters, Boolean(host.recommendations && !recommendationRestoreRef.current))}>{error ? "Повторить" : "Проверить новые"}</Button>
               {!hasMore && !host.recommendations ? <>
                 <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}>Показать анкеты ещё раз</Button>
                 {!host.user.plus ? <p id="feed-plus-hint">Можно включить в профиле.</p> : null}

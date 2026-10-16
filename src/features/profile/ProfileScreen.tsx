@@ -591,6 +591,8 @@ export function ProfileScreen({ host }: Props) {
                   className={styles.selectControl}
                   label="Страна"
                   id="profile-country"
+                  searchable
+                  searchPlaceholder="Найти страну"
                   placeholder="Не указана"
                   options={countryOptions}
                   value={draft.country}

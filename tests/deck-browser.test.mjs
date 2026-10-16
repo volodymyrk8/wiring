@@ -28,10 +28,19 @@ const host = {
  user:{id:99,name:'Тест',neuro:[],vibe:[],plus:true},catalog:{},cards,index:Number(params.get('index')||0),
  filters:{neuro:[],vibe:[],intents:[],min_age:18,max_age:99,city:''},filtersOpen:false,hasMore:params.has('load'),generation:0,
  basePath:'',hrefFor:()=> '#',navigate:()=>{},loadFeed:()=>new Promise(resolve=>window.test.resolveFeed=resolve),
- resetFeed:async()=>({reset:true,generation:1}),onFeedChange:(cards,index)=>window.test.state={ids:cards.map(c=>c.id),index},
+ resetFeed:async()=>({reset:true,generation:1}),onFeedChange:(cards,index,filters,hasMore)=>{
+   window.test.state={ids:cards.map(c=>c.id),index};
+   if (cards.length || !hasMore) host.recommendationPosition={cardId:cards[index]?.id??null,index};
+ },
  onMatch:()=>{},api:async(path,init)=>{window.test.api.push({path,body:init?.body});return {}},toast:()=>{},onUserUpdated:()=>{},onLogout:()=>{}
 };
-window.test.unmount = (recommendations ? mountRecommendations : mountDeck)(document.getElementById('deck-feature-root'),host);
+const mount = () => (recommendations ? mountRecommendations : mountDeck)(document.getElementById('deck-feature-root'),host);
+window.test.unmount = mount();
+window.test.returnToRecommendations = () => {
+ window.test.unmount();
+ host.cards=[]; host.index=0; host.hasMore=true;
+ window.test.unmount=mount();
+};
 </script></body></html>`;
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
@@ -140,6 +149,45 @@ try {
     await page.evaluate(()=>window.test.unmount()); await touch("touchCancel");
     await page.waitForTimeout(200); assert.equal(errors.length,0); passed++;
     console.log(`${mode}: gesture, resize, cancellation, photos, keyboard and action checks passed`);
+  }
+  // Returning from a profile/another tab fetches a fresh shortlist, then restores by identity.
+  const freshCards = [5,4,3,2,1].map(id => ({id,name:`Свежий ${id}`,age:25,recommendation_reasons:['Общий интерес']}));
+  for (const scenario of ['same','reordered','removed','end','retry','refresh','late']) {
+    await open("recommendations", "index=2");
+    if (scenario === 'end') {
+      await page.locator('[aria-label="Анкеты"]').focus();
+      for (let i=0;i<3;i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100); }
+      await settled(5);
+    }
+    await page.evaluate(() => window.test.returnToRecommendations());
+    await page.waitForFunction(() => typeof window.test.resolveFeed === 'function');
+    if (scenario === 'retry') {
+      await page.evaluate(() => window.test.resolveFeed(Promise.reject(new Error('Локальная ошибка'))));
+      await page.getByRole('button',{name:'Повторить',exact:true}).click();
+    }
+    const responseCards = scenario === 'removed' ? freshCards.filter(c=>c.id!==3) :
+      scenario === 'reordered' ? [...freshCards.slice(1),freshCards[0]] : freshCards;
+    if (scenario === 'late') {
+      // A navigation away aborts the pending request; its eventual response must be ignored.
+      await page.evaluate(() => window.test.unmount());
+      await page.evaluate(cards => window.test.resolveFeed({cards,has_more:false,generation:0}),responseCards);
+      assert.equal(await page.locator('[aria-label="Анкеты"]').count(),0); passed++; continue;
+    }
+    await page.evaluate(cards => window.test.resolveFeed({cards,has_more:false,generation:0,recommendation_source:'local'}),responseCards);
+    await settled(scenario === 'end' ? 5 : scenario === 'reordered' ? 1 : 2);
+    if (scenario === 'same' || scenario === 'reordered') {
+      assert.match(await page.locator('section[aria-hidden="false"] article').innerText(),/Свежий 3/);
+      await touch('touchStart',195,620); await touch('touchMove',195,500); await touch('touchEnd');
+      await settled(scenario === 'reordered' ? 2 : 3);
+    }
+    if (scenario === 'refresh') {
+      await page.locator('[aria-label="Анкеты"]').focus();
+      for(let i=0;i<3;i++) {await page.keyboard.press('ArrowDown'); await page.waitForTimeout(100);}
+      await settled(5);
+      await page.getByRole('button',{name:'Проверить новые',exact:true}).click();
+      await page.evaluate(cards => window.test.resolveFeed({cards,has_more:false,generation:0}),responseCards);
+      await settled(0);
+    }
   }
   await open("deck", "index=4&load");
   await page.waitForFunction(() => typeof window.test.resolveFeed === "function");

@@ -4,7 +4,8 @@
 |-------|---------|----------------|
 | **Typecheck** | `npm run typecheck` | Strict TypeScript and Vite configuration check |
 | **Router** | `npm run test:router` (after `npm run build`) | SPA paths, guards, `hrefFor` — `tests/router.test.mjs` |
-| **Deck browser (optional)** | `npm run test:deck:browser` (after build, Playwright installed) | Built deck and recommendations: touch inertia, cancellation, resize, photo/keyboard navigation and action buttons |
+| **Deck browser (optional)** | `npm run test:deck:browser` (after build, Playwright installed) | Built deck and recommendations: touch inertia, cancellation, resize, photo/keyboard navigation, action buttons and recommendation position restoration after navigation (fresh/reordered/removed candidates, exhausted list, retry, explicit refresh and aborted response) |
+| **UI bug regressions (optional)** | `npm run test:ui:browser` (after build, same Playwright overrides) | Incoming like actions, confirmation/cancel/error, duplicate and navigation guards, bottom profile back, country search and unread badge alignment |
 | **API / app** | `python3 -m unittest discover -s tests -q` | Flask routes, auth, swipes, media — `test_app.py` |
 | **Logic** | same unittest run | Catalog, icebreakers helpers — `test_logic.py` |
 | **Support triage** | same | Task scoring — `test_support_triage.py` |

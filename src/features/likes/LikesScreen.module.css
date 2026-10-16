@@ -212,3 +212,5 @@
   .nudge { align-items: stretch; flex-direction: column; }
   .nudge a { width: 100%; }
 }
+
+.cardActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 8px 2px 0; }

@@ -202,6 +202,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
           <Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(true)}>пожаловаться</Button>
         </div> : null}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
+        <Button variant="ghost" fullWidth href={host.hrefFor(backView)} nav={backView} onClick={go(backView)}>{iconArrow}<span>назад</span></Button>
       </div>
     </main>
     <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title="Больше не показывать?" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>Отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>Исключить</Button></>}>

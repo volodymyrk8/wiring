@@ -172,7 +172,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
   return (
     <div class="match-wrap">
       <a
-        class={`match${hasUnread ? " has-unread" : ""}`}
+        class={`match ${styles.matchRow}${hasUnread ? " has-unread" : ""}`}
         href={host.hrefFor("chat", { id: match.id })}
         onClick={(event) => {
           event.preventDefault();
@@ -187,7 +187,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
           </div>
           <p>{match.last_message ? `${match.last_from_id === host.user?.id ? "ты: " : ""}${match.last_message}` : "взаимно · напиши первым"}</p>
         </div>
-        {hasUnread ? <span class="unread">{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
+        {hasUnread ? <span class={styles.unreadBadge}>{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
       </a>
       <button type="button" class="match-remove" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(); }} aria-label="Убрать чат" title="Убрать чат">
         <TrashIcon />

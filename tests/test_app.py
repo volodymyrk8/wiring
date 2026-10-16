@@ -1889,6 +1889,37 @@ class WiringTest(unittest.TestCase):
         after = self.client.get("/api/inbox").get_json()
         self.assertFalse(any(n["kind"] == "message" for n in after["notices"]))
 
+    def test_unread_chat_count_is_distinct_and_clears_on_read_or_block(self):
+        viewer = self._register(email="badge-viewer@wiring.test")
+        peers = []
+        for i in range(2):
+            self._logout()
+            peer = self._register(email=f"badge-peer{i}@wiring.test", name=f"Собеседник {i}")
+            peers.append(peer)
+            self.client.post("/api/swipe", json={"target_id": viewer["id"], "direction": "like"})
+            self._logout()
+            self._login("badge-viewer@wiring.test")
+            self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "like"})
+            self._logout()
+            self._login(f"badge-peer{i}@wiring.test")
+            for text in ("Первое сообщение", "Второе сообщение"):
+                sent = self.client.post("/api/messages", json={"to_id": viewer["id"], "body": text})
+                self.assertEqual(sent.status_code, 200)
+        self._logout()
+        self._login("badge-viewer@wiring.test")
+        inbox = self.client.get("/api/inbox").get_json()
+        self.assertEqual((inbox["unread"], inbox["unread_chats"]), (4, 2))
+        user = self.client.get("/api/me").get_json()["user"]
+        self.assertEqual((user["unread"], user["unread_chats"]), (4, 2))
+        matches = self.client.get("/api/matches").get_json()["matches"]
+        self.assertEqual(sorted(m["unread"] for m in matches), [2, 2])
+        self.client.get(f"/api/messages/{peers[0]['id']}")
+        inbox = self.client.get("/api/inbox").get_json()
+        self.assertEqual((inbox["unread"], inbox["unread_chats"]), (2, 1))
+        self.client.post("/api/block", json={"user_id": peers[1]["id"]})
+        inbox = self.client.get("/api/inbox").get_json()
+        self.assertEqual((inbox["unread"], inbox["unread_chats"]), (0, 0))
+
     def test_referral_grants_plus_to_both(self):
         ada = self._register()
         self.assertFalse(ada.get("plus"))
