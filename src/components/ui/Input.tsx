@@ -8,6 +8,7 @@ export type InputProps = {
   id?: string;
   type?: string;
   required?: boolean;
+  disabled?: boolean;
   minLength?: number;
   maxLength?: number;
   min?: number;
@@ -50,6 +51,7 @@ export function Input({
   id,
   type = "text",
   required,
+  disabled,
   minLength,
   maxLength,
   min,
@@ -107,6 +109,7 @@ export function Input({
           name={name}
           type={isPassword ? (visible ? "text" : "password") : type}
           required={required}
+          disabled={disabled}
           minLength={minLength}
           maxLength={maxLength}
           min={min}

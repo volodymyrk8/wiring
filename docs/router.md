@@ -56,3 +56,5 @@ The feed’s “Профиль” Button link uses the existing `/p/:id` route. 
 `/for-you` mounts the Preact recommendations feature using shared deck cards/actions and `GET /api/recommendations`. Unauthenticated deep links retain the login return path; authenticated accounts without redeemed promo access and enabled opt-in go to their profile. Navigation appears after the persisted profile toggle is enabled. `/p/:id` opened from this tab returns to it. Browsing sends no `/api/feed/view` and does not reserve ordinary feed history.
 
 OAuth использует серверные `POST /api/auth/{google|yandex}/start` и `GET /api/auth/{google|yandex}/callback`, а не новые SPA-пути. После callback: `/me` для новой анкеты или `/feed` для существующей; при ошибке `/login` или `/register`. Preact auth читает одноразовое сообщение из `/api/auth/providers`.
+
+The existing server-header entrypoint also mounts admin reply forms into `/admin` server-template hosts. Support reply history remains on the existing `/support` SPA screen; `/api/support/replies` is its authenticated shared API and is exempt from the report-ban gate. No SPA paths or URL contract change.

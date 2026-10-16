@@ -126,11 +126,11 @@ def send_mail(to_addr: str, subject: str, body: str) -> bool:
     return _send_email(to_addr, subject, body)
 
 
-def notify_support(subject: str, body: str) -> None:
+def notify_support(subject: str, body: str) -> bool:
     inbox = (os.environ.get("SUPPORT_INBOX") or "").strip()
-    if inbox:
-        _send_email(inbox, subject, body)
+    mailed = _send_email(inbox, subject, body) if inbox else False
     _admin_telegram(f"WIRING support: {body[:400]}")
+    return mailed
 
 
 def notify_event(

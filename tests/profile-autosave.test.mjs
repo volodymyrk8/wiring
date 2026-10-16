@@ -173,3 +173,28 @@ test("restored unfinished answers are retained after validation failure", async 
   assert.deepEqual(JSON.parse(storage.getItem(key)), value);
   assert.equal(saver.state.phase, "error");
 });
+
+test("a confirmed name operation shares the draft queue and later drafts use the new name", async (t) => {
+  const draftGate = deferred(), nameGate = deferred();
+  let name = "Old";
+  const sent = [];
+  const { saver } = setup(t, { save: async (value) => {
+    sent.push({ name, bio: value.bio });
+    if (value.bio === "first") await draftGate.promise;
+    return value;
+  }});
+  saver.update({ bio: "first" });
+  const first = saver.save();
+  await tick();
+  const rename = saver.runExclusive(async () => { await nameGate.promise; name = "New"; });
+  saver.update({ bio: "later" });
+  const later = saver.save();
+  draftGate.resolve();
+  await first;
+  await tick();
+  assert.equal(sent.length, 1);
+  nameGate.resolve();
+  await rename;
+  await later;
+  assert.deepEqual(sent, [{ name: "Old", bio: "first" }, { name: "New", bio: "later" }]);
+});

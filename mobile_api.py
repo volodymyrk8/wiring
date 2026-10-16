@@ -129,7 +129,7 @@ def install(
 
     @app.before_request
     def _mobile_gate():
-        if not request.path.startswith("/api/"):
+        if not (request.path.startswith("/api/") or request.path == "/support"):
             return None
         minimum = (os.environ.get("MOBILE_MIN_VERSION") or "").strip()
         client_version = request.headers.get("X-App-Version", "")

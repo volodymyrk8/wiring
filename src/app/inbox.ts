@@ -71,6 +71,11 @@ export function createInboxController({
       }
       return;
     }
+    if (note.kind === "support") {
+      state.view = "support";
+      render();
+      return;
+    }
     if (note.kind === "referral") {
       state.view = "profile";
       if (state.user) await refreshMe();

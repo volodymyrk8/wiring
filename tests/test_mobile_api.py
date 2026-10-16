@@ -40,6 +40,25 @@ class MobileApiTest(unittest.TestCase):
     def _bearer(self, token):
         return {"Authorization": f"Bearer {token}"}
 
+    def test_mobile_support_reply_history_and_name_cooldown_share_web_rules(self):
+        user = self._user()
+        token = self._token_login()["access_token"]
+        headers = self._bearer(token)
+        with patch("app.notify_support"):
+            response = self.mobile.post("/support", json={"body": "Помогите с настройками профиля"}, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        from app import db
+        with app.app_context():
+            ticket = db().execute("SELECT user_id FROM support_tickets").fetchone()
+            self.assertEqual(ticket["user_id"], user["id"])
+        self.assertNotIn("Set-Cookie", response.headers)
+        self.assertEqual(self.mobile.get("/api/support/replies", headers=headers).get_json()["replies"], [])
+        self.assertEqual(self.mobile.get("/api/support/replies").status_code, 401)
+        first = self.mobile.patch("/api/me", json={"name": "Новое имя", "draft": True}, headers=headers)
+        self.assertEqual(first.status_code, 200)
+        second = self.mobile.patch("/api/me", json={"name": "Ещё другое", "draft": True}, headers=headers)
+        self.assertEqual(second.status_code, 409)
+
     def test_token_login_returns_pair_and_user(self):
         self._user()
         data = self._token_login()

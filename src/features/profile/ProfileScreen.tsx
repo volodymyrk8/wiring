@@ -18,6 +18,7 @@ import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
+import { NameEditor } from "./NameEditor";
 import { createDraftAutosave, type SaveState } from "./draft-autosave";
 
 type Prompt = { id: string; answer: string };
@@ -320,7 +321,7 @@ function restoreDraft(host: ProfileHostBridge): { value: Draft; restored: boolea
     });
     const merged = Object.fromEntries(entries) as Draft;
     const tags = splitCatalogTags(merged.neuro, merged.vibe, host.catalog);
-    const value = { ...merged, neuro: tags.neuro, vibe: tags.vibe };
+    const value = { ...merged, name: initial.name, neuro: tags.neuro, vibe: tags.vibe };
     return { value, restored: JSON.stringify(value) !== JSON.stringify(initial) };
   } catch {
     return { value: initial, restored: false };
@@ -346,10 +347,11 @@ export function ProfileScreen({ host }: Props) {
     initial: initialDraft.value,
     restored: initialDraft.restored,
     storage: () => localStorage,
-    save: (value, publish) => host.api("/api/me", {
-      method: "PATCH",
-      body: JSON.stringify({ ...profilePayload(value), draft: !publish }),
-    }),
+    save: (value, publish) => {
+      // Only the explicit NameEditor may rename; stale drafts/devices must not.
+      const { name: _name, ...payload } = profilePayload(value);
+      return host.api("/api/me", { method: "PATCH", body: JSON.stringify({ ...payload, draft: !publish }) });
+    },
     onSaved: (response) => {
       setServerError("");
       setUser(response.user);
@@ -579,7 +581,11 @@ export function ProfileScreen({ host }: Props) {
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Основное</h2></div>
               <div class={styles.gridTwo}>
-                <Input label="Имя" name="name" required maxLength={32} value={draft.name} error={errors.name} onInput={(event) => setField("name", event.currentTarget.value)} />
+                <NameEditor key={String(user.name)} user={user} saveName={(name, signal) => autosave.runExclusive(async () => {
+                  if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+                  const response = await host.api("/api/me", { method: "PATCH", signal, body: JSON.stringify({ name, draft: true }) });
+                  return response.user as ProfileUser;
+                })} onChanged={(next) => { setUser(next); host.onUserUpdated(next); setRenderedDraft((current) => ({ ...current, name: String(next.name || "") })); }} />
                 <Input label="Возраст" name="age" type="number" required value={draft.age} error={errors.age} onInput={(event) => setField("age", event.currentTarget.value)} />
               </div>
               <div class={styles.gridTwo}>

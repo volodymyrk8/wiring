@@ -109,6 +109,7 @@ export function createDraftAutosave<T, R>(options: Options<T, R>) {
       schedule();
     },
     save,
+    runExclusive: <R>(action: () => Promise<R>) => serialize(options.key, action),
     dispose() { disposed = true; cancelTimer(); },
   };
 }

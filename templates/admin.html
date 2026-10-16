@@ -1,3 +1,17 @@
+{% macro reply_panel(kind, id, recipient) %}
+  {% for reply in reply_history[kind].get(id, []) %}
+    <blockquote><p>{{ reply.body }}</p><small>
+      {% if reply.user_id %}Доступен в поддержке аккаунта #{{ reply.user_id }}. {% endif %}
+      {% if reply.email_sent_at %}Письмо принято почтовым сервисом: {{ reply.email }}.
+      {% elif reply.email %}Почтовый сервис не подтвердил отправку: {{ reply.email }}.
+      {% else %}Почта не указана.{% endif %}
+    </small></blockquote>
+    {% if reply.email and not reply.email_sent_at %}
+    <div data-admin-reply data-retry="true" data-action="/admin/replies/{{ kind }}/{{ id }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply.request_id }}" data-body="{{ reply.body }}"></div>
+    {% endif %}
+  {% endfor %}
+  <div data-admin-reply data-kind="{{ kind }}" data-source="{{ id }}" data-action="/admin/replies/{{ kind }}/{{ id }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply_nonce() }}" data-recipient="{{ recipient }}"></div>
+{% endmacro %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -258,7 +272,7 @@
       <h2 id="reports">жалобы</h2>
       <p class="hint">Кто пожаловался → на кого. После жалоб от <strong>двух разных участников</strong> анкета автоматически скрывается; человек может оспорить через <a href="/support">поддержку</a>. При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.</p>
       <table class="admin-table">
-        <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th></tr>
+        <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th><th>ответ заявителю</th></tr>
         {% for r in s.report_queue %}
         <tr>
           <td>{{ r.created_at }}</td>
@@ -266,23 +280,25 @@
           <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
           <td>{{ r.reason }}</td>
           <td>{{ r.details or "—" }}</td>
+          <td>{{ reply_panel("report", r.id, "Заявителю: " ~ r.reporter_name ~ " · " ~ r.reporter_email) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="5">пока пусто</td></tr>
+        <tr><td colspan="6">пока пусто</td></tr>
         {% endfor %}
       </table>
 
-      <h2>поддержка</h2>
+      <h2 id="support">поддержка</h2>
       <table class="admin-table">
-        <tr><th>кто</th><th>контакт</th><th>текст</th></tr>
+        <tr><th>кто</th><th>контакт</th><th>текст</th><th>ответ</th></tr>
         {% for t in tickets %}
         <tr>
           <td>{{ t.name or "—" }}{% if t.user_id %} <span class="hint">#{{ t.user_id }}</span>{% endif %}</td>
           <td>{{ t.email or "—" }}</td>
           <td>{{ t.body }}</td>
+          <td>{{ reply_panel("ticket", t.id, "Заявителю: " ~ (t.email or ("аккаунт #" ~ t.user_id if t.user_id else "нет контакта для ответа"))) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="3">пока пусто</td></tr>
+        <tr><td colspan="4">пока пусто</td></tr>
         {% endfor %}
       </table>
 
