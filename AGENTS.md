@@ -30,9 +30,9 @@
 
 ## Site and mobile apps are one product
 
-iOS and Android live in `mobile/` on `mobile/ios` and `mobile/android`. They are the same product as the site, not a separate design.
+iOS and Android share the Expo/React Native project in [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile), on `main`. This repository owns the website and backend; `mobile/ios` and `mobile/android` are historical branches. They are the same product as the site, not a separate design.
 
-When a site change affects what a person sees or does — screens, copy, navigation, feed, chat, notifications, or themes — plan the smallest matching change for the apps in the same piece of work. If `mobile/` is in the working tree, make that change there. If it is not, name the app follow-up in the same change: which screen, which copy, and whether the existing `/api/*` already covers it (`docs/mobile-api.md`). Do not add a second API for an app-only variant of a site behavior.
+When a site change affects what a person sees or does — screens, copy, navigation, feed, chat, notifications, or themes — plan the smallest matching change for the apps in the same piece of work. If a wiring-mobile checkout is available for the task, make the matching change there. Otherwise, name the app follow-up in the same change: which screen, which copy, and whether the existing `/api/*` already covers it (`docs/mobile-api.md`). Do not add a second API for an app-only variant of a site behavior.
 
 Themes stay one set. The site themes are `pastel` (утро), `mist` (день), `dusk` (сумерки), `night` (ночь), and `slate` (полночь): ids and labels in `THEME_LIST` (`src/components/ui/AppHeader.tsx`), browser chrome colors in `src/lib/theme.ts`, tokens in `public/styles.css` under `html[data-theme]`. Adding, renaming, or recoloring a theme updates the apps to the same ids, names, and palette. Do not give the apps a separate light/dark system or an extra theme.
 
