@@ -35,6 +35,70 @@ from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
 
 
 class WiringTest(unittest.TestCase):
+    def test_sendpulse_schema_lock_is_held_until_migration_commit(self):
+        from sendpulse_sync import ensure_sync_table
+        first = open_request_connection()
+        second = open_request_connection()
+        try:
+            ensure_sync_table(first)
+            self.assertFalse(second.execute('SELECT pg_try_advisory_xact_lock(739201, 2) AS locked').fetchone()['locked'])
+            second.commit()
+            first.commit()
+            self.assertTrue(second.execute('SELECT pg_try_advisory_xact_lock(739201, 2) AS locked').fetchone()['locked'])
+            second.commit()
+        finally:
+            first.close()
+            second.close()
+
+    def test_sendpulse_eligibility_receipts_retry_and_book_change(self):
+        from unittest.mock import Mock
+        from sendpulse_sync import Config, SendPulseError, sync_contacts
+        for email in ('yes@example.com', 'no@example.com', 'unverified@example.com',
+                      'deleted@example.com', 'seed@example.com', 'local@wiring.test', 'existing@example.com'):
+            result = self.client.post('/api/register', json={
+                'name': 'Имя', 'email': email, 'password': 'secret1',
+                'age_confirm': True, 'privacy_confirm': True, 'marketing_consent': email != 'no@example.com',
+            })
+            self.assertEqual(result.status_code, 200)
+        conn = open_request_connection()
+        try:
+            conn.execute("UPDATE users SET email_verified_at = NULL WHERE email = ?", ('unverified@example.com',))
+            conn.execute("UPDATE users SET deleted_at = 1 WHERE email = ?", ('deleted@example.com',))
+            conn.execute("UPDATE users SET is_seed = 1 WHERE email = ?", ('seed@example.com',))
+            conn.commit()
+            client = Mock(config=Config('fake-key', 123))
+            client.exists.side_effect = lambda email: email == 'existing@example.com'
+            client.add.side_effect = SendPulseError('unavailable')
+            result = sync_contacts(conn, client, now=1000)
+            self.assertEqual((result['failed'], result['existing']), (1, 1))
+            self.assertEqual(client.add.call_args.args, ('yes@example.com', 'Имя'))
+            client.reset_mock()
+            result = sync_contacts(conn, client, now=1100)
+            client.exists.assert_not_called()
+            client.add.side_effect = None
+            result = sync_contacts(conn, client, now=1300)
+            self.assertEqual(result['added'], 1)
+            client.reset_mock()
+            sync_contacts(conn, client, now=1600)
+            client.exists.assert_not_called()
+            client.config = Config('fake-key', 456)
+            self.assertEqual(sync_contacts(conn, client, now=1900)['added'], 1)
+            # Session lock prevents concurrent workers, including separate books.
+            other = open_request_connection()
+            try:
+                other.execute('SELECT pg_advisory_lock(739201, 1)')
+                other.commit()
+                self.assertTrue(sync_contacts(conn, client)['busy'])
+            finally:
+                other.close()
+            from app import purge_user_aux_data
+            uid = conn.execute('SELECT id FROM users WHERE email = ?', ('yes@example.com',)).fetchone()['id']
+            purge_user_aux_data(conn, uid)
+            conn.commit()
+            self.assertIsNone(conn.execute('SELECT user_id FROM sendpulse_contacts WHERE user_id = ?', (uid,)).fetchone())
+        finally:
+            conn.close()
+
     @classmethod
     def setUpClass(cls):
         init_db()

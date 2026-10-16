@@ -46,6 +46,7 @@ from devices import ensure_device_tables, track_device_visit, visitor_key_from_r
 from icebreakers import cached_openers, clear_openers, ensure_opener_table
 from jev_ranker import jev_access
 from recommendations import select_recommendations
+from sendpulse_sync import ensure_sync_table
 from glossary import glossary_html
 from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
@@ -374,6 +375,7 @@ def _replace_prompts(conn: Connection, user_id: int, prompts: list[dict[str, str
 def init_db() -> None:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     conn = db_connect()
+    ensure_sync_table(conn)
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -1424,6 +1426,7 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     """Purges auxiliary user data (photos, messages, etc.).
     Database requirement: The user record in 'users' is NEVER deleted!
     """
+    conn.execute("DELETE FROM sendpulse_contacts WHERE user_id = ?", (uid,))
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM feed_history WHERE user_id = ? OR other_id = ?", (uid, uid))
