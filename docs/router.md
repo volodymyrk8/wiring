@@ -60,3 +60,5 @@ OAuth использует серверные `POST /api/auth/{google|yandex}/st
 The existing server-header entrypoint also mounts admin reply forms into `/admin` server-template hosts. Support reply history remains on the existing `/support` SPA screen; `/api/support/replies` is its authenticated shared API and is exempt from the report-ban gate. No SPA paths or URL contract change.
 
 Мобильная навигация Expo Router находится в отдельном [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile/blob/main/docs/router.md). Выделение репозитория не меняет веб-URL или общий `/api/*`.
+
+Native redirect остаётся `wiring://oauth` и обменивает одноразовый результат через `/api/auth/native/exchange`. Universal/App Links ассоциации обслуживает Flask по `/.well-known/apple-app-site-association` и `/.well-known/assetlinks.json`; это публичные JSON документы, не SPA_PATHS. API callback исключён из перехвата Universal Links. Перевод canonical профиля/чата/referral/email ссылок выполняется `src/routes.ts` мобильного клиента. Веб-URL и маршруты Preact не менялись.

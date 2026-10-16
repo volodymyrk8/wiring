@@ -174,3 +174,9 @@ Mobile follow-up: profile promo redemption and opt-in, conditional «Для те
 `profile_policy.py` defines the 14-day interval. Nullable `users.name_changed_at` preserves the first change for old accounts. `/api/me` updates lock the user row before reading the cooldown and atomically store the name/timestamp; unchanged parsed names do not extend it. Private user payloads expose the next available time. `NameEditor.tsx` isolates confirmed name changes from autosave, using the existing serialized profile queue so delayed responses cannot restore an old name. The server enforces the same rule for web, drafts and mobile. See `mobile-api.md` for screen/copy parity.
 
 Ordinary draft and publish requests omit `name`; the profile handler defaults an omitted name to the current locked row. Thus a stale draft or a second device editing another field cannot inadvertently rename the account or trigger the cooldown. Restored browser drafts take their name from the server. Only the separate confirmed operation supplies a new name.
+
+## Общие нативные экраны
+
+`wiring-mobile` реализует React Native страницы сайта и те же пять CSS-палитр. Конкретная матрица и неподтверждённая device/visual проверка описаны в его `docs/web-parity.md`. Прежние мобильные follow-up в разделах выше теперь сопоставляются с этой матрицей.
+
+`social_auth.py` расширяет общий OAuth flow полями native challenge/state в `oauth_flows` и таблицей одноразовых хешированных результатов `oauth_native_codes` (TTL 60 с). `mobile_api.py` экспортирует issuer native-сессии через `app.extensions`, поэтому OAuth и email verify используют тот же refresh family/password fingerprint. Все данные остаются в существующей PostgreSQL; cookie-вход сайта сохраняется. Bearer также разрешён на общей форме `/support`. Ассоциации HTTP-ссылок — два публичных well-known JSON маршрута Flask, не новые SPA-страницы.
