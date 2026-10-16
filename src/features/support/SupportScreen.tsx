@@ -1,4 +1,4 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader } from "@/components/ui/AppHeader";
 import { ProfileMenu } from "@/components/ui/ProfileMenu";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { LegalFooter } from "@/components/ui/LegalFooter";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { SupportHostBridge } from "./types";
+import { ReplyHistory } from "./ReplyHistory";
 import styles from "./SupportScreen.module.css";
 
 export function SupportScreen({ host }: { host: SupportHostBridge }) {
@@ -17,6 +18,8 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const sendingRef = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
+  useEffect(() => () => requestRef.current?.abort(), []);
   const reportBanned = Boolean(host.user?.report_banned);
   const banMessage = String(host.user?.report_ban_message || "");
 
@@ -30,10 +33,12 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
     setError("");
     sendingRef.current = true;
     setBusy(true);
+    const controller = new AbortController(); requestRef.current = controller;
 
     try {
       const res = await host.api("/support", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -45,14 +50,14 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
         }),
       });
 
+      if (controller.signal.aborted) return;
       setNotice(res.notice || "отправили. ответим на почту, если её указал");
       setBody("");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "произошла ошибка, попробуй позже";
-      setError(message);
+      if (!controller.signal.aborted) setError(message);
     } finally {
-      sendingRef.current = false;
-      setBusy(false);
+      if (!controller.signal.aborted) { sendingRef.current = false; requestRef.current = null; setBusy(false); }
     }
   };
 
@@ -116,11 +121,12 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
             </div>
           ) : null}
           <p>
-            Напиши сюда — это единственный способ связаться с нами. Почту в сообщении указывать не
-            обязательно: если укажешь, ответим туда. Если ты в аккаунте, увидим, кто пишет.
+            Ответы появятся здесь, в разделе «Поддержка». Если укажешь почту, отправим ответ и туда.
+            Если ты не вошёл в аккаунт, укажи почту, чтобы мы могли ответить.
           </p>
         </div>
 
+        <ReplyHistory host={host} />
         {error && (
           <div class={`${styles.statusCard} ${styles.statusErr}`} role="alert">
             <span class={styles.statusIcon}>⚠️</span>

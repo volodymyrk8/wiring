@@ -222,3 +222,8 @@
     max-height: none;
   }
 }
+
+.replyHistory { display: grid; gap: 12px; }
+.reply { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-2); }
+.reply time { color: var(--muted); font-size: 12px; }
+.reply p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

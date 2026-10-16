@@ -17,6 +17,11 @@ if not _db_name.endswith("_test"):
 os.environ.setdefault("APP_SECRET_KEY", "test-secret")
 os.environ["UPLOAD_DIR"] = os.path.join(tempfile.gettempdir(), f"wiring-uploads-{os.getpid()}")
 os.environ["OPENAI_API_KEY"] = ""
+# Test suites may call notification paths; never use an inherited real transport.
+os.environ["RESEND_API_KEY"] = ""
+os.environ["SMTP_HOST"] = ""
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["TELEGRAM_ADMIN_CHAT"] = ""
 os.environ["WIRING_SEED_AI"] = "0"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
 os.environ["WIRING_SIGNUP_PLUS"] = "0"
@@ -1919,6 +1924,177 @@ class WiringTest(unittest.TestCase):
         self.client.post("/api/block", json={"user_id": peers[1]["id"]})
         inbox = self.client.get("/api/inbox").get_json()
         self.assertEqual((inbox["unread"], inbox["unread_chats"]), (0, 0))
+
+    def _reply_admin(self):
+        with self.client.session_transaction() as session:
+            session["admin"] = True
+        response = self.client.get("/admin")
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as session:
+            return session["admin_reply_csrf"]
+
+    def test_name_change_cooldown_and_atomic_profile_update(self):
+        user = self._register()
+        changed = self.client.patch("/api/me", json={"name": "Адель", "draft": True})
+        self.assertEqual(changed.status_code, 200)
+        available = changed.get_json()["user"]["name_change_available_at"]
+        self.assertGreater(available, int(time.time()) + 13 * 86400)
+        unchanged = self.client.patch("/api/me", json={"name": " Адель ", "bio": "Сохраняю описание", "draft": True})
+        self.assertEqual(unchanged.status_code, 200)
+        self.assertEqual(unchanged.get_json()["user"]["name_change_available_at"], available)
+        blocked = self.client.patch("/api/me", json={"name": "Другое", "bio": "Не сохранять", "draft": True})
+        self.assertEqual(blocked.status_code, 409)
+        self.assertEqual(blocked.get_json()["name_change_available_at"], available)
+        me = self.client.get("/api/me").get_json()["user"]
+        self.assertEqual(me["name"], "Адель")
+        self.assertEqual(me["bio"], "Сохраняю описание")
+        full = dict(me)
+        full.pop("name")
+        self.assertEqual(self.client.patch("/api/me", json=full).status_code, 200)
+        with patch("app.time.time", return_value=available - 1):
+            self.assertEqual(self.client.patch("/api/me", json={"name": "Новое", "draft": True}).status_code, 409)
+        with patch("app.time.time", return_value=available):
+            self.assertEqual(self.client.patch("/api/me", json={"name": "Новое", "draft": True}).status_code, 200)
+
+    def test_concurrent_name_changes_allow_only_one(self):
+        from concurrent.futures import ThreadPoolExecutor
+        user = self._register()
+        def change(name):
+            with app.test_client() as client:
+                with client.session_transaction() as session:
+                    session["uid"] = user["id"]
+                return client.patch("/api/me", json={"name": name, "draft": True}).status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            statuses = list(pool.map(change, ["Первое имя", "Второе имя"]))
+        self.assertEqual(sorted(statuses), [200, 409])
+
+    def test_each_report_notifies_moderators_and_ban_is_separate(self):
+        from database import connect
+        target = self._register(email="report-target@wiring.test")
+        self._logout()
+        first = self._register(email="report-first@wiring.test")
+        def transport(subject, body):
+            conn = connect()
+            try:
+                self.assertGreater(conn.execute("SELECT COUNT(*) AS n FROM reports").fetchone()["n"], 0)
+            finally:
+                conn.close()
+        with patch("app.notify_support", side_effect=transport) as mail:
+            self.assertEqual(self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"}).status_code, 200)
+            self._logout()
+            self._register(email="report-second@wiring.test")
+            self.assertEqual(self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"}).status_code, 200)
+            subjects = [call.args[0] for call in mail.call_args_list]
+            self.assertEqual(sum("новая жалоба" in subject for subject in subjects), 2)
+            self.assertEqual(sum("auto-ban" in subject for subject in subjects), 1)
+        with patch("app.notify_support", side_effect=RuntimeError("Test transport unavailable")):
+            self.assertEqual(self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"}).status_code, 200)
+
+    def test_report_rate_limit_prevents_extra_report_and_mail(self):
+        target = self._register(email="rate-target@wiring.test")
+        self._logout()
+        self._register(email="rate-reporter@wiring.test")
+        with patch("app.notify_support") as mail:
+            for _ in range(5):
+                self.assertEqual(self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"}).status_code, 200)
+            self.assertEqual(self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"}).status_code, 429)
+            self.assertEqual(mail.call_count, 5)
+
+    def test_admin_report_reply_permission_recipient_idempotency_and_privacy(self):
+        target = self._register(email="reply-target@wiring.test")
+        self._logout()
+        reporter = self._register(email="reply-reporter@wiring.test")
+        with patch("app.notify_support"):
+            self.client.post("/api/report", json={"user_id": target["id"], "reason": "spam"})
+        with app.app_context():
+            report_id = db().execute("SELECT id FROM reports").fetchone()["id"]
+        url = f"/admin/replies/report/{report_id}"
+        form = {"body": "Мы проверили жалобу. Спасибо за обращение. <script>bad()</script>", "request_id": "report-reply-test-0001", "email": "reply-target@wiring.test", "user_id": target["id"]}
+        self.assertEqual(self.client.post(url, data=form).status_code, 403)
+        csrf = self._reply_admin()
+        self.assertEqual(self.client.post(url, data={**form, "csrf": "wrong"}).status_code, 403)
+        with patch("app.send_mail", return_value=True) as mail:
+            response = self.client.post(url, data={**form, "csrf": csrf})
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(mail.call_args.args[0], "reply-reporter@wiring.test")
+            self.assertEqual(self.client.post(url, data={**form, "csrf": csrf}).status_code, 302)
+            self.assertEqual(mail.call_count, 1)
+        admin_html = self.client.get("/admin").get_data(as_text=True)
+        self.assertNotIn("<script>bad()</script>", admin_html)
+        self.assertIn("&lt;script&gt;bad()&lt;/script&gt;", admin_html)
+        history = self.client.get("/api/support/replies").get_json()["replies"]
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]["body"], form["body"])
+        self.assertNotIn("email", history[0])
+        self.assertNotIn("user_id", history[0])
+        with app.app_context():
+            db().execute("UPDATE users SET report_banned_at = ? WHERE id = ?", (int(time.time()), reporter["id"]))
+            db().commit()
+        self.assertEqual(len(self.client.get("/api/support/replies").get_json()["replies"]), 1)
+        self._logout()
+        self._login("reply-target@wiring.test")
+        self.assertEqual(self.client.get("/api/support/replies").get_json()["replies"], [])
+
+    def test_support_reply_email_failure_retry_and_no_contact(self):
+        with patch("app.notify_support"):
+            self.client.post("/support", json={"name": "Гость", "email": "contact@wiring.test", "body": "Прошу ответить на это обращение"})
+            self.client.post("/support", json={"body": "Обращение без контактов"})
+        with app.app_context():
+            tickets = db().execute("SELECT id FROM support_tickets ORDER BY id").fetchall()
+        csrf = self._reply_admin()
+        form = {"csrf": csrf, "body": "Ответ для гостя", "request_id": "ticket-reply-test-0001"}
+        url = f"/admin/replies/ticket/{tickets[0]['id']}"
+        with patch("app.send_mail", return_value=False):
+            self.assertEqual(self.client.post(url, data=form).status_code, 302)
+        with patch("app.send_mail", return_value=True) as mail:
+            self.assertEqual(self.client.post(url, data=form).status_code, 302)
+            self.assertEqual(self.client.post(url, data=form).status_code, 302)
+            self.assertEqual(mail.call_count, 1)
+            self.assertEqual(mail.call_args.args[0], "contact@wiring.test")
+        with app.app_context():
+            self.assertEqual(db().execute("SELECT COUNT(*) AS n FROM support_replies").fetchone()["n"], 1)
+        self.assertEqual(self.client.post(f"/admin/replies/ticket/{tickets[1]['id']}", data={**form, "request_id": "ticket-no-contact-0001"}).status_code, 400)
+        self.assertEqual(self.client.post("/admin/replies/ticket/999999", data={**form, "request_id": "ticket-not-found-0001"}).status_code, 404)
+        self.assertEqual(self.client.post(url, data={**form, "body": "x" * 2001, "request_id": "ticket-too-long-00001"}).status_code, 400)
+        self.assertEqual(self.client.post(url, data={**form, "body": "Иной текст"}).status_code, 400)
+
+    def test_reply_to_explicit_email_after_account_hidden_follows_account_purge(self):
+        from app import purge_user_aux_data
+        from support_replies import save_reply
+        user = self._register(email="purge-reply@wiring.test")
+        with patch("app.notify_support"):
+            self.client.post("/support", json={"body": "Открытое обращение до удаления", "email": "explicit@wiring.test"})
+        with app.app_context():
+            conn = db()
+            ticket = conn.execute("SELECT id FROM support_tickets").fetchone()["id"]
+            conn.execute("UPDATE users SET deleted_at = ? WHERE id = ?", (int(time.time()) - 8 * 86400, user["id"]))
+            save_reply(conn, "ticket", ticket, "Ответ на обращение", "purge-explicit-mail-001", lambda *args: True, "http://localhost")
+            row = conn.execute("SELECT user_id, email FROM support_replies").fetchone()
+            self.assertIsNone(row["user_id"])
+            self.assertEqual(row["email"], "explicit@wiring.test")
+            purge_user_aux_data(conn, user["id"])
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM support_replies").fetchone()["n"], 0)
+            conn.commit()
+
+    def test_account_support_reply_is_visible_without_email_and_admin_rate_limit(self):
+        user = self._register(email="support-owner@wiring.test")
+        with patch("app.notify_support"):
+            self.client.post("/support", json={"body": "Нужна помощь с настройками"})
+        with app.app_context():
+            ticket = db().execute("SELECT id FROM support_tickets").fetchone()["id"]
+        csrf = self._reply_admin()
+        url = f"/admin/replies/ticket/{ticket}"
+        with patch("app.send_mail", return_value=True) as mail:
+            form = {"csrf": csrf, "body": "Ответ виден в поддержке", "request_id": "account-reply-test-0001"}
+            for _ in range(20):
+                self.assertEqual(self.client.post(url, data=form).status_code, 302)
+            self.assertEqual(self.client.post(url, data=form).status_code, 429)
+            self.assertEqual(mail.call_count, 1)
+            self.assertEqual(mail.call_args.args[0], "support-owner@wiring.test")
+        self.assertEqual(len(self.client.get("/api/support/replies").get_json()["replies"]), 1)
+        with app.app_context():
+            notices = db().execute("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND kind = 'support'", (user["id"],)).fetchone()["n"]
+            self.assertEqual(notices, 1)
 
     def test_referral_grants_plus_to_both(self):
         ada = self._register()
