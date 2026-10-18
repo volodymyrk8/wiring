@@ -75,4 +75,6 @@ export type ProfileHostBridge = {
   onLogout: () => void;
   onThemeSelect?: (theme: string) => void;
   refreshFeed?: () => Promise<unknown>;
+  armFilePickerHistoryGuard?: () => void;
+  disarmFilePickerHistoryGuard?: () => void;
 };

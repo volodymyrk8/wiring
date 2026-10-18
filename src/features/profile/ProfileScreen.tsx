@@ -13,6 +13,7 @@ import {
   Checkbox,
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { isProfilePhotoFile, PROFILE_PHOTO_ACCEPT } from "@/lib/profile-photo-file";
 import { applyNeuroToggle, catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
 import { catalogCities, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
@@ -132,20 +133,32 @@ function PhotoManager({
   const needsPhotoConsent = Boolean(user.needs_photo_consent);
 
   const refresh = async () => onChange(await host.refreshUser());
+  const armPicker = () => host.armFilePickerHistoryGuard?.();
+  const disarmPicker = () => host.disarmFilePickerHistoryGuard?.();
+  const queuePhotoFiles = (files: File[]) => {
+    const images = files.filter(isProfilePhotoFile);
+    const rejected = files.length - images.length;
+    if (rejected) {
+      setError("Нужно фото (jpg, png, webp), не видео. Screen recording из «Фото» — это mp4, его сюда не загрузить.");
+    }
+    if (!images.length) return;
+    setError("");
+    setConsentError(false);
+    setCropError("");
+    batchRef.current = images.length;
+    setCropQueue(images);
+  };
   const upload = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const files = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
+    disarmPicker();
     if (!files.length) return;
     if (needsPhotoConsent && !consent) {
       setConsentError(true);
       setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
       return;
     }
-    setError("");
-    setConsentError(false);
-    setCropError("");
-    batchRef.current = files.length;
-    setCropQueue(files);
+    queuePhotoFiles(files);
   };
 
   const pickAvatar = () => {
@@ -162,10 +175,10 @@ function PhotoManager({
   const uploadAvatar = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
+    disarmPicker();
     if (!file) return;
     makePrimaryAfterCrop.current = true;
-    batchRef.current = 1;
-    setCropQueue([file]);
+    queuePhotoFiles([file]);
   };
 
   const acceptCrop = async (file: File) => {
@@ -184,6 +197,7 @@ function PhotoManager({
       const rest = cropQueue.slice(1);
       setCropQueue(rest);
       if (!rest.length) {
+        disarmPicker();
         host.toast(replaceAvatar ? "аватар обновлён" : batchRef.current > 1 ? "фото добавлены" : "фото добавлено");
       }
     } catch (caught) {
@@ -245,7 +259,7 @@ function PhotoManager({
         <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>Изменить аватар</Button>
         <p class={styles.photoHint}>Аватар — главное фото в ленте. Нажми на другое фото, чтобы сделать его аватаром.</p>
       </div>
-      <input ref={avatarInputRef} class={styles.srOnly} type="file" accept="image/*" disabled={busy || cropQueue.length > 0} onChange={uploadAvatar} />
+      <input ref={avatarInputRef} class={styles.srOnly} type="file" accept={PROFILE_PHOTO_ACCEPT} disabled={busy || cropQueue.length > 0} onClick={armPicker} onCancel={disarmPicker} onChange={uploadAvatar} />
       <div class={styles.photoGrid}>
         {photos.map((photo) => (
           <div key={photo.id} class={`${styles.photoCell}${photo.is_primary ? ` ${styles.primary}` : ""}`}>
@@ -258,7 +272,7 @@ function PhotoManager({
         ))}
         <label class={`${styles.photoAdd}${busy ? ` ${styles.disabled}` : ""}`}>
           <span aria-hidden="true">+</span>
-          <input type="file" accept="image/*" multiple disabled={busy || cropQueue.length > 0} onChange={upload} />
+          <input type="file" accept={PROFILE_PHOTO_ACCEPT} multiple disabled={busy || cropQueue.length > 0} onClick={armPicker} onCancel={disarmPicker} onChange={upload} />
         </label>
       </div>
       {error && <p class={styles.error} role="alert">{error}</p>}
@@ -268,7 +282,7 @@ function PhotoManager({
           title={batchRef.current > 1 ? `Кадр · ${batchRef.current - cropQueue.length + 1} из ${batchRef.current}` : "Кадр"}
           busy={busy}
           error={cropError}
-          onCancel={() => { setCropQueue([]); setCropError(""); }}
+          onCancel={() => { disarmPicker(); setCropQueue([]); setCropError(""); }}
           onConfirm={(file) => { void acceptCrop(file); }}
         />
       ) : null}

@@ -298,7 +298,7 @@ export function PhotoCropper({ file, title = "Кадр", busy = false, error = "
     >
       <div onKeyDown={keepEnterInside}>
         <p class={styles.hint}>Двигай и увеличивай. В анкете все фото одного кадра, 3:4.</p>
-        {failed ? <p class={styles.error} role="alert">Это фото не открывается. Выбери jpg или png.</p> : (
+        {failed ? <p class={styles.error} role="alert">Это не фото для анкеты. Выбери jpg, png или webp — не видео (mp4).</p> : (
           <>
             <div
               ref={stageRef}

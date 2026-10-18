@@ -83,6 +83,24 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     chatId: null,
   };
   const urlSyncState = { lastUrl: "" };
+  /** iOS file picker can trigger history.back(); keep profile (or other view) until picker closes. */
+  let filePickerHistoryGuard = null;
+  const armFilePickerHistoryGuard = (view, ms = 20_000) => {
+    filePickerHistoryGuard = { view, until: Date.now() + ms };
+  };
+  const disarmFilePickerHistoryGuard = () => {
+    filePickerHistoryGuard = null;
+  };
+  const restoreFilePickerHistoryGuard = () => {
+    const guard = filePickerHistoryGuard;
+    if (!guard || Date.now() > guard.until) return false;
+    const url = hrefFor(guard.view);
+    state.view = guard.view;
+    urlSyncState.lastUrl = url;
+    if (location.pathname !== url) history.pushState({ view: guard.view }, "", url);
+    render();
+    return true;
+  };
 
   let routing = null;
   const ensureRouting = () => {
@@ -372,7 +390,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         || state.view === "archive"
         || state.view === "login"
         || (state.view === "person" && from === "profile");
-      const dest = state.user ? "my-preview" : "login";
+      const dest = state.user ? "profile" : "login";
       const label = state.user ? "Профиль" : "Войти";
       const icon = state.user
         ? photoRef(state.user.photo)
@@ -384,7 +402,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     return items
       .map(([view, label, icon, on]) => {
         const badge = view === "likes" ? countSlot("likes") : view === "matches" ? countSlot("unread") : "";
-        const href = view === "my-preview" ? hrefFor("person", { id: state.user.id }) : hrefFor(view);
+        const href = hrefFor(view);
         return `<a href="${href}" data-nav="${view}" class="${kind}-link${on ? " on" : ""}"${on ? ' aria-current="page"' : ""}>
           <span class="nav-ico" aria-hidden="true">${icon}${badge}</span>
           <span class="nav-lbl">${label}</span>
@@ -433,6 +451,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     state.personFrom = origin;
     state.photoIndex = 0;
     state.view = "person";
+    syncUrl();
     render();
   };
 
@@ -633,6 +652,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     onLogout: logout,
     onThemeSelect: (theme) => applyTheme(theme),
+    armFilePickerHistoryGuard: () => armFilePickerHistoryGuard(state.view),
+    disarmFilePickerHistoryGuard,
   });
 
   const buildLikesHostBridge = () => ({
@@ -917,6 +938,10 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     state.view = next;
     state.photoIndex = 0;
     if (next !== "chat") state.chatId = null;
+    if (next !== "person") {
+      state.person = null;
+    }
+    syncUrl();
     if (state.view === "deck" && state.user && !state.cards.length) await loadFeed();
     if (state.view === "matches" && state.user) {
       const data = await api("/api/matches");
@@ -1415,6 +1440,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   };
 
   window.addEventListener("popstate", () => {
+    if (restoreFilePickerHistoryGuard()) return;
     urlSyncState.lastUrl = location.pathname;
     hydrateFromUrl().catch((err) => {
       root.innerHTML = `<p class="err">${escapeHtml(err.message)}</p>`;
