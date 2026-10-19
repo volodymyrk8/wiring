@@ -1238,11 +1238,17 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       void renderAuthFeature("register");
       return;
     }
-    if (!state.user && state.view === "login") {
+    if (state.user && !state.user.guest && (state.view === "login" || state.view === "register")) {
+      state.view = state.user.needs_profile ? "profile" : "deck";
+      if (state.view === "deck") void loadFeed().then(() => render());
+      else render();
+      return;
+    }
+    if (state.view === "login" && !state.user) {
       void renderAuthFeature("login");
       return;
     }
-    if (!state.user && state.view === "forgot") {
+    if (state.view === "forgot") {
       void renderAuthFeature("forgot");
       return;
     }
