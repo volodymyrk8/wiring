@@ -1521,6 +1521,32 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(len(thread["openers"]), 3)
         self.assertTrue(all(thread["openers"]))
 
+    def test_chat_openers_after_three_day_silence(self):
+        first = self._register(prompts=[{"id": "special", "answer": "ночные поезда и таблицы"}])
+        self.client.post("/api/logout")
+        leo = self._register(email="leo-silence@example.com", name="Лео", gender="man", photo="portraits/p03.jpg")
+        self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
+        self.client.post("/api/logout")
+        self.client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
+        self.client.post("/api/swipe", json={"target_id": leo["id"], "direction": "like"})
+        other = self.client.get("/api/matches").get_json()["matches"][0]
+        sent = self.client.post("/api/messages", json={"to_id": other["id"], "body": "привет"})
+        self.assertEqual(sent.status_code, 200)
+        fresh = self.client.get(f"/api/messages/{other['id']}").get_json()
+        self.assertEqual(fresh["openers"], [])
+        self.assertFalse(fresh.get("openers_after_silence"))
+        stale_at = int(time.time()) - 4 * 24 * 60 * 60
+        with db() as conn:
+            conn.execute(
+                "UPDATE messages SET created_at = ? WHERE from_id = ? AND to_id = ?",
+                (stale_at, fresh["messages"][0]["from_id"], other["id"]),
+            )
+            conn.commit()
+        stale = self.client.get(f"/api/messages/{other['id']}").get_json()
+        self.assertEqual(len(stale["openers"]), 3)
+        self.assertTrue(stale.get("openers_after_silence"))
+        self.assertEqual(len(stale["messages"]), 1)
+
     def test_chat_photo_message(self):
         ada = self._register()
         self.client.post("/api/logout")

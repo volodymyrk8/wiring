@@ -43,6 +43,7 @@ export type ChatThread = {
   peer: ChatUser & { id: number; name: string };
   messages: ChatMessage[];
   openers?: string[];
+  openers_after_silence?: boolean;
 };
 
 export type ChatMode = "matches" | "chat";

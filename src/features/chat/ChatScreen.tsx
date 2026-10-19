@@ -874,12 +874,18 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 onJump={jumpTo}
                 revealedTranscript={revealed[message.id] || ""}
               />
-            )) : thread ? (
-              <>
-                <p class="hint">Напиши первым. Подсказки по анкете — ткни, отредактируй и отправь.</p>
+            )) : thread && !(thread.openers?.length) ? <p class="hint">загрузка…</p> : null}
+            {thread?.openers?.length ? (
+              <div class={`openers-block${thread.messages?.length ? " openers-block--after-thread" : ""}`}>
+                <p class={thread.openers_after_silence ? "nudge" : "hint"}>
+                  {thread.openers_after_silence
+                    ? "Тишина больше трёх дней. Подсказки по анкете — ткни, подправь и отправь."
+                    : "Напиши первым. Подсказки по анкете — ткни, отредактируй и отправь."}
+                </p>
                 <div class="openers">{(thread.openers || []).map((opener) => <button key={opener} type="button" class="ghost slim opener" onClick={() => setDraft(opener)}>{opener}</button>)}</div>
-              </>
-            ) : <p class="hint">загрузка…</p>}
+              </div>
+            ) : null}
+            {!thread ? <p class="hint">загрузка…</p> : null}
           </div>
           <div class="composer-dock">
             {replyTo || editing ? (

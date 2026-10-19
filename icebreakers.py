@@ -179,6 +179,39 @@ def ensure_opener_table(conn: Connection) -> None:
     )
 
 
+CHAT_OPENER_SILENCE_SEC = 3 * 24 * 60 * 60
+
+
+def last_visible_message_at(conn: Connection, uid: int, other_id: int) -> int | None:
+    row = conn.execute(
+        """
+        SELECT MAX(created_at) AS ts FROM messages
+        WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
+          AND COALESCE(deleted_at, 0) = 0
+        """,
+        (uid, other_id, other_id, uid),
+    ).fetchone()
+    ts = row["ts"] if row else None
+    return int(ts) if ts else None
+
+
+def should_offer_chat_openers(
+    conn: Connection,
+    uid: int,
+    other_id: int,
+    *,
+    now: int | None = None,
+) -> tuple[bool, str]:
+    """Whether to show icebreaker buttons; reason is ``empty``, ``silence``, or ````."""
+    last = last_visible_message_at(conn, uid, other_id)
+    if last is None:
+        return True, "empty"
+    now_ts = int(time.time()) if now is None else now
+    if now_ts - last >= CHAT_OPENER_SILENCE_SEC:
+        return True, "silence"
+    return False, ""
+
+
 def clear_openers(conn: Connection, uid: int, other_id: int) -> None:
     conn.execute(
         "DELETE FROM chat_openers WHERE (user_id = ? AND other_id = ?) OR (user_id = ? AND other_id = ?)",

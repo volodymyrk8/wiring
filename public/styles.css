@@ -2093,6 +2093,9 @@ html[data-theme="pastel"] .ui-checkbox .custom-box {
   line-height: 1.4;
 }
 .nudge .actions { margin-top: 10px; }
+.openers-block--after-thread {
+  margin-top: 18px;
+}
 .openers {
   display: flex;
   flex-wrap: wrap;

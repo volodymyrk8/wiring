@@ -43,7 +43,12 @@ from catalog import (
 )
 from cities import PLACES, catalog_city, country_of_city, is_catalog_city, normalize_city
 from devices import ensure_device_tables, track_device_visit, visitor_key_from_request
-from icebreakers import cached_openers, clear_openers, ensure_opener_table
+from icebreakers import (
+    cached_openers,
+    clear_openers,
+    ensure_opener_table,
+    should_offer_chat_openers,
+)
 from jev_ranker import jev_access
 from recommendations import select_recommendations
 from sendpulse_sync import ensure_sync_table
@@ -2979,7 +2984,13 @@ def api_messages(other_id: int):
     peer = user_public(other, detail=True)
     me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     me = user_public(me_row, detail=True) if me_row else None
-    openers = cached_openers(conn, uid, other_id, peer, me) if not messages else []
+    show_openers, openers_reason = should_offer_chat_openers(conn, uid, other_id)
+    if show_openers:
+        if openers_reason == "silence":
+            clear_openers(conn, uid, other_id)
+        openers = cached_openers(conn, uid, other_id, peer, me)
+    else:
+        openers = []
     return jsonify(
         {
             "ok": True,
@@ -2987,6 +2998,7 @@ def api_messages(other_id: int):
             "messages": messages,
             "has_more": has_more,
             "openers": openers,
+            "openers_after_silence": openers_reason == "silence",
         }
     )
 
