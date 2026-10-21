@@ -2334,12 +2334,8 @@ def _eligible_card(
     if "incognito" in keys and int(row["incognito"] or 0):
         if not liked_me or row["id"] not in liked_me:
             return None
-    if not mutual_looking_ok(
-        str(me["looking_for"] or "everyone"),
-        str(me["gender"] or ""),
-        str(row["looking_for"] or "everyone"),
-        str(row["gender"] or ""),
-    ):
+    # Feed follows the viewer's «кого ищу» only; the other person's preference is shown on the card.
+    if not looking_matches(str(me["looking_for"] or "everyone"), str(row["gender"] or "")):
         return None
     if not discovery_allows(row, me):
         return None

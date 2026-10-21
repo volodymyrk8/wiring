@@ -2316,7 +2316,7 @@ class WiringTest(unittest.TestCase):
         self.assertFalse(user.get("plus"))
         self.assertEqual(user.get("ref_count"), 0)
 
-    def test_feed_respects_mutual_looking(self):
+    def test_feed_follows_viewer_looking_for_only(self):
         man = self._register(email="man@example.com", name="Макс", gender="man", looking_for="women", photo="portraits/p03.jpg")
         self.client.post("/api/logout")
         woman = self._register(email="woman@example.com", name="Мира", gender="woman", looking_for="men", photo="portraits/p01.jpg")
@@ -2324,6 +2324,23 @@ class WiringTest(unittest.TestCase):
         self.client.post("/api/logout")
         other_man = self._register(email="bro@example.com", name="Боря", gender="man", looking_for="everyone", photo="portraits/p02.jpg")
         other_man_id = other_man["id"]
+        self.client.post("/api/logout")
+        woman_everyone = self._register(
+            email="everyone@example.com",
+            name="Лена",
+            gender="woman",
+            looking_for="everyone",
+            photo="portraits/p04.jpg",
+        )
+        self.client.post("/api/logout")
+        lesbian = self._register(
+            email="sapphic@example.com",
+            name="Саша",
+            gender="woman",
+            looking_for="women",
+            photo="portraits/p05.jpg",
+        )
+        lesbian_id = lesbian["id"]
         self.client.post("/api/logout")
         self.client.post("/api/login", json={"email": "man@example.com", "password": "secret1"})
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
@@ -2335,6 +2352,13 @@ class WiringTest(unittest.TestCase):
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
         self.assertIn(man["id"], ids)
         self.assertNotIn(woman_id, ids)
+        self.assertNotIn(lesbian_id, ids)
+        self.client.post("/api/logout")
+        self.client.post("/api/login", json={"email": "everyone@example.com", "password": "secret1"})
+        ids = {c["id"] for c in self.client.get("/api/feed?limit=20").get_json()["cards"]}
+        self.assertIn(man["id"], ids)
+        self.assertIn(lesbian_id, ids)
+        self.assertNotIn(woman_everyone["id"], ids)
 
     def test_feed_respects_discovery_filters(self):
         host = self._register(
