@@ -21,6 +21,14 @@ export function catalogIdSet(items: CatalogItem[] | undefined): Set<string> {
   return new Set((items || []).map((item) => item.id));
 }
 
+/** Match filter search: label, hint, id, glossary expand (e.g. "body doubling"). */
+export function tagSearchHaystack(option: CatalogItem): string {
+  return [option.id, option.label, option.hint, option.expand, option.tip, option.blurb]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase("ru");
+}
+
 /** Tags shown in UI — current catalog only; neuro ids stored under vibe move to neuro. */
 export function splitCatalogTags(
   neuro: string[] | undefined,

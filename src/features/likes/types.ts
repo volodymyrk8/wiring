@@ -32,6 +32,7 @@ export type LikesCatalog = {
   vibe?: CatalogItem[];
   intents?: CatalogItem[];
   places?: PlaceBlock[];
+  city_search?: Record<string, string[]>;
 };
 
 export type LikesHostBridge = {

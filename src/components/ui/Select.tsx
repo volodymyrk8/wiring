@@ -20,6 +20,8 @@ const ChevronIcon = () => (
 export type SelectOption<T extends string = string> = {
   value: T;
   label: string;
+  /** Extra tokens for searchable selects (e.g. latin city aliases). */
+  searchText?: string;
   icon?: ComponentChildren;
   swatchTheme?: string;
   disabled?: boolean;
@@ -101,7 +103,10 @@ export function Select<T extends string = string>({
 
   const needle = query.trim().toLocaleLowerCase("ru");
   const visibleOptions = searchable && needle
-    ? options.filter((option) => option.label.toLocaleLowerCase("ru").includes(needle))
+    ? options.filter((option) => {
+        const hay = (option.searchText || option.label).toLocaleLowerCase("ru");
+        return hay.includes(needle);
+      })
     : options;
 
   useEffect(() => {

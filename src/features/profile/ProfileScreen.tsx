@@ -15,7 +15,7 @@ import {
 import { getErrorMessage } from "@/lib/get-error-message";
 import { isProfilePhotoFile, PROFILE_PHOTO_ACCEPT } from "@/lib/profile-photo-file";
 import { applyNeuroToggle, catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
-import { catalogCities, countryForCity } from "@/lib/places";
+import { catalogCities, citySelectOptions, countryForCity } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
@@ -627,7 +627,7 @@ export function ProfileScreen({ host }: Props) {
                   placeholder="Не указан"
                   searchable
                   searchPlaceholder="Город"
-                  options={[{ value: "", label: "Не указан" }, ...cityOptions.map((city) => ({ value: city, label: city }))]}
+                  options={citySelectOptions(cityOptions, host.catalog.city_search, { value: "", label: "Не указан" })}
                   value={draft.city}
                   error={errors.city}
                   onChange={setCity}

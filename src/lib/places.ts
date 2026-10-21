@@ -6,6 +6,29 @@ export function countryForCity(city: string, places: PlaceBlock[]): string {
   return places.find((place) => place.cities.includes(trimmed))?.country || "";
 }
 
+export type CitySearchIndex = Record<string, string[]>;
+
+export function cityOptionSearchText(city: string, citySearch?: CitySearchIndex): string {
+  const keys = citySearch?.[city];
+  return keys?.length ? keys.join(" ") : city;
+}
+
+export function citySelectOptions(
+  cities: string[],
+  citySearch?: CitySearchIndex,
+  empty?: { value: string; label: string },
+) {
+  const head = empty ? [empty] : [];
+  return [
+    ...head,
+    ...cities.map((city) => ({
+      value: city,
+      label: city,
+      searchText: cityOptionSearchText(city, citySearch),
+    })),
+  ];
+}
+
 export function catalogCities(places: PlaceBlock[], country?: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];

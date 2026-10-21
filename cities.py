@@ -355,6 +355,22 @@ _ALIASES = {
     "стамбул": "Стамбул",
     "berlin": "Берлин",
     "берлин": "Берлин",
+    "dublin": "Дублин",
+    "дublin": "Дублин",
+    "дублин": "Дублин",
+    "даблин": "Дублин",
+    "cork": "Корк",
+    "корк": "Корк",
+    "london": "Лондон",
+    "лондон": "Лондон",
+    "manchester": "Манчестер",
+    "манчестер": "Манчестер",
+    "edinburgh": "Эдинбург",
+    "эдинбург": "Эдинбург",
+    "birmingham": "Бирмингем",
+    "бирмингем": "Бирмингем",
+    "glasgow": "Глазго",
+    "глазго": "Глазго",
     "warsaw": "Варшава",
     "warszawa": "Варшава",
     "варшава": "Варшава",
@@ -500,6 +516,20 @@ def catalog_city(raw: str) -> str | None:
 
 def is_catalog_city(raw: str) -> bool:
     return catalog_city(raw) is not None
+
+
+def city_search_index() -> dict[str, list[str]]:
+    """Search tokens per catalog city (labels, aliases, compact forms) for UI filters."""
+    grouped: dict[str, set[str]] = {
+        city: {_key(city), _key(city).replace(" ", "")} for city in CITY_SET
+    }
+    for alias, city in _ALIASES.items():
+        bucket = grouped.get(city)
+        if not bucket:
+            continue
+        bucket.add(alias)
+        bucket.add(alias.replace(" ", ""))
+    return {city: sorted(keys) for city, keys in grouped.items()}
 
 
 def places_payload() -> list[dict[str, object]]:

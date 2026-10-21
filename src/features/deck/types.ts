@@ -46,6 +46,7 @@ export type DeckCatalog = {
   genders?: CatalogItem[];
   looking_for?: CatalogItem[];
   places?: PlaceBlock[];
+  city_search?: Record<string, string[]>;
 };
 
 export type FeedPage = {

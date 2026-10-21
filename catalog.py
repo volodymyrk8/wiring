@@ -125,7 +125,7 @@ SEED_PHOTOS = set(PORTRAITS) | set(PEOPLE)
 
 
 def catalog_payload() -> dict:
-    from cities import places_payload
+    from cities import city_search_index, places_payload
     from glossary import enrich
 
     return {
@@ -135,6 +135,7 @@ def catalog_payload() -> dict:
         "genders": GENDERS,
         "intents": INTENTS,
         "places": places_payload(),
+        "city_search": city_search_index(),
         "prompts": PROMPTS,
         "report_reasons": REPORT_REASONS,
         "default_albums": DEFAULT_ALBUMS,

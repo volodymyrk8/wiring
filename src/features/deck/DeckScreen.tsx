@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Checkbox, GuestFlowSteps, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
-import { applyNeuroToggle, labelForTag, splitCatalogTags } from "@/lib/catalog-tags";
+import { applyNeuroToggle, labelForTag, splitCatalogTags, tagSearchHaystack } from "@/lib/catalog-tags";
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
+import { cityOptionSearchText, citySelectOptions } from "@/lib/places";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
 import { feedSwipeTarget, lockFeedSwipeAxis, type FeedSwipe } from "./vertical-swipe";
@@ -152,11 +153,16 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   const [maxAge, setMaxAge] = useState(String(filters.max_age));
   const [discovery, setDiscovery] = useState(() => discoveryFromUser(host));
   const places = host.catalog.places || [];
+  const citySearch = host.catalog.city_search;
   const cities = [...new Set(places.flatMap((place) => place.cities))];
   const placeOptions = [
     { value: "", label: "Отовсюду" },
     ...places.map((place) => ({ value: place.country, label: place.country })),
-    ...cities.map((city) => ({ value: city, label: city })),
+    ...cities.map((city) => ({
+      value: city,
+      label: city,
+      searchText: cityOptionSearchText(city, citySearch),
+    })),
   ];
   const update = <K extends keyof DeckFilters>(key: K, value: DeckFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const reset = () => {
@@ -178,11 +184,11 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
           <Input label="Возраст до" name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
         </div>
         <Select className={styles.citySelect} label="Пол" id="deck-gender" options={[{ value: "", label: "Любой" }, { value: "woman", label: "Женщины" }, { value: "man", label: "Мужчины" }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel="Пол в ленте" />
-        <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={[{ value: "", label: "Любой" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
+        <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={citySelectOptions(cities, citySearch, { value: "", label: "Любой" })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
         <TagPicker label="Цель поиска" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
-        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} />
+        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder="Диагноз или расшифровка" searchHaystack={tagSearchHaystack} />
         <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>Скрыть анкеты без диагноза</Checkbox>
-        <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
+        <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder="Вайб, body doubling…" searchHaystack={tagSearchHaystack} />
         <h3 class={styles.filterSection}>Кто может искать меня</h3>
         <p class={styles.filterIntro}>Кому ты сам виден. Это не то, кого видишь ты.</p>
         <div class={styles.range}>

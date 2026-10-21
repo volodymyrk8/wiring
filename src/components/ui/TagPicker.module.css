@@ -7,6 +7,29 @@
   line-height: 1.4;
 }
 
+.search {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.search:focus {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+
+.empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;

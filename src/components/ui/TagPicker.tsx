@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import styles from "./TagPicker.module.css";
 
@@ -17,6 +17,10 @@ export type TagPickerProps = {
   label?: ComponentChildren;
   tone?: "default" | "vibe";
   id?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  /** Extra text per id for search (e.g. glossary expand). */
+  searchHaystack?: (option: TagOption) => string;
 };
 
 const PAD = 12;
@@ -103,7 +107,18 @@ export function TagHints({ tags }: { tags: TagOption[] }) {
   );
 }
 
-export function TagPicker({ options, selected, onChange, label, tone = "default", id }: TagPickerProps) {
+export function TagPicker({
+  options,
+  selected,
+  onChange,
+  label,
+  tone = "default",
+  id,
+  searchable = false,
+  searchPlaceholder = "Найти…",
+  searchHaystack,
+}: TagPickerProps) {
+  const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onPointerDown = (event: Event) => {
@@ -122,11 +137,33 @@ export function TagPicker({ options, selected, onChange, label, tone = "default"
     onChange(next);
   };
 
+  const needle = query.trim().toLocaleLowerCase("ru");
+  const visibleOptions = searchable && needle
+    ? options.filter((option) => {
+        if (selected.includes(option.id)) return true;
+        const hay = (searchHaystack ? searchHaystack(option) : `${option.id} ${option.label} ${option.hint || ""}`).toLocaleLowerCase("ru");
+        return hay.includes(needle);
+      })
+    : options;
+
   return (
     <div class={styles.wrap} id={id}>
       {label && <p class={styles.label}>{label}</p>}
+      {searchable ? (
+        <input
+          class={styles.search}
+          type="search"
+          value={query}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+          onInput={(event) => setQuery(event.currentTarget.value)}
+        />
+      ) : null}
+      {searchable && needle && !visibleOptions.length ? (
+        <p class={styles.empty}>Ничего не нашлось</p>
+      ) : null}
       <div class={styles.tags} ref={rootRef} role="group" aria-label={typeof label === "string" ? label : undefined}>
-        {options.map((option) => {
+        {visibleOptions.map((option) => {
           const active = selected.includes(option.id);
           const marked = tone === "vibe" ? { ...option, vibe: true } : option;
           return (

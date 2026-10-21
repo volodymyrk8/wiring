@@ -46,7 +46,7 @@ export type ProfileUser = {
   [key: string]: unknown;
 };
 
-export type CatalogItem = { id: string; label: string; hint?: string; tip?: string };
+export type CatalogItem = { id: string; label: string; hint?: string; tip?: string; expand?: string; blurb?: string };
 export type PlaceBlock = { country: string; cities: string[] };
 
 export type ProfileCatalog = {
@@ -57,6 +57,7 @@ export type ProfileCatalog = {
   looking_for?: CatalogItem[];
   prompts?: CatalogItem[];
   places?: PlaceBlock[];
+  city_search?: Record<string, string[]>;
 };
 
 export type ProfileHostBridge = {

@@ -509,6 +509,26 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(lonely.status_code, 403)
         self.assertEqual(peer["name"], "Адик")
 
+    def test_feed_vibe_bodydouble_filter(self):
+        self._register()
+        self._peers(1)
+        self._logout()
+        peer = self._register(
+            email="bodydouble-peer@example.com",
+            name="Рядом",
+            gender="man",
+            looking_for="everyone",
+            neuro=["adhd"],
+            vibe=["bodydouble", "nonsmalltalk"],
+            photo="portraits/p03.jpg",
+        )
+        self._logout()
+        self._login("ada@example.com")
+        feed = self.client.get("/api/feed?vibe=bodydouble").get_json()
+        self.assertTrue(feed["cards"], "expected at least one card with bodydouble vibe")
+        self.assertTrue(any(card["id"] == peer["id"] for card in feed["cards"]))
+        self.assertTrue(all("bodydouble" in card["vibe"] for card in feed["cards"]))
+
     def test_demo_login(self):
         self._peers(6)
         first = self.client.post("/api/demo")

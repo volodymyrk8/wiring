@@ -4,7 +4,8 @@ import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu, Select, TagPicke
 import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
-import { applyNeuroToggle, splitCatalogTags } from "@/lib/catalog-tags";
+import { applyNeuroToggle, splitCatalogTags, tagSearchHaystack } from "@/lib/catalog-tags";
+import { citySelectOptions } from "@/lib/places";
 import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
 import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
@@ -44,11 +45,11 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
     <div class={styles.filters}>
       <div class={styles.filterGroup}>
         <p class={styles.filterLabel}>диагнозы в лайках</p>
-        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} />
+        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder="Диагноз" searchHaystack={tagSearchHaystack} />
       </div>
       <div class={styles.filterGroup}>
         <p class={styles.filterLabel}>вайб</p>
-        <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" />
+        <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder="body doubling, вайб…" searchHaystack={tagSearchHaystack} />
       </div>
       <div class={styles.filterGroup}>
         <p class={styles.filterLabel}>формат</p>
@@ -58,7 +59,7 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
         <label>от<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
         <label>до<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
       </div>
-      <Select className={styles.cityField} label="Город" id="likes-city" placeholder="неважно" searchable searchPlaceholder="Город" options={[{ value: "", label: "неважно" }, ...cities.map((city) => ({ value: city, label: city }))]} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город" />
+      <Select className={styles.cityField} label="Город" id="likes-city" placeholder="неважно" searchable searchPlaceholder="Город" options={citySelectOptions(cities, host.catalog.city_search, { value: "", label: "неважно" })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город" />
       <div class={styles.filterFooter}>
         <Button variant="ghost" slim onClick={onClear}>сбросить</Button>
         <Button variant="solid" slim onClick={() => onApply(draft)}>применить</Button>
