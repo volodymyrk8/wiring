@@ -509,6 +509,22 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(lonely.status_code, 403)
         self.assertEqual(peer["name"], "Адик")
 
+    def test_qa_feed_respects_gender_filter_and_flags_account(self):
+        from qa_accounts import QA_FEED_EMAILS
+
+        email = next(iter(QA_FEED_EMAILS))
+        self._register(email=email)
+        woman = self._register(email="qa-w@example.com", name="Ж", gender="woman", photo="portraits/p01.jpg")
+        man = self._register(email="qa-m@example.com", name="М", gender="man", photo="portraits/p02.jpg")
+        self._logout()
+        self._login(email)
+        me = self.client.get("/api/me").get_json()
+        self.assertTrue(me["user"]["feed_qa"])
+        men = self.client.get("/api/feed?gender=man&limit=10").get_json()["cards"]
+        ids = {card["id"] for card in men}
+        self.assertIn(man["id"], ids)
+        self.assertNotIn(woman["id"], ids)
+
     def test_feed_vibe_bodydouble_filter(self):
         self._register()
         self._peers(1)
