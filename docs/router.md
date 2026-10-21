@@ -24,7 +24,8 @@ src/router/
 | `/likes` | likes | |
 | `/chats` | matches | |
 | `/chats/:id` | chat | Deep link |
-| `/me` | profile | |
+| `/me` | profile | Own preview, without mounting editor effects |
+| `/me/edit` | edit-profile | Explicit edit action; direct link/reload supported |
 | `/notifications` | notifications | Preact profile bundle |
 | `/archive` | archive | Own likes, passes and blocks. On your profile preview, next to «Редактировать анкету». Not a tab |
 | `/onboard` | onboard | |
@@ -62,3 +63,5 @@ The existing server-header entrypoint also mounts admin reply forms into `/admin
 Мобильная навигация Expo Router находится в отдельном [wiring-mobile](https://github.com/volodymyrk8/wiring-mobile/blob/main/docs/router.md). Выделение репозитория не меняет веб-URL или общий `/api/*`.
 
 Native redirect остаётся `wiring://oauth` и обменивает одноразовый результат через `/api/auth/native/exchange`. Universal/App Links ассоциации обслуживает Flask по `/.well-known/apple-app-site-association` и `/.well-known/assetlinks.json`; это публичные JSON документы, не SPA_PATHS. API callback исключён из перехвата Universal Links. Перевод canonical профиля/чата/referral/email ссылок выполняется `src/routes.ts` мобильного клиента. Веб-URL и маршруты Preact не менялись.
+
+`/me` по умолчанию показывает собственную анкету через Preact person bundle. Только «Редактировать анкету» открывает `/me/edit`; вкладка и пункт меню «Профиль» возвращают `/me`. Первичная настройка после регистрации может сразу открыть `/me/edit`. Browser regression `npm run test:profile:browser` проверяет исходный режим, явный переход, reload редактора, возврат вкладкой и отсутствие PATCH при открытии. Режим `PUBLISHED_ASSETS=1` проверяет опубликованный клиент с теми же ожиданиями. `PUBLISHED_BASELINE=1` воспроизводит прежний баг редактора. Оба режима читают публичные JS-ассеты, но все API подменены синтетическим аккаунтом, без production-входа или записей.

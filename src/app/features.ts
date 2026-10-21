@@ -5,7 +5,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
   home: "home.js?v=83",
   profile: "profile.js?v=48",
   likes: "likes.js?v=34",
-  person: "person.js?v=27",
+  person: "person.js?v=28",
   deck: "deck.js?v=47",
   account: "account.js?v=20",
   chat: "chat.js?v=41",
@@ -14,7 +14,7 @@ const FEATURE_FILES: Record<FeatureName, string> = {
 
 const VIEW_FEATURE: Record<string, FeatureName> = {
   home: "home", login: "auth", register: "auth", forgot: "auth", reset: "auth", verify: "auth",
-  profile: "profile", consents: "profile", plus: "profile", notifications: "profile", archive: "profile",
+  profile: "person", "edit-profile": "profile", consents: "profile", plus: "profile", notifications: "profile", archive: "profile",
   likes: "likes", person: "person", deck: "deck", recommendations: "deck", matches: "chat", chat: "chat",
   onboard: "account", invite: "account", "delete-account": "account", support: "support",
 };

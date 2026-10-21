@@ -91,7 +91,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [reportDetails, setReportDetails] = useState("");
   const photoAspect = 3 / 4;
 
-  const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "recommendations" ? "recommendations" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
+  const backView = host.ownPreview ? "home" : host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "recommendations" ? "recommendations" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
   const go = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     event.preventDefault();
     host.navigate(view, params);
@@ -185,7 +185,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         <div class={styles.actions}>
           {isSelf ? (
             <>
-              <Button fullWidth href={host.hrefFor("profile")} nav="profile" onClick={go("profile")}>Редактировать анкету</Button>
+              <Button fullWidth href={host.hrefFor("edit-profile")} onClick={go("edit-profile")}>Редактировать анкету</Button>
               <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>Лайки, дизлайки, блок</Button>
             </>
           ) : null}

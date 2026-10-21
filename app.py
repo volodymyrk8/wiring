@@ -1714,6 +1714,7 @@ def index():
 @app.get("/chats")
 @app.get("/chats/<int:chat_id>")
 @app.get("/me")
+@app.get("/me/edit")
 @app.get("/consents")
 @app.get("/plus")
 @app.get("/premium")

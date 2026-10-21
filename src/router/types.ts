@@ -12,6 +12,7 @@ export type ViewId =
   | "matches"
   | "chat"
   | "profile"
+  | "edit-profile"
   | "consents"
   | "plus"
   | "onboard"
