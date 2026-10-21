@@ -514,8 +514,8 @@ class WiringTest(unittest.TestCase):
 
         email = next(iter(QA_FEED_EMAILS))
         self._register(email=email)
-        woman = self._register(email="qa-w@example.com", name="Ж", gender="woman", photo="portraits/p01.jpg")
-        man = self._register(email="qa-m@example.com", name="М", gender="man", photo="portraits/p02.jpg")
+        woman = self._register(email="qa-w@example.com", name="Женя", gender="woman", photo="portraits/p01.jpg")
+        man = self._register(email="qa-m@example.com", name="Макс", gender="man", photo="portraits/p02.jpg")
         self._logout()
         self._login(email)
         me = self.client.get("/api/me").get_json()

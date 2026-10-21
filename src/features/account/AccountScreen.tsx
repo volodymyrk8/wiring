@@ -82,35 +82,51 @@ export function InviteScreen({ host }: { host: AccountHostBridge }) {
 }
 
 export function DeleteAccountScreen({ host }: { host: AccountHostBridge }) {
-  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"intro" | "confirm">("intro");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submit = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     event.preventDefault();
-    if (!password) { setError("введи пароль для подтверждения"); return; }
-    if (!confirmed) { setError("подтверди удаление профиля"); return; }
+    if (!confirmed) { setError("отметь, что понимаешь последствия"); return; }
     if (busy) return;
     setBusy(true); setError("");
     try {
-      const response = await host.api("/api/me/delete", { method: "POST", body: JSON.stringify({ password }) });
+      const response = await host.api("/api/me/delete", { method: "POST", body: JSON.stringify({}) });
       if (!response?.ok) throw new Error(response?.error || "ошибка при удалении");
-      host.toast("Аккаунт удалён. Восстановить профиль можно в течение 7 суток.");
+      host.toast("Аккаунт удалён.");
       await host.onDeleted();
     } catch (caught) { setError(getErrorMessage(caught)); setBusy(false); }
   };
+  if (step === "intro") {
+    return <div class={styles.root}>
+      <AccountHeader host={host} title="удаление" />
+      <main class={styles.content}><section class={styles.panel}>
+        <h1>Удаление аккаунта</h1>
+        <div class={styles.warning} role="alert">
+          <strong>ВНИМАНИЕ!</strong>
+          <span>Вы уверены, что действительно хотите удалить аккаунт навсегда? Вы не сможете его восстановить.</span>
+        </div>
+        <p class={styles.lede}>Профиль сразу исчезнет из ленты, поиска и чатов. Если передумали — вернитесь в профиль. Дальше будет ещё один экран подтверждения.</p>
+        <div class={styles.actions}>
+          <Button variant="ghost" slim href={host.hrefFor("profile")} nav="profile">оставить аккаунт</Button>
+          <Button variant="solid" slim className={styles.danger} onClick={() => { setError(""); setStep("confirm"); }}>продолжить</Button>
+        </div>
+      </section><LegalFooter /></main>
+    </div>;
+  }
   return <div class={styles.root}>
     <AccountHeader host={host} title="удаление" />
     <main class={styles.content}><section class={styles.panel}>
-      <h1>Удаление аккаунта</h1>
-      <div class={styles.warning}><strong>Профиль сразу пропадёт из публичного доступа</strong><span>В момент удаления ты исчезнешь из ленты, поиска и чатов.</span><span><b>Восстановление:</b> профиль можно восстановить в течение 7 суток. После этого данные удалятся полностью.</span></div>
+      <h1 class={styles.deleteSure}>Точно?</h1>
+      <p class={styles.deleteSureSub}>Точно-точно?</p>
+      <p class={styles.lede}>Это последний шаг. После удаления восстановить аккаунт будет нельзя.</p>
       <form onSubmit={submit}>
-        <div class={styles.panel} style={{ padding: 0, border: 0, background: "transparent" }}>
-          <p class={styles.hint}>Если зарегистрировались через Google или Яндекс, сначала задайте пароль через <a href={host.hrefFor("forgot")} onClick={(event) => { event.preventDefault(); host.navigate("forgot"); }}>сброс пароля</a>.</p>
-          <label>текущий пароль<input type="password" value={password} autocomplete="current-password" required onInput={(event) => setPassword(event.currentTarget.value)} /></label>
-          <label class={styles.confirm}><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.currentTarget.checked)} /> <span>Подтверждаю удаление своего профиля</span></label>
-          {error ? <p class={styles.error} role="alert">{error}</p> : null}
-          <div class={styles.actions}><Button variant="solid" slim type="submit" disabled={busy} loading={busy} className={styles.danger}>Удалить аккаунт навсегда</Button><Button variant="ghost" slim href={host.hrefFor("profile")} nav="profile">отмена</Button></div>
+        <label class={styles.confirm}><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.currentTarget.checked)} /> <span>Да, удалить аккаунт навсегда</span></label>
+        {error ? <p class={styles.error} role="alert">{error}</p> : null}
+        <div class={styles.actions}>
+          <Button variant="ghost" slim type="button" disabled={busy} onClick={() => { setError(""); setConfirmed(false); setStep("intro"); }}>назад</Button>
+          <Button variant="solid" slim type="submit" disabled={busy || !confirmed} loading={busy} className={styles.danger}>Удалить навсегда</Button>
         </div>
       </form>
     </section><LegalFooter /></main>
