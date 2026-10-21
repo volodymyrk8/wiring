@@ -349,7 +349,9 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   };
 
   const refreshMe = async () => {
+    const owner = state.user?.id;
     const me = await api("/api/me");
+    if (owner && state.user?.id !== owner) return;
     state.user = me.user;
     if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
@@ -526,7 +528,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const resumeApp = async () => {
     if (!state.user) return;
-    await pollInbox();
+    await Promise.all([pollInbox(), refreshMe()]);
     try {
       if (state.view === "matches") {
         const data = await api("/api/matches");
