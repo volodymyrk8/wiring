@@ -239,7 +239,7 @@ html[data-view="chat"] #chat-feature-root {
 html.keyboard[data-view="chat"] #app {
   padding-bottom: 8px;
 }
-html[data-view="profile"] #app,
+html:is([data-view="profile"], [data-view="edit-profile"]) #app,
 html[data-view="onboard"] #app,
 html[data-view="person"] #app {
   min-height: 100dvh;
@@ -249,12 +249,12 @@ html[data-view="person"] #app {
   box-sizing: border-box;
 }
 
-html[data-view="profile"][data-tabs] #app {
+html:is([data-view="profile"], [data-view="edit-profile"])[data-tabs] #app {
   --tabbar-clearance: 92px;
   padding-bottom: calc(var(--tabbar-clearance) + env(safe-area-inset-bottom) + 12px);
 }
 
-html[data-view="profile"] #profile-feature-root {
+html:is([data-view="profile"], [data-view="edit-profile"]) #profile-feature-root {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -1238,7 +1238,7 @@ html[data-view="person"] .toast-stack {
 }
 .panel { animation: in 0.35s ease; }
 html:is([data-view="deck"], [data-view="recommendations"]) .panel.deck-panel { animation: none; }
-html[data-view="profile"] .panel { animation: none; }
+html:is([data-view="profile"], [data-view="edit-profile"]) .panel { animation: none; }
 @keyframes in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 .consent-box {
@@ -2537,7 +2537,7 @@ html:is([data-view="deck"], [data-view="recommendations"]) #deck-feature-root {
   html[data-view="home"][data-tabs] #app {
     --tabbar-clearance: 70px;
   }
-  html[data-view="profile"][data-tabs] #app {
+  html:is([data-view="profile"], [data-view="edit-profile"])[data-tabs] #app {
     --tabbar-clearance: 108px;
   }
   html:is([data-view="deck"], [data-view="recommendations"])[data-tabs] #app {

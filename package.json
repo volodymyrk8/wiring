@@ -11,6 +11,7 @@
     "test:profile": "node --test tests/profile-autosave.test.mjs",
     "test:deck": "node --test tests/deck-gesture.test.mjs",
     "test:deck:browser": "node tests/deck-browser.test.mjs",
+    "test:profile:browser": "node tests/own-profile-browser.test.mjs",
     "test:ui:browser": "node tests/ui-bugs-browser.test.mjs",
     "test:inbox": "node --test tests/inbox.test.mjs",
     "test:analytics": "node --test tests/registration-analytics.test.mjs"

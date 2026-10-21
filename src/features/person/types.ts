@@ -43,6 +43,7 @@ export type PersonHostBridge = {
   catalog: PersonCatalog;
   person: PersonProfile;
   personFrom: PersonOrigin;
+  ownPreview?: boolean;
   basePath: string;
   hrefFor: (view: string, params?: Record<string, string | number>) => string;
   navigate: (view: string, params?: Record<string, string | number>) => void;

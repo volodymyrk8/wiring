@@ -118,7 +118,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   let routing = null;
   const ensureRouting = () => {
     if (routing) return Promise.resolve(routing);
-    return import(`${BASE}/public/dist/router.js?v=5`).then((mod) => {
+    return import(`${BASE}/public/dist/router.js?v=6`).then((mod) => {
       routing = mod;
       return mod;
     });
@@ -387,6 +387,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if (isTab) {
       const isMe =
         state.view === "profile"
+        || state.view === "edit-profile"
         || state.view === "plus"
         || state.view === "archive"
         || state.view === "login"
@@ -583,7 +584,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   let chatFeatureUnmount = null;
   let chatFeatureMountToken = 0;
 
-  const cityGateActive = () => Boolean(state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && state.view !== "profile");
+  const cityGateActive = () => Boolean(state.user && !state.user.guest && state.user.needs_city && !state.user.needs_profile && !["profile", "edit-profile"].includes(state.view));
 
   const buildHomeHostBridge = () => {
     const signed = Boolean(state.user && !state.user.guest);
@@ -690,11 +691,12 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     onLogout: logout,
   });
 
-  const buildPersonHostBridge = () => ({
+  const buildPersonHostBridge = (own = false) => ({
     user: state.user,
     catalog: state.catalog,
-    person: state.person,
-    personFrom: state.personFrom,
+    person: own ? state.user : state.person,
+    personFrom: own ? "profile" : state.personFrom,
+    ownPreview: own,
     basePath: BASE,
     hrefFor,
     navigate: (view, params = {}) => {
@@ -868,7 +870,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       }
       startInbox();
       if (mode === "register") {
-        state.view = state.user?.needs_profile ? "profile" : "deck";
+        state.view = state.user?.needs_profile ? "edit-profile" : "deck";
         if (state.view === "deck") await loadFeed();
         render();
         return;
@@ -881,7 +883,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         await hydrateFromUrl();
         return;
       }
-      state.view = state.user?.needs_profile ? "profile" : "deck";
+      state.view = state.user?.needs_profile ? "edit-profile" : "deck";
       if (state.view === "deck") await loadFeed();
       render();
     },
@@ -913,7 +915,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       render();
       return;
     }
-    if (!state.user && ["recommendations", "profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
+    if (!state.user && ["recommendations", "profile", "edit-profile", "consents", "person", "chat", "delete-account", "plus", "notifications", "archive"].includes(next)) {
       let pending = hrefFor(next);
       if (BASE && pending.startsWith(BASE)) pending = pending.slice(BASE.length) || "/";
       state.pendingPath = pending;
@@ -933,7 +935,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       return;
     }
     if (next === "my-preview" && state.user?.id) {
-      await openPerson(state.user.id, "profile");
+      await goToView("profile");
       return;
     }
     state.view = next;
@@ -948,7 +950,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if (state.view === "likes" && state.user) {
       await Promise.all([loadLikes(), refreshMe()]);
     }
-    if (["profile", "consents", "plus", "notifications", "archive"].includes(state.view) && state.user) await refreshMe();
+    if (["profile", "edit-profile", "consents", "plus", "notifications", "archive"].includes(state.view) && state.user) await refreshMe();
     render();
   };
 
@@ -1059,10 +1061,12 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     }
   };
 
-  const renderPersonFeature = async () => {
+  const renderPersonFeature = async (own = false) => {
+    const person = own ? state.user : state.person;
+    const view = own ? "profile" : "person";
     personFeatureUnmount?.();
     personFeatureUnmount = null;
-    if (!state.person) {
+    if (!person) {
       state.view = "deck";
       await loadFeed();
       render();
@@ -1074,8 +1078,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if (!mountEl) return;
     try {
       const mod = await featureLoader.person();
-      if (state.view !== "person" || !state.person) return;
-      personFeatureUnmount = mod.mountPerson(mountEl, buildPersonHostBridge());
+      if (state.view !== view || (own ? state.user?.id !== person.id : state.person !== person)) return;
+      personFeatureUnmount = mod.mountPerson(mountEl, buildPersonHostBridge(own));
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
@@ -1196,7 +1200,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       homeFeatureUnmount?.();
       homeFeatureUnmount = null;
     }
-    if (!["profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
+    if (!["edit-profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
       profileFeatureUnmount?.();
       profileFeatureUnmount = null;
     }
@@ -1209,7 +1213,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       likesFeatureUnmount?.();
       likesFeatureUnmount = null;
     }
-    if (state.view !== "person") {
+    if (state.view !== "person" && state.view !== "profile") {
       personFeatureUnmount?.();
       personFeatureUnmount = null;
     }
@@ -1235,7 +1239,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       return;
     }
     if (state.user && !state.user.guest && (state.view === "login" || state.view === "register")) {
-      state.view = state.user.needs_profile ? "profile" : "deck";
+      state.view = state.user.needs_profile ? "edit-profile" : "deck";
       if (state.view === "deck") void loadFeed().then(() => render());
       else render();
       return;
@@ -1314,7 +1318,11 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       void renderAccountFeature(state.view);
       return;
     }
-    else if (["profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
+    else if (state.view === "profile") {
+      void renderPersonFeature(true);
+      return;
+    }
+    else if (["edit-profile", "consents", "plus", "notifications", "archive"].includes(state.view)) {
       void renderProfileFeature(state.view);
       return;
     }
@@ -1364,7 +1372,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         state.verifyEmail = "";
         toast("почта подтверждена");
         startInbox();
-        state.view = state.user?.needs_profile ? "profile" : "deck";
+        state.view = state.user?.needs_profile ? "edit-profile" : "deck";
         if (state.view === "deck") await loadFeed();
         render();
       } catch (err) {
@@ -1417,7 +1425,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     state.photoIndex = 0;
     if (state.view === "deck" && !state.cards.length && state.feedHasMore) await loadFeed();
     if (state.view === "likes" && state.user) await loadLikes();
-    if (state.view === "profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications" || state.view === "archive") await refreshMe();
+    if (state.view === "profile" || state.view === "edit-profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications" || state.view === "archive") await refreshMe();
     render();
   };
 

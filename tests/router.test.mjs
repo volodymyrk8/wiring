@@ -24,6 +24,9 @@ assert.deepEqual(matchRoute("/p/7", BASE), { view: "person", id: 7 });
 assert.equal(normalizePath("/feed/", BASE), "/feed");
 assert.equal(normalizePath("/feed", "/prefix"), "/feed");
 
+assert.equal(hrefFor(BASE, "profile"), "/me");
+assert.equal(hrefFor(BASE, "edit-profile"), "/me/edit");
+assert.equal(planRoute({ view: "edit-profile" }, {loggedIn:false}, "/me/edit").kind, "login");
 assert.equal(hrefFor(BASE, "deck"), SPA_PATHS.deck);
 assert.equal(hrefFor(BASE, "chat", { id: 9 }), "/chats/9");
 assert.equal(hrefFor(BASE, "person", { id: 3 }), "/p/3");
