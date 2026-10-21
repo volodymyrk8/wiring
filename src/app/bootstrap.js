@@ -53,13 +53,32 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   }, { passive: true });
   window.visualViewport?.addEventListener("resize", pinChatHeight);
   window.visualViewport?.addEventListener("scroll", pinChatHeight);
-  const savedFilters = (() => {
+  const FILTER_STORAGE_KEY = "wiring-deck-filters";
+  const defaultDeckFilters = () => ({
+    neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "",
+    hide_undiagnosed: true, real_only: false,
+  });
+  const readStoredFilters = (userId) => {
+    if (userId == null) return null;
     try {
-      return JSON.parse(sessionStorage.getItem("wiring-filters") || "null");
+      const legacy = sessionStorage.getItem("wiring-filters");
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        sessionStorage.removeItem("wiring-filters");
+        localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ userId, filters: parsed }));
+      }
+      const raw = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) || "null");
+      if (!raw || String(raw.userId) !== String(userId)) return null;
+      return raw.filters;
     } catch {
       return null;
     }
-  })();
+  };
+  const restoreDeckFilters = () => {
+    const saved = readStoredFilters(state.user?.id);
+    if (!saved) return;
+    state.filters = { ...defaultDeckFilters(), ...saved, real_only: false };
+  };
   const state = {
     user: null,
     catalog: null,
@@ -74,11 +93,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     likes: [],
     person: null,
     personFrom: "deck",
-    filters: {
-      ...(savedFilters || { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" }),
-      hide_undiagnosed: !savedFilters || savedFilters.hide_undiagnosed !== false,
-      real_only: false,
-    },
+    filters: defaultDeckFilters(),
     filtersOpen: false,
     likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
     resetToken: "",
@@ -217,8 +232,10 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   applyTheme(themeNow());
 
   const persistFilters = () => {
+    const uid = state.user?.id;
+    if (uid == null) return;
     const { real_only: _ignore, ...rest } = state.filters;
-    sessionStorage.setItem("wiring-filters", JSON.stringify(rest));
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ userId: uid, filters: rest }));
   };
   state.filters.real_only = false;
 
@@ -860,6 +877,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     onAuthSuccess: async (mode, data) => {
       state.user = data.user;
+      restoreDeckFilters();
       if (data.user?.theme) applyTheme(data.user.theme);
       if (mode === "login" && data.restored) toast("профиль восстановлен");
       if (mode === "register") {
@@ -1434,6 +1452,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const [catalog, me] = await Promise.all([api("/api/catalog"), api("/api/me")]);
     state.catalog = catalog;
     state.user = me.user;
+    if (me.user) restoreDeckFilters();
     if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
