@@ -208,6 +208,18 @@ try {
     await rawTouch("touchMove",x,y-60); await rawTouch("touchEnd");
     await settled(0); assert.ok(await page.evaluate(()=>window.test.body.scrollTop > 0));
   }
+  for (const size of [{width:320,height:568},{width:390,height:844},{width:768,height:1024},{width:1440,height:900}]) {
+    await page.setViewportSize(size);
+    const dimensions=[];
+    for (const mode of ["deck","recommendations"]) {
+      await open(mode); await page.waitForTimeout(150);
+      dimensions.push(await page.locator('section[aria-hidden="false"] article').evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width})));
+      if(size.width===390)await page.screenshot({path:`/tmp/wiring-${mode}-oct21.png`});
+    }
+    assert.ok(Math.abs(dimensions[0].height-dimensions[1].height)<2,JSON.stringify({size,dimensions}));
+    assert.ok(Math.abs(dimensions[0].width-dimensions[1].width)<2,JSON.stringify({size,dimensions}));
+    passed++;
+  }
   console.log(`${passed} browser scenarios passed (Chromium mobile emulation, synthetic profiles)`);
 } finally {
   await browser?.close();

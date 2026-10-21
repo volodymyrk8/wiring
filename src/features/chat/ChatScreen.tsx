@@ -440,14 +440,15 @@ function MessageBubble({
   onJump: (id: number) => void;
   revealedTranscript?: string;
 }) {
-  const photo = message.photo_url ? photoUrl(host.basePath, message.photo_url) : "";
+  const photos = (message.photo_urls?.length ? message.photo_urls : message.photo_url ? [message.photo_url] : []).map((url) => photoUrl(host.basePath, url));
+  const photo = photos[0] || "";
   const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
   const quote = message.reply_to?.body || (message.reply_to?.has_audio ? "голосовое" : message.reply_to?.has_photo ? "фото" : "");
   return (
     <div class={`bubble-wrap${message.mine ? " mine" : ""}`} data-msg={message.id}>
       <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`}>
         {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
-        {photo ? <a class="bubble-photo" href={photo} target="_blank" rel="noopener"><img src={photo} alt="" decoding="async" /></a> : null}
+        {photos.length ? <div class={photos.length > 1 ? styles.photoGroup : ""}>{photos.map((src, index) => <a key={src} class="bubble-photo" href={src} target="_blank" rel="noopener"><img src={src} alt={`Фото ${index + 1}`} decoding="async" loading="lazy" /></a>)}</div> : null}
         {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
         {revealedTranscript ? <div class="bubble-transcript">{revealedTranscript}</div> : null}
         {message.body ? <div class="bubble-body">{message.body}</div> : null}
@@ -476,6 +477,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
+  const [recordingNotice, setRecordingNotice] = useState("");
   const [error, setError] = useState("");
   const [sendMode] = useState<ChatSendMode>(() => readChatSendMode());
   const [revealed, setRevealed] = useState<Record<number, string>>({});
@@ -487,7 +489,13 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const recTimerRef = useRef<number | null>(null);
   const discardRecRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [photos, setPhotos] = useState<Array<{ file: File; url: string }>>([]);
+  const [photoProgress, setPhotoProgress] = useState("");
+  useEffect(() => () => photos.forEach(({ url }) => URL.revokeObjectURL(url)), [photos]);
   const draftReadyRef = useRef(false);
+  const requestRef = useRef(0);
+  const aliveRef = useRef(true);
+  const followsEndRef = useRef(true);
 
   const scrollToEnd = () => {
     const element = threadRef.current;
@@ -495,19 +503,43 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     element.scrollTop = element.scrollHeight;
   };
 
+  useEffect(() => {
+    const element = threadRef.current;
+    if (!element) return;
+    let height = element.clientHeight;
+    let frame = 0;
+    const remember = () => {
+      // A resize-generated scroll must not replace the reader's previous intent.
+      if (element.clientHeight === height) followsEndRef.current = element.scrollHeight - element.scrollTop - height <= 80;
+    };
+    const observer = new ResizeObserver(() => {
+      height = element.clientHeight;
+      if (followsEndRef.current) {
+        scrollToEnd();
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(scrollToEnd);
+      }
+    });
+    element.addEventListener("scroll", remember, { passive: true });
+    observer.observe(element);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); element.removeEventListener("scroll", remember); };
+  }, [chatId]);
+
   const loadThread = async (scroll = false) => {
+    const request = ++requestRef.current;
     try {
       const element = threadRef.current;
       const nearBottom = !element || element.scrollHeight - element.scrollTop - element.clientHeight <= 120;
       const next = await host.api(`/api/messages/${chatId}`) as ChatThread;
-      if (scroll || nearBottom) shouldScrollRef.current = true;
+      if (!aliveRef.current || request !== requestRef.current) return;
+      if (scroll || nearBottom) { shouldScrollRef.current = true; followsEndRef.current = true; }
       setThread((current) => {
         if (current && current.messages.length !== next.messages.length && nearBottom) shouldScrollRef.current = true;
-        return next;
+        return current && JSON.stringify(current) === JSON.stringify(next) ? current : next;
       });
       setError("");
     } catch (caught) {
-      setError(errorMessage(caught, "не удалось загрузить переписку"));
+      if (aliveRef.current && request === requestRef.current) setError(errorMessage(caught, "не удалось загрузить переписку"));
     }
   };
 
@@ -541,12 +573,14 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
 
   useEffect(() => {
     let alive = true;
+    aliveRef.current = true;
+    const request = ++requestRef.current;
     setThread(null);
     setRevealed({});
     setError("");
     shouldScrollRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
-      if (alive) setThread(data as ChatThread);
+      if (alive && request === requestRef.current) setThread(data as ChatThread);
     }).catch((caught) => {
       if (alive) setError(errorMessage(caught, "не удалось загрузить переписку"));
     });
@@ -555,6 +589,8 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }, 8000);
     return () => {
       alive = false;
+      aliveRef.current = false;
+      requestRef.current++;
       window.clearInterval(timer);
     };
   }, [chatId, host]);
@@ -580,7 +616,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     element.addEventListener("pointerdown", markMoved);
     const observer = new ResizeObserver(() => pin());
     observer.observe(element);
-    for (const child of element.children) observer.observe(child);
+    if (element.lastElementChild) observer.observe(element.lastElementChild);
     const stop = window.setTimeout(() => observer.disconnect(), 2500);
     return () => {
       alive = false;
@@ -599,6 +635,20 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     streamRef.current?.getTracks().forEach((track) => track.stop());
     if (recTimerRef.current) window.clearInterval(recTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    const cancelHidden = () => {
+      if (document.visibilityState !== "visible" && recorderRef.current?.state === "recording") {
+        discardRecRef.current = true;
+        recorderRef.current.stop();
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+        setRecordingNotice("Запись отменена при уходе с экрана. Запиши сообщение ещё раз.");
+      }
+    };
+    document.addEventListener("visibilitychange", cancelHidden);
+    return () => document.removeEventListener("visibilitychange", cancelHidden);
+  }, [host]);
 
   const jumpTo = (id: number) => {
     const node = threadRef.current?.querySelector(`[data-msg="${id}"]`);
@@ -643,6 +693,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   };
 
   const onComposerKeyDown = (event: JSX.TargetedKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.isComposing || (window.matchMedia("(pointer: coarse)").matches && !event.ctrlKey && !event.metaKey)) return;
     if (!shouldSendOnComposerKey(sendMode, event)) return;
     event.preventDefault();
     event.stopPropagation();
@@ -713,7 +764,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       return;
     }
     try {
+      setRecordingNotice("");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!aliveRef.current || document.visibilityState !== "visible") { stream.getTracks().forEach((track) => track.stop()); return; }
       const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find((type) => {
         try { return MediaRecorder.isTypeSupported(type); } catch { return false; }
       }) || "";
@@ -791,39 +844,28 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     }
   };
 
-  const sendPhotos = async (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
+  const pickPhotos = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const picked = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
     if (!picked.length || sending || recording || editing) return;
-    const files = picked.slice(0, 10);
     if (picked.length > 10) host.toast("за раз можно 10 фото");
+    setPhotos(picked.slice(0, 10).map((file) => ({ file, url: URL.createObjectURL(file) })));
+  };
+  const sendPhotos = async () => {
+    if (!photos.length || sending) return;
     setSending(true);
-    let sent = 0;
+    setPhotoProgress(`Загружаем ${photos.length} фото…`);
     try {
-      for (const file of files) {
-        const form = new FormData();
-        form.append("to_id", String(chatId));
-        form.append("file", file, file.name || "photo.jpg");
-        if (sent === 0 && draft.trim()) form.append("body", draft.trim().slice(0, 500));
-        if (sent === 0 && replyTo?.id) form.append("reply_to_id", String(replyTo.id));
-        await host.api("/api/messages/photo", { method: "POST", body: form });
-        sent += 1;
-      }
-      setDraft("");
-      setReplyTo(null);
-      shouldScrollRef.current = true;
+      const form = new FormData();
+      form.append("to_id", String(chatId));
+      photos.forEach(({ file }) => form.append("files", file, file.name || "photo.jpg"));
+      if (draft.trim()) form.append("body", draft.trim().slice(0, 500));
+      if (replyTo?.id) form.append("reply_to_id", String(replyTo.id));
+      await host.api("/api/messages/photo", { method: "POST", body: form });
+      setPhotos([]); setDraft(""); setReplyTo(null);
       await loadThread(true);
-    } catch (caught) {
-      if (sent) {
-        setDraft("");
-        setReplyTo(null);
-        shouldScrollRef.current = true;
-        await loadThread(true);
-      }
-      host.toast(errorMessage(caught, "не удалось отправить фото"));
-    } finally {
-      setSending(false);
-    }
+    } catch (caught) { host.toast(errorMessage(caught, "не удалось отправить фото")); }
+    finally { setSending(false); setPhotoProgress(""); }
   };
 
   const peer = thread?.peer;
@@ -860,7 +902,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       </header>
       {error ? <p class={styles.error}>{error}</p> : (
         <>
-          <div class="thread" ref={threadRef}>
+          <div class="thread" id="thread" ref={threadRef}>
             {thread?.messages?.length ? thread.messages.map((message) => (
               <MessageBubble
                 key={message.id}
@@ -888,6 +930,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
             {!thread ? <p class="hint">загрузка…</p> : null}
           </div>
           <div class="composer-dock">
+            {recordingNotice ? <p class={styles.recordingNotice} role="status">{recordingNotice}</p> : null}
             {replyTo || editing ? (
               <div class="reply-bar">
                 <span>
@@ -907,7 +950,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
                 <label class="composer-attach" title="до 10 фото" aria-label="прикрепить фото, до 10">
                   <PhotoIcon />
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={sendPhotos} />
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={pickPhotos} />
                 </label>
                 <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
                 <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} onKeyDown={onComposerKeyDown} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" disabled={sending} />
@@ -915,6 +958,13 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               </form>
             )}
           </div>
+          <Modal isOpen={photos.length > 0} onClose={() => !sending && setPhotos([])} title={`Отправить фото · ${photos.length}`} footer={<>
+            <Button variant="ghost" disabled={sending} onClick={() => setPhotos([])}>Отмена</Button>
+            <Button variant="solid" disabled={sending} loading={sending} onClick={() => void sendPhotos()}>Отправить вместе</Button>
+          </>}>
+            <div class={styles.photoGroup}>{photos.map(({ url }, index) => <img key={url} src={url} alt={`Фото ${index + 1}`} />)}</div>
+            {photoProgress ? <p role="status">{photoProgress}</p> : <p>Фото отправятся одним сообщением. Можно отменить перед отправкой.</p>}
+          </Modal>
           <Modal
             isOpen={pendingDelete !== null}
             onClose={() => !sending && setPendingDelete(null)}
@@ -951,7 +1001,7 @@ export function ChatScreen({ host }: { host: ChatHostBridge }) {
 
   return (
     <>
-      {host.mode === "chat" && host.chatId ? <ChatThread host={host} chatId={host.chatId} onUnmatchRequest={setPendingUnmatch} /> : <MatchesScreen host={host} />}
+      {host.mode === "chat" && host.chatId ? <ChatThread key={host.chatId} host={host} chatId={host.chatId} onUnmatchRequest={setPendingUnmatch} /> : <MatchesScreen host={host} />}
       <Modal
         isOpen={host.mode === "chat" && pendingUnmatch !== null}
         onClose={() => !busy && setPendingUnmatch(null)}

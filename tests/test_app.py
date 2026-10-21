@@ -1556,7 +1556,8 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(fresh["openers"], [])
         self.assertFalse(fresh.get("openers_after_silence"))
         stale_at = int(time.time()) - 4 * 24 * 60 * 60
-        with db() as conn:
+        with app.app_context():
+            conn = db()
             conn.execute(
                 "UPDATE messages SET created_at = ? WHERE from_id = ? AND to_id = ?",
                 (stale_at, fresh["messages"][0]["from_id"], other["id"]),
@@ -1566,6 +1567,52 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(len(stale["openers"]), 3)
         self.assertTrue(stale.get("openers_after_silence"))
         self.assertEqual(len(stale["messages"]), 1)
+
+    def test_social_account_can_set_password_then_delete(self):
+        from app import _create_social_user
+        with app.app_context():
+            uid = _create_social_user(db(), "social-delete@example.com", "Тест", "")
+            db().commit()
+        with self.client.session_transaction() as state:
+            state["uid"] = uid
+        self.assertEqual(self.client.get("/forgot").status_code, 200)
+        with patch("app.send_mail"):
+            self.assertEqual(self.client.post("/api/password/forgot", json={"email": "social-delete@example.com"}).status_code, 200)
+        with app.app_context():
+            token = db().execute("SELECT token FROM password_resets WHERE user_id = ?", (uid,)).fetchone()["token"]
+        self.assertEqual(self.client.post("/api/password/reset", json={"token": token, "password": "secret1"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/login", json={"email": "social-delete@example.com", "password": "secret1"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/me/delete", json={"password": "secret1"}).status_code, 200)
+
+    def test_theme_syncs_between_sessions_and_is_private(self):
+        user = self._register()
+        other_client = app.test_client()
+        other_client.post("/api/login", json={"email": "ada@example.com", "password": "secret1"})
+        self.assertEqual(self.client.patch("/api/me/theme", json={"theme": "night"}).status_code, 200)
+        self.assertEqual(other_client.get("/api/me").get_json()["user"]["theme"], "night")
+        self.assertEqual(self.client.patch("/api/me/theme", json={"theme": "dark"}).status_code, 400)
+        self.assertEqual(self.client.patch("/api/me/theme", json={"theme": []}).status_code, 400)
+        from app import user_public
+        with app.app_context():
+            public = user_public(db().execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone())
+            self.assertNotIn("theme", public)
+        self.client.post("/api/logout")
+        self.assertEqual(self.client.patch("/api/me/theme", json={"theme": "mist"}).status_code, 401)
+
+    def test_photo_order_requires_exact_owned_permutation(self):
+        user = self._register()
+        with patch("app.moderate_photo"):
+            for name in ("second.jpg", "third.jpg"):
+                self.assertEqual(self.client.post("/api/photos", data={"file": (self._jpeg(), name)}, content_type="multipart/form-data").status_code, 200)
+        photos = self.client.get("/api/me").get_json()["user"]["photos"]
+        ids = [photo["id"] for photo in photos][::-1]
+        result = self.client.patch("/api/photos/order", json={"ids": ids})
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual([photo["id"] for photo in result.get_json()["photos"]], ids)
+        self.assertTrue(result.get_json()["photos"][0]["is_primary"])
+        self.assertEqual(self.client.patch("/api/photos/order", json={"ids": ids[:-1]}).status_code, 409)
+        self.assertEqual(self.client.patch("/api/photos/order", json={"ids": [ids[0]] * len(ids)}).status_code, 400)
+        self.assertEqual(self.client.patch("/api/photos/order", json={"ids": [999999]}).status_code, 409)
 
     def test_chat_photo_message(self):
         ada = self._register()
@@ -1598,6 +1645,31 @@ class WiringTest(unittest.TestCase):
                 content_type="multipart/form-data",
             )
         self.assertEqual(blocked.status_code, 400)
+
+        with patch("app.moderate_photo"):
+            result = self.client.post("/api/messages/photo", data={"to_id": str(leo["id"]), "files": [(self._jpeg((420, 420), (230, 20, 20)), "one.jpg"), (self._jpeg((420, 420), (20, 20, 230)), "two.jpg")]}, content_type="multipart/form-data")
+        self.assertEqual(result.status_code, 200)
+        thread = self.client.get(f"/api/messages/{leo['id']}").get_json()
+        self.assertEqual(len(thread["messages"]), 2)
+        group = thread["messages"][-1]
+        self.assertEqual(len(group["photo_urls"]), 2)
+        legacy = self.client.get(group["photo_url"])
+        with Image.open(BytesIO(legacy.data)) as sheet:
+            self.assertEqual(sheet.size, (1200, 600))
+            self.assertGreater(sheet.getpixel((300, 300))[0], 200)
+            self.assertGreater(sheet.getpixel((900, 300))[2], 200)
+        legacy.close()
+        for url in group["photo_urls"]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            response.close()
+        self.assertEqual(self.client.get(group["photo_url"] + "?index=-1").status_code, 404)
+        self.assertEqual(self.client.get(group["photo_url"] + "?index=3").status_code, 404)
+        stranger = app.test_client()
+        stranger.post("/api/register", json={"email": "stranger@example.com", "password": "secret1", "name": "Тест", "age_confirm": True, "privacy_confirm": True})
+        self.assertEqual(stranger.get(group["photo_urls"][1]).status_code, 403)
+        self.assertEqual(self.client.delete(f"/api/messages/{group['id']}").status_code, 200)
+        self.assertEqual(self.client.get(group["photo_urls"][1]).status_code, 404)
 
     def test_chat_intent_allows_profile_without_city(self):
         self._register()

@@ -124,7 +124,8 @@ const recommendationCopy = (card: DeckCard, source: "api" | "local" | "taste" | 
   const footnote = source === "taste"
     ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия."
     : "Это совпадения в анкетах, а не гарантия совместимости.";
-  return reasons.length ? `${reasons.join(". ")}. ${footnote}` : footnote;
+  const provider = source === "local" ? "Jev сейчас недоступен: подбор по совпадениям анкет. " : source === "api" ? "Jev ранжирует предварительный список. " : "";
+  return provider + (reasons.length ? `${reasons.join(". ")}. ${footnote}` : footnote);
 };
 
 type DiscoveryDraft = {
@@ -204,9 +205,9 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   </Modal>;
 }
 
-function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; heightLimit: number }) {
+function DeckCardView({ host, card, active, onVertical, heightLimit, source }: { host: DeckHostBridge; card: DeckCard; active: boolean; onVertical: (direction: number) => void; heightLimit: number; source?: "api" | "local" | "taste" }) {
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [photoAspect, setPhotoAspect] = useState(3 / 4);
+  const photoAspect = 3 / 4;
   const cardRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     if (!active && cardRef.current?.contains(document.activeElement)) {
@@ -250,7 +251,7 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
     <div class={styles.media}>
       <div class={styles.photoTrack} style={{ transform: `translateX(-${photoIndex * 100}%)` }}>
         {(photos.length ? photos : [card.photo]).map((photo, index) => <img key={index} class={styles.photo} src={photoUrl(host.basePath, photo, card.name)} alt="" draggable={false}
-          onLoad={(event) => { const image = event.currentTarget; if (index === 0 && image.naturalHeight) setPhotoAspect(image.naturalWidth / image.naturalHeight); }} />)}
+           />)}
       </div>
     </div>
     {photos.length > 1 ? <span class={styles.srOnly} aria-live={active ? "polite" : "off"}>Фото {photoIndex + 1} из {photos.length}</span> : null}
@@ -289,6 +290,10 @@ function DeckCardView({ host, card, active, onVertical, heightLimit }: { host: D
           ) : null}
         </div>
       ) : null}
+      {host.recommendations ? <section class={styles.recommendationPanel} aria-label="Почему может подойти">
+        <strong class={styles.recommendationPanelTitle}>Почему может подойти</strong>
+        <p class={styles.recommendationPanelBody}>{recommendationCopy(card, source)}</p>
+      </section> : null}
       {card.bio ? <p class={`${styles.bio}${showJev ? ` ${styles.bioCompact}` : ""}`}>{card.bio}</p> : null}
       {previewTags.length ? (
         <div class={styles.tags}>
@@ -444,7 +449,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     };
     const align = () => {
       const height = viewport.clientHeight;
-      setCardHeight(Math.max(120, height - (host.recommendations ? 20 : 128)));
+      setCardHeight(Math.max(120, height - 128));
       if (height < 1 || gestureActive()) return;
       const target = indexRef.current * height;
       if (restoreRef.current) restoreScroll();
@@ -659,7 +664,6 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </Modal>
     <main class={styles.content} aria-label={host.recommendations ? "Для тебя" : "Лента"}>
-      {host.recommendations ? <p class={styles.recommendationIntro}>Анкеты со всего WIRING.{source === "taste" ? " Подбор по тем, кого ты лайкаешь." : source === "local" ? " Подбор по отметкам и целям. Jev сейчас недоступен: порядок по совпадениям анкет." : source === "api" ? " Подбор по отметкам и целям. Jev ранжирует предварительный список." : " Подбор по отметкам и целям."}</p> : null}
       <Modal isOpen={resetOpen} onClose={() => { if (!busy) setResetOpen(false); }} title="Показать анкеты ещё раз?"
         footer={<><Button variant="ghost" disabled={busy} onClick={() => setResetOpen(false)}>Отмена</Button><Button loading={busy} onClick={() => void repeatFeed()}>Показать ещё раз</Button></>}>
         <p>Ранее показанные анкеты снова появятся в ленте. Исключённые анкеты не вернутся; лайки и чаты сохранятся.</p>
@@ -756,7 +760,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         onPointerUp={finishDrag}
         onPointerCancel={() => { dragRef.current = null; setDragging(false); }}>
         {cards.map((card, cardIndex) => <section key={card.id} class={styles.slide} aria-hidden={cardIndex !== index}>
-          <DeckCardView host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
+          <DeckCardView source={source} host={host} card={card} active={cardIndex === index} heightLimit={cardHeight} onVertical={advance} />
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
@@ -772,12 +776,6 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
           </div>
         </section>
       </div>
-      {host.recommendations && current ? (
-        <section class={styles.recommendationPanel} aria-labelledby="recommendation-why">
-          <strong id="recommendation-why" class={styles.recommendationPanelTitle}>Почему может подойти</strong>
-          <p class={styles.recommendationPanelBody}>{recommendationCopy(current, source)}</p>
-        </section>
-      ) : null}
       <div
         class={`${styles.controls} ${styles.actionPanel}${!current ? ` ${styles.actionPanelHidden}` : ""}${panelHold ? ` ${styles.actionPanelHolding}` : ""}`}
         aria-hidden={!current && !panelHold}

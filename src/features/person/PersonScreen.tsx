@@ -89,7 +89,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState(host.catalog.report_reasons?.[0]?.id || "");
   const [reportDetails, setReportDetails] = useState("");
-  const [photoAspect, setPhotoAspect] = useState(3 / 4);
+  const photoAspect = 3 / 4;
 
   const backView = host.personFrom === "likes" ? "likes" : host.personFrom === "archive" ? "archive" : host.personFrom === "recommendations" ? "recommendations" : host.personFrom === "matches" || host.personFrom === "chat" ? "matches" : "deck";
   const go = (view: string, params?: Record<string, string | number>) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
@@ -163,7 +163,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); } }} aria-label={`Фото анкеты ${person.name}`}>
         {photos.length > 1 ? <div class={styles.dots}>{photos.map((_, index) => <i key={index} class={index === photoIndex ? styles.active : ""} />)}</div> : null}
         <img class={styles.heroImage} src={photoUrl(host.basePath, photos[photoIndex] || person.photo, person.name)} alt={`Фото ${photoIndex + 1} из ${photos.length || 1}: ${person.name}`} draggable={false}
-          onLoad={(event) => { const image = event.currentTarget; if (image.naturalHeight) setPhotoAspect(image.naturalWidth / image.naturalHeight); }} />
+           />
         <div class={styles.heroOverlay}>
           <h1>{person.online ? <span class={styles.online} aria-label="в сети" /> : null}{person.name}{person.age ? `, ${person.age}` : ""}</h1>
           {meta ? <p class={styles.meta}>{meta}</p> : null}

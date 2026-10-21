@@ -1,3 +1,4 @@
+import { showToast } from "./toasts";
 import { applyTheme, themeNow } from "../lib/theme";
 import { fetchFeed, resetFeed, fetchRecommendations } from "./feed";
 import { createApi } from "./api";
@@ -11,6 +12,22 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const BASE = root.dataset.base || "";
   const api = createApi(BASE);
   const featureLoader = createFeatureLoader(BASE);
+  let themeSave = Promise.resolve();
+  let pendingThemes = 0;
+  const selectTheme = (theme) => {
+    applyTheme(theme);
+    if (state.user) {
+      const owner = state.user.id;
+      state.user.theme = theme;
+      pendingThemes++;
+      themeSave = themeSave.catch(() => {}).then(() => {
+        if (state.user?.id !== owner) return;
+        return api("/api/me/theme", { method: "PATCH", body: JSON.stringify({ theme }) });
+      }).catch(() => {
+        if (state.user?.id === owner) toast("Не удалось сохранить тему в аккаунте. Выбери её ещё раз.");
+      }).finally(() => { pendingThemes--; });
+    }
+  };
   const pinChatHeight = () => {
     const port = window.visualViewport;
     const layoutH = window.innerHeight;
@@ -27,10 +44,6 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     document.documentElement.classList.toggle("keyboard", keyboard);
     if (document.documentElement.dataset.view === "chat") {
       window.scrollTo(0, 0);
-      if (keyboard) {
-        const box = document.getElementById("thread");
-        if (box) box.scrollTop = box.scrollHeight;
-      }
     }
   };
   pinChatHeight();
@@ -242,22 +255,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     return (list.find((x) => x.id === id) || {}).label || id;
   };
 
-  const toast = (text, action) => {
-    let stack = document.getElementById("toasts");
-    if (!stack) {
-      stack = document.createElement("div");
-      stack.id = "toasts";
-      stack.className = "toast-stack";
-      document.body.appendChild(stack);
-    }
-    const el = document.createElement("div");
-    el.className = action ? "toast tap" : "toast";
-    el.textContent = text;
-    if (action) el.addEventListener("click", () => action());
-    stack.appendChild(el);
-    while (stack.children.length > 3) stack.firstElementChild?.remove();
-    setTimeout(() => el.remove(), action ? 8000 : 2400);
-  };
+  const toast = showToast;
 
   const pingBrowser = (text) => {
     if (state.user?.notify_enabled === false || state.user?.notify_push === false) return;
@@ -353,6 +351,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const refreshMe = async () => {
     const me = await api("/api/me");
     state.user = me.user;
+    if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
     enforceReportBanView();
@@ -610,9 +609,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       navigate: (view) => {
         void goToView(view);
       },
-      onThemeSelect: (theme) => {
-        applyTheme(theme);
-      },
+      onThemeSelect: selectTheme,
       onLogout: logout,
     };
   };
@@ -651,7 +648,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       await loadFeed();
     },
     onLogout: logout,
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     armFilePickerHistoryGuard: () => armFilePickerHistoryGuard(state.view),
     disarmFilePickerHistoryGuard,
   });
@@ -687,7 +684,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       state.likesIn = user.likes_in || 0;
       state.unread = user.unread_chats ?? user.unread ?? 0;
     },
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -708,7 +705,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     swipe,
     api,
     toast,
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -761,7 +758,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     onUserUpdated: (user) => {
       state.user = user;
     },
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -785,7 +782,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       return state.user;
     },
     onUserUpdated: (user) => { state.user = user; },
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -807,7 +804,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     api,
     toast,
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -831,7 +828,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     api,
     toast,
-    onThemeSelect: (theme) => applyTheme(theme),
+    onThemeSelect: selectTheme,
     onLogout: logout,
   });
 
@@ -859,6 +856,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     onAuthSuccess: async (mode, data) => {
       state.user = data.user;
+      if (data.user?.theme) applyTheme(data.user.theme);
       if (mode === "login" && data.restored) toast("профиль восстановлен");
       if (mode === "register") {
         sessionStorage.removeItem("wiring-ref");
@@ -899,6 +897,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   });
 
   const goToView = async (next, meta = {}) => {
+    featureLoader.prefetch(next);
     if (meta.neuro && next === "register") sessionStorage.setItem("wiring_pick_neuro", meta.neuro);
     if (meta.neuro && next === "deck") {
       state.filters.neuro = [meta.neuro];
@@ -943,14 +942,9 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     }
     syncUrl();
     if (state.view === "deck" && state.user && !state.cards.length) await loadFeed();
-    if (state.view === "matches" && state.user) {
-      const data = await api("/api/matches");
-      state.matches = data.matches;
-      await refreshMe();
-    }
+    if (state.view === "matches" && state.user) void refreshMe().catch(() => {});
     if (state.view === "likes" && state.user) {
-      await loadLikes();
-      await refreshMe();
+      await Promise.all([loadLikes(), refreshMe()]);
     }
     if (["profile", "consents", "plus", "notifications", "archive"].includes(state.view) && state.user) await refreshMe();
     render();
@@ -1364,6 +1358,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
           body: JSON.stringify({ token: verifyQ }),
         });
         state.user = data.user;
+      if (data.user?.theme) applyTheme(data.user.theme);
         state.verifyEmail = "";
         toast("почта подтверждена");
         startInbox();
@@ -1419,10 +1414,6 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     state.chatId = null;
     state.photoIndex = 0;
     if (state.view === "deck" && !state.cards.length && state.feedHasMore) await loadFeed();
-    if (state.view === "matches" && state.user) {
-      const data = await api("/api/matches");
-      state.matches = data.matches;
-    }
     if (state.view === "likes" && state.user) await loadLikes();
     if (state.view === "profile" || state.view === "consents" || state.view === "plus" || state.view === "notifications" || state.view === "archive") await refreshMe();
     render();
@@ -1430,9 +1421,10 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const boot = async () => {
     await ensureRouting();
-    state.catalog = await api("/api/catalog");
-    const me = await api("/api/me");
+    const [catalog, me] = await Promise.all([api("/api/catalog"), api("/api/me")]);
+    state.catalog = catalog;
     state.user = me.user;
+    if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
     if (me.user) {

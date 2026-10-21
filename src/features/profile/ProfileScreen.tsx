@@ -208,6 +208,18 @@ function PhotoManager({
     }
   };
 
+  const movePhoto = async (index: number, delta: number) => {
+    if (busy) return;
+    const ids = photos.map((photo) => photo.id);
+    [ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
+    setBusy(true);
+    try {
+      await host.api("/api/photos/order", { method: "PATCH", body: JSON.stringify({ ids }) });
+      await refresh();
+    } catch (caught) { setError(getErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+
   const makePrimary = async (id: number) => {
     setBusy(true);
     try {
@@ -257,15 +269,20 @@ function PhotoManager({
       ) : null}
       <div class={styles.photoToolbar}>
         <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>Изменить аватар</Button>
-        <p class={styles.photoHint}>Аватар — главное фото в ленте. Нажми на другое фото, чтобы сделать его аватаром.</p>
+        <p class={styles.photoHint}>Меняй порядок стрелками под фото. Первое фото — аватар в ленте.</p>
       </div>
       <input ref={avatarInputRef} class={styles.srOnly} type="file" accept={PROFILE_PHOTO_ACCEPT} disabled={busy || cropQueue.length > 0} onClick={armPicker} onCancel={disarmPicker} onChange={uploadAvatar} />
       <div class={styles.photoGrid}>
-        {photos.map((photo) => (
+        {photos.map((photo, index) => (
           <div key={photo.id} class={`${styles.photoCell}${photo.is_primary ? ` ${styles.primary}` : ""}`}>
             <button type="button" class={styles.photoPick} disabled={busy} onClick={() => makePrimary(photo.id)} aria-label={photo.is_primary ? "Это аватар" : "Сделать аватаром"}>
               <img src={photoSrc(host.basePath, photo.url, name)} alt="" />
             </button>
+            <div class={styles.photoOrder}>
+              <button type="button" disabled={busy || index === 0} onClick={() => void movePhoto(index, -1)} aria-label={`Передвинуть фото ${index + 1} влево`}>←</button>
+              <span>{index + 1}</span>
+              <button type="button" disabled={busy || index === photos.length - 1} onClick={() => void movePhoto(index, 1)} aria-label={`Передвинуть фото ${index + 1} вправо`}>→</button>
+            </div>
             {photo.is_primary && <span class={styles.avatarBadge}>аватар</span>}
             <button type="button" class={styles.photoDelete} disabled={busy} onClick={() => remove(photo.id)} aria-label="Удалить фото">×</button>
           </div>
@@ -642,9 +659,9 @@ export function ProfileScreen({ host }: Props) {
 
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>Детали и предпочтения</h2><span>по желанию</span></div>
-              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
               <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
+              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
               <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
             </section>

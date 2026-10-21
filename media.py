@@ -94,3 +94,20 @@ def read_upload(file_storage, *, portrait: bool = False) -> bytes:
         except Exception:
             pass
     return process_image(raw, portrait=portrait)
+
+
+def chat_contact_sheet(images: list[bytes]) -> bytes:
+    """Legacy clients see every album photo in one cover; new clients open originals."""
+    columns = 2
+    cell = 600
+    rows = (len(images) + columns - 1) // columns
+    sheet = Image.new("RGB", (columns * cell, rows * cell), "#171719")
+    for index, raw in enumerate(images):
+        with Image.open(io.BytesIO(raw)) as source:
+            photo = ImageOps.contain(source.convert("RGB"), (cell - 8, cell - 8))
+            x = (index % columns) * cell + (cell - photo.width) // 2
+            y = (index // columns) * cell + (cell - photo.height) // 2
+            sheet.paste(photo, (x, y))
+    output = io.BytesIO()
+    sheet.save(output, "JPEG", quality=88, optimize=True)
+    return output.getvalue()

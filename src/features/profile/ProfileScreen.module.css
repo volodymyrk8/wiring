@@ -116,3 +116,7 @@
 }
 
 .nameEditor { display: grid; align-content: start; gap: 10px; min-width: 0; }
+
+.photoOrder { position: absolute; bottom: 5px; left: 5px; right: 5px; display: flex; align-items: center; justify-content: space-between; color: white; background: #19191ddd; border-radius: 10px; }
+.photoOrder button { border: 0; padding: 6px 10px; color: white; background: transparent; cursor: pointer; }
+.photoOrder button:disabled { opacity: .3; }

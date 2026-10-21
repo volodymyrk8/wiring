@@ -146,12 +146,12 @@ EOF
 echo "== Public check =="
 date_headers="$(curl -sI "https://wiring.date/")"
 printf '%s\n' "$date_headers" | head -15
-if printf '%s\n' "$date_headers" | grep -qi 'location: https://wiring.club/'; then
-  echo "wiring.date still redirects to https://wiring.club/"
+printf '%s\n' "$date_headers" | grep -Eqi '^location: https://wiring.club/' || {
+  echo "wiring.date did not redirect to wiring.club"
   exit 1
-fi
-printf '%s\n' "$date_headers" | grep -Eq '^HTTP/.* 200' || {
-  echo "wiring.date did not answer 200"
+}
+printf '%s\n' "$date_headers" | grep -Eq '^HTTP/.* (301|308)' || {
+  echo "wiring.date did not return a permanent redirect"
   exit 1
 }
 echo
