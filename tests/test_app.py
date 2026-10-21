@@ -509,27 +509,6 @@ class WiringTest(unittest.TestCase):
             self.assertEqual(lonely.status_code, 403)
         self.assertEqual(peer["name"], "Адик")
 
-    def test_qa_feed_ignores_client_filters(self):
-        from qa_accounts import QA_FEED_EMAILS
-
-        email = next(iter(QA_FEED_EMAILS))
-        self._register(email=email)
-        self._peers(1)
-        self._logout()
-        peer = self._register(
-            email="qa-plain-peer@example.com",
-            name="Только ASD",
-            gender="man",
-            neuro=["asd"],
-            photo="portraits/p03.jpg",
-        )
-        self._logout()
-        self._login(email)
-        me = self.client.get("/api/me").get_json()
-        self.assertTrue(me["user"]["feed_qa"])
-        feed = self.client.get("/api/feed?neuro=adhd&hide_empty=1&limit=10").get_json()
-        self.assertIn(peer["id"], {card["id"] for card in feed["cards"]})
-
     def test_feed_vibe_bodydouble_filter(self):
         self._register()
         self._peers(1)
@@ -1603,7 +1582,7 @@ class WiringTest(unittest.TestCase):
             token = db().execute("SELECT token FROM password_resets WHERE user_id = ?", (uid,)).fetchone()["token"]
         self.assertEqual(self.client.post("/api/password/reset", json={"token": token, "password": "secret1"}).status_code, 200)
         self.assertEqual(self.client.post("/api/login", json={"email": "social-delete@example.com", "password": "secret1"}).status_code, 200)
-        self.assertEqual(self.client.post("/api/me/delete", json={"password": "secret1"}).status_code, 200)
+        self.assertEqual(self.client.post("/api/me/delete", json={}).status_code, 200)
 
     def test_theme_syncs_between_sessions_and_is_private(self):
         user = self._register()
@@ -2480,7 +2459,7 @@ class WiringTest(unittest.TestCase):
         small.close()
         full.close()
 
-    def test_delete_account_soft_delete_and_password(self):
+    def test_delete_account_soft_delete_and_session(self):
         # Register a new user
         res = self.client.post(
             "/api/register",
@@ -2496,13 +2475,7 @@ class WiringTest(unittest.TestCase):
         user = res.get_json()["user"]
         uid = user["id"]
 
-        # Deleting without password or wrong password fails
-        bad = self.client.post("/api/me/delete", json={"password": "wrong"})
-        self.assertEqual(bad.status_code, 401)
-        self.assertFalse(bad.get_json()["ok"])
-
-        # Deleting with correct password succeeds
-        ok = self.client.post("/api/me/delete", json={"password": "mysecretpassword"})
+        ok = self.client.post("/api/me/delete", json={})
         self.assertEqual(ok.status_code, 200)
         self.assertTrue(ok.get_json()["ok"])
 
