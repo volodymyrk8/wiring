@@ -30,6 +30,7 @@ export type ChatMessage = {
   mine?: boolean;
   body?: string;
   photo_url?: string;
+  photo_urls?: string[];
   audio_url?: string;
   audio_duration?: number;
   transcript?: string;

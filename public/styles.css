@@ -1194,7 +1194,7 @@ a.solid, a.ghost { display: inline-block; text-align: center; text-decoration: n
 .toast-stack {
   position: fixed;
   left: 50%;
-  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  top: calc(64px + env(safe-area-inset-top, 0px));
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -3445,3 +3445,7 @@ body.support-page #server-header { --container-app: 540px; }
 body.legal-page .legal, body.admin-page .legal {
   padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
 }
+
+.toast { display: flex; align-items: center; gap: 8px; touch-action: none; }
+.toast > :first-child { flex: 1; min-width: 0; color: inherit; font: inherit; background: transparent; border: 0; }
+.toast-close { flex: 0 0 28px; width: 28px; height: 28px; border: 0; border-radius: 50%; color: inherit; background: #0001; font-size: 21px; cursor: pointer; }

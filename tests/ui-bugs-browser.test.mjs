@@ -8,6 +8,7 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"><meta name="vi
 const params=new URLSearchParams(location.search);
 const screen=params.get('screen');
 document.documentElement.dataset.view=screen;
+if(params.has('thread')){document.getElementById('feature').style.cssText='display:flex;flex:1;min-height:0;flex-direction:column';}
 if(screen==='admin')document.getElementById('feature').innerHTML='<div data-admin-reply data-kind=\"ticket\" data-source=\"1\" data-action=\"/admin/replies/ticket/1\" data-csrf=\"fixture-csrf\" data-request-id=\"fixture-reply-request-1\" data-recipient=\"Заявителю: тестовый аккаунт\"></div>';
 const mod=await import('/public/dist/'+(screen==='admin'?'server-header':screen)+'.js');
 window.test={calls:[],actions:[],navigation:[],fail:false,delay:false,resolve:null};
@@ -16,9 +17,9 @@ const likes=[person,{id:3,name:'Лео',age:30},{hidden:true}];
 const matches=[{id:2,name:'Ада',age:29,unread:2,last_message:'Привет',last_at:1720000000}];
 if(params.has('stale'))localStorage.setItem('wiring-profile-draft-99',JSON.stringify({name:'',bio:'Старый черновик без имени'}));
 const user={name_change_available_at:params.has('locked')?Math.floor(Date.now()/1000)+86400:0,id:99,name:'Тест',age:28,plus:true,neuro:[],vibe:[],photos:[],city:'Белград'};
-const host={user,person,personFrom:'recommendations',mode:'matches',catalog:{places:[{country:'Сербия',cities:['Белград']},{country:'Черногория',cities:['Подгорица']}]},likes,matches,filters:{neuro:[],vibe:[],intents:[],min_age:18,max_age:99,city:''},basePath:'',matchesCount:0,
+const host={user,person,personFrom:'recommendations',mode:params.has('thread')?'chat':'matches',chatId:2,catalog:{places:[{country:'Сербия',cities:['Белград']},{country:'Черногория',cities:['Подгорица']}]},likes,matches,filters:{neuro:[],vibe:[],intents:[],min_age:18,max_age:99,city:''},basePath:'',matchesCount:0,
 hrefFor:v=>'/'+v,navigate:v=>window.test.navigation.push(v),toast:()=>{},onLogout:()=>{},onUserUpdated:()=>{},onAction:id=>window.test.actions.push(id),loadLikes:async()=>({likes}),refreshUser:async()=>user,
-api:async(path,init)=>{window.test.calls.push({path,body:init?.body});if(path==='/api/support/replies')return {replies:[{id:1,source_kind:'report',body:'Жалобу проверили. Спасибо за обращение.',created_at:1720000000}]};if(path==='/api/me'&&init?.method==='PATCH'){const data=JSON.parse(init.body);if(params.has('conflict')&&typeof data.name==='string'){const error=Error('Сменить имя можно позднее');error.payload={name_change_available_at:Math.floor(Date.now()/1000)+86400};throw error;}if(typeof data.name==='string'&&data.name!==user.name){user.name=data.name;user.name_change_available_at=Math.floor(Date.now()/1000)+14*86400;}return {user:{...user}};}if(path==='/api/swipe'){if(window.test.fail)throw Error('Локальная ошибка');if(window.test.delay)await new Promise(resolve=>window.test.resolve=resolve);return {matched:true}};return {matches,user}},swipe:async()=>{}};
+api:async(path,init)=>{window.test.calls.push({path,body:init?.body});if(path.startsWith('/api/messages/'))return {peer:{id:2,name:'Ада'},messages:Array.from({length:2000},(_,i)=>({id:i+1,from_id:2,body:'Сообщение '+i,created_at:1720000000})),openers:[]};if(path==='/api/support/replies')return {replies:[{id:1,source_kind:'report',body:'Жалобу проверили. Спасибо за обращение.',created_at:1720000000}]};if(path==='/api/me'&&init?.method==='PATCH'){const data=JSON.parse(init.body);if(params.has('conflict')&&typeof data.name==='string'){const error=Error('Сменить имя можно позднее');error.payload={name_change_available_at:Math.floor(Date.now()/1000)+86400};throw error;}if(typeof data.name==='string'&&data.name!==user.name){user.name=data.name;user.name_change_available_at=Math.floor(Date.now()/1000)+14*86400;}return {user:{...user}};}if(path==='/api/swipe'){if(window.test.fail)throw Error('Локальная ошибка');if(window.test.delay)await new Promise(resolve=>window.test.resolve=resolve);return {matched:true}};return {matches,user}},swipe:async()=>{}};
 window.test.unmount=screen==='admin'?()=>{}:mod[{likes:'mountLikes',person:'mountPerson',profile:'mountProfile',chat:'mountChat',support:'mountSupport'}[screen]](document.getElementById('feature'),host);
 </script></body></html>`;
 const server=createServer(async(req,res)=>{
@@ -78,6 +79,31 @@ try{
  const geometry=await badge.evaluate(el=>{const b=el.getBoundingClientRect(),r=el.closest('a').getBoundingClientRect();const range=document.createRange();range.selectNodeContents(el);const t=range.getBoundingClientRect();return {b:{x:b.x,y:b.y,width:b.width,height:b.height},r:{x:r.x,y:r.y,width:r.width,height:r.height},textCenter:t.y+t.height/2};});
  assert.ok(Math.abs(geometry.b.y+geometry.b.height/2-(geometry.r.y+geometry.r.height/2))<2,JSON.stringify(geometry));
  assert.ok(Math.abs(geometry.textCenter-(geometry.b.y+geometry.b.height/2))<2,JSON.stringify(geometry));
+ await open('chat','&thread=1');
+ await page.locator('.thread [data-msg]').last().waitFor();
+ const composer=page.getByPlaceholder('написать сообщение');
+ await composer.fill('Первая строка'); await composer.press('Enter'); await composer.pressSequentially('Вторая строка');
+ assert.equal(await composer.inputValue(),'Первая строка\nВторая строка');
+ assert.equal(await page.evaluate(()=>window.test.calls.filter(c=>c.path==='/api/messages').length),0);
+ await page.getByRole('button',{name:'Отправить сообщение',exact:true}).click();
+ await page.waitForFunction(()=>window.test.calls.some(c=>c.path==='/api/messages'));
+ assert.equal(await page.evaluate(()=>JSON.parse(window.test.calls.find(c=>c.path==='/api/messages').body).body),'Первая строка\nВторая строка');
+ const chatBefore=await page.locator('.thread').evaluate(el=>({gap:el.scrollHeight-el.clientHeight-el.scrollTop,top:el.scrollTop}));
+ assert.ok(chatBefore.gap<3,JSON.stringify(chatBefore));
+ await page.setViewportSize({width:390,height:500});await page.waitForTimeout(250);
+ assert.ok(await page.locator('.thread').evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop<3));
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(250);
+ const header=await page.locator('.chat-topbar').boundingBox();assert.ok(header.y>=0&&header.y<40,JSON.stringify(header));
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aJ9kAAAAASUVORK5CYII=','base64');
+ await page.locator('input[type=file]').setInputFiles([{name:'one.png',mimeType:'image/png',buffer:png},{name:'two.png',mimeType:'image/png',buffer:png}]);
+ await page.getByRole('button',{name:'Отправить вместе',exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>window.test.calls.filter(c=>c.path==='/api/messages/photo').length),0);
+ await page.getByRole('button',{name:'Отмена',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.test.calls.filter(c=>c.path==='/api/messages/photo').length),0);
+ await page.locator('input[type=file]').setInputFiles([{name:'one.png',mimeType:'image/png',buffer:png},{name:'two.png',mimeType:'image/png',buffer:png}]);
+ await page.getByRole('button',{name:'Отправить вместе',exact:true}).click();
+ await page.waitForFunction(()=>window.test.calls.filter(c=>c.path==='/api/messages/photo').length===1);
+ await page.screenshot({path:'/tmp/wiring-chat-oct21.png'});
  await open('profile');
  const nameInput=page.getByRole('textbox',{name:'Имя',exact:true});
  await nameInput.fill('Новое имя');await page.waitForTimeout(1600);

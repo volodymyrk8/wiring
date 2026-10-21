@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import json
 import random
 import re
 import secrets
@@ -55,7 +56,7 @@ from sendpulse_sync import ensure_sync_table
 from glossary import glossary_html
 from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
-from media import MediaError, make_thumb, read_upload
+from media import MediaError, chat_contact_sheet, make_thumb, read_upload
 from moderation import moderate_photo
 from report_moderation import (
     REPORT_BAN_USER_MESSAGE,
@@ -584,6 +585,7 @@ def init_db() -> None:
     )
     for name, ddl in {
         "name_changed_at": "INTEGER",
+        "theme": "TEXT",
         "job": "TEXT NOT NULL DEFAULT ''",
         "intent": "TEXT NOT NULL DEFAULT 'dating'",
         "height": "INTEGER",
@@ -626,6 +628,7 @@ def init_db() -> None:
         )
     _ensure_column(conn, "messages", "reply_to_id", "INTEGER")
     _ensure_column(conn, "messages", "photo", "TEXT NOT NULL DEFAULT ''")
+    _ensure_column(conn, "messages", "extra_photos", "TEXT NOT NULL DEFAULT '[]'")
     _ensure_column(conn, "messages", "audio", "TEXT NOT NULL DEFAULT ''")
     _ensure_column(conn, "messages", "audio_duration", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column(conn, "messages", "transcript", "TEXT NOT NULL DEFAULT ''")
@@ -916,6 +919,7 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         payload["albums"] = albums_for(row["id"])
     if include_email:
         payload["name_change_available_at"] = name_change_available_at(row)
+        payload["theme"] = row["theme"] if "theme" in keys else None
         payload["email"] = row["email"]
         payload["guest"] = is_guest_email(str(row["email"]))
         complete = profile_complete(row, tags, photos)
@@ -1432,6 +1436,10 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     Database requirement: The user record in 'users' is NEVER deleted!
     """
     conn.execute("DELETE FROM sendpulse_contacts WHERE user_id = ?", (uid,))
+    for message in conn.execute("SELECT * FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid)).fetchall():
+        for photo in _message_photos(message):
+            _unlink_upload(photo)
+        _unlink_upload(str(message["audio"] or ""))
     conn.execute("DELETE FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM swipes WHERE from_id = ? OR to_id = ?", (uid, uid))
     conn.execute("DELETE FROM feed_history WHERE user_id = ? OR other_id = ?", (uid, uid))
@@ -1735,6 +1743,19 @@ def api_catalog():
 def api_me():
     user = current_user()
     return jsonify({"ok": True, "user": user})
+
+
+@app.patch("/api/me/theme")
+@login_required
+@report_ban_exempt
+def api_me_theme():
+    theme = (request.get_json(silent=True) or {}).get("theme")
+    if theme not in ("pastel", "mist", "dusk", "night", "slate"):
+        return jsonify({"ok": False, "error": "неизвестная тема"}), 400
+    conn = db()
+    conn.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session["uid"]))
+    conn.commit()
+    return jsonify({"ok": True, "theme": theme})
 
 
 @app.post("/api/me/jev-feed")
@@ -2839,6 +2860,12 @@ def _unlink_upload(rel: str) -> None:
         os.remove(full)
 
 
+def _message_photos(row):
+    first = str(row["photo"] or "") if "photo" in row.keys() else ""
+    extra = json.loads(row["extra_photos"] or "[]") if "extra_photos" in row.keys() else []
+    return ([first] if first else []) + extra
+
+
 def _message_payload(
     row: Row,
     uid: int,
@@ -2866,6 +2893,7 @@ def _message_payload(
             "has_audio": bool(src_audio),
             "gone": gone,
         }
+    photos = _message_photos(row)
     duration = int(row["audio_duration"] or 0) if "audio_duration" in keys else 0
     return {
         "id": row["id"],
@@ -2874,6 +2902,7 @@ def _message_payload(
         "body": body,
         "photo": photo,
         "photo_url": prefix(f"/api/messages/media/{row['id']}") if photo else "",
+        "photo_urls": [prefix(f"/api/messages/media/{row['id']}?index={i}") for i, _ in enumerate(photos) if i > 0 or len(photos) == 1],
         "audio_url": prefix(f"/api/messages/media/{row['id']}") if audio else "",
         "audio_duration": duration,
         "transcript": "",
@@ -2907,7 +2936,7 @@ def _insert_message(
 
 
 def _message_columns() -> str:
-    return "id, from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, transcript, edited_at, deleted_at"
+    return "id, from_id, to_id, body, created_at, reply_to_id, photo, extra_photos, audio, audio_duration, transcript, edited_at, deleted_at"
 
 
 def _attach_reply_sources(conn: Connection, rows: list[Row], by_id: dict[int, Row]) -> None:
@@ -2954,7 +2983,7 @@ def api_messages(other_id: int):
     limit = max(0, min(200, request.args.get("limit", type=int) or 0))
     rows = conn.execute(
         """
-        SELECT id, from_id, to_id, body, created_at, reply_to_id, photo, audio, audio_duration, transcript, edited_at, deleted_at FROM messages
+        SELECT id, from_id, to_id, body, created_at, reply_to_id, photo, extra_photos, audio, audio_duration, transcript, edited_at, deleted_at FROM messages
         WHERE ((from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?))
           AND COALESCE(deleted_at, 0) = 0
           AND id > ? AND (? = 0 OR id < ?)
@@ -3117,25 +3146,36 @@ def api_send_photo_message():
         ).fetchone()
         if not src:
             return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
+    uploads = request.files.getlist("files") or request.files.getlist("file")
+    if not 1 <= len(uploads) <= 10:
+        return jsonify({"ok": False, "error": "выбери от 1 до 10 фото"}), 400
     try:
-        jpeg = read_upload(request.files.get("file"))
-        moderate_photo(jpeg)
+        images = []
+        for upload in uploads:
+            jpeg = read_upload(upload)
+            moderate_photo(jpeg)
+            images.append(jpeg)
     except MediaError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    if len(images) > 1:
+        images.insert(0, chat_contact_sheet(images))
     folder = os.path.join(UPLOAD_DIR, "chat", str(uid))
     os.makedirs(folder, exist_ok=True)
-    filename = f"{secrets.token_hex(16)}.jpg"
-    rel = f"chat/{uid}/{filename}"
-    with open(os.path.join(folder, filename), "wb") as handle:
-        handle.write(jpeg)
-    msg_id = _insert_message(
-        conn,
-        uid=uid,
-        other_id=other_id,
-        body=caption,
-        photo=rel,
-        reply_to_id=reply_to_id,
-    )
+    paths = []
+    try:
+        for jpeg in images:
+            rel = f"chat/{uid}/{secrets.token_hex(16)}.jpg"
+            paths.append(rel)
+            with open(os.path.join(UPLOAD_DIR, rel), "wb") as handle:
+                handle.write(jpeg)
+        rel = paths[0]
+        msg_id = _insert_message(conn, uid=uid, other_id=other_id, body=caption, photo=rel, reply_to_id=reply_to_id)
+        conn.execute("UPDATE messages SET extra_photos = ? WHERE id = ?", (json.dumps(paths[1:]), msg_id))
+    except Exception:
+        conn.rollback()
+        for path in paths:
+            _unlink_upload(path)
+        raise
     mark_read(conn, uid, other_id)
     if sender and other and _notifiable(other):
         notify_event(
@@ -3208,7 +3248,11 @@ def api_message_media(message_id: int):
     other = to_id if uid == from_id else from_id
     if other in blocked_ids(conn, uid):
         abort(403)
-    photo = str(row["photo"] or "") if "photo" in row.keys() else ""
+    photos = _message_photos(row)
+    index = request.args.get("index", default=0, type=int)
+    if index < 0 or (photos and index >= len(photos)):
+        abort(404)
+    photo = photos[index] if photos else ""
     audio = str(row["audio"] or "") if "audio" in row.keys() else ""
     rel = audio or photo
     if not rel:
@@ -3286,7 +3330,8 @@ def api_delete_message(message_id: int):
     if not row or int(row["from_id"]) != uid:
         return jsonify({"ok": False, "error": "это сообщение нельзя удалить"}), 404
     conn.execute("UPDATE messages SET deleted_at = ? WHERE id = ?", (int(time.time()), message_id))
-    _unlink_upload(str(row["photo"] or ""))
+    for photo in _message_photos(row):
+        _unlink_upload(photo)
     _unlink_upload(str(row["audio"] or ""))
     conn.commit()
     return jsonify({"ok": True})
@@ -3674,6 +3719,26 @@ def api_upload_photo():
     photos = photos_for(uid)
     item = next((p for p in photos if p["id"] == photo_id), None)
     return jsonify({"ok": True, "photo": item, "photos": photos, "albums": albums_for(uid)})
+
+
+@app.patch("/api/photos/order")
+@login_required
+@real_account_required
+def api_photo_order():
+    uid = session["uid"]
+    ids = (request.get_json(silent=True) or {}).get("ids")
+    if not isinstance(ids, list) or any(type(i) is not int for i in ids) or len(set(ids)) != len(ids):
+        return jsonify({"ok": False, "error": "укажи порядок всех фото"}), 400
+    conn = db()
+    conn.execute("SELECT id FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
+    owned = {r["id"] for r in conn.execute("SELECT id FROM photos WHERE user_id = ? FOR UPDATE", (uid,)).fetchall()}
+    if set(ids) != owned:
+        return jsonify({"ok": False, "error": "список фото изменился, обнови профиль"}), 409
+    for position, photo_id in enumerate(ids):
+        conn.execute("UPDATE photos SET sort_order = ?, is_primary = ? WHERE id = ? AND user_id = ?", (position, int(position == 0), photo_id, uid))
+    _sync_primary_photo(conn, uid)
+    conn.commit()
+    return jsonify({"ok": True, "photos": photos_for(uid)})
 
 
 @app.patch("/api/photos/<int:photo_id>")
