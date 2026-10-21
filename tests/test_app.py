@@ -518,9 +518,9 @@ class WiringTest(unittest.TestCase):
         self._logout()
         peer = self._register(
             email="qa-plain-peer@example.com",
-            name="Без тегов",
+            name="Только ASD",
             gender="man",
-            neuro=[],
+            neuro=["asd"],
             photo="portraits/p03.jpg",
         )
         self._logout()
