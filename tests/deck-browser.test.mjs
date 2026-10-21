@@ -16,7 +16,7 @@ import { mountDeck, mountRecommendations } from '/public/dist/deck.js';
 const params = new URLSearchParams(location.search);
 const recommendations = params.has('recommendations');
 document.documentElement.dataset.view = recommendations ? 'recommendations' : 'deck';
-const photo = color => 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="'+color+'"/></svg>');
+const photo = color => 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+(params.has('landscape')?600:300)+'" height="'+(params.has('landscape')?300:400)+'"><rect width="300" height="400" fill="'+color+'"/></svg>');
 const cards = Array.from({length:5}, (_,i) => ({id:i+1,name:params.has('body')?'Тестовый профиль с длинным именем для проверки прокрутки описания':'Тест '+(i+1),age:25,photos:[photo('#9988aa'),photo('#448899')],job:params.has('body')?'Описание профессии '.repeat(10):'',bio:'Локальный тест',neuro:[],vibe:[],recommendation_reasons:['Общий интерес']}));
 window.test = { state: {}, api: [], scrolls: [], resolveFeed: null };
 const nativeScrollTo = Element.prototype.scrollTo;
@@ -212,7 +212,7 @@ try {
     await page.setViewportSize(size);
     const dimensions=[];
     for (const mode of ["deck","recommendations"]) {
-      await open(mode); await page.waitForTimeout(150);
+      await open(mode,"landscape"); await page.waitForTimeout(150);
       dimensions.push(await page.locator('section[aria-hidden="false"] article').evaluate(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width})));
       if(size.width===390)await page.screenshot({path:`/tmp/wiring-${mode}-oct21.png`});
     }
