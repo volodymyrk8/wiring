@@ -1146,6 +1146,17 @@ def intents_of(row_or_value: Any) -> list[str]:
     return found or ["dating"]
 
 
+def intents_for_discovery(row: Row) -> list[str]:
+    """Profile intents plus legacy bodydouble vibe for feed/likes intent filters."""
+    items = list(intents_of(row))
+    if "bodydouble" in items:
+        return items
+    tags = tags_for(int(row["id"]))
+    if "bodydouble" in tags.get("vibe", []):
+        items.append("bodydouble")
+    return items
+
+
 def parse_profile(
     data: dict[str, Any], *, require_password: bool, require_neuro: bool = True, draft: bool = False
 ) -> tuple[dict[str, Any] | None, str | None]:
@@ -2334,8 +2345,14 @@ def _eligible_card(
     if "incognito" in keys and int(row["incognito"] or 0):
         if not liked_me or row["id"] not in liked_me:
             return None
-    # Feed follows the viewer's «кого ищу» only; the other person's preference is shown on the card.
-    if not looking_matches(str(me["looking_for"] or "everyone"), str(row["gender"] or "")):
+    viewer_looking = str(me["looking_for"] or "everyone")
+    viewer_gender = str(me["gender"] or "")
+    candidate_looking = str(row["looking_for"] or "everyone")
+    candidate_gender = str(row["gender"] or "")
+    if has_qa_feed(str(me["email"])):
+        if not looking_matches(viewer_looking, candidate_gender):
+            return None
+    elif not mutual_looking_ok(viewer_looking, viewer_gender, candidate_looking, candidate_gender):
         return None
     if not discovery_allows(row, me):
         return None
@@ -2438,7 +2455,7 @@ def api_feed():
     limit = max(1, min(limit_cap, request.args.get("limit", type=int) or limit_cap))
 
     def eligible(row):
-        if intent_filter and not any(i in intent_filter for i in intents_of(row)):
+        if intent_filter and not any(i in intent_filter for i in intents_for_discovery(row)):
             return None
         return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
                               skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me,
@@ -2764,7 +2781,7 @@ def api_likes():
                 continue
             if vibe_filter and not set(vibe_filter) & set(tags["vibe"]):
                 continue
-        if intent_filter and not any(i in intent_filter for i in intents_of(row)):
+        if intent_filter and not any(i in intent_filter for i in intents_for_discovery(row)):
             continue
         if plus:
             item = user_public(row, detail=True)

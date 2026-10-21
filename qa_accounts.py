@@ -1,4 +1,4 @@
-"""Internal demo accounts with relaxed discovery delivery (filters still apply)."""
+"""Internal demo accounts: feed recycles faster and uses viewer-only «кого ищу» matching for debug."""
 from __future__ import annotations
 
 QA_FEED_EMAILS = frozenset(

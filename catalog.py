@@ -83,6 +83,7 @@ INTENTS = [
     {"id": "dating", "label": "свидания, посмотрим"},
     {"id": "friends", "label": "дружба / компания"},
     {"id": "chat", "label": "пока просто писать"},
+    {"id": "bodydouble", "label": "боди-даблинг"},
 ]
 
 PROMPTS = [
