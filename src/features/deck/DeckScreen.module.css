@@ -44,6 +44,7 @@
 }
 
 .filterDot { position: absolute; width: 6px; height: 6px; top: 7px; right: 7px; border-radius: 50%; background: var(--lime); }
+.qaHint { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
 .filters { display: grid; gap: 20px; }
 .filterSection { margin: 8px 0 0; color: var(--ink); font-size: 16px; font-weight: 600; }
 .filterSection:first-child { margin-top: 0; }

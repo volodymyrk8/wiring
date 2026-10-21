@@ -216,7 +216,17 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   applyTheme(themeNow());
 
+  const QA_FEED_FILTERS = {
+    neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "",
+    hide_undiagnosed: false, real_only: false,
+  };
+  const applyQaFeedState = () => {
+    if (!state.user?.feed_qa) return;
+    state.filters = { ...QA_FEED_FILTERS };
+    sessionStorage.removeItem("wiring-filters");
+  };
   const persistFilters = () => {
+    if (state.user?.feed_qa) return;
     const { real_only: _ignore, ...rest } = state.filters;
     sessionStorage.setItem("wiring-filters", JSON.stringify(rest));
   };
@@ -353,6 +363,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const me = await api("/api/me");
     if (owner && state.user?.id !== owner) return;
     state.user = me.user;
+    applyQaFeedState();
     if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
@@ -749,7 +760,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       }
       state.cards = cards;
       state.index = index;
-      state.filters = filters;
+      state.filters = state.user?.feed_qa ? { ...QA_FEED_FILTERS } : filters;
       state.feedHasMore = hasMore;
       state.feedGeneration = generation;
       persistFilters();
@@ -860,6 +871,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     },
     onAuthSuccess: async (mode, data) => {
       state.user = data.user;
+      applyQaFeedState();
       if (data.user?.theme) applyTheme(data.user.theme);
       if (mode === "login" && data.restored) toast("профиль восстановлен");
       if (mode === "register") {

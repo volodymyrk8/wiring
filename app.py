@@ -91,6 +91,7 @@ from premium import (
     unsnooze,
 )
 from profile_policy import name_change_available_at, name_change_error
+from qa_accounts import QA_FEED_LIMIT, has_qa_feed
 from support_replies import ensure_reply_tables, save_reply, admin_reply_history, user_replies, purge_user_replies
 from profanity import has_profanity
 from site_branding import SITE_META_DESCRIPTION, SITE_OG_DESCRIPTION, SITE_PAGE_TITLE
@@ -943,6 +944,7 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         payload["jev_feed_beta"] = jev_allowed  # Compatibility for existing clients.
         payload["jev_feed_available"] = bool(jev_allowed and jev_configured)
         payload["jev_feed_enabled"] = bool(jev_allowed and int(row["jev_feed_enabled"] or 0)) if "jev_feed_enabled" in keys else False
+        payload["feed_qa"] = has_qa_feed(str(row["email"]))
         code = str(row["referral_code"] or "") if "referral_code" in keys else ""
         if code and not is_guest_email(str(row["email"])) and not int(row["is_seed"] or 0):
             payload["ref"] = code
@@ -2398,6 +2400,7 @@ def api_feed():
     me = db().execute("SELECT * FROM users WHERE id = ?", (session["uid"],)).fetchone()
     if not me:
         return jsonify({"ok": False, "error": "нет профиля"}), 401
+    qa_feed = has_qa_feed(str(me["email"]))
     neuro_filter = [t for t in request.args.get("neuro", "").split(",") if t in NEURO_IDS]
     vibe_filter = [t for t in request.args.get("vibe", "").split(",") if t in VIBE_IDS]
     intent_filter = [t for t in request.args.get("intent", "").split(",") if t in INTENT_IDS]
@@ -2418,6 +2421,17 @@ def api_feed():
     max_age = max(18, min(99, max_age))
     if min_age > max_age:
         min_age, max_age = max_age, min_age
+    if qa_feed:
+        neuro_filter = []
+        vibe_filter = []
+        intent_filter = []
+        min_age, max_age = 18, 99
+        city_q = ""
+        city_raw = ""
+        unknown_city = False
+        gender_q = ""
+        hide_undiagnosed = False
+        real_only = False
     if not is_guest_email(str(me["email"])) and not int(me["is_seed"] or 0):
         track_filters(
             db(),
@@ -2433,7 +2447,7 @@ def api_feed():
         )
     blocked = blocked_ids(db(), me["id"])
     # Seeds are wiped; real_only remains for hiding @example.com test/demo rows if asked.
-    skip_seeds = bool(real_only and is_premium(me))
+    skip_seeds = bool(real_only and is_premium(me)) and not qa_feed
     hidden = snoozed_ids(db(), me["id"]) if is_premium(me) else set()
     liked_me = {
         int(r["from_id"])
@@ -2442,7 +2456,8 @@ def api_feed():
             (me["id"],),
         )
     }
-    limit = max(1, min(30, request.args.get("limit", type=int) or 30))
+    limit_cap = QA_FEED_LIMIT if qa_feed else 30
+    limit = max(1, min(limit_cap, request.args.get("limit", type=int) or limit_cap))
 
     def eligible(row):
         if intent_filter and not any(i in intent_filter for i in intents_of(row)):
@@ -2451,7 +2466,9 @@ def api_feed():
                               skip_seeds=skip_seeds, snoozed=hidden, liked_me=liked_me,
                               hide_undiagnosed=hide_undiagnosed)
 
-    narrowed = bool(city_raw or gender_q or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99)
+    narrowed = qa_feed or bool(
+        city_raw or gender_q or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99
+    )
     cards, has_more, generation = claim_feed(
         db(), int(me["id"]), min_age=min_age, max_age=max_age,
         city=city_q, gender=gender_q, limit=limit, eligible=eligible,
@@ -2509,7 +2526,7 @@ def api_feed_reset():
         return jsonify({"ok": False, "error": "неверная версия ленты"}), 400
     conn = db()
     viewer = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (session["uid"],)).fetchone()
-    if not is_premium(viewer):
+    if not is_premium(viewer) and not has_qa_feed(str(viewer["email"])):
         return jsonify({"ok": False, "error": "доступно только с WIRING+"}), 403
     reset, generation = reset_delivery(conn, viewer, generation)
     conn.commit()

@@ -113,7 +113,11 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
     showBetaBadge={false}
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
-    rightSlot={host.recommendations ? <span>Для тебя</span> : <IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
+    rightSlot={
+      host.recommendations ? <span>Для тебя</span>
+        : host.user?.feed_qa ? <span class={styles.qaHint}>демо</span>
+          : <IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>
+    }
   />;
 }
 
