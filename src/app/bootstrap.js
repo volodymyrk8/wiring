@@ -76,8 +76,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   };
   const restoreDeckFilters = () => {
     const saved = readStoredFilters(state.user?.id);
-    if (!saved) return;
-    state.filters = { ...defaultDeckFilters(), ...saved, real_only: false };
+    state.filters = { ...defaultDeckFilters(), ...(saved || {}), real_only: false };
   };
   const state = {
     user: null,
@@ -235,7 +234,11 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const uid = state.user?.id;
     if (uid == null) return;
     const { real_only: _ignore, ...rest } = state.filters;
-    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ userId: uid, filters: rest }));
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ userId: uid, filters: rest }));
+    } catch {
+      // Safari private mode or a full store must not break applying filters.
+    }
   };
   state.filters.real_only = false;
 

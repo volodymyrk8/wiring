@@ -172,7 +172,7 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
     setMaxAge("99");
   };
   return <Modal isOpen onClose={onClose} title="Фильтры" responsiveSheet
-    footer={<><Button variant="ghost" disabled={applying} onClick={reset}>Сбросить</Button><Button type="button" disabled={applying} loading={applying} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>Применить</Button></>}>
+    footer={<><Button variant="ghost" disabled={applying} onClick={reset}>Сбросить</Button><Button type="submit" form="deck-filters" disabled={applying} loading={applying}>Применить</Button></>}>
     <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
       event.preventDefault();
       if (!applying) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
@@ -518,7 +518,6 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
       requestRef.current?.abort();
       requestRef.current = null;
       await loadPage(nextFilters, true);
-      setFiltersOpen(false);
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {

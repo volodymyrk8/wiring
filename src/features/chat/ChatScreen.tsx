@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
 import { readChatSendMode, shouldSendOnComposerKey, type ChatSendMode } from "@/lib/chat-send-mode";
@@ -199,6 +199,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
 function MatchesScreen({ host }: { host: ChatHostBridge }) {
   const signedOut = !host.user;
   const [matches, setMatches] = useState<ChatMatch[]>(host.matches || []);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [pendingUnmatch, setPendingUnmatch] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -208,10 +209,13 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
   useEffect(() => {
     if (signedOut) return undefined;
     let alive = true;
+    setLoading(true);
     host.api("/api/matches").then((data) => {
       if (alive) setMatches(data.matches || []);
     }).catch((caught) => {
       if (alive) setError(errorMessage(caught, "не удалось загрузить чаты"));
+    }).finally(() => {
+      if (alive) setLoading(false);
     });
     return () => { alive = false; };
   }, [host, signedOut]);
@@ -299,7 +303,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
               ) : (
                 <div class="chat-no-results"><span><SearchIcon /></span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>
               )
-            ) : (
+            ) : loading ? <p class="hint" role="status">Загружаем чаты…</p> : error ? null : (
               <div class="chat-empty">
                 <div class="chat-empty-icon"><ChatIcon /></div>
                 <h2>Первый мэтч — уже начало</h2>
@@ -482,6 +486,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [sendMode] = useState<ChatSendMode>(() => readChatSendMode());
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -505,15 +510,18 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
 
   useEffect(() => {
     const element = threadRef.current;
-    if (!element) return;
+    const content = contentRef.current;
+    if (!element || !content) return;
     let height = element.clientHeight;
+    let contentHeight = content.offsetHeight;
     let frame = 0;
     const remember = () => {
       // A resize-generated scroll must not replace the reader's previous intent.
-      if (element.clientHeight === height) followsEndRef.current = element.scrollHeight - element.scrollTop - height <= 80;
+      if (element.clientHeight === height && content.offsetHeight === contentHeight) followsEndRef.current = element.scrollHeight - element.scrollTop - height <= 80;
     };
     const observer = new ResizeObserver(() => {
       height = element.clientHeight;
+      contentHeight = content.offsetHeight;
       if (followsEndRef.current) {
         scrollToEnd();
         cancelAnimationFrame(frame);
@@ -522,8 +530,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     });
     element.addEventListener("scroll", remember, { passive: true });
     observer.observe(element);
+    observer.observe(content);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); element.removeEventListener("scroll", remember); };
-  }, [chatId]);
+  }, [chatId, Boolean(thread), Boolean(error)]);
 
   const loadThread = async (scroll = false) => {
     const request = ++requestRef.current;
@@ -579,6 +588,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     setRevealed({});
     setError("");
     shouldScrollRef.current = true;
+    followsEndRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
       if (alive && request === requestRef.current) setThread(data as ChatThread);
     }).catch((caught) => {
@@ -595,7 +605,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     };
   }, [chatId, host]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!thread || !shouldScrollRef.current) return;
     shouldScrollRef.current = false;
     const element = threadRef.current;
@@ -614,15 +624,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     element.addEventListener("wheel", markMoved, { passive: true });
     element.addEventListener("touchmove", markMoved, { passive: true });
     element.addEventListener("pointerdown", markMoved);
-    const observer = new ResizeObserver(() => pin());
-    observer.observe(element);
-    if (element.lastElementChild) observer.observe(element.lastElementChild);
-    const stop = window.setTimeout(() => observer.disconnect(), 2500);
     return () => {
       alive = false;
       window.cancelAnimationFrame(frame);
-      window.clearTimeout(stop);
-      observer.disconnect();
       element.removeEventListener("wheel", markMoved);
       element.removeEventListener("touchmove", markMoved);
       element.removeEventListener("pointerdown", markMoved);
@@ -854,7 +858,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const sendPhotos = async () => {
     if (!photos.length || sending) return;
     setSending(true);
-    setPhotoProgress(`Загружаем ${photos.length} фото…`);
+    setPhotoProgress(photos.length === 1 ? "Загружаем фото…" : `Загружаем ${photos.length} фото…`);
     try {
       const form = new FormData();
       form.append("to_id", String(chatId));
@@ -903,6 +907,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       {error ? <p class={styles.error}>{error}</p> : (
         <>
           <div class="thread" id="thread" ref={threadRef}>
+            <div class={styles.threadContent} ref={contentRef}>
             {thread?.messages?.length ? thread.messages.map((message) => (
               <MessageBubble
                 key={message.id}
@@ -928,6 +933,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               </div>
             ) : null}
             {!thread ? <p class="hint">загрузка…</p> : null}
+            </div>
           </div>
           <div class="composer-dock">
             {recordingNotice ? <p class={styles.recordingNotice} role="status">{recordingNotice}</p> : null}
@@ -958,12 +964,12 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               </form>
             )}
           </div>
-          <Modal isOpen={photos.length > 0} onClose={() => !sending && setPhotos([])} title={`Отправить фото · ${photos.length}`} footer={<>
+          <Modal isOpen={photos.length > 0} onClose={() => !sending && setPhotos([])} title={photos.length === 1 ? "Отправить фото" : `Отправить фото · ${photos.length}`} footer={<>
             <Button variant="ghost" disabled={sending} onClick={() => setPhotos([])}>Отмена</Button>
-            <Button variant="solid" disabled={sending} loading={sending} onClick={() => void sendPhotos()}>Отправить вместе</Button>
+            <Button variant="solid" disabled={sending} loading={sending} onClick={() => void sendPhotos()}>{photos.length === 1 ? "Отправить" : "Отправить вместе"}</Button>
           </>}>
-            <div class={styles.photoGroup}>{photos.map(({ url }, index) => <img key={url} src={url} alt={`Фото ${index + 1}`} />)}</div>
-            {photoProgress ? <p role="status">{photoProgress}</p> : <p>Фото отправятся одним сообщением. Можно отменить перед отправкой.</p>}
+            <div class={photos.length === 1 ? styles.singlePhoto : styles.photoGroup}>{photos.map(({ url }, index) => <img key={url} src={url} alt={`Фото ${index + 1}`} />)}</div>
+            {photoProgress ? <p role="status">{photoProgress}</p> : <p>{photos.length === 1 ? "Можно отменить перед отправкой." : "Фото отправятся одним сообщением. Можно отменить перед отправкой."}</p>}
           </Modal>
           <Modal
             isOpen={pendingDelete !== null}

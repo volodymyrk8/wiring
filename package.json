@@ -13,6 +13,7 @@
     "test:deck:browser": "node tests/deck-browser.test.mjs",
     "test:profile:browser": "node tests/own-profile-browser.test.mjs",
     "test:ui:browser": "node tests/ui-bugs-browser.test.mjs",
+    "test:trello:browser": "node tests/trello-bugs-browser.test.mjs",
     "test:inbox": "node --test tests/inbox.test.mjs",
     "test:analytics": "node --test tests/registration-analytics.test.mjs"
   },
