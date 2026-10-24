@@ -272,5 +272,9 @@
 
 .photoGroup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .photoGroup img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+.singlePhoto img { display: block; width: auto; max-width: 100%; max-height: 55vh; margin: auto; object-fit: contain; border-radius: 10px; }
+.threadContent { display: flex; flex-direction: column; flex: 0 0 auto; gap: 7px; min-width: 0; }
+.threadContent > :global(.hint) { align-self: center; }
+.threadContent > :global(.bubble-wrap):last-child { margin-bottom: 10px; }
 
 .recordingNotice { margin: 0; padding: 8px 14px; color: var(--ink); font-size: 12px; line-height: 1.4; background: var(--bg-2); }
