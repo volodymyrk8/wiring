@@ -130,29 +130,6 @@ export function HomeScreen({ host }: HomeScreenProps) {
             </div>
           </div>
 
-          <div class={styles.about}>
-            <div class={styles.aboutFrame}>
-              <p class={styles.plusGiftText} aria-label={tr("подарок WIRING+")}>
-                <span class={styles.plusGiftLead}>{tr("WIRING+ на 3 месяца.")}</span> {tr("Каждому аккаунту — и тем, кто уже с нами, и всем, кто только регистрируется. Спасибо, что помогаете тестировать бета.")}
-              </p>
-              {signed ? (
-                <p class={styles.plusGiftAction}>
-                  <a
-                    class={styles.plusGiftLink}
-                    href={hrefFor("plus")}
-                    data-nav="plus"
-                    onClick={handleNav("plus")}
-                  >
-                    {tr("Посмотреть в профиле")}
-                  </a>
-                </p>
-              ) : (
-                <p class={styles.plusGiftAction}>
-                  <span class={styles.plusGiftNote}>{tr("После входа статус будет в разделе WIRING+.")}</span>
-                </p>
-              )}
-            </div>
-          </div>
           <p class={styles.quiet}>{tr("Можно быть собой.")}</p>
         </div>
       </section>

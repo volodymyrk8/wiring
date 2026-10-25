@@ -2,7 +2,7 @@ type FeatureName = "auth" | "home" | "profile" | "likes" | "person" | "deck" | "
 
 const FEATURE_FILES: Record<FeatureName, string> = {
   auth: "auth.js?v=24",
-  home: "home.js?v=85",
+  home: "home.js?v=86",
   profile: "profile.js?v=49",
   likes: "likes.js?v=35",
   person: "person.js?v=30",
