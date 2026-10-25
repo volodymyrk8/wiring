@@ -176,7 +176,12 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
       <div class={styles.body}>
         <p class={styles.disclaimer}>{tr("Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.")}</p>
         {person.bio ? <p class={styles.bio}>{person.bio}</p> : null}
-        {jobLine ? <p class={styles.factLine}>{tr("Занятость: ")}{jobLine}</p> : null}
+        {jobLine ? (
+          <p class={styles.jobBadge}>
+            <span class={styles.jobBadgeLabel}>{tr("Занятость")}</span>
+            <span class={styles.jobBadgeValue}>{jobLine}</span>
+          </p>
+        ) : null}
         {person.communication ? <div class={styles.prompt}><strong>{tr("как тебе писать")}</strong><p>{person.communication}</p></div> : null}
         {tags.length ? (
           <div class={styles.tagBlock}>
