@@ -4326,8 +4326,8 @@ def marketing_consent():
 def glossary():
     return render_template(
         "legal.html",
-        title=tr("Особенности и аббревиатуры"),
-        description=tr("Что значат ASD, ADHD, AuDHD, ПРЛ, RSD, PDA и остальные особенности на WIRING."),
+        title=tr("Буквы и слова с анкет"),
+        description=tr("Простым языком: что значат ASD, СДВГ, ПРЛ и остальные слова на WIRING."),
         path="/glossary",
         site_url=SITE_URL,
         body=glossary_html(),
