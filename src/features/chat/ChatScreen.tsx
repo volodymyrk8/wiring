@@ -4,6 +4,7 @@ import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/compone
 import { readChatSendMode, shouldSendOnComposerKey, type ChatSendMode } from "@/lib/chat-send-mode";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
+import { micToastMessage, requestMicStream, shouldShowMicToast } from "./mic-access";
 import styles from "./ChatScreen.module.css";
 
 const errorMessage = (caught: unknown, fallback: string) =>
@@ -577,6 +578,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     const request = ++requestRef.current;
     setThread(null);
     setRevealed({});
+    setRecordingNotice("");
     setError("");
     shouldScrollRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
@@ -759,13 +761,18 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
 
   const startRecording = async () => {
     if (sending || recording || editing) return;
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    if (typeof MediaRecorder === "undefined") {
       host.toast("этот браузер не записывает голосовые");
       return;
     }
     try {
       setRecordingNotice("");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mic = await requestMicStream();
+      if (!mic.ok) {
+        if (shouldShowMicToast()) host.toast(micToastMessage(mic.reason));
+        return;
+      }
+      const stream = mic.stream;
       if (!aliveRef.current || document.visibilityState !== "visible") { stream.getTracks().forEach((track) => track.stop()); return; }
       const mime = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg"].find((type) => {
         try { return MediaRecorder.isTypeSupported(type); } catch { return false; }
@@ -810,7 +817,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         if (elapsed >= 90) stopRecording(false);
       }, 250);
     } catch {
-      host.toast("разреши микрофон, чтобы записать голосовое");
+      if (shouldShowMicToast()) host.toast(micToastMessage("failed"));
     }
   };
 
