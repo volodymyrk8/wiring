@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { render } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { Button, Textarea } from "@/components/ui";
@@ -17,9 +18,9 @@ function ReplyComposer({ node }: { node: HTMLElement }) {
     <input type="hidden" name="request_id" value={node.dataset.requestId} />
     {retry ? <input type="hidden" name="body" value={node.dataset.body} /> : <>
       <p class={styles.recipient}>{node.dataset.recipient}</p>
-      <Textarea id={`reply-${node.dataset.kind}-${node.dataset.source}`} name="body" label="Ответ заявителю" value={body} onInput={(event) => setBody(event.currentTarget.value)} maxLength={2000} required rows={3} />
+      <Textarea id={`reply-${node.dataset.kind}-${node.dataset.source}`} name="body" label={tr("Ответ заявителю")} value={body} onInput={(event) => setBody(event.currentTarget.value)} maxLength={2000} required rows={3} />
     </>}
-    <Button type="submit" slim disabled={busy} loading={busy}>{retry ? "Повторить письмо" : "Отправить ответ"}</Button>
+    <Button type="submit" slim disabled={busy} loading={busy}>{retry ? tr("Повторить письмо") : tr("Отправить ответ")}</Button>
   </form>;
 }
 

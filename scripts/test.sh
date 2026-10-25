@@ -22,6 +22,7 @@ if [[ -f package.json ]]; then
   npm run typecheck
   npm run build
   npm run test:router
+  npm run test:i18n
   npm run test:profile
   npm run test:deck
   npm run test:analytics

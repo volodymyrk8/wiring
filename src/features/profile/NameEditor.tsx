@@ -1,3 +1,4 @@
+import { tr, getLocale } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Button, Input, Modal } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
@@ -39,14 +40,14 @@ export function NameEditor({ user, saveName, onChanged }: { user: ProfileUser; s
     }
   };
   return <div class={styles.nameEditor}>
-    <Input label="Имя" name="name" required maxLength={32} value={name} disabled={locked || busy}
-      hint={locked ? `Сменить имя можно ${new Date(available * 1000).toLocaleString("ru")}.` : "После смены следующее изменение будет доступно через 14 дней."}
+    <Input label={tr("Имя")} name="name" required maxLength={32} value={name} disabled={locked || busy}
+      hint={locked ? tr("Сменить имя можно {0}.", new Date(available * 1000).toLocaleString(getLocale())) : tr("После смены следующее изменение будет доступно через 14 дней.")}
       onInput={(event) => { setName(event.currentTarget.value); setError(""); }} />
-    {!locked && name.trim() !== String(user.name || "") ? <Button type="button" slim disabled={!name.trim() || busy} onClick={() => setOpen(true)}>Сменить имя</Button> : null}
+    {!locked && name.trim() !== String(user.name || "") ? <Button type="button" slim disabled={!name.trim() || busy} onClick={() => setOpen(true)}>{tr("Сменить имя")}</Button> : null}
     {error && !open ? <p role="alert">{error}</p> : null}
-    <Modal isOpen={open} onClose={() => { if (!busy) setOpen(false); }} title="Сменить имя?" footer={<>
-      <Button variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Отмена</Button>
-      <Button disabled={busy} loading={busy} onClick={() => void save()}>Подтвердить смену</Button>
-    </>}><p>Имя изменится на «{name.trim()}». Следующая смена будет доступна через 14 дней.</p>{error ? <p role="alert">{error}</p> : null}</Modal>
+    <Modal isOpen={open} onClose={() => { if (!busy) setOpen(false); }} title={tr("Сменить имя?")} footer={<>
+      <Button variant="ghost" disabled={busy} onClick={() => setOpen(false)}>{tr("Отмена")}</Button>
+      <Button disabled={busy} loading={busy} onClick={() => void save()}>{tr("Подтвердить смену")}</Button>
+    </>}><p>{tr("Имя изменится на «")}{name.trim()}{tr("». Следующая смена будет доступна через 14 дней.")}</p>{error ? <p role="alert">{error}</p> : null}</Modal>
   </div>;
 }

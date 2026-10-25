@@ -1,9 +1,11 @@
+import { tr, getLocale } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
 import { readChatSendMode, shouldSendOnComposerKey, type ChatSendMode } from "@/lib/chat-send-mode";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
+import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { micToastMessage, requestMicStream, shouldShowMicToast } from "./mic-access";
 import styles from "./ChatScreen.module.css";
 
@@ -96,21 +98,21 @@ const timeLabel = (timestamp?: number) => {
   const date = new Date(timestamp * 1000);
   const now = new Date();
   return date.toDateString() === now.toDateString()
-    ? date.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("ru", { day: "numeric", month: "short" });
+    ? date.toLocaleTimeString(getLocale(), { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString(getLocale(), { day: "numeric", month: "short" });
 };
 
 const chatTimeLabel = (timestamp?: number) => {
   if (!timestamp) return "";
   const date = new Date(timestamp * 1000);
-  return `${date.toLocaleDateString("ru", { day: "numeric", month: "short" })}, ${date.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${date.toLocaleDateString(getLocale(), { day: "numeric", month: "short" })}, ${date.toLocaleTimeString(getLocale(), { hour: "2-digit", minute: "2-digit" })}`;
 };
 
 const replyText = (message: ChatMessage, revealed = "") => {
   if (revealed) return revealed;
-  if (message.audio_url) return "голосовое";
-  if (message.photo_url && !message.body) return "фото";
-  return message.body || "сообщение";
+  if (message.audio_url) return tr("голосовое");
+  if (message.photo_url && !message.body) return tr("фото");
+  return message.body || tr("сообщение");
 };
 
 const clock = (seconds: number) => {
@@ -137,12 +139,12 @@ function ChatHeader({ host }: { host: ChatHostBridge }) {
     <AppHeader
       homeHref={host.hrefFor("home")}
       onHomeClick={navigate("home")}
-      sectionTitle="чаты"
+      sectionTitle={tr("чаты")}
       showThemeSwatches
       onThemeSelect={host.onThemeSelect}
       rightSlot={
         signedOut ? (
-          <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label="войти">
+          <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label={tr("войти")}>
             <UserIcon />
           </a>
         ) : (
@@ -186,11 +188,11 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
             <h3>{match.name}, {match.age}</h3>
             {match.last_at ? <time class="match-time">{timeLabel(match.last_at)}</time> : null}
           </div>
-          <p>{match.last_message ? `${match.last_from_id === host.user?.id ? "ты: " : ""}${match.last_message}` : "взаимно · напиши первым"}</p>
+          <p>{match.last_message ? `${match.last_from_id === host.user?.id ? tr("ты: ") : ""}${match.last_message}` : tr("взаимно · начни разговор")}</p>
         </div>
         {hasUnread ? <span class={styles.unreadBadge}>{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
       </a>
-      <button type="button" class="match-remove" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(); }} aria-label="Убрать чат" title="Убрать чат">
+      <button type="button" class="match-remove" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onRemove(); }} aria-label={tr("Убрать чат")} title={tr("Убрать чат")}>
         <TrashIcon />
       </button>
     </div>
@@ -212,7 +214,7 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
     host.api("/api/matches").then((data) => {
       if (alive) setMatches(data.matches || []);
     }).catch((caught) => {
-      if (alive) setError(errorMessage(caught, "не удалось загрузить чаты"));
+      if (alive) setError(errorMessage(caught, tr("не удалось загрузить чаты")));
     });
     return () => { alive = false; };
   }, [host, signedOut]);
@@ -246,9 +248,9 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
       await host.api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: pendingUnmatch }) });
       setMatches((current) => current.filter((match) => match.id !== pendingUnmatch));
       setPendingUnmatch(null);
-      host.toast("убрано · в пропущенных");
+      host.toast(tr("убрано · в пропущенных"));
     } catch (caught) {
-      host.toast(errorMessage(caught, "не удалось убрать чат"));
+      host.toast(errorMessage(caught, tr("не удалось убрать чат")));
     } finally {
       setBusy(false);
     }
@@ -264,23 +266,23 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
       <ChatHeader host={host} />
       <main class={signedOut ? styles.guestMain : "chat-list-page"}>
         {signedOut ? (
-          <section class={styles.empty} aria-label="Чаты">
+          <section class={styles.empty} aria-label={tr("Чаты")}>
             <span class={styles.emptyIcon} aria-hidden="true"><ChatIcon /></span>
-            <h2>Чаты после мэтча</h2>
+            <h2>{tr("Чаты после мэтча")}</h2>
             <GuestFlowSteps variant="chats" />
             <div class={styles.guestCta}>
-              <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+              <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>{tr("Создать профиль")}</Button>
               <div class={styles.switchRow}>
-                <span class={styles.switchPrompt}>Уже есть профиль?</span>
-                <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
+                <span class={styles.switchPrompt}>{tr("Уже есть профиль?")}</span>
+                <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>{tr("Войти")}</a>
               </div>
             </div>
           </section>
         ) : (
-          <section class="chat-list-card" aria-label="Список чатов">
+          <section class="chat-list-card" aria-label={tr("Список чатов")}>
             <label class="chat-search">
               <SearchIcon />
-              <input ref={searchRef} type="search" value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder="найти диалог" autocomplete="off" />
+              <input ref={searchRef} type="search" value={query} onInput={(event) => setQuery(event.currentTarget.value)} placeholder={tr("найти диалог")} autocomplete="off" />
               <kbd>⌘ K</kbd>
             </label>
             {error ? <p class={styles.error}>{error}</p> : null}
@@ -298,15 +300,15 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
                   ))}
                 </div>
               ) : (
-                <div class="chat-no-results"><span><SearchIcon /></span><strong>Ничего не нашлось</strong><p>Попробуй поискать по имени или тексту сообщения.</p></div>
+                <div class="chat-no-results"><span><SearchIcon /></span><strong>{tr("Ничего не нашлось")}</strong><p>{tr("Попробуй поискать по имени или тексту сообщения.")}</p></div>
               )
             ) : (
               <div class="chat-empty">
                 <div class="chat-empty-icon"><ChatIcon /></div>
-                <h2>Первый мэтч — уже начало</h2>
-                <p>Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.</p>
+                <h2>{tr("Первый мэтч — уже начало")}</h2>
+                <p>{tr("Лайкни анкету. Если человек ответит тем же, здесь появится ваш разговор.")}</p>
                 <Button variant="solid" slim href={host.hrefFor("deck")} nav="deck" onClick={navigate("deck")}>
-                  перейти в ленту <ArrowIcon />
+                  {tr("перейти в ленту ")}<ArrowIcon />
                 </Button>
               </div>
             )}
@@ -316,15 +318,15 @@ function MatchesScreen({ host }: { host: ChatHostBridge }) {
       <Modal
         isOpen={pendingUnmatch !== null}
         onClose={() => !busy && setPendingUnmatch(null)}
-        title="Убрать чат?"
+        title={tr("Убрать чат?")}
         footer={
           <>
-            <Button variant="ghost" slim disabled={busy} onClick={() => setPendingUnmatch(null)}>отмена</Button>
-            <Button variant="solid" slim disabled={busy} loading={busy} className={styles.dangerButton} onClick={confirmUnmatch}>убрать чат</Button>
+            <Button variant="ghost" slim disabled={busy} onClick={() => setPendingUnmatch(null)}>{tr("отмена")}</Button>
+            <Button variant="solid" slim disabled={busy} loading={busy} className={styles.dangerButton} onClick={confirmUnmatch}>{tr("убрать чат")}</Button>
           </>
         }
       >
-        <p class={styles.modalHint}>Переписка сохранится, но чат исчезнет из списка.</p>
+        <p class={styles.modalHint}>{tr("Переписка сохранится, но чат исчезнет из списка.")}</p>
       </Modal>
     </div>
   );
@@ -413,9 +415,9 @@ function VoiceNote({ src, duration }: { src: string; duration: number }) {
   return (
     <div class="voice-note">
       <audio ref={audioRef} preload="none" />
-      <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? "пауза" : "слушать"}>{playing ? "❚❚" : "▶"}</button>
+      <button type="button" class="voice-play" onClick={toggle} aria-label={playing ? tr("пауза") : tr("слушать")}>{playing ? "❚❚" : "▶"}</button>
       <span class="voice-bar" aria-hidden="true"><i style={{ width: `${progress}%` }} /></span>
-      <span class="voice-duration">{failed ? "не открывается" : clock(shown)}</span>
+      <span class="voice-duration">{failed ? tr("не открывается") : clock(shown)}</span>
     </div>
   );
 }
@@ -444,26 +446,26 @@ function MessageBubble({
   const photos = (message.photo_urls?.length ? message.photo_urls : message.photo_url ? [message.photo_url] : []).map((url) => photoUrl(host.basePath, url));
   const photo = photos[0] || "";
   const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
-  const quote = message.reply_to?.body || (message.reply_to?.has_audio ? "голосовое" : message.reply_to?.has_photo ? "фото" : "");
+  const quote = message.reply_to?.body || (message.reply_to?.has_audio ? tr("голосовое") : message.reply_to?.has_photo ? tr("фото") : "");
   return (
     <div class={`bubble-wrap${message.mine ? " mine" : ""}`} data-msg={message.id}>
       <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`}>
-        {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || "сообщение"}</button> : null}
-        {photos.length ? <div class={photos.length > 1 ? styles.photoGroup : ""}>{photos.map((src, index) => <a key={src} class="bubble-photo" href={src} target="_blank" rel="noopener"><img src={src} alt={`Фото ${index + 1}`} decoding="async" loading="lazy" /></a>)}</div> : null}
+        {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || tr("сообщение")}</button> : null}
+        {photos.length ? <div class={photos.length > 1 ? styles.photoGroup : ""}>{photos.map((src, index) => <a key={src} class="bubble-photo" href={src} target="_blank" rel="noopener"><img src={src} alt={tr("Фото {0}", index + 1)} decoding="async" loading="lazy" /></a>)}</div> : null}
         {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
         {revealedTranscript ? <div class="bubble-transcript">{revealedTranscript}</div> : null}
         {message.body ? <div class="bubble-body">{message.body}</div> : null}
         <span class="time">
-          {message.edited ? <span>изменено</span> : null}
+          {message.edited ? <span>{tr("изменено")}</span> : null}
           {chatTimeLabel(message.created_at)}
-          {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? "прочитано" : "отправлено"}>{message.read ? "✓✓" : "✓"}</i> : null}
+          {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? tr("прочитано") : tr("отправлено")}>{message.read ? "✓✓" : "✓"}</i> : null}
         </span>
       </div>
       <div class="bubble-actions">
-        <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>Ответить</button>
-        {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>Расшифровать</button> : null}
-        {message.mine && !audio ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onEdit} aria-label="Изменить" title="Изменить"><PencilIcon /></button> : null}
-        {message.mine ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onDelete} aria-label="Удалить" title="Удалить"><TrashIcon /></button> : null}
+        <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>{tr("Ответить")}</button>
+        {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>{tr("Расшифровать")}</button> : null}
+        {message.mine && !audio ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onEdit} aria-label={tr("Изменить")} title={tr("Изменить")}><PencilIcon /></button> : null}
+        {message.mine ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onDelete} aria-label={tr("Удалить")} title={tr("Удалить")}><TrashIcon /></button> : null}
       </div>
     </div>
   );
@@ -493,6 +495,13 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [photos, setPhotos] = useState<Array<{ file: File; url: string }>>([]);
   const [photoProgress, setPhotoProgress] = useState("");
   useEffect(() => () => photos.forEach(({ url }) => URL.revokeObjectURL(url)), [photos]);
+  useEffect(() => {
+    const guard = (event: Event) => {
+      if (sending || recording || photos.length > 0) event.preventDefault();
+    };
+    window.addEventListener("wiring:before-language-change", guard);
+    return () => window.removeEventListener("wiring:before-language-change", guard);
+  }, [sending, recording, photos.length]);
   const draftReadyRef = useRef(false);
   const requestRef = useRef(0);
   const aliveRef = useRef(true);
@@ -540,7 +549,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       });
       setError("");
     } catch (caught) {
-      if (aliveRef.current && request === requestRef.current) setError(errorMessage(caught, "не удалось загрузить переписку"));
+      if (aliveRef.current && request === requestRef.current) setError(errorMessage(caught, tr("не удалось загрузить переписку")));
     }
   };
 
@@ -584,7 +593,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     host.api(`/api/messages/${chatId}`).then((data) => {
       if (alive && request === requestRef.current) setThread(data as ChatThread);
     }).catch((caught) => {
-      if (alive) setError(errorMessage(caught, "не удалось загрузить переписку"));
+      if (alive) setError(errorMessage(caught, tr("не удалось загрузить переписку")));
     });
     const timer = window.setInterval(() => {
       if (alive) void loadThread();
@@ -645,7 +654,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         recorderRef.current.stop();
         streamRef.current?.getTracks().forEach((track) => track.stop());
         if (recTimerRef.current) window.clearInterval(recTimerRef.current);
-        setRecordingNotice("Запись отменена при уходе с экрана. Запиши сообщение ещё раз.");
+        setRecordingNotice(tr("Запись отменена при уходе с экрана. Запиши сообщение ещё раз."));
       }
     };
     document.addEventListener("visibilitychange", cancelHidden);
@@ -724,7 +733,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
-      host.toast(errorMessage(caught, editing ? "не удалось изменить сообщение" : "не удалось отправить сообщение"));
+      host.toast(errorMessage(caught, editing ? tr("не удалось изменить сообщение") : tr("не удалось отправить сообщение")));
     } finally {
       setSending(false);
     }
@@ -762,7 +771,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const startRecording = async () => {
     if (sending || recording || editing) return;
     if (typeof MediaRecorder === "undefined") {
-      host.toast("этот браузер не записывает голосовые");
+      host.toast(tr("этот браузер не записывает голосовые"));
       return;
     }
     try {
@@ -802,12 +811,12 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         chunksRef.current = [];
         if (discardRecRef.current) return;
         if (blob.size < 64) {
-          host.toast("не получилось записать звук");
+          host.toast(tr("не получилось записать звук"));
           return;
         }
         setSending(true);
         void sendVoiceBlob(blob, seconds).catch((caught) => {
-          host.toast(errorMessage(caught, "не удалось отправить голосовое"));
+          host.toast(errorMessage(caught, tr("не удалось отправить голосовое")));
         }).finally(() => setSending(false));
       };
       recorder.start();
@@ -831,7 +840,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       setPendingDelete(null);
       await loadThread();
     } catch (caught) {
-      host.toast(errorMessage(caught, "не удалось удалить сообщение"));
+      host.toast(errorMessage(caught, tr("не удалось удалить сообщение")));
     } finally {
       setSending(false);
     }
@@ -845,7 +854,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       const text = String(response.transcript || "");
       if (text) setRevealed((current) => ({ ...current, [message.id]: text }));
     } catch (caught) {
-      host.toast(errorMessage(caught, "не удалось расшифровать"));
+      host.toast(errorMessage(caught, tr("не удалось расшифровать")));
     } finally {
       setSending(false);
     }
@@ -855,13 +864,13 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     const picked = Array.from(event.currentTarget.files || []);
     event.currentTarget.value = "";
     if (!picked.length || sending || recording || editing) return;
-    if (picked.length > 10) host.toast("за раз можно 10 фото");
+    if (picked.length > 10) host.toast(tr("за раз можно 10 фото"));
     setPhotos(picked.slice(0, 10).map((file) => ({ file, url: URL.createObjectURL(file) })));
   };
   const sendPhotos = async () => {
     if (!photos.length || sending) return;
     setSending(true);
-    setPhotoProgress(`Загружаем ${photos.length} фото…`);
+    setPhotoProgress(tr("Загружаем {0} фото…", photos.length));
     try {
       const form = new FormData();
       form.append("to_id", String(chatId));
@@ -871,7 +880,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       await host.api("/api/messages/photo", { method: "POST", body: form });
       setPhotos([]); setDraft(""); setReplyTo(null);
       await loadThread(true);
-    } catch (caught) { host.toast(errorMessage(caught, "не удалось отправить фото")); }
+    } catch (caught) { host.toast(errorMessage(caught, tr("не удалось отправить фото"))); }
     finally { setSending(false); setPhotoProgress(""); }
   };
 
@@ -881,16 +890,16 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     host.navigate(view, params);
   };
 
-  const modeTitle = editing ? "Изменить" : replyTo ? "Ответить" : "";
+  const modeTitle = editing ? tr("Изменить") : replyTo ? tr("Ответить") : "";
   const modePreview = editing ? (editing.body || "") : replyTo ? replyText(replyTo, revealed[replyTo.id] || "") : "";
 
   return (
     <section class="chat-screen">
       <header class={`chat-topbar${modeTitle ? " is-compose" : ""}`}>
         {modeTitle ? (
-          <button class="chat-back" type="button" onClick={cancelComposeMode} aria-label="Отменить" title="Отменить"><ArrowIcon /></button>
+          <button class="chat-back" type="button" onClick={cancelComposeMode} aria-label={tr("Отменить")} title={tr("Отменить")}><ArrowIcon /></button>
         ) : (
-          <a class="chat-back" href={host.hrefFor("matches")} onClick={navigate("matches")} aria-label="Вернуться к чатам" title="Чаты"><ArrowIcon /></a>
+          <a class="chat-back" href={host.hrefFor("matches")} onClick={navigate("matches")} aria-label={tr("Вернуться к чатам")} title={tr("Чаты")}><ArrowIcon /></a>
         )}
         {modeTitle ? (
           <div class="chat-peer">
@@ -899,12 +908,13 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         ) : peer ? (
           <a class="chat-peer" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })}>
             <img src={avatarUrl(host.basePath, peer.photo, peer.name)} alt="" />
-            <span class="chat-peer-copy"><strong>{peer.name}</strong><small>взаимная симпатия</small></span>
+            <span class="chat-peer-copy"><strong>{peer.name}</strong><small>{tr("взаимная симпатия")}</small></span>
           </a>
-        ) : <div class="chat-peer"><span class="chat-peer-copy"><strong>Загрузка…</strong></span></div>}
+        ) : <div class="chat-peer"><span class="chat-peer-copy"><strong>{tr("Загрузка…")}</strong></span></div>}
         <div class="chat-top-actions">
-          {!modeTitle && peer ? <a class="chat-top-action" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })} aria-label="Открыть анкету" title="Анкета"><UserIcon /></a> : null}
-          {!modeTitle && peer ? <button class="chat-top-action chat-remove-action" type="button" onClick={() => onUnmatchRequest(peer.id)} aria-label="Убрать чат" title="Убрать чат"><TrashIcon /></button> : null}
+          <LanguageSwitch />
+          {!modeTitle && peer ? <a class="chat-top-action" href={host.hrefFor("person", { id: peer.id })} onClick={navigate("person", { id: peer.id })} aria-label={tr("Открыть анкету")} title={tr("Анкета")}><UserIcon /></a> : null}
+          {!modeTitle && peer ? <button class="chat-top-action chat-remove-action" type="button" onClick={() => onUnmatchRequest(peer.id)} aria-label={tr("Убрать чат")} title={tr("Убрать чат")}><TrashIcon /></button> : null}
         </div>
       </header>
       {error ? <p class={styles.error}>{error}</p> : (
@@ -923,62 +933,62 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 onJump={jumpTo}
                 revealedTranscript={revealed[message.id] || ""}
               />
-            )) : thread && !(thread.openers?.length) ? <p class="hint">загрузка…</p> : null}
+            )) : thread && !(thread.openers?.length) ? <p class="hint">{tr("загрузка…")}</p> : null}
             {thread?.openers?.length ? (
               <div class={`openers-block${thread.messages?.length ? " openers-block--after-thread" : ""}`}>
                 <p class={thread.openers_after_silence ? "nudge" : "hint"}>
                   {thread.openers_after_silence
-                    ? "Тишина больше трёх дней. Подсказки по анкете — ткни, подправь и отправь."
-                    : "Напиши первым. Подсказки по анкете — ткни, отредактируй и отправь."}
+                    ? tr("Тишина больше трёх дней. Подсказки по анкете — ткни, подправь и отправь.")
+                    : tr("Можно начать разговор так. Подсказки по анкете — ткни, отредактируй и отправь.")}
                 </p>
                 <div class="openers">{(thread.openers || []).map((opener) => <button key={opener} type="button" class="ghost slim opener" onClick={() => setDraft(opener)}>{opener}</button>)}</div>
               </div>
             ) : null}
-            {!thread ? <p class="hint">загрузка…</p> : null}
+            {!thread ? <p class="hint">{tr("загрузка…")}</p> : null}
           </div>
           <div class="composer-dock">
             {recordingNotice ? <p class={styles.recordingNotice} role="status">{recordingNotice}</p> : null}
             {replyTo || editing ? (
               <div class="reply-bar">
                 <span>
-                  <b>{editing ? "изменяешь сообщение" : "ответ на сообщение"}</b>
+                  <b>{editing ? tr("изменяешь сообщение") : tr("ответ на сообщение")}</b>
                   <em>{modePreview}</em>
                 </span>
-                <button type="button" class="reply-cancel" onClick={cancelComposeMode} aria-label="Отменить">×</button>
+                <button type="button" class="reply-cancel" onClick={cancelComposeMode} aria-label={tr("Отменить")}>×</button>
               </div>
             ) : null}
             {recording ? (
               <div class="composer is-recording" role="status">
-                <button type="button" class="composer-text" onClick={() => stopRecording(true)}>Отмена</button>
-                <span class="rec-time">запись {clock(recSeconds)}</span>
-                <button type="button" class="composer-send" onClick={() => stopRecording(false)} aria-label="Отправить голосовое">Отправить</button>
+                <button type="button" class="composer-text" onClick={() => stopRecording(true)}>{tr("Отмена")}</button>
+                <span class="rec-time">{tr("запись ")}{clock(recSeconds)}</span>
+                <button type="button" class="composer-send" onClick={() => stopRecording(false)} aria-label={tr("Отправить голосовое")}>{tr("Отправить")}</button>
               </div>
             ) : (
               <form class={`composer${sending ? " is-sending" : ""}`} onSubmit={sendMessage} aria-busy={sending}>
-                <label class="composer-attach" title="до 10 фото" aria-label="прикрепить фото, до 10">
+                <label class="composer-attach" title={tr("до 10 фото")} aria-label={tr("прикрепить фото, до 10")}>
                   <PhotoIcon />
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden disabled={sending || Boolean(editing)} onChange={pickPhotos} />
                 </label>
-                <button type="button" class="composer-attach" title="голосовое" aria-label="записать голосовое" disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
-                <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} onKeyDown={onComposerKeyDown} placeholder={editing ? "новый текст" : replyTo ? "добавь ответ" : "написать сообщение"} autocomplete="off" disabled={sending} />
-                <button class="composer-send" type="submit" aria-label={editing ? "Сохранить" : "Отправить сообщение"} title={editing ? "Сохранить" : "Отправить"} disabled={sending || !draft.trim()} onMouseDown={(event) => event.preventDefault()}><SendIcon /></button>
+                <button type="button" class="composer-attach" title={tr("голосовое")} aria-label={tr("записать голосовое")} disabled={sending || Boolean(editing)} onClick={() => void startRecording()}><MicIcon /></button>
+                <textarea ref={inputRef} name="body" rows={1} maxlength={1000} value={draft} onInput={(event) => setDraft(event.currentTarget.value)} onKeyDown={onComposerKeyDown} placeholder={editing ? tr("новый текст") : replyTo ? tr("добавь ответ") : tr("написать сообщение")} autocomplete="off" disabled={sending} />
+                <button class="composer-send" type="submit" aria-label={editing ? tr("Сохранить") : tr("Отправить сообщение")} title={editing ? tr("Сохранить") : tr("Отправить")} disabled={sending || !draft.trim()} onMouseDown={(event) => event.preventDefault()}><SendIcon /></button>
               </form>
             )}
           </div>
-          <Modal isOpen={photos.length > 0} onClose={() => !sending && setPhotos([])} title={`Отправить фото · ${photos.length}`} footer={<>
-            <Button variant="ghost" disabled={sending} onClick={() => setPhotos([])}>Отмена</Button>
-            <Button variant="solid" disabled={sending} loading={sending} onClick={() => void sendPhotos()}>Отправить вместе</Button>
+          <Modal isOpen={photos.length > 0} onClose={() => !sending && setPhotos([])} title={tr("Отправить фото · {0}", photos.length)} footer={<>
+            <Button variant="ghost" disabled={sending} onClick={() => setPhotos([])}>{tr("Отмена")}</Button>
+            <Button variant="solid" disabled={sending} loading={sending} onClick={() => void sendPhotos()}>{tr("Отправить вместе")}</Button>
           </>}>
-            <div class={styles.photoGroup}>{photos.map(({ url }, index) => <img key={url} src={url} alt={`Фото ${index + 1}`} />)}</div>
-            {photoProgress ? <p role="status">{photoProgress}</p> : <p>Фото отправятся одним сообщением. Можно отменить перед отправкой.</p>}
+            <div class={styles.photoGroup}>{photos.map(({ url }, index) => <img key={url} src={url} alt={tr("Фото {0}", index + 1)} />)}</div>
+            {photoProgress ? <p role="status">{photoProgress}</p> : <p>{tr("Фото отправятся одним сообщением. Можно отменить перед отправкой.")}</p>}
           </Modal>
           <Modal
             isOpen={pendingDelete !== null}
             onClose={() => !sending && setPendingDelete(null)}
-            title="Удалить сообщение?"
+            title={tr("Удалить сообщение?")}
             footer={<>
-              <Button variant="ghost" slim disabled={sending} onClick={() => setPendingDelete(null)}>отмена</Button>
-              <Button variant="solid" slim disabled={sending} loading={sending} onClick={() => void removeMessage()}>Удалить</Button>
+              <Button variant="ghost" slim disabled={sending} onClick={() => setPendingDelete(null)}>{tr("отмена")}</Button>
+              <Button variant="solid" slim disabled={sending} loading={sending} onClick={() => void removeMessage()}>{tr("Удалить")}</Button>
             </>}
           >{null}</Modal>
         </>
@@ -997,10 +1007,10 @@ export function ChatScreen({ host }: { host: ChatHostBridge }) {
     try {
       await host.api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: pendingUnmatch }) });
       setPendingUnmatch(null);
-      host.toast("убрано · в пропущенных");
+      host.toast(tr("убрано · в пропущенных"));
       host.navigate("matches");
     } catch (caught) {
-      host.toast(errorMessage(caught, "не удалось убрать чат"));
+      host.toast(errorMessage(caught, tr("не удалось убрать чат")));
     } finally {
       setBusy(false);
     }
@@ -1012,15 +1022,15 @@ export function ChatScreen({ host }: { host: ChatHostBridge }) {
       <Modal
         isOpen={host.mode === "chat" && pendingUnmatch !== null}
         onClose={() => !busy && setPendingUnmatch(null)}
-        title="Убрать чат?"
+        title={tr("Убрать чат?")}
         footer={
           <>
-            <Button variant="ghost" slim disabled={busy} onClick={() => setPendingUnmatch(null)}>отмена</Button>
-            <Button variant="solid" slim disabled={busy} loading={busy} className={styles.dangerButton} onClick={confirmUnmatch}>убрать чат</Button>
+            <Button variant="ghost" slim disabled={busy} onClick={() => setPendingUnmatch(null)}>{tr("отмена")}</Button>
+            <Button variant="solid" slim disabled={busy} loading={busy} className={styles.dangerButton} onClick={confirmUnmatch}>{tr("убрать чат")}</Button>
           </>
         }
       >
-        <p class={styles.modalHint}>Переписка сохранится, но чат исчезнет из списка.</p>
+        <p class={styles.modalHint}>{tr("Переписка сохранится, но чат исчезнет из списка.")}</p>
       </Modal>
     </>
   );

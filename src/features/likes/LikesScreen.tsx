@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu, Select, TagPicker } from "@/components/ui";
@@ -44,25 +45,25 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
   return (
     <div class={styles.filters}>
       <div class={styles.filterGroup}>
-        <p class={styles.filterLabel}>диагнозы в лайках</p>
-        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder="Диагноз" searchHaystack={tagSearchHaystack} />
+        <p class={styles.filterLabel}>{tr("диагнозы в лайках")}</p>
+        <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder={tr("Диагноз")} searchHaystack={tagSearchHaystack} />
       </div>
       <div class={styles.filterGroup}>
-        <p class={styles.filterLabel}>вайб</p>
-        <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder="body doubling, вайб…" searchHaystack={tagSearchHaystack} />
+        <p class={styles.filterLabel}>{tr("вайб")}</p>
+        <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder={tr("body doubling, вайб…")} searchHaystack={tagSearchHaystack} />
       </div>
       <div class={styles.filterGroup}>
-        <p class={styles.filterLabel}>формат</p>
+        <p class={styles.filterLabel}>{tr("формат")}</p>
         <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
       </div>
       <div class={styles.range}>
-        <label>от<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
-        <label>до<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
+        <label>{tr("от")}<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
+        <label>{tr("до")}<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
       </div>
-      <Select className={styles.cityField} label="Город" id="likes-city" placeholder="неважно" searchable searchPlaceholder="Город" options={citySelectOptions(cities, host.catalog.city_search, { value: "", label: "неважно" })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город" />
+      <Select className={styles.cityField} label={tr("Город")} id="likes-city" placeholder={tr("неважно")} searchable searchPlaceholder={tr("Город")} options={citySelectOptions(cities, host.catalog.city_search, { value: "", label: tr("неважно") })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город")} />
       <div class={styles.filterFooter}>
-        <Button variant="ghost" slim onClick={onClear}>сбросить</Button>
-        <Button variant="solid" slim onClick={() => onApply(draft)}>применить</Button>
+        <Button variant="ghost" slim onClick={onClear}>{tr("сбросить")}</Button>
+        <Button variant="solid" slim onClick={() => onApply(draft)}>{tr("применить")}</Button>
       </div>
     </div>
   );
@@ -71,13 +72,13 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
 function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: LikeCard; onOpen: () => void }) {
   if (item.hidden || !item.id) {
     return (
-      <button type="button" class={styles.locked} onClick={() => host.navigate("plus")} aria-label="Скрытая симпатия. Узнать о WIRING+">
+      <button type="button" class={styles.locked} onClick={() => host.navigate("plus")} aria-label={tr("Скрытая симпатия. Узнать о WIRING+")}>
         <span class={`${styles.media} ${styles.lockedMedia}`} aria-hidden="true"><span class={styles.silhouette}>🔒</span></span>
         <span class={styles.body}>
-          <span class={styles.head}><strong>Новая симпатия</strong><span class={styles.lockPill}>скрыто</span></span>
-          <span class={styles.meta}>Этот человек лайкнул твою анкету</span>
-          <span class={styles.lockedHint}>Фото и анкета доступны с подпиской WIRING+</span>
-          <span class={styles.cta}>Открыть с WIRING+ →</span>
+          <span class={styles.head}><strong>{tr("Новая симпатия")}</strong><span class={styles.lockPill}>{tr("скрыто")}</span></span>
+          <span class={styles.meta}>{tr("Этот человек лайкнул твою анкету")}</span>
+          <span class={styles.lockedHint}>{tr("Фото и анкета доступны с подпиской WIRING+")}</span>
+          <span class={styles.cta}>{tr("Открыть с WIRING+ →")}</span>
         </span>
       </button>
     );
@@ -112,7 +113,7 @@ function LikeCardView({ host, item, onOpen }: { host: LikesHostBridge; item: Lik
         <span class={styles.meta}>{[item.city, intent].filter(Boolean).join(" · ")}</span>
         {hasTags ? <span class={styles.tags}>{neuroTags}{vibeTags}</span> : null}
         {bio ? <span class={styles.bio}>{bio}</span> : null}
-        <span class={styles.cta}>Смотреть анкету →</span>
+        <span class={styles.cta}>{tr("Смотреть анкету →")}</span>
       </span>
     </a>
   );
@@ -145,7 +146,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
       setLikes((current) => current.filter((card) => card.id !== item.id));
       setPendingPass(null);
       host.onAction(item.id);
-      host.toast(response.matched ? `Взаимно с ${item.name || "тобой"}. Чат в разделе «Чаты».` : direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+      host.toast(response.matched ? tr("Взаимно с {0}. Чат в разделе «Чаты».", item.name || tr("тобой")) : direction === "like" ? tr("Лайк отправлен") : tr("Анкета больше не появится в ленте"));
     } catch (caught) {
       if (!controller.signal.aborted) setError(getErrorMessage(caught));
     } finally {
@@ -154,7 +155,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
   };
   const hasFilters = activeFilters(filters);
   const sortedLikes = useMemo(() => sortLikeCards(likes, sort), [likes, sort]);
-  const sortLabel = LIKES_SORT_OPTIONS.find((option) => option.id === sort)?.label || "Сначала новые";
+  const sortLabel = LIKES_SORT_OPTIONS.find((option) => option.id === sort)?.label || tr("Сначала новые");
 
   useEffect(() => {
     storeLikesSort(sort);
@@ -191,7 +192,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
       host.onUserUpdated(response.user as ProfileUser);
       setCode("");
       setPromoOpen(false);
-      host.toast("WIRING+ включён");
+      host.toast(tr("WIRING+ включён"));
       await apply(filters);
     } catch (caught) {
       setError(getErrorMessage(caught));
@@ -201,7 +202,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
 
   const signedOut = !host.user;
   const isGuest = Boolean(host.user?.guest);
-  const emptyText = host.matchesCount ? "Новых лайков нет — взаимные уже в чатах." : "Когда кто-то лайкнет тебя первым, анкета появится здесь.";
+  const emptyText = host.matchesCount ? tr("Новых лайков нет — взаимные уже в чатах.") : tr("Когда кто-то лайкнет тебя первым, анкета появится здесь.");
   const emptyFiltered = !likes.length && hasFilters;
 
   return (
@@ -209,7 +210,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
       <AppHeader
         homeHref={host.hrefFor("home")}
         onHomeClick={navigate("home")}
-        sectionTitle="лайки"
+        sectionTitle={tr("лайки")}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={host.user && !isGuest ? (
@@ -229,10 +230,10 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
             onArchiveClick={navigate("archive")}
             onLogout={host.onLogout}
           />
-        ) : <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label="войти">♡</a>}
+        ) : <a class="icon-btn profile-slot" href={host.hrefFor("login")} onClick={navigate("login")} aria-label={tr("войти")}>♡</a>}
       />
       <main class={`${styles.content}${signedOut ? ` ${styles.contentCentered}` : ""}`}>
-        {host.user?.needs_profile && !host.user.guest ? <aside class={styles.nudge}><div><strong>Анкета ещё пустая</strong><p>Добавь фото, город и особенности, чтобы тебя находили.</p></div><Button slim href={host.hrefFor("profile")} nav="profile" onClick={navigate("profile")}>дозаполнить</Button></aside> : null}
+        {host.user?.needs_profile && !host.user.guest ? <aside class={styles.nudge}><div><strong>{tr("Анкета ещё пустая")}</strong><p>{tr("Добавь фото, город и особенности, чтобы тебя находили.")}</p></div><Button slim href={host.hrefFor("profile")} nav="profile" onClick={navigate("profile")}>{tr("дозаполнить")}</Button></aside> : null}
         {!signedOut && (likes.length || hasFilters || filtersOpen || sortOpen) ? (
           <div class={styles.toolbar}>
             <Button
@@ -246,7 +247,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
               }}
             >
               {iconSort}
-              <span>{sortOpen ? "скрыть сортировку" : "сортировка"}</span>
+              <span>{sortOpen ? tr("скрыть сортировку") : tr("сортировка")}</span>
               {!sortOpen ? <span class={styles.sortHint}>{sortLabel}</span> : null}
             </Button>
             <Button
@@ -260,13 +261,13 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
               }}
             >
               {iconFilter}
-              <span>{filtersOpen ? "скрыть фильтры" : "фильтры"}</span>
+              <span>{filtersOpen ? tr("скрыть фильтры") : tr("фильтры")}</span>
               {hasFilters ? <span class={styles.filterDot} /> : null}
             </Button>
           </div>
         ) : null}
         {sortOpen ? (
-          <div class={styles.sortPanel} role="group" aria-label="Сортировка лайков">
+          <div class={styles.sortPanel} role="group" aria-label={tr("Сортировка лайков")}>
             {LIKES_SORT_OPTIONS.map((option) => (
               <button
                 key={option.id}
@@ -282,56 +283,56 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
         ) : null}
         {host.user && !host.user.plus && likes.length ? (
           <section class={styles.gate}>
-            <div class={styles.gateTop}><span class={styles.gateBadge}>{isGuest ? "гость" : "WIRING+"}</span><div class={styles.gateInfo}><strong>{isGuest ? "Создай свой профиль" : "Узнай, кто тебя лайкнул"}</strong><p>{isGuest ? "Чтобы видеть, кто проявил интерес, и начинать диалоги." : "С WIRING+ входящие симпатии открыты сразу."}</p></div></div>
-            <div class={styles.gateActions}>{isGuest ? <Button slim href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать анкету</Button> : <><Button slim href={host.hrefFor("plus")} nav="plus" onClick={navigate("plus")}>Узнать о WIRING+</Button><Button variant="ghost" slim onClick={() => setPromoOpen((open) => !open)}>{promoOpen ? "Скрыть промокод" : "Ввести промокод"}</Button></>}</div>
-            {promoOpen ? <div class={styles.promo}><input value={code} maxlength={24} placeholder="Промокод WIRING+" onInput={(event) => setCode(event.currentTarget.value)} /><Button slim disabled={busy} loading={busy} onClick={() => void redeem()}>Активировать</Button></div> : null}
+            <div class={styles.gateTop}><span class={styles.gateBadge}>{isGuest ? tr("гость") : "WIRING+"}</span><div class={styles.gateInfo}><strong>{isGuest ? tr("Создай свой профиль") : tr("Узнай, кто тебя лайкнул")}</strong><p>{isGuest ? tr("Чтобы видеть, кто проявил интерес, и начинать диалоги.") : tr("С WIRING+ входящие симпатии открыты сразу.")}</p></div></div>
+            <div class={styles.gateActions}>{isGuest ? <Button slim href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>{tr("Создать анкету")}</Button> : <><Button slim href={host.hrefFor("plus")} nav="plus" onClick={navigate("plus")}>{tr("Узнать о WIRING+")}</Button><Button variant="ghost" slim onClick={() => setPromoOpen((open) => !open)}>{promoOpen ? tr("Скрыть промокод") : tr("Ввести промокод")}</Button></>}</div>
+            {promoOpen ? <div class={styles.promo}><input value={code} maxlength={24} placeholder={tr("Промокод WIRING+")} onInput={(event) => setCode(event.currentTarget.value)} /><Button slim disabled={busy} loading={busy} onClick={() => void redeem()}>{tr("Активировать")}</Button></div> : null}
           </section>
         ) : null}
         {filtersOpen ? <FilterPanel host={host} filters={filters} onApply={(next) => void apply(next)} onClear={clear} /> : null}
         {likes.length ? <div class={styles.cards}>{sortedLikes.map((item, index) => <div key={item.id || `hidden-${index}`}>
           <LikeCardView host={host} item={item} onOpen={() => item.id && host.navigate("person", { id: item.id })} />
           {item.id && !item.hidden ? <div class={styles.cardActions}>
-            <Button variant="ghost" slim disabled={busy} ariaLabel={`Скрыть: ${item.name || "анкету"}`} onClick={() => { setError(""); setPendingPass(item); }}>Скрыть</Button>
-            <Button slim disabled={busy} ariaLabel={`Лайк: ${item.name || "анкету"}`} onClick={() => void act(item, "like")}>Лайк</Button>
+            <Button variant="ghost" slim disabled={busy} ariaLabel={tr("Скрыть: {0}", item.name || tr("анкету"))} onClick={() => { setError(""); setPendingPass(item); }}>{tr("Скрыть")}</Button>
+            <Button slim disabled={busy} ariaLabel={tr("Лайк: {0}", item.name || tr("анкету"))} onClick={() => void act(item, "like")}>{tr("Лайк")}</Button>
           </div> : null}
         </div>)}</div> : (
           <section class={styles.empty}>
             <span class={styles.emptyIcon}>{emptyFiltered ? iconFilter : iconLike}</span>
             <h2>
-              {emptyFiltered ? "Ничего не найдено" : signedOut ? "Кто тебя лайкнул" : isGuest ? "Создай свой профиль" : "Пока нет новых лайков"}
+              {emptyFiltered ? tr("Ничего не найдено") : signedOut ? tr("Кто тебя лайкнул") : isGuest ? tr("Создай свой профиль") : tr("Пока нет новых лайков")}
             </h2>
             {!signedOut ? (
               <p>
                 {emptyFiltered
-                  ? "По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска."
+                  ? tr("По выбранным фильтрам пока нет анкет. Попробуй изменить параметры поиска.")
                   : isGuest
-                    ? "Чтобы видеть людей, которым ты нравишься, и начинать диалоги."
+                    ? tr("Чтобы видеть людей, которым ты нравишься, и начинать диалоги.")
                     : emptyText}
               </p>
             ) : null}
             {emptyFiltered ? (
-              <Button variant="ghost" slim onClick={clear}>Сбросить фильтры</Button>
+              <Button variant="ghost" slim onClick={clear}>{tr("Сбросить фильтры")}</Button>
             ) : signedOut ? (
               <>
                 <GuestFlowSteps variant="likes" />
                 <div class={styles.guestCta}>
-                <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+                <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>{tr("Создать профиль")}</Button>
                 <div class={styles.switchRow}>
-                  <span class={styles.switchPrompt}>Уже есть профиль?</span>
-                  <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
+                  <span class={styles.switchPrompt}>{tr("Уже есть профиль?")}</span>
+                  <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>{tr("Войти")}</a>
                 </div>
               </div>
               </>
             ) : (
-              <Button variant="solid" slim onClick={navigate(isGuest ? "register" : "deck")}>{isGuest ? "Создать анкету" : "Смотреть ленту"}</Button>
+              <Button variant="solid" slim onClick={navigate(isGuest ? "register" : "deck")}>{isGuest ? tr("Создать анкету") : tr("Смотреть ленту")}</Button>
             )}
           </section>
         )}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </main>
-      <Modal isOpen={pendingPass !== null} onClose={() => { if (!busy) setPendingPass(null); }} title="Больше не показывать?" responsiveSheet
-        footer={<><Button variant="ghost" disabled={busy} onClick={() => setPendingPass(null)}>Отмена</Button><Button disabled={busy} loading={busy} onClick={() => pendingPass && void act(pendingPass, "pass")}>Исключить</Button></>}>
-        <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
+      <Modal isOpen={pendingPass !== null} onClose={() => { if (!busy) setPendingPass(null); }} title={tr("Больше не показывать?")} responsiveSheet
+        footer={<><Button variant="ghost" disabled={busy} onClick={() => setPendingPass(null)}>{tr("Отмена")}</Button><Button disabled={busy} loading={busy} onClick={() => pendingPass && void act(pendingPass, "pass")}>{tr("Исключить")}</Button></>}>
+        <p>{tr("Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.")}</p>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </Modal>
     </div>

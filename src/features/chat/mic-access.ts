@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 const MIC_GRANTED_KEY = "wiring-mic-granted";
 const MIC_LOST_KEY = "wiring-mic-lost";
 const MIC_TOAST_AT_KEY = "wiring-mic-toast-at";
@@ -44,16 +45,16 @@ export async function requestMicStream(): Promise<MicRequestResult> {
 }
 
 export function micToastMessage(reason: "denied" | "failed" | "unsupported"): string {
-  if (reason === "unsupported") return "этот браузер не записывает голосовые";
-  if (reason === "failed") return "не получилось включить микрофон";
+  if (reason === "unsupported") return tr("этот браузер не записывает голосовые");
+  if (reason === "failed") return tr("не получилось включить микрофон");
   try {
     if (localStorage.getItem(MIC_LOST_KEY) === "1" || localStorage.getItem(MIC_GRANTED_KEY) === "1") {
-      return "Safari сбросил доступ к микрофону. Включи его для сайта: aA → «Настройки для сайта» → Микрофон.";
+      return tr("Safari сбросил доступ к микрофону. Включи его для сайта: aA → «Настройки для сайта» → Микрофон.");
     }
   } catch {
     /* ignore */
   }
-  return "разреши микрофон, чтобы записать голосовое";
+  return tr("разреши микрофон, чтобы записать голосовое");
 }
 
 /** Avoid the same mic toast on every tap after reopening the PWA. */

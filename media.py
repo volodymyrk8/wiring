@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from i18n import tr
+
 import io
 import os
 from typing import BinaryIO
@@ -42,14 +44,14 @@ def crop_portrait(image: Image.Image) -> Image.Image:
 
 def process_image(raw: bytes, *, portrait: bool = False) -> bytes:
     if len(raw) > MAX_UPLOAD_BYTES:
-        raise MediaError("файл больше 8 МБ — сожми или выбери другое фото")
+        raise MediaError(tr("файл больше 8 МБ — сожми или выбери другое фото"))
     if len(raw) < 32:
-        raise MediaError("это не похоже на фото")
+        raise MediaError(tr("это не похоже на фото"))
     try:
         image = Image.open(io.BytesIO(raw))
         image.load()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise MediaError("нужен jpg, png или webp") from exc
+        raise MediaError(tr("нужен jpg, png или webp")) from exc
     image = ImageOps.exif_transpose(image)
     if image.mode not in {"RGB", "L"}:
         image = image.convert("RGB")
@@ -57,7 +59,7 @@ def process_image(raw: bytes, *, portrait: bool = False) -> bytes:
         image = image.convert("RGB")
     width, height = image.size
     if min(width, height) < MIN_EDGE:
-        raise MediaError("фото слишком маленькое")
+        raise MediaError(tr("фото слишком маленькое"))
     if portrait:
         image = crop_portrait(image)
     image.thumbnail((MAX_EDGE, MAX_EDGE))
@@ -71,7 +73,7 @@ def make_thumb(raw: bytes, edge: int = THUMB_EDGE) -> bytes:
         image = Image.open(io.BytesIO(raw))
         image.load()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise MediaError("нужен jpg, png или webp") from exc
+        raise MediaError(tr("нужен jpg, png или webp")) from exc
     image = ImageOps.exif_transpose(image)
     image = image.convert("RGB")
     image.thumbnail((edge, edge))
@@ -82,11 +84,11 @@ def make_thumb(raw: bytes, edge: int = THUMB_EDGE) -> bytes:
 
 def read_upload(file_storage, *, portrait: bool = False) -> bytes:
     if file_storage is None:
-        raise MediaError("выбери файл")
+        raise MediaError(tr("выбери файл"))
     name = (file_storage.filename or "").lower()
     ext = os.path.splitext(name)[1]
     if ext and ext not in ALLOWED_EXT:
-        raise MediaError("нужен jpg, png или webp")
+        raise MediaError(tr("нужен jpg, png или webp"))
     raw = file_storage.read(MAX_UPLOAD_BYTES + 1)
     if isinstance(file_storage.stream, BinaryIO) or hasattr(file_storage, "seek"):
         try:

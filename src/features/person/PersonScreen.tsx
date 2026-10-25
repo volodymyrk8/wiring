@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Modal, ProfileMenu, TagHints } from "@/components/ui";
@@ -55,7 +56,7 @@ function PersonHeader({ host }: { host: PersonHostBridge }) {
   return <AppHeader
     homeHref={host.hrefFor("home")}
     onHomeClick={navigate("home")}
-    sectionTitle="анкета"
+    sectionTitle={tr("анкета")}
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
     rightSlot={<ProfileMenu
@@ -111,12 +112,12 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     if (confirm === "block") {
       await host.api("/api/block", { method: "POST", body: JSON.stringify({ user_id: person.id }) });
       setConfirm(null);
-      host.toast("в блоке");
+      host.toast(tr("в блоке"));
       host.navigate(backView);
     } else if (confirm === "unmatch") {
       await host.api("/api/unmatch", { method: "POST", body: JSON.stringify({ user_id: person.id }) });
       setConfirm(null);
-      host.toast("убрано · в пропущенных");
+      host.toast(tr("убрано · в пропущенных"));
       host.navigate("matches");
     }
   });
@@ -124,7 +125,7 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
     if (!reportReason) return;
     await host.api("/api/report", { method: "POST", body: JSON.stringify({ user_id: person.id, reason: reportReason, details: reportDetails }) });
     setReportOpen(false);
-    host.toast("жалоба отправлена, человек скрыт");
+    host.toast(tr("жалоба отправлена, человек скрыт"));
     host.navigate(backView);
   });
   const onHeroClick = (event: JSX.TargetedMouseEvent<HTMLDivElement>) => {
@@ -136,9 +137,10 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   const looking = labelsFor(host.catalog, "looking_for", person.looking_for);
   const intents = labelsFor(host.catalog, "intents", person.intents?.length ? person.intents : person.intent);
   const showGender = person.gender && person.gender !== "hidden" && person.gender !== "other" && person.gender !== "nb";
-  const meta = [person.city, person.job, person.height ? `${person.height} см` : "", ...(showGender ? gender : [])].filter(Boolean).join(" · ");
+  const meta = [tr(person.city || ""), person.height ? tr("{0} см", person.height) : "", ...(showGender ? gender : [])].filter(Boolean).join(" · ");
+  const jobLine = String(person.job || "").trim();
   const intentLine = openToIntentsLine(person.gender, intents);
-  const secondaryMeta = [...(looking.length ? [`ищет ${looking.join(", ")}`] : []), intentLine].filter(Boolean).join(" · ");
+  const secondaryMeta = [...(looking.length ? [tr("ищет {0}", looking.join(", "))] : []), intentLine].filter(Boolean).join(" · ");
   const split = splitCatalogTags(person.neuro, person.vibe, host.catalog);
   const sharedNeuro = isSelf ? new Set<string>() : sharedNeuroIdSet(host.user.neuro, person.neuro, host.catalog);
   const sharedVibes = isSelf ? new Set<string>() : sharedVibeIdSet(host.user.vibe, person.vibe, host.catalog);
@@ -158,26 +160,27 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
   return <div class={styles.root}>
     <PersonHeader host={host} />
     <main class={styles.content}>
-      <Button variant="ghost" slim href={host.hrefFor(backView)} nav={backView} onClick={go(backView)} className={styles.back}>{iconArrow}<span>назад</span></Button>
+      <Button variant="ghost" slim href={host.hrefFor(backView)} nav={backView} onClick={go(backView)} className={styles.back}>{iconArrow}<span>{tr("назад")}</span></Button>
       <section {...gesture} class={styles.hero} style={{ "--photo-aspect": photoAspect }} tabIndex={photos.length > 1 ? 0 : -1} onClick={onHeroClick}
-        onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); } }} aria-label={`Фото анкеты ${person.name}`}>
+        onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowRight" ? 1 : -1); } }} aria-label={tr("Фото анкеты {0}", person.name)}>
         {photos.length > 1 ? <div class={styles.dots}>{photos.map((_, index) => <i key={index} class={index === photoIndex ? styles.active : ""} />)}</div> : null}
-        <img class={styles.heroImage} src={photoUrl(host.basePath, photos[photoIndex] || person.photo, person.name)} alt={`Фото ${photoIndex + 1} из ${photos.length || 1}: ${person.name}`} draggable={false}
+        <img class={styles.heroImage} src={photoUrl(host.basePath, photos[photoIndex] || person.photo, person.name)} alt={tr("Фото {0} из {1}: {2}", photoIndex + 1, photos.length || 1, person.name)} draggable={false}
            />
         <div class={styles.heroOverlay}>
-          <h1>{person.online ? <span class={styles.online} aria-label="в сети" /> : null}{person.name}{person.age ? `, ${person.age}` : ""}</h1>
+          <h1>{person.online ? <span class={styles.online} aria-label={tr("в сети")} /> : null}{person.name}{person.age ? `, ${person.age}` : ""}</h1>
           {meta ? <p class={styles.meta}>{meta}</p> : null}
           {secondaryMeta ? <p class={`${styles.meta} ${styles.metaSecondary}`}>{secondaryMeta}</p> : null}
         </div>
       </section>
-      {photos.length > 1 ? <div class={styles.photoStrip} aria-label="Фотографии анкеты">{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-pressed={index === photoIndex} aria-label={`Фото ${index + 1} из ${photos.length}`}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
+      {photos.length > 1 ? <div class={styles.photoStrip} aria-label={tr("Фотографии анкеты")}>{photos.map((photo, index) => <button type="button" data-photo={index} key={`${photoName(photo)}-${index}`} class={`${styles.photoThumb} ${index === photoIndex ? styles.active : ""}`} onClick={() => selectPhoto(index)} aria-pressed={index === photoIndex} aria-label={tr("Фото {0} из {1}", index + 1, photos.length)}><img src={photoUrl(host.basePath, photo, person.name)} alt="" /></button>)}</div> : null}
       <div class={styles.body}>
-        <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
+        <p class={styles.disclaimer}>{tr("Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.")}</p>
         {person.bio ? <p class={styles.bio}>{person.bio}</p> : null}
-        {person.communication ? <div class={styles.prompt}><strong>как тебе писать</strong><p>{person.communication}</p></div> : null}
+        {jobLine ? <p class={styles.factLine}>{tr("Занятость: ")}{jobLine}</p> : null}
+        {person.communication ? <div class={styles.prompt}><strong>{tr("как тебе писать")}</strong><p>{person.communication}</p></div> : null}
         {tags.length ? (
           <div class={styles.tagBlock}>
-            {hasShared ? <p class={styles.tagLegend}>Яркие — совпадает с твоей анкетой</p> : null}
+            {hasShared ? <p class={styles.tagLegend}>{tr("Яркие — совпадает с твоей анкетой")}</p> : null}
             <TagHints tags={tags} />
           </div>
         ) : null}
@@ -185,36 +188,36 @@ export function PersonScreen({ host }: { host: PersonHostBridge }) {
         <div class={styles.actions}>
           {isSelf ? (
             <>
-              <Button fullWidth href={host.hrefFor("edit-profile")} onClick={go("edit-profile")}>Редактировать анкету</Button>
-              <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>Лайки, дизлайки, блок</Button>
+              <Button fullWidth href={host.hrefFor("edit-profile")} onClick={go("edit-profile")}>{tr("Редактировать анкету")}</Button>
+              <Button variant="ghost" fullWidth href={host.hrefFor("archive")} nav="archive" onClick={go("archive")}>{tr("Лайки, дизлайки, блок")}</Button>
             </>
           ) : null}
           {!isSelf && (host.personFrom === "deck" || host.personFrom === "recommendations" || host.personFrom === "likes") ? <>
-            <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => setPassOpen(true)} aria-label="Скрыть — больше не показывать" title="Скрыть">{iconPass}</button>
-            {host.user.plus ? <button type="button" class={`${styles.actionIcon} ${styles.snooze}`} disabled={busy} onClick={() => performSwipe("snooze")} aria-label="отложить на неделю" title="отложить на неделю">{iconClock}</button> : null}
-            <button type="button" class={`${styles.actionIcon} ${styles.like}`} disabled={busy} onClick={() => performSwipe("like")} aria-label="лайк" title="лайк">{iconLike}</button>
+            <button type="button" class={`${styles.actionIcon} ${styles.pass}`} disabled={busy} onClick={() => setPassOpen(true)} aria-label={tr("Скрыть — больше не показывать")} title={tr("Скрыть")}>{iconPass}</button>
+            {host.user.plus ? <button type="button" class={`${styles.actionIcon} ${styles.snooze}`} disabled={busy} onClick={() => performSwipe("snooze")} aria-label={tr("отложить на неделю")} title={tr("отложить на неделю")}>{iconClock}</button> : null}
+            <button type="button" class={`${styles.actionIcon} ${styles.like}`} disabled={busy} onClick={() => performSwipe("like")} aria-label={tr("лайк")} title={tr("лайк")}>{iconLike}</button>
           </> : null}
-          {!isSelf && person.matched ? <Button slim className={styles.matchedAction} href={host.hrefFor("chat", { id: person.id })} nav="chat" onClick={go("chat", { id: person.id })}>написать</Button> : null}
+          {!isSelf && person.matched ? <Button slim className={styles.matchedAction} href={host.hrefFor("chat", { id: person.id })} nav="chat" onClick={go("chat", { id: person.id })}>{tr("написать")}</Button> : null}
         </div>
         {!isSelf ? <div class={styles.safety}>
-          {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("unmatch")}>размэтчить</Button> : null}
-          {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("block")}>в блок</Button> : null}
-          <Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(true)}>пожаловаться</Button>
+          {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("unmatch")}>{tr("размэтчить")}</Button> : null}
+          {person.matched ? <Button variant="ghost" slim disabled={busy} onClick={() => setConfirm("block")}>{tr("в блок")}</Button> : null}
+          <Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(true)}>{tr("пожаловаться")}</Button>
         </div> : null}
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
-        <Button variant="ghost" fullWidth href={host.hrefFor(backView)} nav={backView} onClick={go(backView)}>{iconArrow}<span>назад</span></Button>
+        <Button variant="ghost" fullWidth href={host.hrefFor(backView)} nav={backView} onClick={go(backView)}>{iconArrow}<span>{tr("назад")}</span></Button>
       </div>
     </main>
-    <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title="Больше не показывать?" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>Отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>Исключить</Button></>}>
-      <p class={styles.modalHint}>Эта анкета больше не появится в ленте. Вернуть её можно в своём профиле, рядом с «Редактировать анкету». Чтобы просто закрыть анкету, нажми «назад».</p>
+    <Modal isOpen={passOpen} onClose={() => { if (!busy) setPassOpen(false); }} title={tr("Больше не показывать?")} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setPassOpen(false)}>{tr("Отмена")}</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void run(async () => { await host.swipe("pass"); setPassOpen(false); })}>{tr("Исключить")}</Button></>}>
+      <p class={styles.modalHint}>{tr("Эта анкета больше не появится в ленте. Вернуть её можно в своём профиле, рядом с «Редактировать анкету». Чтобы просто закрыть анкету, нажми «назад».")}</p>
     </Modal>
-    <Modal isOpen={confirm !== null} onClose={() => !busy && setConfirm(null)} title={confirm === "unmatch" ? "Убрать чат?" : "Скрыть человека?"} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setConfirm(null)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={confirmAction}>{confirm === "unmatch" ? "убрать чат" : "скрыть"}</Button></>}>
-      <p class={styles.modalHint}>{confirm === "unmatch" ? "Переписка сохранится, но чат исчезнет из списка." : "Человек исчезнет из ленты и чатов."}</p>
+    <Modal isOpen={confirm !== null} onClose={() => !busy && setConfirm(null)} title={confirm === "unmatch" ? tr("Убрать чат?") : tr("Скрыть человека?")} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setConfirm(null)}>{tr("отмена")}</Button><Button variant="solid" slim loading={busy} disabled={busy} onClick={confirmAction}>{confirm === "unmatch" ? tr("убрать чат") : tr("скрыть")}</Button></>}>
+      <p class={styles.modalHint}>{confirm === "unmatch" ? tr("Переписка сохранится, но чат исчезнет из списка.") : tr("Человек исчезнет из ленты и чатов.")}</p>
     </Modal>
-    <Modal isOpen={reportOpen} onClose={() => !busy && setReportOpen(false)} title="Пожаловаться" footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(false)}>отмена</Button><Button variant="solid" slim loading={busy} disabled={busy || !reportReason} onClick={submitReport}>отправить</Button></>}>
+    <Modal isOpen={reportOpen} onClose={() => !busy && setReportOpen(false)} title={tr("Пожаловаться")} footer={<><Button variant="ghost" slim disabled={busy} onClick={() => setReportOpen(false)}>{tr("отмена")}</Button><Button variant="solid" slim loading={busy} disabled={busy || !reportReason} onClick={submitReport}>{tr("отправить")}</Button></>}>
       <div class={styles.reportForm}>
         <div class={styles.reportReasons}>{reportReasons.map((reason) => <label class={styles.reason} key={reason.id}><input type="radio" name="person-report-reason" value={reason.id} checked={reportReason === reason.id} onChange={() => setReportReason(reason.id)} /> <span>{reason.label}</span></label>)}</div>
-        <label class={styles.reportDetailsLabel}>коротко, если нужно<textarea maxlength={280} rows={3} value={reportDetails} onInput={(event) => setReportDetails(event.currentTarget.value)} /></label>
+        <label class={styles.reportDetailsLabel}>{tr("коротко, если нужно")}<textarea maxlength={280} rows={3} value={reportDetails} onInput={(event) => setReportDetails(event.currentTarget.value)} /></label>
       </div>
     </Modal>
   </div>;

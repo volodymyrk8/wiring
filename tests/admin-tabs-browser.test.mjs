@@ -13,6 +13,8 @@ import re
 from collections import defaultdict
 from jinja2 import Environment, FileSystemLoader
 env = Environment(loader=FileSystemLoader('templates'), autoescape=True)
+from i18n import tr
+env.globals.update(_=tr, language='ru')
 stats = defaultdict(int)
 for key in re.findall(r'for \\w+ in s\\.(\\w+)', open('templates/admin.html').read()):
     stats[key] = []

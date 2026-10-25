@@ -1,6 +1,8 @@
 """Server-side Jev ranking and persisted recommendation access."""
 from __future__ import annotations
 
+from i18n import tr
+
 import json
 import math
 import os
@@ -81,28 +83,28 @@ def match_reasons(viewer: Any, candidate: Any, *, max_items: int = 3) -> list[st
 
     shared_neuro = signals["shared_neuro"]
     if shared_neuro:
-        labels = [_NEURO_LABEL.get(tag, tag) for tag in shared_neuro[:4]]
+        labels = [tr(_NEURO_LABEL.get(tag, tag)) for tag in shared_neuro[:4]]
         suffix = f" (+{len(shared_neuro) - 4})" if len(shared_neuro) > 4 else ""
-        reasons.append(f"Общие отметки о диагнозах: {', '.join(labels)}{suffix}")
+        reasons.append(tr("Общие отметки о диагнозах: {0}{1}", ", ".join(labels), suffix))
 
     shared_vibe = signals["shared_vibe"]
     if shared_vibe and len(reasons) < max_items:
-        labels = [_VIBE_LABEL.get(tag, tag) for tag in shared_vibe[:3]]
-        reasons.append(f"Совпадает вайб: {', '.join(labels)}")
+        labels = [tr(_VIBE_LABEL.get(tag, tag)) for tag in shared_vibe[:3]]
+        reasons.append(tr("Совпадает вайб: {0}", ", ".join(labels)))
 
     if signals["same_city"] and len(reasons) < max_items:
-        reasons.append("Один город — проще встретиться офлайн")
+        reasons.append(tr("Один город — проще встретиться офлайн"))
 
     shared_intents = signals["shared_intent_ids"]
     if shared_intents and len(reasons) < max_items:
-        labels = [_INTENT_LABEL.get(tag, tag) for tag in shared_intents[:3]]
-        reasons.append(f"Схожие цели: {', '.join(labels)}")
+        labels = [tr(_INTENT_LABEL.get(tag, tag)) for tag in shared_intents[:3]]
+        reasons.append(tr("Схожие цели: {0}", ", ".join(labels)))
 
     if signals["age_gap_band"] in {"0-2", "3-5"} and len(reasons) < max_items:
-        reasons.append("Близкий возраст")
+        reasons.append(tr("Близкий возраст"))
 
     if not reasons:
-        reasons.append("Анкета подходит под ваши взаимные предпочтения видимости")
+        reasons.append(tr("Анкета подходит под ваши взаимные предпочтения видимости"))
 
     return reasons[:max_items]
 

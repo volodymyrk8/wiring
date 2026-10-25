@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 /** One placement and dismissal model for notices on every screen. */
 export function showToast(text: string, action?: () => void) {
   let stack = document.getElementById("toasts");
@@ -17,7 +18,7 @@ export function showToast(text: string, action?: () => void) {
   close.type = "button";
   close.className = "toast-close";
   close.textContent = "×";
-  close.setAttribute("aria-label", "Закрыть уведомление");
+  close.setAttribute("aria-label", tr("Закрыть уведомление"));
   const timer = window.setTimeout(() => dismiss(), action ? 5000 : 1800);
   const dismiss = () => { clearTimeout(timer); el.remove(); };
   close.addEventListener("click", dismiss);

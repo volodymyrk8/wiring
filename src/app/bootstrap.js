@@ -1,3 +1,4 @@
+import { tr, syncAccountLanguage } from "@/lib/i18n";
 import { showToast } from "./toasts";
 import { applyTheme, themeNow } from "../lib/theme";
 import { fetchFeed, resetFeed, fetchRecommendations } from "./feed";
@@ -24,7 +25,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         if (state.user?.id !== owner) return;
         return api("/api/me/theme", { method: "PATCH", body: JSON.stringify({ theme }) });
       }).catch(() => {
-        if (state.user?.id === owner) toast("Не удалось сохранить тему в аккаунте. Выбери её ещё раз.");
+        if (state.user?.id === owner) toast(tr("Не удалось сохранить тему в аккаунте. Выбери её ещё раз."));
       }).finally(() => { pendingThemes--; });
     }
   };
@@ -370,6 +371,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const me = await api("/api/me");
     if (owner && state.user?.id !== owner) return;
     state.user = me.user;
+    if (await syncAccountLanguage(me.user)) { location.reload(); return; }
     if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;
     state.unread = me.user?.unread_chats ?? me.user?.unread ?? 0;
@@ -388,18 +390,18 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const from = state.personFrom;
     const isTab = kind === "tab";
     const items = [
-      ["home", "Главная", ICONS.home, state.view === "home"],
-      ["deck", "Лента", ICONS.feed, state.view === "deck" || (state.view === "person" && from === "deck")],
-      ["likes", "Лайки", friendlyLike().icon === ICONS.thumb ? ICONS.thumb : ICONS.heart, state.view === "likes" || (state.view === "person" && from === "likes")],
+      ["home", tr("Главная"), ICONS.home, state.view === "home"],
+      ["deck", tr("Лента"), ICONS.feed, state.view === "deck" || (state.view === "person" && from === "deck")],
+      ["likes", tr("Лайки"), friendlyLike().icon === ICONS.thumb ? ICONS.thumb : ICONS.heart, state.view === "likes" || (state.view === "person" && from === "likes")],
       [
         "matches",
-        "Чаты",
+        tr("Чаты"),
         ICONS.chat,
         state.view === "matches" || state.view === "chat" || (state.view === "person" && (from === "matches" || from === "chat")),
       ],
     ];
     if (state.user?.jev_feed_beta && state.user?.jev_feed_enabled) {
-      items.splice(2, 0, ["recommendations", "Для тебя", ICONS.heart, state.view === "recommendations" || (state.view === "person" && from === "recommendations")]);
+      items.splice(2, 0, ["recommendations", tr("Для тебя"), ICONS.heart, state.view === "recommendations" || (state.view === "person" && from === "recommendations")]);
     }
     if (isTab) {
       const isMe =
@@ -410,7 +412,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         || state.view === "login"
         || (state.view === "person" && from === "profile");
       const dest = state.user ? "profile" : "login";
-      const label = state.user ? "Профиль" : "Войти";
+      const label = state.user ? tr("Профиль") : tr("Войти");
       const icon = state.user
         ? photoRef(state.user.photo)
           ? `<span class="nav-avatar"><img src="${avatarUrl(state.user.photo, state.user.name)}" alt=""></span>`
@@ -432,7 +434,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const tabbar = () =>
     showsTabbar()
-      ? `<nav class="tabbar" aria-label="разделы">${navLinks("tab")}</nav>`
+      ? tr("<nav class=\"tabbar\" aria-label=\"разделы\">{0}</nav>", navLinks("tab"))
       : "";
 
   const friendlyLike = () => {
@@ -440,8 +442,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const soft = intents.length > 0 && intents.every((id) => id === "friends" || id === "chat");
     return {
       icon: soft ? ICONS.thumb : ICONS.like,
-      label: soft ? "лайк / ок" : "лайк",
-      title: soft ? "лайк — дружба или общение" : "лайк",
+      label: soft ? tr("лайк / ок") : tr("лайк"),
+      title: soft ? tr("лайк — дружба или общение") : tr("лайк"),
     };
   };
 
@@ -492,12 +494,12 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       state.index = Math.min(state.index, state.cards.length);
       state.photoIndex = 0;
       if (data.matched && data.match?.id) {
-        toast(`взаимно с ${data.match.name}. Чат в разделе «Чаты».`);
+        toast(tr("взаимно с {0}. Чат в разделе «Чаты».", data.match.name));
       }
-      if (direction === "snooze") toast("отложено на неделю");
+      if (direction === "snooze") toast(tr("отложено на неделю"));
     } catch (err) {
       if (err?.payload?.matched && err.payload?.match?.id) {
-        toast(`${err.message} Чат в разделе «Чаты».`);
+        toast(tr("{0} Чат в разделе «Чаты».", err.message));
         state.busy = false;
         render();
         return;
@@ -530,6 +532,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   };
 
   const inboxController = createInboxController({
+    translate: tr,
     api,
     root,
     state,
@@ -772,7 +775,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       persistFilters();
     },
     onMatch: (match) => {
-      toast(`взаимно с ${match.name || "тобой"}. Чат в разделе «Чаты».`);
+      toast(tr("взаимно с {0}. Чат в разделе «Чаты».", match.name || tr("тобой")));
     },
     api,
     toast,
@@ -872,18 +875,18 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       state.verifyEmail = email;
       state.user = null;
       state.view = "verify";
-      toast("проверь почту — нужна ссылка подтверждения");
+      toast(tr("проверь почту — нужна ссылка подтверждения"));
       render();
     },
     onAuthSuccess: async (mode, data) => {
       state.user = data.user;
       restoreDeckFilters();
       if (data.user?.theme) applyTheme(data.user.theme);
-      if (mode === "login" && data.restored) toast("профиль восстановлен");
+      if (mode === "login" && data.restored) toast(tr("профиль восстановлен"));
       if (mode === "register") {
         sessionStorage.removeItem("wiring-ref");
         state.pendingRef = "";
-        if (data.user?.plus) toast("WIRING+ за приглашение");
+        if (data.user?.plus) toast(tr("WIRING+ за приглашение"));
         await refreshMe();
       }
       startInbox();
@@ -1011,7 +1014,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      mountEl.innerHTML = `<p class="err">не загрузился модуль auth (${err.message}). выполни npm run build</p>`;
+      mountEl.innerHTML = tr("<p class=\"err\">не загрузился модуль auth ({0}). выполни npm run build</p>", err.message);
     }
   };
 
@@ -1028,8 +1031,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль home (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль home (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль home ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль home ({0}).", err.message));
     }
   };
 
@@ -1055,8 +1058,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль profile (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль profile (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль profile ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль profile ({0}).", err.message));
     }
   };
 
@@ -1074,8 +1077,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль likes (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль likes (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль likes ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль likes ({0}).", err.message));
     }
   };
 
@@ -1101,8 +1104,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль person (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль person (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль person ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль person ({0}).", err.message));
     }
   };
 
@@ -1135,8 +1138,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль deck (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль deck (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль deck ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль deck ({0}).", err.message));
     }
   };
 
@@ -1161,8 +1164,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль account (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль account (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль account ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль account ({0}).", err.message));
     }
   };
 
@@ -1181,8 +1184,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль chat (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль chat (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль chat ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль chat ({0}).", err.message));
     }
   };
 
@@ -1201,8 +1204,8 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       bindDataNavLinks();
       syncUrl();
     } catch (err) {
-      root.innerHTML = `<p class="err">не загрузился модуль support (${escapeHtml(err.message)}). выполни npm run build</p>`;
-      toast(`не загрузился модуль support (${err.message}).`);
+      root.innerHTML = tr("<p class=\"err\">не загрузился модуль support ({0}). выполни npm run build</p>", escapeHtml(err.message));
+      toast(tr("не загрузился модуль support ({0}).", err.message));
     }
   };
 
@@ -1249,7 +1252,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       supportFeatureUnmount = null;
     }
     if (!state.catalog) {
-      root.innerHTML = `<p class="lede">загрузка…</p>`;
+      root.innerHTML = tr("<p class=\"lede\">загрузка…</p>");
       return;
     }
     if (state.view === "register" && (!state.user || state.user.guest)) {
@@ -1344,7 +1347,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
       void renderProfileFeature(state.view);
       return;
     }
-    else root.innerHTML = `<p class="err">неизвестный раздел приложения</p>`;
+    else root.innerHTML = tr("<p class=\"err\">неизвестный раздел приложения</p>");
 
     if (bound) {
       root.innerHTML = bound.html;
@@ -1388,7 +1391,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         state.user = data.user;
       if (data.user?.theme) applyTheme(data.user.theme);
         state.verifyEmail = "";
-        toast("почта подтверждена");
+        toast(tr("почта подтверждена"));
         startInbox();
         state.view = state.user?.needs_profile ? "edit-profile" : "deck";
         if (state.view === "deck") await loadFeed();
@@ -1397,7 +1400,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
         state.verifyEmail = "";
         state.view = "verify";
         render();
-        toast(err.message || "ссылка не сработала");
+        toast(err.message || tr("ссылка не сработала"));
       }
       return;
     }
@@ -1452,6 +1455,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const [catalog, me] = await Promise.all([api("/api/catalog"), api("/api/me")]);
     state.catalog = catalog;
     state.user = me.user;
+    if (await syncAccountLanguage(me.user)) { location.reload(); return; }
     if (me.user) restoreDeckFilters();
     if (me.user?.theme && !pendingThemes) applyTheme(me.user.theme);
     state.likesIn = me.user?.likes_in || 0;

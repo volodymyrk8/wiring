@@ -447,3 +447,15 @@
     max-height: 50px;
   }
 }
+
+.language { flex: 0 0 auto; width: 54px; font-family: var(--sans); }
+.language > span { position: absolute; top: 100%; right: 0; max-width: 280px; background: var(--bg); color: var(--ink); padding: 8px; font-size: 13px; }
+.language button { min-height: 40px; padding-inline: 8px; }
+
+@media (max-width: 380px) {
+  .inner { gap: 6px; }
+  .headerEnd { gap: 5px; }
+  .brandName { font-size: 23px; }
+  .brandSection { max-width: 74px; overflow: hidden; text-overflow: ellipsis; }
+  .language { width: 44px; }
+}

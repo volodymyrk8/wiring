@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from i18n import tr
+
 import json
 import os
 import secrets
@@ -53,9 +55,9 @@ def audio_kind(data: bytes, content_type: str) -> tuple[str, str] | None:
 def transcribe_audio(data: bytes, filename: str, mime: str) -> str:
     key = (os.environ.get("OPENAI_API_KEY") or "").strip()
     if not key:
-        raise SpeechError("расшифровка не настроена")
+        raise SpeechError(tr("расшифровка не настроена"))
     if not data:
-        raise SpeechError("пустое голосовое")
+        raise SpeechError(tr("пустое голосовое"))
     model = (os.environ.get("OPENAI_TRANSCRIBE_MODEL") or "whisper-1").strip()
     boundary = "----wiring" + secrets.token_hex(12)
     body = b"".join(
@@ -93,8 +95,8 @@ def transcribe_audio(data: bytes, filename: str, mime: str) -> str:
         with urllib.request.urlopen(request, timeout=45) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-        raise SpeechError("не удалось расшифровать") from exc
+        raise SpeechError(tr("не удалось расшифровать")) from exc
     text = str(payload.get("text") or "").strip()
     if not text:
-        raise SpeechError("в записи не слышно слов")
+        raise SpeechError(tr("в записи не слышно слов"))
     return text[:2000]

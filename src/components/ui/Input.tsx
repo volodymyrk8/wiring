@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import styles from "./Input.module.css";
@@ -36,13 +37,13 @@ function calculateStrength(pwd: string): {
   tone: "none" | "weak" | "medium" | "strong";
 } {
   if (!pwd) return { score: 0, label: "", tone: "none" };
-  if (pwd.length < 6) return { score: 1, label: "минимум 6 символов", tone: "weak" };
+  if (pwd.length < 6) return { score: 1, label: tr("минимум 6 символов"), tone: "weak" };
 
   const hasMixed = /[A-Za-zА-Яа-я]/.test(pwd) && /[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
   if (pwd.length >= 10 || (pwd.length >= 8 && hasMixed)) {
-    return { score: 3, label: "отличный пароль", tone: "strong" };
+    return { score: 3, label: tr("отличный пароль"), tone: "strong" };
   }
-  return { score: 2, label: "хороший пароль", tone: "medium" };
+  return { score: 2, label: tr("хороший пароль"), tone: "medium" };
 }
 
 export function Input({
@@ -143,8 +144,8 @@ export function Input({
           <button
             type="button"
             class={`${styles.actionBtn}${visible ? ` ${styles.active}` : ""}`}
-            aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
-            title={visible ? "Скрыть пароль" : "Показать пароль"}
+            aria-label={visible ? tr("Скрыть пароль") : tr("Показать пароль")}
+            title={visible ? tr("Скрыть пароль") : tr("Показать пароль")}
             onClick={() => setVisible((v) => !v)}
             tabIndex={-1}
           >

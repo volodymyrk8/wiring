@@ -3,6 +3,8 @@
 | Suite | Command | What it covers |
 |-------|---------|----------------|
 | **Typecheck** | `npm run typecheck` | Strict TypeScript and Vite configuration check |
+| **Languages** | `npm run test:i18n` and Python `test_i18n.py` | English coverage, placeholders, original member text, static legal/glossary copy, canonical catalog ids, persistence and failure/guest paths |
+| **Languages in browser (optional)** | `npm run test:i18n:browser` (after build, same Playwright overrides) | English screens, RU/EN switching, saved preference and chat drafts, unchanged member content and mobile/desktop layout |
 | **Router** | `npm run test:router` (after `npm run build`) | SPA paths, guards, `hrefFor` — `tests/router.test.mjs` |
 | **Deck browser (optional)** | `npm run test:deck:browser` (after build, Playwright installed) | Built deck and recommendations: touch inertia, cancellation, resize, photo/keyboard navigation, action buttons and recommendation position restoration after navigation (fresh/reordered/removed candidates, exhausted list, retry, explicit refresh and aborted response) |
 | **UI bug regressions (optional)** | `npm run test:ui:browser` (after build, same Playwright overrides) | Incoming like actions, confirmation/cancel/error, duplicate and navigation guards, bottom profile back, country search and unread badge alignment |

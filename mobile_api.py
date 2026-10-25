@@ -11,6 +11,8 @@ and a replayed (already used) refresh token revokes its whole family.
 
 from __future__ import annotations
 
+from i18n import tr
+
 import hashlib
 import json
 import os
@@ -135,7 +137,7 @@ def install(
         client_version = request.headers.get("X-App-Version", "")
         if minimum and client_version and version_too_old(client_version, minimum):
             return _error(
-                "версия приложения устарела — обнови WIRING",
+                tr("версия приложения устарела — обнови WIRING"),
                 426,
                 upgrade=True,
                 min_version=minimum,
@@ -145,7 +147,7 @@ def install(
             return None
         row = user_for_token(header[7:].strip())
         if row is None:
-            return _error("токен недействителен", 401, token_expired=True)
+            return _error(tr("токен недействителен"), 401, token_expired=True)
         session.permanent = False
         session["uid"] = int(row["id"])
         # Request-scoped only: never persist a cookie for token clients.
@@ -165,7 +167,7 @@ def install(
         conn = db()
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row or row["deleted_at"]:
-            return _error("аккаунт недоступен", 401)
+            return _error(tr("аккаунт недоступен"), 401)
         payload = _login_payload(conn, row, secrets.token_hex(12), device)
         conn.commit()
         session.clear()
@@ -182,7 +184,7 @@ def install(
     def api_auth_token():
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
         if too_many(f"login:{ip}", 20, 300):
-            return _error("слишком много попыток", 429)
+            return _error(tr("слишком много попыток"), 429)
         data = request.get_json(silent=True) or {}
         email = str(data.get("email") or "").strip().lower()
         password = str(data.get("password") or "")
@@ -210,7 +212,7 @@ def install(
         ).fetchone()
         now = int(time.time())
         if not found:
-            return _error("сессия недействительна", 401, token_expired=True)
+            return _error(tr("сессия недействительна"), 401, token_expired=True)
         if found["used_at"] or found["revoked_at"]:
             # Replay of a rotated token: assume theft and kill the whole family.
             conn.execute(
@@ -218,7 +220,7 @@ def install(
                 (now, found["family"]),
             )
             conn.commit()
-            return _error("сессия недействительна", 401, token_expired=True)
+            return _error(tr("сессия недействительна"), 401, token_expired=True)
         user = conn.execute("SELECT * FROM users WHERE id = ?", (found["user_id"],)).fetchone()
         gone = not user or ("deleted_at" in user.keys() and user["deleted_at"])
         if found["expires_at"] < now or gone or found["pw"] != _pw_fingerprint(str(user["password_hash"])):
@@ -227,7 +229,7 @@ def install(
                 (now, found["family"]),
             )
             conn.commit()
-            return _error("сессия недействительна", 401, token_expired=True)
+            return _error(tr("сессия недействительна"), 401, token_expired=True)
         # Claim the refresh atomically. Two requests can both read the unused row
         # above; only one may rotate it under PostgreSQL's concurrent row locking.
         claimed = conn.execute(
@@ -243,7 +245,7 @@ def install(
                 (now, found["family"]),
             )
             conn.commit()
-            return _error("сессия недействительна", 401, token_expired=True)
+            return _error(tr("сессия недействительна"), 401, token_expired=True)
         payload = _login_payload(conn, user, str(found["family"]), str(found["device"] or ""))
         conn.commit()
         return jsonify(payload)
@@ -285,18 +287,18 @@ def install(
     def api_push_device_register():
         uid = session.get("uid")
         if not uid:
-            return _error("нужна сессия", 401)
+            return _error(tr("нужна сессия"), 401)
         data = request.get_json(silent=True) or {}
         token = str(data.get("token") or "").strip()
         platform = str(data.get("platform") or "").strip().lower()
         if not _EXPO_TOKEN_RE.match(token):
-            return _error("неверный push-токен", 400)
+            return _error(tr("неверный push-токен"), 400)
         if platform not in _PLATFORMS:
-            return _error("platform: ios или android", 400)
+            return _error(tr("platform: ios или android"), 400)
         conn = db()
         row = conn.execute("SELECT notify_enabled, notify_push FROM users WHERE id = ?", (uid,)).fetchone()
         if not row or not int(row["notify_enabled"] or 0) or not int(row["notify_push"] or 0):
-            return _error("сначала включи пуш в уведомлениях", 403)
+            return _error(tr("сначала включи пуш в уведомлениях"), 403)
         now = int(time.time())
         conn.execute(
             """
@@ -314,7 +316,7 @@ def install(
     def api_push_device_delete():
         uid = session.get("uid")
         if not uid:
-            return _error("нужна сессия", 401)
+            return _error(tr("нужна сессия"), 401)
         data = request.get_json(silent=True) or {}
         conn = db()
         conn.execute(

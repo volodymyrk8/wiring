@@ -1,6 +1,8 @@
 """Server-side OAuth code flow; provider tokens never enter browser storage."""
 from __future__ import annotations
 
+from i18n import tr
+
 import base64
 import hashlib
 import json
@@ -64,10 +66,10 @@ def _json_request(url, *, data=None, headers=None):
         with urlopen(req, timeout=8) as response:
             payload = json.loads(response.read(65536))
         if not isinstance(payload, dict) or payload.get('error'):
-            raise OAuthError('Не удалось войти. Попробуй ещё раз.')
+            raise OAuthError(tr("Не удалось войти. Попробуй ещё раз."))
         return payload
     except (URLError, TimeoutError, ValueError, OSError) as exc:
-        raise OAuthError('Сервис входа временно недоступен. Попробуй ещё раз.') from exc
+        raise OAuthError(tr("Сервис входа временно недоступен. Попробуй ещё раз.")) from exc
 
 
 def _apple_identity(token, client_id, nonce):
@@ -86,7 +88,7 @@ def _apple_identity(token, client_id, nonce):
             raise ValueError('email not verified')
         return info
     except (jwt.PyJWTError, ValueError, TypeError, KeyError, StopIteration) as exc:
-        raise OAuthError('Не удалось проверить аккаунт Apple. Начни вход заново.') from exc
+        raise OAuthError(tr("Не удалось проверить аккаунт Apple. Начни вход заново.")) from exc
 
 
 def exchange_identity(provider, code, redirect_uri, verifier):
@@ -102,23 +104,23 @@ def exchange_identity(provider, code, redirect_uri, verifier):
     else:
         token = tokens.get('access_token')
         if not isinstance(token, str) or not token:
-            raise OAuthError('Не удалось войти. Попробуй ещё раз.')
+            raise OAuthError(tr("Не удалось войти. Попробуй ещё раз."))
         info = _json_request(info_url, headers={'Authorization': f'{"Bearer" if provider == "google" else "OAuth"} {token}'})
     email = str(info.get('default_email' if provider == 'yandex' else 'email') or '').strip().lower()
     subject = str(info.get('id' if provider == 'yandex' else 'sub') or '').strip()
     if not subject or len(subject) > 255 or not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
-        raise OAuthError('Сервис входа не передал адрес почты. Разреши доступ к почте и повтори вход.')
+        raise OAuthError(tr("Сервис входа не передал адрес почты. Разреши доступ к почте и повтори вход."))
     if email.endswith(('@wiring.guest', '@wiring.demo', '@deleted.wiring')) or email == 'demo@wiring.app':
-        raise OAuthError('Этот адрес нельзя использовать для входа.')
+        raise OAuthError(tr("Этот адрес нельзя использовать для входа."))
     if provider == 'google' and info.get('email_verified') is not True:
-        raise OAuthError('Сначала подтверди почту в аккаунте Google.')
+        raise OAuthError(tr("Сначала подтверди почту в аккаунте Google."))
     if provider == 'yandex' and info.get('client_id') != client_id:
-        raise OAuthError('Не удалось проверить аккаунт Яндекса.')
+        raise OAuthError(tr("Не удалось проверить аккаунт Яндекса."))
     # Third-party addresses in Google accounts aren't authoritative for linking.
     authoritative = (email.endswith('@gmail.com') or bool(info.get('hd'))) if provider == 'google' else provider == 'yandex' and email.rsplit('@', 1)[1] in {
         'yandex.ru', 'yandex.com', 'ya.ru', 'yandex.by', 'yandex.kz', 'yandex.ua', 'yandex.com.tr'}
-    name = str(info.get('given_name' if provider == 'google' else 'first_name') or info.get('display_name') or 'Участник').strip()[:32]
-    return subject, email, name if len(name) >= 2 else 'Участник', authoritative
+    name = str(info.get('given_name' if provider == 'google' else 'first_name') or info.get('display_name') or tr("Участник")).strip()[:32]
+    return subject, email, name if len(name) >= 2 else tr("Участник"), authoritative
 
 
 def install(app, *, db, prefix, site_url, create_user, too_many, grace):
@@ -146,24 +148,24 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
     @app.post('/api/auth/<provider>/start')
     def auth_start(provider):
         if provider not in PROVIDERS or not all(credentials(provider)):
-            return jsonify(ok=False, error='Этот способ входа пока не настроен.'), 503
+            return jsonify(ok=False, error=tr("Этот способ входа пока не настроен.")), 503
         if request.headers.get('Origin') and request.headers['Origin'].rstrip('/') != request.host_url.rstrip('/'):
-            return jsonify(ok=False, error='Открой вход на сайте WIRING.'), 403
+            return jsonify(ok=False, error=tr("Открой вход на сайте WIRING.")), 403
         if too_many(f'oauth:{request.remote_addr}', 20, 300):
-            return jsonify(ok=False, error='Слишком много попыток. Подожди.'), 429
+            return jsonify(ok=False, error=tr("Слишком много попыток. Подожди.")), 429
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
-            return jsonify(ok=False, error='Некорректный запрос.'), 400
+            return jsonify(ok=False, error=tr("Некорректный запрос.")), 400
         mode = data.get('mode')
         if mode not in ('login', 'register'):
-            return jsonify(ok=False, error='Выбери вход или регистрацию.'), 400
+            return jsonify(ok=False, error=tr("Выбери вход или регистрацию.")), 400
         if mode == 'register' and (data.get('age_confirm') is not True or data.get('privacy_confirm') is not True):
-            return jsonify(ok=False, error='Подтверди возраст 18+ и согласие с правилами.'), 400
+            return jsonify(ok=False, error=tr("Подтверди возраст 18+ и согласие с правилами.")), 400
         native = data.get('native') is True
         challenge, native_state = data.get('code_challenge'), data.get('native_state')
         if native and (not isinstance(challenge, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', challenge)
                        or not isinstance(native_state, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,100}', native_state)):
-            return jsonify(ok=False, error='Некорректное подтверждение приложения.'), 400
+            return jsonify(ok=False, error=tr("Некорректное подтверждение приложения.")), 400
         # Keep the browser cookie on its starting host, but only for explicitly trusted origins.
         allowed_origins = {value.strip().rstrip('/') for value in
                            os.environ.get('OAUTH_ALLOWED_ORIGINS', site_url).split(',') if value.strip()}
@@ -197,7 +199,7 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         state, ticket = request.args.get('state', ''), request.args.get('ticket', '')
         flow = db().execute('SELECT * FROM oauth_flows WHERE state_hash = ?', (hashlib.sha256(state.encode()).hexdigest(),)).fetchone()
         if not flow or not flow['native_challenge'] or int(time.time()) - flow['created_at'] > TTL or not secrets.compare_digest(ticket, flow['browser']):
-            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+            return jsonify(ok=False, error=tr("Вход устарел. Начни заново.")), 400
         session['oauth_browser'] = flow['browser']
         provider = flow['provider']
         auth_url, _, _, scope = PROVIDERS[provider]
@@ -214,16 +216,16 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
     def auth_native_exchange():
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
-            return jsonify(ok=False, error='Некорректный запрос.'), 400
+            return jsonify(ok=False, error=tr("Некорректный запрос.")), 400
         code, verifier = str(data.get('code') or ''), str(data.get('code_verifier') or '')
         if not re.fullmatch(r'[A-Za-z0-9._~-]{43,128}', verifier) or not code:
-            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+            return jsonify(ok=False, error=tr("Вход устарел. Начни заново.")), 400
         conn = db()
         found = conn.execute('SELECT * FROM oauth_native_codes WHERE code_hash = ? FOR UPDATE', (hashlib.sha256(code.encode()).hexdigest(),)).fetchone()
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
         if not found or int(time.time()) - found['created_at'] > 60 or not secrets.compare_digest(challenge, found['challenge']):
             conn.rollback()
-            return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+            return jsonify(ok=False, error=tr("Вход устарел. Начни заново.")), 400
         conn.execute('DELETE FROM oauth_native_codes WHERE code_hash = ?', (found['code_hash'],))
         # The session issuer commits the one-time consumption with the refresh token.
         return current_app.extensions['wiring_native_session'](int(found['user_id']), 'native OAuth')
@@ -231,12 +233,12 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
     @app.route('/api/auth/<provider>/callback', methods=['GET', 'POST'])
     def auth_callback(provider):
         if provider not in PROVIDERS or not all(credentials(provider)):
-            return failure('Этот способ входа пока не настроен.')
+            return failure(tr("Этот способ входа пока не настроен."))
         # Apple posts cross-site, where SameSite=Lax omits our browser cookie.
         # Hold the response server-side, then require that cookie on a same-site GET.
         if request.method == 'POST':
             if provider != 'apple':
-                return jsonify(ok=False, error='Некорректный запрос.'), 405
+                return jsonify(ok=False, error=tr("Некорректный запрос.")), 405
             state = request.form.get('state', '')[:512]
             payload = json.dumps({key: request.form.get(key, '')[:4096] for key in ('code', 'error')})
             conn = db()
@@ -244,7 +246,7 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
                                   (payload, hashlib.sha256(state.encode()).hexdigest(), provider, int(time.time()) - TTL)).rowcount
             conn.commit()
             if not stored:
-                return jsonify(ok=False, error='Вход устарел. Начни заново.'), 400
+                return jsonify(ok=False, error=tr("Вход устарел. Начни заново.")), 400
             return redirect(prefix('/api/auth/apple/callback') + '?' + urlencode({'state': state}), 303)
         state = request.args.get('state', '')[:512]
         conn = db()
@@ -253,18 +255,18 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         browser = session.get('oauth_browser', '')
         if not flow or flow['provider'] != provider or not browser or not secrets.compare_digest(browser, flow['browser']):
             conn.rollback()
-            return failure('Вход устарел. Начни заново.')
+            return failure(tr("Вход устарел. Начни заново."))
         conn.execute('DELETE FROM oauth_flows WHERE state_hash = ?', (flow['state_hash'],))
         conn.commit()  # Consume once before talking to the provider, including failed/cancelled flows.
         session.pop('oauth_browser', None)
         mode = flow['mode']
         if int(time.time()) - flow['created_at'] > TTL:
-            return failure('Вход устарел. Начни заново.', mode, flow['native_state'])
+            return failure(tr("Вход устарел. Начни заново."), mode, flow['native_state'])
         payload = json.loads(flow['callback_payload']) if provider == 'apple' and flow['callback_payload'] else request.args
         if provider == 'apple' and not flow['callback_payload']:
-            return failure('Вход устарел. Начни заново.', mode, flow['native_state'])
+            return failure(tr("Вход устарел. Начни заново."), mode, flow['native_state'])
         if payload.get('error') or not payload.get('code'):
-            return failure('Вход отменён. Можно попробовать снова.', mode, flow['native_state'])
+            return failure(tr("Вход отменён. Можно попробовать снова."), mode, flow['native_state'])
         created = False
         try:
             subject, email, name, authoritative = exchange_identity(provider, payload['code'], flow['redirect_uri'], flow['verifier'])
@@ -274,22 +276,22 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
             if not row:
                 row = conn.execute('SELECT * FROM users WHERE email = ? FOR UPDATE', (email,)).fetchone()
                 if row and (not authoritative or not row['email_verified_at'] or row['is_seed']):
-                    raise OAuthError('Эта почта уже зарегистрирована. Войди с паролем или восстанови его через «Забыли пароль».')
+                    raise OAuthError(tr("Эта почта уже зарегистрирована. Войди с паролем или восстанови его через «Забыли пароль»."))
                 if not row:
                     if mode != 'register':
-                        raise OAuthError('Аккаунта ещё нет. Открой «Создать профиль» и зарегистрируйся через этот сервис.')
+                        raise OAuthError(tr("Аккаунта ещё нет. Открой «Создать профиль» и зарегистрируйся через этот сервис."))
                     uid = create_user(conn, email, name, flow['referral'])
                     created = True
                     row = conn.execute('SELECT * FROM users WHERE id = ?', (uid,)).fetchone()
                 conn.execute('INSERT INTO oauth_identities (provider, subject, user_id) VALUES (?, ?, ?)', (provider, subject, row['id']))
             deleted = int(row['deleted_at'] or 0)
             if deleted and int(time.time()) - deleted > grace:
-                raise OAuthError('Аккаунт удалён, срок восстановления прошёл.')
+                raise OAuthError(tr("Аккаунт удалён, срок восстановления прошёл."))
             conn.execute('UPDATE users SET deleted_at = NULL, last_seen = ? WHERE id = ?', (int(time.time()), row['id']))
             conn.commit()
         except (OAuthError, IntegrityError) as exc:
             conn.rollback()
-            return failure(str(exc) if isinstance(exc, OAuthError) else 'Этот аккаунт уже связан с другим входом. Используй прежний способ входа.', mode, flow['native_state'])
+            return failure(str(exc) if isinstance(exc, OAuthError) else tr("Этот аккаунт уже связан с другим входом. Используй прежний способ входа."), mode, flow['native_state'])
         if flow['native_challenge']:
             code = secrets.token_urlsafe(32)
             conn.execute('DELETE FROM oauth_native_codes WHERE created_at < ?', (int(time.time()) - 60,))

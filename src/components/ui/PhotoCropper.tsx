@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { Button } from "./Button";
@@ -56,7 +57,7 @@ function release(source: Source | null) {
   if (source.image instanceof ImageBitmap) source.image.close();
 }
 
-export function PhotoCropper({ file, title = "Кадр", busy = false, error = "", onConfirm, onCancel }: PhotoCropperProps) {
+export function PhotoCropper({ file, title = tr("Кадр"), busy = false, error = "", onConfirm, onCancel }: PhotoCropperProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sourceRef = useRef<Source | null>(null);
@@ -288,17 +289,17 @@ export function PhotoCropper({ file, title = "Кадр", busy = false, error = "
       closeOnEsc={!busy}
       ariaLabel={title}
       footer={failed ? (
-        <Button type="button" variant="ghost" onClick={onCancel}>Закрыть</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>{tr("Закрыть")}</Button>
       ) : (
         <>
-          <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>Отмена</Button>
-          <Button type="button" disabled={!ready || busy} loading={busy} onClick={confirm}>Готово</Button>
+          <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>{tr("Отмена")}</Button>
+          <Button type="button" disabled={!ready || busy} loading={busy} onClick={confirm}>{tr("Готово")}</Button>
         </>
       )}
     >
       <div onKeyDown={keepEnterInside}>
-        <p class={styles.hint}>Двигай и увеличивай. В анкете все фото одного кадра, 3:4.</p>
-        {failed ? <p class={styles.error} role="alert">Это не фото для анкеты. Выбери jpg, png или webp — не видео (mp4).</p> : (
+        <p class={styles.hint}>{tr("Двигай и увеличивай. В анкете все фото одного кадра, 3:4.")}</p>
+        {failed ? <p class={styles.error} role="alert">{tr("Это не фото для анкеты. Выбери jpg, png или webp — не видео (mp4).")}</p> : (
           <>
             <div
               ref={stageRef}
@@ -306,7 +307,7 @@ export function PhotoCropper({ file, title = "Кадр", busy = false, error = "
               style={{ aspectRatio: `${RATIO}` }}
               tabIndex={0}
               role="application"
-              aria-label="Кадр фото. Стрелки двигают, плюс и минус приближают."
+              aria-label={tr("Кадр фото. Стрелки двигают, плюс и минус приближают.")}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -314,11 +315,10 @@ export function PhotoCropper({ file, title = "Кадр", busy = false, error = "
               onKeyDown={onStageKey}
             >
               <canvas ref={canvasRef} />
-              {!ready ? <span class={styles.loading}>Открываем фото…</span> : null}
+              {!ready ? <span class={styles.loading}>{tr("Открываем фото…")}</span> : null}
             </div>
             <label class={styles.zoom}>
-              Масштаб
-              <input
+              {tr("Масштаб")}<input
                 type="range"
                 min="1"
                 max={String(MAX_ZOOM)}

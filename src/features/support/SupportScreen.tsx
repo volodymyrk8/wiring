@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader } from "@/components/ui/AppHeader";
@@ -27,7 +28,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
     if (sendingRef.current) return;
     const trimmed = body.trim();
     if (trimmed.length < 8) {
-      setError("напиши чуть подробнее (минимум 8 символов)");
+      setError(tr("напиши чуть подробнее (минимум 8 символов)"));
       return;
     }
     setError("");
@@ -51,10 +52,10 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
       });
 
       if (controller.signal.aborted) return;
-      setNotice(res.notice || "отправили. ответим на почту, если её указал");
+      setNotice(res.notice || tr("отправили. ответим на почту, если её указал"));
       setBody("");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "произошла ошибка, попробуй позже";
+      const message = err instanceof Error ? err.message : tr("произошла ошибка, попробуй позже");
       if (!controller.signal.aborted) setError(message);
     } finally {
       if (!controller.signal.aborted) { sendingRef.current = false; requestRef.current = null; setBusy(false); }
@@ -84,7 +85,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
         onBackClick={handleBack}
         homeHref={host.hrefFor("home")}
         onHomeClick={handleHome}
-        sectionTitle="поддержка"
+        sectionTitle={tr("поддержка")}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={
@@ -112,18 +113,16 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
       />
 
       <main class={styles.content}>
-        <h1 class={styles.title}>Поддержка</h1>
+        <h1 class={styles.title}>{tr("Поддержка")}</h1>
         <div class={styles.intro}>
           {reportBanned ? (
             <div class={styles.banNotice} role="status">
-              <strong>Аккаунт временно ограничен</strong>
-              <p>{banMessage || "После жалоб анкета скрыта. Напиши ниже, если хочешь оспорить решение."}</p>
+              <strong>{tr("Аккаунт временно ограничен")}</strong>
+              <p>{banMessage || tr("После жалоб анкета скрыта. Напиши ниже, если хочешь оспорить решение.")}</p>
             </div>
           ) : null}
           <p>
-            Ответы появятся здесь, в разделе «Поддержка». Если укажешь почту, отправим ответ и туда.
-            Если ты не вошёл в аккаунт, укажи почту, чтобы мы могли ответить.
-          </p>
+            {tr("Ответы появятся здесь, в разделе «Поддержка». Если укажешь почту, отправим ответ и туда. Если ты не вошёл в аккаунт, укажи почту, чтобы мы могли ответить.")}</p>
         </div>
 
         <ReplyHistory host={host} />
@@ -140,12 +139,11 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
           <div class={`${styles.statusCard} ${styles.statusOk}`}>
             <span class={styles.statusIcon}>✓</span>
             <div>
-              <h3 class={styles.statusTitle}>Сообщение отправлено</h3>
+              <h3 class={styles.statusTitle}>{tr("Сообщение отправлено")}</h3>
               <p class={styles.statusText}>{notice}</p>
               <div class={styles.anotherBtn}>
                 <Button variant="ghost" slim onClick={() => setNotice("")}>
-                  Написать ещё одно сообщение
-                </Button>
+                  {tr("Написать ещё одно сообщение")}</Button>
               </div>
             </div>
           </div>
@@ -153,7 +151,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
           <form class={styles.form} onSubmit={handleSubmit} noValidate>
             <div class={styles.fields}>
               <Input
-                label="Имя (по желанию)"
+                label={tr("Имя (по желанию)")}
                 name="name"
                 maxLength={80}
                 autoComplete="name"
@@ -162,7 +160,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
               />
 
               <Input
-                label="Почта для ответа (по желанию)"
+                label={tr("Почта для ответа (по желанию)")}
                 name="email"
                 type="email"
                 maxLength={120}
@@ -180,7 +178,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
                   required
                   minLength={8}
                   maxLength={2000}
-                  placeholder="Что случилось? Опиши подробно..."
+                  placeholder={tr("Что случилось? Опиши подробно...")}
                   class={styles.textarea}
                   value={body}
                   onInput={(e) => {
@@ -189,7 +187,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
                   }}
                 />
                 <div class={styles.textareaMeta}>
-                  <span>Минимум 8 символов</span>
+                  <span>{tr("Минимум 8 символов")}</span>
                   <span id="char-count">{body.length} / 2000</span>
                 </div>
               </div>
@@ -209,7 +207,7 @@ export function SupportScreen({ host }: { host: SupportHostBridge }) {
                   void sendMessage();
                 }}
               >
-                <span>{busy ? "Отправляем…" : "Отправить сообщение"}</span>
+                <span>{busy ? tr("Отправляем…") : tr("Отправить сообщение")}</span>
               </Button>
             </div>
           </form>

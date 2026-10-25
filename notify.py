@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from functools import wraps
+from i18n import tr, use_language
+
+import re
 import json
 import os
 import smtplib
@@ -22,6 +26,23 @@ def add_notice(conn: Connection, user_id: int, kind: str, from_id: int, body: st
     )
 
 
+def _notice_body(kind: str, body: str) -> str:
+    # Only rewrite known system templates. Message previews and member text stay original.
+    if kind == "support":
+        return tr("Поддержка ответила на твоё обращение. Ответ — в разделе «Поддержка».")
+    templates = {
+        "like": [(r"^(.*) лайкнул\(а\) тебя$", "{0} лайкнул(а) тебя"), (r"^(.*) liked you$", "{0} лайкнул(а) тебя")],
+        "match": [(r"^взаимно с (.*)$", "взаимно с {0}"), (r"^You and (.*) liked each other$", "взаимно с {0}")],
+        "message": [(r"^(.*) написал\(а\)$", "{0} написал(а)"), (r"^(.*) sent a message$", "{0} написал(а)")],
+        "referral": [(r"^по твоей ссылке зарегистрировались — ещё (\d+) дней WIRING\+$", "по твоей ссылке зарегистрировались — ещё {0} дней WIRING+"), (r"^Someone signed up with your link — another (\d+) days of WIRING\+$", "по твоей ссылке зарегистрировались — ещё {0} дней WIRING+")],
+    }
+    for pattern, source in templates.get(kind, []):
+        match = re.fullmatch(pattern, body)
+        if match:
+            return tr(source, match[1])
+    return body
+
+
 def unread_notices(conn: Connection, user_id: int, limit: int = 8) -> list[dict[str, Any]]:
     rows = conn.execute(
         """
@@ -37,7 +58,7 @@ def unread_notices(conn: Connection, user_id: int, limit: int = 8) -> list[dict[
             "id": row["id"],
             "kind": row["kind"],
             "from_id": row["from_id"],
-            "body": row["body"],
+            "body": _notice_body(row["kind"], row["body"]),
             "created_at": row["created_at"],
         }
         for row in rows
@@ -133,6 +154,16 @@ def notify_support(subject: str, body: str) -> bool:
     return mailed
 
 
+def _recipient_language(function):
+    @wraps(function)
+    def wrapped(conn, *args, **kwargs):
+        row = conn.execute("SELECT language FROM users WHERE id = ?", (kwargs["user_id"],)).fetchone()
+        with use_language(row["language"] if row else "ru"):
+            return function(conn, *args, **kwargs)
+    return wrapped
+
+
+@_recipient_language
 def notify_event(
     conn: Connection,
     *,
@@ -146,16 +177,16 @@ def notify_event(
     last_seen: int = 0,
 ) -> None:
     if kind == "like":
-        body = f"{from_name} лайкнул(а) тебя"
-        subject = "Тебя лайкнули на WIRING"
-        mail = f"{from_name} лайкнул(а) твою анкету. Открыть: https://wiring.date/"
+        body = tr("{0} лайкнул(а) тебя", from_name)
+        subject = tr("Тебя лайкнули на WIRING")
+        mail = tr("{0} лайкнул(а) твою анкету. Открыть: https://wiring.date/", from_name)
     elif kind == "message":
         snippet = " ".join((preview or "").split())
         if len(snippet) > 80:
             snippet = snippet[:79] + "…"
-        body = f"{from_name}: {snippet}" if snippet else f"{from_name} написал(а)"
-        subject = "Новое сообщение на WIRING"
-        mail = f"{from_name} написал(а) тебе. Открыть чат: https://wiring.date/"
+        body = f"{from_name}: {snippet}" if snippet else tr("{0} написал(а)", from_name)
+        subject = tr("Новое сообщение на WIRING")
+        mail = tr("{0} написал(а) тебе. Открыть чат: https://wiring.date/", from_name)
         existing = conn.execute(
             "SELECT id FROM notifications WHERE user_id = ? AND kind = 'message' AND from_id = ? AND read = 0",
             (user_id, from_id),
@@ -175,9 +206,9 @@ def notify_event(
             )
             return
     else:
-        body = f"взаимно с {from_name}"
-        subject = "Мэтч на WIRING"
-        mail = f"Взаимно с {from_name}. Можно писать: https://wiring.date/"
+        body = tr("взаимно с {0}", from_name)
+        subject = tr("Мэтч на WIRING")
+        mail = tr("Взаимно с {0}. Можно писать: https://wiring.date/", from_name)
     add_notice(conn, user_id, kind, from_id, body)
     send_user_push(
         conn,

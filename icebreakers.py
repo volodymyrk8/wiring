@@ -11,8 +11,10 @@ import urllib.request
 from typing import Any
 
 from catalog import PROMPTS
+from i18n import tr, get_language
 
 _PROMPT_LABEL = {item["id"]: item["label"] for item in PROMPTS}
+_OPENER_VERSION = 3
 
 _FALLBACKS = [
     "параллельный плей или сначала текст?",
@@ -36,22 +38,23 @@ def _heuristic_openers(peer: dict[str, Any], me: dict[str, Any] | None = None) -
         label = _PROMPT_LABEL.get(str(first.get("id") or ""), "промпт")
         answer = str(first.get("answer") or "").strip()
         if answer:
-            lines.append(_clip(f"про «{label}»: {answer[:40]} — расскажи ещё чуть-чуть"))
+            lines.append(_clip(tr("про «{0}»: {1} — расскажи ещё чуть-чуть", tr(label), answer[:40])))
         else:
-            lines.append(f"у тебя про «{label}» — расскажи ещё чуть-чуть")
+            lines.append(tr("у тебя про «{0}» — расскажи ещё чуть-чуть", tr(label)))
     job = str(peer.get("job") or "").strip()
     if job:
-        lines.append(_clip(f"{job} — это special interest или работа?"))
+        lines.append(_clip(tr("{0} — это special interest или работа?", job)))
     communication = str(peer.get("communication") or "").strip()
     if communication:
-        lines.append("напишу как ты просишь. сразу без small talk ок?")
+        lines.append(tr("напишу как ты просишь. сразу без small talk ок?"))
     bio = str(peer.get("bio") or "")
     if "параллель" in bio.lower() or "parallel" in (peer.get("vibe") or []):
-        lines.append("можно молчать в одном чате, или лучше сразу текст?")
+        lines.append(tr("можно молчать в одном чате, или лучше сразу текст?"))
     shared = set(peer.get("neuro") or []) & set((me or {}).get("neuro") or [])
     if shared:
-        lines.append("у нас пересекается нейротип — как тебе удобнее писать?")
-    for item in _FALLBACKS:
+        lines.append(tr("у нас пересекается нейротип — как тебе удобнее писать?"))
+    for fallback in _FALLBACKS:
+        item = tr(fallback)
         if item not in lines:
             lines.append(item)
     return _uniq(lines, 3)
@@ -70,9 +73,15 @@ def _uniq(lines: list[str], n: int = 3) -> list[str]:
     return unique
 
 
+def _gender(profile: dict[str, Any]) -> str:
+    gender = profile.get("gender")
+    return gender if gender in ("man", "woman") else "hidden"
+
+
 def _slim(profile: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": profile.get("name"),
+        "gender": _gender(profile),
         "age": profile.get("age"),
         "city": profile.get("city"),
         "job": (profile.get("job") or "")[:120],
@@ -120,6 +129,13 @@ def _openai_openers(peer: dict[str, Any], me: dict[str, Any] | None = None) -> l
                     "3) Тон: тёплый, дружеский, спокойный. Живой, но не панибратский; без флирта-шаблона, "
                     "без «привет», «как дела», эмодзи и пустых комплиментов.\n"
                     "4) Каждая фраза — одно сообщение 8–110 символов, можно сразу вопрос по их детали.\n"
+                    "5) Род обращения определяй только по gender в «их_анкета»: woman — женский, man — мужской. "
+                    "Род фраз от первого лица определяй только по gender в «моя_анкета». "
+                    "Не угадывай род по имени, профессии или увлечениям. "
+                    "При hidden используй только нейтральные формулировки без указания рода. "
+                    "Предпочитай нейтральные вопросы для всех: «Что привело тебя в психологию?» "
+                    "вместо «Как ты пришёл в психологию?».\n" +
+                    ("Пиши все три сообщения только по-английски. " if get_language() == "en" else "Пиши все три сообщения по-русски. ") +
                     "Ответь только JSON {\"openers\": [\"...\", \"...\", \"...\"]}."
                 ),
             },
@@ -234,18 +250,29 @@ def cached_openers(
     if row:
         try:
             cached = json.loads(row["lines"])
-            if isinstance(cached, list) and cached:
-                return _uniq([str(x) for x in cached], 3)
+            if (isinstance(cached, dict)
+                    and cached.get("version") == _OPENER_VERSION
+                    and cached.get("language") == get_language()
+                    and cached.get("genders") == [_gender(peer), _gender(me or {})]
+                    and isinstance(cached.get("lines"), list)
+                    and cached["lines"]):
+                return _uniq([str(x) for x in cached["lines"]], 3)
         except (TypeError, json.JSONDecodeError):
             pass
     lines = openers_for(peer, me)
+    cache = {
+        "version": _OPENER_VERSION,
+        "language": get_language(),
+        "genders": [_gender(peer), _gender(me or {})],
+        "lines": lines,
+    }
     conn.execute(
         """
         INSERT INTO chat_openers (user_id, other_id, lines, created_at)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(user_id, other_id) DO UPDATE SET lines = excluded.lines, created_at = excluded.created_at
         """,
-        (uid, other_id, json.dumps(lines, ensure_ascii=False), int(time.time())),
+        (uid, other_id, json.dumps(cache, ensure_ascii=False), int(time.time())),
     )
     conn.commit()
     return lines

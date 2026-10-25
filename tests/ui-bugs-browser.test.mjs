@@ -12,7 +12,7 @@ if(params.has('thread')){document.getElementById('feature').style.cssText='displ
 if(screen==='admin')document.getElementById('feature').innerHTML='<div data-admin-reply data-kind=\"ticket\" data-source=\"1\" data-action=\"/admin/replies/ticket/1\" data-csrf=\"fixture-csrf\" data-request-id=\"fixture-reply-request-1\" data-recipient=\"Заявителю: тестовый аккаунт\"></div>';
 const mod=await import('/public/dist/'+(screen==='admin'?'server-header':screen)+'.js');
 window.test={calls:[],actions:[],navigation:[],fail:false,delay:false,resolve:null};
-const person={id:2,name:'Ада',age:29,neuro:[],vibe:[],bio:'Описание '.repeat(80),prompts:[]};
+const person={id:2,name:'Ада',age:29,job:params.has('nojob')?'':'Клинический психолог',photos:['data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400"><rect width="300" height="400" fill="#9988aa"/></svg>')],neuro:[],vibe:[],bio:'Описание '.repeat(80),prompts:[]};
 const likes=[person,{id:3,name:'Лео',age:30},{hidden:true}];
 const matches=[{id:2,name:'Ада',age:29,unread:2,last_message:'Привет',last_at:1720000000}];
 if(params.has('stale'))localStorage.setItem('wiring-profile-draft-99',JSON.stringify({name:'',bio:'Старый черновик без имени'}));
@@ -64,9 +64,19 @@ try{
  await page.evaluate(()=>{window.test.unmount();window.test.resolve();});
  await page.waitForTimeout(100);assert.deepEqual(await page.evaluate(()=>window.test.actions),[]);
  await open('person');
+ assert.equal(await page.getByRole('heading',{name:'Ада, 29',exact:true}).locator('..').innerText().then(text=>text.includes('Клинический психолог')),false);
+ await page.getByText('Занятость: Клинический психолог',{exact:true}).waitFor();
+ assert.equal(await page.getByText(/Клинический психолог/).count(),1);
+ await page.screenshot({path:'/tmp/wiring-person-facts-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1280,height:900});
+ await page.getByText('Занятость: Клинический психолог',{exact:true}).waitFor();
+ await page.screenshot({path:'/tmp/wiring-person-facts-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
  const backs=page.getByRole('link',{name:'назад',exact:true});
  assert.equal(await backs.count(),2);await backs.last().click();
  assert.deepEqual(await page.evaluate(()=>window.test.navigation),['recommendations']);
+ await open('person','&nojob=1');
+ assert.equal(await page.getByText(/^Занятость:/).count(),0);
  await open('profile');await page.getByRole('button',{name:'Страна',exact:true}).click();
  await page.getByRole('textbox',{name:'Найти страну',exact:true}).fill('черно');
  await page.waitForFunction(()=>document.querySelectorAll('[role=option]').length===1);

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ language }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -33,24 +33,24 @@
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
     window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
   </script>
-  <script src="/public/analytics.js?v=4" defer></script>
+  <script src="/public/analytics.js?v=5" defer></script>
   {% endif %}
 </head>
 <body class="legal-page{% if support_form %} support-page{% endif %}">
   {% set show_back = true %}
   {% set back_href = '/' %}
-  {% set section_title = 'поддержка' if support_form else '' %}
+  {% set section_title = _('поддержка') if support_form else '' %}
   {% set logo_position = 'center' %}
   {% include "components/header.html" %}
   <main class="legal{% if support_form %} legal--support{% endif %}">
     <h1{% if support_form %} class="support-title"{% endif %}>{{ title }}</h1>
     {% if support_form %}
       <div class="support-intro">
-        {{ body | safe }}
+        {{ body | localized_html | safe }}
       </div>
       {% include "components/support_form.html" %}
     {% else %}
-      {{ body | safe }}
+      {{ body | localized_html | safe }}
     {% endif %}
   </main>
   {% include "components/footer.html" %}

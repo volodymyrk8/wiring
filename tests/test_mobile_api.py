@@ -65,6 +65,18 @@ class MobileApiTest(unittest.TestCase):
         self.assertTrue(data["access_token"] and data["refresh_token"])
         self.assertEqual(data["user"]["email"], "mob@example.com")
 
+    def test_language_switch_shares_account_preference_without_browser_cookies(self):
+        self._user()
+        token = self._token_login()["access_token"]
+        headers = {**self._bearer(token), "X-Wiring-Language": "en"}
+        changed = self.mobile.patch('/api/me/language', json={'language': 'en'}, headers=headers)
+        self.assertEqual(changed.status_code, 200)
+        self.assertNotIn('Set-Cookie', changed.headers)
+        self.assertEqual(self.mobile.get('/api/me', headers=headers).get_json()['user']['language'], 'en')
+        self.assertEqual(self.mobile.patch('/api/me/language', json={'language': 'unknown'}, headers=headers).status_code, 400)
+        self.web.post('/api/login', json={'email': 'mob@example.com', 'password': 'secret1'})
+        self.assertEqual(self.web.get('/api/me').get_json()['user']['language'], 'en')
+
     def test_bad_password_rejected(self):
         self._user()
         res = self.mobile.post("/api/auth/token", json={"email": "mob@example.com", "password": "nope"})

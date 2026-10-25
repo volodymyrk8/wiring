@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from i18n import tr
+
 import base64
 import io
 import json
@@ -32,7 +34,7 @@ def moderate_photo(jpeg: bytes) -> None:
     except (urllib.error.URLError, TimeoutError, KeyError, IndexError, TypeError, json.JSONDecodeError, OSError, ValueError):
         return
     if blocked_labels(result):
-        raise MediaError("это фото нельзя загрузить")
+        raise MediaError(tr("это фото нельзя загрузить"))
 
 
 def _preview_jpeg(jpeg: bytes) -> bytes:

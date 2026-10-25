@@ -14,7 +14,7 @@ try{
  browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE}:{})});
  const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
  const origin='http://127.0.0.1:'+server.address().port;
- const user={id:99,name:'Локальный профиль',age:29,city:'Белград',gender:'woman',looking_for:'everyone',bio:'Описание локального профиля',neuro:['asd'],vibe:[],photos:[],prompts:[],needs_profile:false,needs_photo_consent:false,needs_special_consent:false};
+ const user={id:99,name:'Локальный профиль',age:29,city:'Белград',job:'Клинический психолог',gender:'woman',looking_for:'everyone',bio:'Описание локального профиля',neuro:['asd'],vibe:[],photos:[],prompts:[],needs_profile:false,needs_photo_consent:false,needs_special_consent:false};
  const catalog={places:[{country:'Сербия',cities:['Белград']}],neuro:[{id:'asd',label:'Аутизм'}],vibe:[],intents:[],genders:[{id:'woman',label:'женщина'}],looking_for:[{id:'everyone',label:'всех'}],prompts:[],limits:{photos:6}};
  const calls=[];
  await page.route('**/*',async route=>{const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();if(url.pathname.startsWith('/api/')){calls.push({path:url.pathname,method:route.request().method()});const data=url.pathname==='/api/catalog'?{ok:true,...catalog}:url.pathname==='/api/me'?{ok:true,user}:url.pathname==='/api/inbox'?{ok:true,likes_in:0,unread:0,unread_chats:0,notices:[]}:url.pathname.startsWith('/api/people/')?{ok:true,person:user}:{ok:true,cards:[],has_more:false,matches:[]};return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});}return route.continue();});
@@ -23,6 +23,8 @@ try{
  if(baseline){await page.getByRole('textbox',{name:'Имя',exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/me');console.log('Published regression reproduced: /me directly mounts the editor with a synthetic account');}
  else {
  await page.getByRole('link',{name:'Редактировать анкету',exact:true}).waitFor();
+ await page.getByText('Занятость: Клинический психолог',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('heading',{name:'Локальный профиль, 29',exact:true}).locator('..').innerText().then(text=>text.includes(user.job)),false);
  assert.equal(await page.locator('#profile-feature-root').count(),0,'/me initially renders preview, without mounting the editor');
  assert.equal(await page.locator('textarea[name=bio]').count(),0);
  assert.equal(new URL(page.url()).pathname,'/me');

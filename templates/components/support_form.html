@@ -3,7 +3,7 @@
     <div class="card-status ok">
       <span class="status-icon">✓</span>
       <div>
-        <h3>Сообщение отправлено</h3>
+        <h3>{{ _("Сообщение отправлено") }}</h3>
         <p>{{ notice }}</p>
       </div>
     </div>
@@ -29,7 +29,7 @@
         placeholder=" "
         value="{{ me.name if me else '' }}"
       >
-      <span class="field-floating__label">Имя (по желанию)</span>
+      <span class="field-floating__label">{{ _("Имя (по желанию)") }}</span>
     </label>
 
     <label class="field-floating">
@@ -43,7 +43,7 @@
         placeholder=" "
         value="{{ me.email if me and me.email else '' }}"
       >
-      <span class="field-floating__label">Почта для ответа (по желанию)</span>
+      <span class="field-floating__label">{{ _("Почта для ответа (по желанию)") }}</span>
     </label>
 
     <div class="textarea-field">
@@ -53,10 +53,10 @@
         required
         minlength="8"
         maxlength="2000"
-        placeholder="Что случилось? Опиши подробно..."
+        placeholder="{{ _('Что случилось? Опиши подробно...') }}"
       ></textarea>
       <div class="textarea-meta">
-        <span>Минимум 8 символов</span>
+        <span>{{ _("Минимум 8 символов") }}</span>
         <span id="char-count">0 / 2000</span>
       </div>
     </div>
@@ -64,7 +64,7 @@
 
   <div class="support-actions">
     <button class="btn solid fullWidth" type="submit" id="support-submit">
-      <span>Отправить сообщение</span>
+      <span>{{ _("Отправить сообщение") }}</span>
     </button>
   </div>
 </form>

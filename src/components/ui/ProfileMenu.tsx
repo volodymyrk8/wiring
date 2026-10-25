@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState, useRef } from "preact/hooks";
 import type { JSX } from "preact";
 import { announcePopupOpen, useDismissibleLayer } from "./useDismissibleLayer";
@@ -83,8 +84,8 @@ export function ProfileMenu({
         onClick={toggleOpen}
         aria-expanded={isOpen}
         aria-haspopup="menu"
-        aria-label="Меню профиля"
-        title="Меню профиля"
+        aria-label={tr("Меню профиля")}
+        title={tr("Меню профиля")}
       >
         <span class="avatar-link">
           {avatarUrl ? (
@@ -118,9 +119,9 @@ export function ProfileMenu({
             </span>
             <span class={styles.itemText}>WIRING+</span>
             {isPlus ? (
-              <span class={styles.plusStatusBadge}>активен</span>
+              <span class={styles.plusStatusBadge}>{tr("активен")}</span>
             ) : (
-              <span class={styles.plusStatusBadgeInactive}>подключить</span>
+              <span class={styles.plusStatusBadgeInactive}>{tr("подключить")}</span>
             )}
           </a>
           <a
@@ -135,7 +136,7 @@ export function ProfileMenu({
                 <path d="M5.5 20.2c1.3-3.6 3.6-5 6.5-5s5.2 1.4 6.5 5" />
               </svg>
             </span>
-            <span class={styles.itemText}>Профиль</span>
+            <span class={styles.itemText}>{tr("Профиль")}</span>
           </a>
 
           <a
@@ -150,7 +151,7 @@ export function ProfileMenu({
                 <path d="m9.5 12 1.7 1.7 3.5-3.8" />
               </svg>
             </span>
-            <span class={styles.itemText}>Согласия</span>
+            <span class={styles.itemText}>{tr("Согласия")}</span>
           </a>
 
           <a
@@ -170,7 +171,7 @@ export function ProfileMenu({
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </span>
-            <span class={styles.itemText}>Поддержка</span>
+            <span class={styles.itemText}>{tr("Поддержка")}</span>
           </a>
 
           <a
@@ -189,7 +190,7 @@ export function ProfileMenu({
                 <path d="M10 21h4" />
               </svg>
             </span>
-            <span class={styles.itemText}>Уведомления</span>
+            <span class={styles.itemText}>{tr("Уведомления")}</span>
           </a>
 
           {archiveHref ? (
@@ -209,7 +210,7 @@ export function ProfileMenu({
                   <path d="m6 6 12 12M18 6 6 18" />
                 </svg>
               </span>
-              <span class={styles.itemText}>Лайки, дизлайки, блок</span>
+              <span class={styles.itemText}>{tr("Лайки, дизлайки, блок")}</span>
             </a>
           ) : null}
 
@@ -226,7 +227,7 @@ export function ProfileMenu({
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>
             </span>
-            <span class={styles.itemText}>Выйти</span>
+            <span class={styles.itemText}>{tr("Выйти")}</span>
           </button>
         </div>
       )}

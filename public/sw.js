@@ -1,5 +1,5 @@
 self.addEventListener("push", (event) => {
-  let payload = { title: "WIRING", body: "Новое уведомление", url: "/", tag: "wiring" };
+  let payload = { title: "WIRING", body: "", url: "/", tag: "wiring" };
   try {
     if (event.data) payload = { ...payload, ...event.data.json() };
   } catch (err) {

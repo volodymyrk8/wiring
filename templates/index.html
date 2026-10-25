@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ language }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{{ page_title }}</title>
-  <meta name="description" content="{{ meta_description }}">
+  <title>{{ _(page_title) }}</title>
+  <meta name="description" content="{{ _(meta_description) }}">
   <link rel="canonical" href="{{ site_url }}/">
   <meta name="theme-color" content="#e9ebf3">
   <script>
@@ -27,10 +27,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="WIRING">
   <meta property="og:type" content="website">
-  <meta property="og:locale" content="ru_RU">
+  <meta property="og:locale" content="{{ 'en_US' if language == 'en' else 'ru_RU' }}">
   <meta property="og:site_name" content="WIRING">
-  <meta property="og:title" content="{{ page_title }}">
-  <meta property="og:description" content="{{ og_description }}">
+  <meta property="og:title" content="{{ _(page_title) }}">
+  <meta property="og:description" content="{{ _(og_description) }}">
   <meta property="og:url" content="{{ site_url }}/">
   <meta property="og:image" content="{{ site_url }}/public/og.svg?v=2">
   <meta name="twitter:card" content="summary_large_image">
@@ -46,11 +46,11 @@
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
     window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
   </script>
-  <script src="{{ base_path }}/public/analytics.js?v=4" defer></script>
+  <script src="{{ base_path }}/public/analytics.js?v=5" defer></script>
   {% endif %}
 </head>
 <body>
   <div id="app" data-base="{{ base_path }}" data-registration-created="{{ 'true' if registration_created else 'false' }}"></div>
-  <script type="module" src="{{ base_path }}/public/dist/app.js?v=88"></script>
+  <script type="module" src="{{ base_path }}/public/dist/app.js?v=91"></script>
 </body>
 </html>

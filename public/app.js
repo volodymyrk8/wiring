@@ -3,6 +3,6 @@
   const root = document.getElementById("app");
   const base = root?.dataset.base || "";
   import(`${base}/public/dist/app.js?v=2`).catch((error) => {
-    if (root) root.innerHTML = `<p class="err">не загрузилось приложение: ${String(error?.message || error)}</p>`;
+    if (root) root.innerHTML = `<p class="err">${document.documentElement.lang === "en" ? "Could not load the app:" : "не загрузилось приложение:"} ${String(error?.message || error)}</p>`;
   });
 })();

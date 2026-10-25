@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from i18n import tr
+
 import os
 import secrets
 import time
@@ -175,18 +177,18 @@ def list_codes(conn: Connection) -> list[dict[str, Any]]:
 def add_code(conn: Connection, code: str, days: int, max_uses: int = 0) -> str | None:
     clean = "".join(ch for ch in (code or "").upper() if ch.isalnum() or ch in "-_")
     if not (4 <= len(clean) <= 24):
-        return "код: 4–24 символа"
+        return tr("код: 4–24 символа")
     if days < 1 or days > 36500:
-        return "дни: 1–36500"
+        return tr("дни: 1–36500")
     if max_uses < 0:
-        return "лимит использований не может быть меньше 0"
+        return tr("лимит использований не может быть меньше 0")
     try:
         conn.execute(
             "INSERT INTO promo_codes (code, days, max_uses, uses) VALUES (?, ?, ?, 0)",
             (clean, days, max_uses),
         )
     except IntegrityError:
-        return "такой код уже есть"
+        return tr("такой код уже есть")
     return None
 
 
@@ -249,24 +251,24 @@ def apply_referral(conn: Connection, new_uid: int, raw: str) -> int | None:
 def redeem_code(conn: Connection, uid: int, raw: str) -> tuple[int | None, str | None]:
     code = "".join(ch for ch in (raw or "").upper() if ch.isalnum() or ch in "-_")
     if not code:
-        return None, "нужен код"
+        return None, tr("нужен код")
     row = conn.execute("SELECT * FROM promo_codes WHERE code = ? FOR UPDATE", (code,)).fetchone()
     if not row:
-        return None, "нет такого кода"
+        return None, tr("нет такого кода")
     if row["max_uses"] and int(row["uses"]) >= int(row["max_uses"]):
-        return None, "код уже израсходован"
+        return None, tr("код уже израсходован")
     if conn.execute("SELECT 1 FROM promo_redemptions WHERE code = ? AND user_id = ?", (code, uid)).fetchone():
-        return None, "этот код ты уже вводил(а)"
+        return None, tr("этот код ты уже вводил(а)")
     if row["benefit"] == "recommendations":
         user = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
         if not user or int(user["is_seed"] or 0) or user["deleted_at"]:
-            return None, "промокод доступен только реальным аккаунтам"
+            return None, tr("промокод доступен только реальным аккаунтам")
         conn.execute("UPDATE users SET jev_recommendations_unlocked = 1 WHERE id = ?", (uid,))
         until = plus_until(user)
     elif row["benefit"] == "plus":
         until = grant_premium(conn, uid, int(row["days"]))
     else:
-        return None, "этот промокод пока недоступен"
+        return None, tr("этот промокод пока недоступен")
     conn.execute("UPDATE promo_codes SET uses = uses + 1 WHERE code = ?", (code,))
     conn.execute(
         "INSERT INTO promo_redemptions (code, user_id, created_at) VALUES (?, ?, ?)",

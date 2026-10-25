@@ -1,14 +1,15 @@
+import { tr, getLocale } from "@/lib/i18n";
 import type { LikeCard, LikesSort } from "./types";
 
 const ageOf = (card: LikeCard) => Number(card.age) || 0;
 const likedAt = (card: LikeCard) => Number(card.liked_at) || 0;
 
 export const LIKES_SORT_OPTIONS: { id: LikesSort; label: string }[] = [
-  { id: "newest", label: "Сначала новые" },
-  { id: "oldest", label: "Сначала старые" },
-  { id: "name", label: "По имени" },
-  { id: "age_asc", label: "Младше" },
-  { id: "age_desc", label: "Старше" },
+  { id: "newest", label: tr("Сначала новые") },
+  { id: "oldest", label: tr("Сначала старые") },
+  { id: "name", label: tr("По имени") },
+  { id: "age_asc", label: tr("Младше") },
+  { id: "age_desc", label: tr("Старше") },
 ];
 
 export function sortLikeCards(cards: LikeCard[], sort: LikesSort): LikeCard[] {
@@ -21,7 +22,7 @@ export function sortLikeCards(cards: LikeCard[], sort: LikesSort): LikeCard[] {
       sorted.sort((a, b) => likedAt(a) - likedAt(b));
       break;
     case "name":
-      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ru"));
+      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), getLocale()));
       break;
     case "age_asc":
       sorted.sort((a, b) => ageOf(a) - ageOf(b));

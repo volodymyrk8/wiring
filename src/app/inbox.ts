@@ -18,6 +18,7 @@ type InboxState = {
 };
 
 type InboxDeps = {
+  translate?: (source: string) => string;
   api: ApiClient;
   root: HTMLElement;
   state: InboxState;
@@ -43,6 +44,7 @@ export function createInboxController({
   openChat,
   refreshMe,
   render,
+  translate: tr = source => source,
 }: InboxDeps) {
   const seenNotices = new Set<number | string>();
   let timer = 0;
@@ -119,8 +121,8 @@ export function createInboxController({
       if (inChat || !announce) continue;
       const noticesOn = state.user?.notify_enabled !== false;
       if (!noticesOn) continue;
-      toast(note.body || "новое уведомление", noticeAction(note));
-      pingBrowser(note.body || "новое уведомление");
+      toast(note.body || tr("новое уведомление"), noticeAction(note));
+      pingBrowser(note.body || tr("новое уведомление"));
       shown.push(note.id);
     }
     if (shown.length) {

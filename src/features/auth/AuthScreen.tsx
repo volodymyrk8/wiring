@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState, useEffect, useRef } from "preact/hooks";
 import type { JSX } from "preact";
 import { Button, Input, LegalFooter } from "@/components/ui";
@@ -7,7 +8,7 @@ import { registrationCreated } from "@/app/registration-analytics";
 import styles from "./AuthScreen.module.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PROVIDER_LABELS: Record<string, string> = { google: "Google", yandex: "Яндекс", apple: "Apple" };
+const PROVIDER_LABELS: Record<string, string> = { google: "Google", yandex: tr("Яндекс"), apple: "Apple" };
 const CYRILLIC_RE = /[а-яё]/i;
 
 type AuthScreenProps = { host: AuthHostBridge };
@@ -96,22 +97,22 @@ export function AuthScreen({ host }: AuthScreenProps) {
     if (isRegister) {
       const trimmedName = name.trim();
       if (trimmedName.length < 2 || trimmedName.length > 32) {
-        errs.name = "Имя должно быть от 2 до 32 символов";
+        errs.name = tr("Имя должно быть от 2 до 32 символов");
       }
     }
 
     if (!trimmedEmail) {
-      errs.email = "Укажи адрес почты";
+      errs.email = tr("Укажи адрес почты");
     } else if (CYRILLIC_RE.test(trimmedEmail)) {
-      errs.email = "В почте должны быть только латинские буквы";
+      errs.email = tr("В почте должны быть только латинские буквы");
     } else if (!EMAIL_RE.test(trimmedEmail)) {
-      errs.email = "Проверь правильность адреса почты";
+      errs.email = tr("Проверь правильность адреса почты");
     }
 
     if (!password) {
-      errs.password = "Введи пароль";
+      errs.password = tr("Введи пароль");
     } else if (password.length < 6) {
-      errs.password = "Пароль должен содержать минимум 6 символов";
+      errs.password = tr("Пароль должен содержать минимум 6 символов");
     }
 
     setFieldErrors(errs);
@@ -171,9 +172,9 @@ export function AuthScreen({ host }: AuthScreenProps) {
       }
 
       const msg = getErrorMessage(error);
-      if (msg.includes("такая почта уже есть") || msg.includes("уже зарегистрирован")) {
+      if (msg.includes(tr("такая почта уже есть")) || msg.includes(tr("уже зарегистрирован"))) {
         setEmailTaken(true);
-        setFieldError("email", "Эта почта уже зарегистрирована");
+        setFieldError("email", tr("Эта почта уже зарегистрирована"));
       }
       setServerError(msg);
     } finally {
@@ -190,7 +191,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
     setServerError("");
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !EMAIL_RE.test(trimmedEmail)) {
-      setFieldError("email", "Укажи корректный адрес почты");
+      setFieldError("email", tr("Укажи корректный адрес почты"));
       return;
     }
     setBusy(true);
@@ -199,7 +200,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         method: "POST",
         body: JSON.stringify({ email: trimmedEmail }),
       });
-      host.toast("если аккаунт есть — письмо уже в пути");
+      host.toast(tr("если аккаунт есть — письмо уже в пути"));
       host.onForgotDone();
     } catch (error) {
       setServerError(getErrorMessage(error));
@@ -212,7 +213,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
     e.preventDefault();
     setServerError("");
     if (password.length < 6) {
-      setFieldError("password", "Минимум 6 символов");
+      setFieldError("password", tr("Минимум 6 символов"));
       return;
     }
     setBusy(true);
@@ -221,7 +222,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         method: "POST",
         body: JSON.stringify({ token: host.resetToken, password }),
       });
-      host.toast("пароль обновлён — можно войти");
+      host.toast(tr("пароль обновлён — можно войти"));
       host.onResetDone();
     } catch (error) {
       setServerError(getErrorMessage(error));
@@ -233,7 +234,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
   const onResendVerify = async () => {
     setServerError("");
     if (!host.verifyEmail) {
-      setServerError("нет адреса — зарегистрируйся ещё раз");
+      setServerError(tr("нет адреса — зарегистрируйся ещё раз"));
       return;
     }
     try {
@@ -241,7 +242,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         method: "POST",
         body: JSON.stringify({ email: host.verifyEmail }),
       });
-      host.toast("если аккаунт ждёт подтверждения — письмо уже в пути");
+      host.toast(tr("если аккаунт ждёт подтверждения — письмо уже в пути"));
     } catch (error) {
       setServerError(getErrorMessage(error));
     }
@@ -254,19 +255,17 @@ export function AuthScreen({ host }: AuthScreenProps) {
     return (
       <div class={styles.container}>
         <div class={styles.authBody}>
-          <h2 class={`${styles.title} ${styles.titleWithLede}`}>Подтверди почту</h2>
+          <h2 class={`${styles.title} ${styles.titleWithLede}`}>{tr("Подтверди почту")}</h2>
           <p class={styles.lede}>
-            Мы отправили ссылку
-            {verifyTarget ? (
+            {tr("Мы отправили ссылку")}{verifyTarget ? (
               <>
                 {" "}
-                на <strong>{verifyTarget}</strong>
+                {tr("на ")}<strong>{verifyTarget}</strong>
               </>
             ) : (
               ""
             )}
-            . Открой письмо и перейди по ссылке — после этого можно войти.
-          </p>
+            {tr(". Открой письмо и перейди по ссылке — после этого можно войти.")}</p>
           {serverError && (
             <div class={styles.errorBanner} role="alert">
               <span class={styles.errorIcon}>⚠️</span>
@@ -275,13 +274,11 @@ export function AuthScreen({ host }: AuthScreenProps) {
           )}
           <div class={styles.actions}>
             <Button type="button" onClick={onResendVerify} fullWidth>
-              Отправить ссылку ещё раз
-            </Button>
+              {tr("Отправить ссылку ещё раз")}</Button>
             <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-              Назад ко входу
-            </Button>
+              {tr("Назад ко входу")}</Button>
           </div>
-          <p class={styles.footerHint}>Не видишь письмо? Проверь «Спам» и «Промоакции».</p>
+          <p class={styles.footerHint}>{tr("Не видишь письмо? Проверь «Спам» и «Промоакции».")}</p>
         </div>
         <LegalFooter />
       </div>
@@ -292,11 +289,11 @@ export function AuthScreen({ host }: AuthScreenProps) {
     return (
       <div class={styles.container}>
         <div class={styles.authBody}>
-          <h2 class={`${styles.title} ${styles.titleWithLede}`}>Сброс пароля</h2>
-          <p class={styles.lede}>Пришлём ссылку на почту, если такой аккаунт есть.</p>
+          <h2 class={`${styles.title} ${styles.titleWithLede}`}>{tr("Сброс пароля")}</h2>
+          <p class={styles.lede}>{tr("Пришлём ссылку на почту, если такой аккаунт есть.")}</p>
           <form class={styles.form} onSubmit={onSubmitForgot} noValidate>
             <Input
-              label="Почта"
+              label={tr("Почта")}
               name="email"
               type="email"
               required
@@ -316,11 +313,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
             )}
             <div class={styles.actions}>
               <Button type="submit" disabled={busy} loading={busy} fullWidth>
-                {busy ? "Отправляем…" : "Отправить ссылку"}
+                {busy ? tr("Отправляем…") : tr("Отправить ссылку")}
               </Button>
               <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-                Назад ко входу
-              </Button>
+                {tr("Назад ко входу")}</Button>
             </div>
           </form>
         </div>
@@ -333,10 +329,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
     return (
       <div class={styles.container}>
         <div class={styles.authBody}>
-          <h2 class={styles.title}>Новый пароль</h2>
+          <h2 class={styles.title}>{tr("Новый пароль")}</h2>
           <form class={styles.form} onSubmit={onSubmitReset} noValidate>
             <Input
-              label="Новый пароль"
+              label={tr("Новый пароль")}
               name="password"
               type="password"
               autoComplete="new-password"
@@ -356,11 +352,10 @@ export function AuthScreen({ host }: AuthScreenProps) {
             )}
             <div class={styles.actions}>
               <Button type="submit" disabled={busy} loading={busy} fullWidth>
-                {busy ? "Сохраняем…" : "Сохранить пароль"}
+                {busy ? tr("Сохраняем…") : tr("Сохранить пароль")}
               </Button>
               <Button variant="ghost" href={hrefFor("login")} nav="login" fullWidth>
-                Назад ко входу
-              </Button>
+                {tr("Назад ко входу")}</Button>
             </div>
           </form>
         </div>
@@ -375,25 +370,18 @@ export function AuthScreen({ host }: AuthScreenProps) {
     <div class={styles.container}>
       <div class={styles.authBody}>
         <h2 class={styles.title}>
-          {isLogin ? "Вход" : "Регистрация"}
+          {isLogin ? tr("Вход") : tr("Регистрация")}
         </h2>
 
       {!isLogin && (
         <div class={styles.registerIntro}>
           <p class={styles.mission}>
-            Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и
-            комфортного общения.
-          </p>
+            {tr("Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство для свободного и комфортного общения.")}</p>
           <p class={styles.mission}>
-            После регистрации WIRING+ включён на 3 месяца.
-          </p>
-          <p class={styles.mission}>
-            <strong>Бета-версия.</strong> Сообщай в{" "}
+            <strong>{tr("Бета-версия.")}</strong> {tr(" Сообщай в")}{" "}
             <a href={hrefFor("support")} data-nav="support" onClick={(e) => { e.preventDefault(); host.navigate("support"); }}>
-              поддержку
-            </a>{" "}
-            о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.
-          </p>
+              {tr("поддержку")}</a>{" "}
+            {tr("о любых замечаниях, пожеланиях и улучшениях — мы внимательно и оперативно обработаем и при необходимости дадим обратную связь.")}</p>
         </div>
       )}
 
@@ -403,10 +391,9 @@ export function AuthScreen({ host }: AuthScreenProps) {
             <div class={styles.badgeCard}>
               <span class={styles.badgeIcon}>🎁</span>
               <div class={styles.badgeContent}>
-                <span class={styles.badgeTitle}>Тебе доступен подарок!</span>
+                <span class={styles.badgeTitle}>{tr("Тебе доступен подарок!")}</span>
                 <span class={styles.badgeDesc}>
-                  Ты по приглашению. После регистрации WIRING+ на 3 месяца, и ещё 30 дней вам обоим за приглашение.
-                </span>
+                  {tr("Ты по приглашению. После регистрации — ещё 30 дней WIRING+ вам обоим за приглашение.")}</span>
               </div>
             </div>
           )}
@@ -415,10 +402,9 @@ export function AuthScreen({ host }: AuthScreenProps) {
             <div class={styles.badgeCard}>
               <span class={styles.badgeIcon}>✨</span>
               <div class={styles.badgeContent}>
-                <span class={styles.badgeTitle}>Твой выбор сохранён</span>
+                <span class={styles.badgeTitle}>{tr("Твой выбор сохранён")}</span>
                 <span class={styles.badgeDesc}>
-                  Мы автоматически добавим выбранную особенность в твой профиль.
-                </span>
+                  {tr("Мы автоматически добавим выбранную особенность в твой профиль.")}</span>
               </div>
             </div>
           )}
@@ -429,22 +415,22 @@ export function AuthScreen({ host }: AuthScreenProps) {
         <div class={styles.socialActions}>
           {providers.map((provider) => (
             <Button key={provider} variant="ghost" fullWidth disabled={busy} onClick={() => void startSocialLogin(provider)}>
-              {isRegister ? "Зарегистрироваться" : "Войти"} через {PROVIDER_LABELS[provider]}
+              {isRegister ? tr("Зарегистрироваться") : tr("Войти")} {tr(" через ")}{PROVIDER_LABELS[provider]}
             </Button>
           ))}
           {isRegister && <p class={styles.legalDisclaimer}>
-            Нажимая кнопку регистрации через внешний сервис, ты подтверждаешь возраст 18+ и принимаешь{" "}
-            <a href={`${host.basePath}/rules`} target="_blank" rel="noopener noreferrer">пользовательское соглашение</a> и{" "}
-            <a href={`${host.basePath}/privacy`} target="_blank" rel="noopener noreferrer">политику конфиденциальности</a>.
+            {tr("Нажимая кнопку регистрации через внешний сервис, ты подтверждаешь возраст 18+ и принимаешь")}{" "}
+            <a href={`${host.basePath}/rules`} target="_blank" rel="noopener noreferrer">{tr("пользовательское соглашение")}</a> {tr(" и")}{" "}
+            <a href={`${host.basePath}/privacy`} target="_blank" rel="noopener noreferrer">{tr("политику конфиденциальности")}</a>.
           </p>}
-          <p class={styles.socialSeparator}>или с почтой и паролем</p>
+          <p class={styles.socialSeparator}>{tr("или с почтой и паролем")}</p>
         </div>
       )}
 
       <form class={styles.form} onSubmit={onSubmitLoginRegister} noValidate>
         {!isLogin && (
           <Input
-            label="Имя"
+            label={tr("Имя")}
             name="name"
             required
             minLength={2}
@@ -461,7 +447,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         )}
 
         <Input
-          label="Почта"
+          label={tr("Почта")}
           name="email"
           type="email"
           required
@@ -478,7 +464,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         />
 
         <Input
-          label="Пароль"
+          label={tr("Пароль")}
           name="password"
           type="password"
           autoComplete={isLogin ? "current-password" : "new-password"}
@@ -509,8 +495,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
                   data-nav="login"
                   onClick={() => host.navigate("login")}
                 >
-                  Войти с этой почтой →
-                </a>
+                  {tr("Войти с этой почтой →")}</a>
               )}
             </div>
           </div>
@@ -520,29 +505,27 @@ export function AuthScreen({ host }: AuthScreenProps) {
           <Button type="submit" disabled={busy} loading={busy} fullWidth>
             {busy
               ? isLogin
-                ? "Входим…"
-                : "Создаём профиль…"
+                ? tr("Входим…")
+                : tr("Создаём профиль…")
               : isLogin
-              ? "Войти"
-              : "Создать аккаунт"}
+              ? tr("Войти")
+              : tr("Создать аккаунт")}
           </Button>
 
           {isRegister && (
             <p class={styles.legalDisclaimer}>
-              Нажимая «Создать аккаунт», ты подтверждаешь возраст 18+ и принимаешь{" "}
+              {tr("Нажимая «Создать аккаунт», ты подтверждаешь возраст 18+ и принимаешь")}{" "}
               <a href="/rules" target="_blank" rel="noopener noreferrer">
-                пользовательское соглашение
-              </a>{" "}
-              и{" "}
+                {tr("пользовательское соглашение")}</a>{" "}
+              {tr("и")}{" "}
               <a href="/privacy" target="_blank" rel="noopener noreferrer">
-                политику конфиденциальности
-              </a>
+                {tr("политику конфиденциальности")}</a>
             </p>
           )}
 
           <div class={styles.switchRow}>
             <span class={styles.switchPrompt}>
-              {isLogin ? "Ещё нет профиля?" : "Уже есть аккаунт?"}
+              {isLogin ? tr("Ещё нет профиля?") : tr("Уже есть аккаунт?")}
             </span>
             <a
               class={styles.switchLink}
@@ -553,7 +536,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
                 host.navigate(isLogin ? "register" : "login");
               }}
             >
-              {isLogin ? "Создать профиль" : "Войти"}
+              {isLogin ? tr("Создать профиль") : tr("Войти")}
             </a>
           </div>
 
@@ -568,8 +551,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
                   host.navigate("forgot");
                 }}
               >
-                Напомнить пароль?
-              </a>
+                {tr("Напомнить пароль?")}</a>
             </div>
           )}
         </div>

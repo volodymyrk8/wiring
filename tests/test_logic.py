@@ -1,8 +1,9 @@
+import json
 import unittest
 from unittest.mock import patch
 
 from cities import catalog_city, city_search_index, normalize_city, places_payload
-from icebreakers import openers_for
+from icebreakers import _openai_openers, _slim, openers_for
 from matchmaker import heuristic_like, _mutual_looking_ok
 from profanity import has_profanity
 from io import BytesIO
@@ -124,6 +125,31 @@ class LogicTest(unittest.TestCase):
         with patch("icebreakers._openai_openers", return_value=fake):
             lines = openers_for({"job": "x", "bio": "", "prompts": [], "vibe": [], "neuro": []})
         self.assertEqual(lines, fake)
+
+    def test_openai_openers_receive_separate_peer_and_sender_genders(self):
+        lines = ["Что привело тебя в психологию?", "Какая музыка тебя вдохновляет?", "Какие игры тебе нравятся?"]
+        for peer_gender, sender_gender in (("woman", "man"), ("man", "woman"), ("hidden", "hidden")):
+            with self.subTest(peer=peer_gender, sender=sender_gender):
+                response = BytesIO(json.dumps({"choices": [{"message": {
+                    "content": json.dumps({"openers": lines})
+                }}]}).encode())
+                with patch.dict("os.environ", {"OPENAI_API_KEY": "fixture-key", "WIRING_OPENER_AI": "1"}):
+                    with patch("icebreakers.urllib.request.urlopen", return_value=response) as request:
+                        result = _openai_openers(
+                            {"name": "Pikushel", "gender": peer_gender, "job": "Клинический психолог"},
+                            {"gender": sender_gender},
+                        )
+                self.assertEqual(result, lines)
+                payload = json.loads(request.call_args.args[0].data)
+                profiles = json.loads(payload["messages"][1]["content"])
+                self.assertEqual(profiles["их_анкета"]["gender"], peer_gender)
+                self.assertEqual(profiles["моя_анкета"]["gender"], sender_gender)
+                self.assertIn("Не угадывай род", payload["messages"][0]["content"])
+
+    def test_opener_gender_is_neutral_unless_explicitly_known(self):
+        for gender in (None, "", "hidden", "nb", "other", "unknown"):
+            with self.subTest(gender=gender):
+                self.assertEqual(_slim({"name": "Анна", "gender": gender, "job": "Актриса"})["gender"], "hidden")
 
     def test_profile_photo_uses_one_portrait_frame(self):
         wide = BytesIO()

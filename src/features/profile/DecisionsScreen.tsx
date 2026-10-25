@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { AppHeader, Button, IconButton, LegalFooter, Modal, ProfileMenu } from "@/components/ui";
@@ -27,24 +28,24 @@ type Pending = { person: DecisionPerson; action: Action };
 
 const COPY: Record<Action, { title: string; body: string; confirm: string }> = {
   unlike: {
-    title: "Убрать лайк?",
-    body: "Анкета снова сможет попасть в ленту.",
-    confirm: "Убрать лайк",
+    title: tr("Убрать лайк?"),
+    body: tr("Анкета снова сможет попасть в ленту."),
+    confirm: tr("Убрать лайк"),
   },
   restore: {
-    title: "Вернуть в ленту?",
-    body: "Дизлайк снимется, и анкета снова сможет попасться.",
-    confirm: "Вернуть",
+    title: tr("Вернуть в ленту?"),
+    body: tr("Дизлайк снимется, и анкета снова сможет попасться."),
+    confirm: tr("Вернуть"),
   },
   unblock: {
-    title: "Разблокировать?",
-    body: "Блок снимется. В ленту анкета сама не вернётся — она останется в дизлайках, пока ты не вернёшь её отдельно.",
-    confirm: "Разблокировать",
+    title: tr("Разблокировать?"),
+    body: tr("Блок снимется. В ленту анкета сама не вернётся — она останется в дизлайках, пока ты не вернёшь её отдельно."),
+    confirm: tr("Разблокировать"),
   },
   unmatch: {
-    title: "Убрать из чатов?",
-    body: "Переписка скроется. Анкета уйдёт в дизлайки и не появится в ленте, пока ты сам её не вернёшь.",
-    confirm: "Убрать из чатов",
+    title: tr("Убрать из чатов?"),
+    body: tr("Переписка скроется. Анкета уйдёт в дизлайки и не появится в ленте, пока ты сам её не вернёшь."),
+    confirm: tr("Убрать из чатов"),
   },
 };
 
@@ -102,8 +103,8 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
         body: JSON.stringify({ target_id: person.id, direction }),
       });
       await reloadArchive();
-      if (response.matched) host.toast(`взаимно с ${person.name || "собой"}. Чат в разделе «Чаты».`);
-      else host.toast(direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+      if (response.matched) host.toast(tr("взаимно с {0}. Чат в разделе «Чаты».", person.name || tr("собой")));
+      else host.toast(direction === "like" ? tr("Лайк отправлен") : tr("Анкета больше не появится в ленте"));
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -144,7 +145,7 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
         showBack
         backHref={host.hrefFor("profile")}
         onBackClick={navigate("profile")}
-        sectionTitle="Лайки, дизлайки, блок"
+        sectionTitle={tr("Лайки, дизлайки, блок")}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={!host.user.guest ? <ProfileMenu
@@ -166,38 +167,38 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
       />
       <main class={styles.content}>
         <div class={styles.heading}>
-          <h1>Лайки, дизлайки, блок</h1>
-          <p>Сюда можно зайти, когда хочется передумать. В ленте и чатах этого списка нет.</p>
+          <h1>{tr("Лайки, дизлайки, блок")}</h1>
+          <p>{tr("Сюда можно зайти, когда хочется передумать. В ленте и чатах этого списка нет.")}</p>
         </div>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
-        {!archive ? <p class={styles.empty}>Загружаем…</p> : (
+        {!archive ? <p class={styles.empty}>{tr("Загружаем…")}</p> : (
           <>
-            <Section title="Лайки" empty="Лайков пока нет. Взаимные — в разделе «Чаты»." count={oneWayLikes.length}>
+            <Section title={tr("Лайки")} empty={tr("Лайков пока нет. Взаимные — в разделе «Чаты».")} count={oneWayLikes.length}>
               {oneWayLikes.map((person) => (
                 <Row key={person.id} person={person} href={host.hrefFor("person", { id: person.id })} onOpen={openPerson(person)}>
                   <div class={styles.quickActions}>
-                    <IconButton class={`${styles.quickBtn} ${styles.quickLikeActive}`} type="button" disabled aria-label="Лайк уже отправлен" title="Лайк уже отправлен">{iconLike}</IconButton>
-                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label="Скрыть из ленты" title="Скрыть из ленты" onClick={() => void quickSwipe(person, "pass")}>{iconPass}</IconButton>
+                    <IconButton class={`${styles.quickBtn} ${styles.quickLikeActive}`} type="button" disabled aria-label={tr("Лайк уже отправлен")} title={tr("Лайк уже отправлен")}>{iconLike}</IconButton>
+                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label={tr("Скрыть из ленты")} title={tr("Скрыть из ленты")} onClick={() => void quickSwipe(person, "pass")}>{iconPass}</IconButton>
                   </div>
-                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "unlike" })}>убрать лайк</Button>
+                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "unlike" })}>{tr("убрать лайк")}</Button>
                 </Row>
               ))}
             </Section>
-            <Section title="Дизлайки" empty="Скрытых анкет пока нет." count={archive.passes.length}>
+            <Section title={tr("Дизлайки")} empty={tr("Скрытых анкет пока нет.")} count={archive.passes.length}>
               {archive.passes.map((person) => (
                 <Row key={person.id} person={person} href={host.hrefFor("person", { id: person.id })} onOpen={openPerson(person)}>
                   <div class={styles.quickActions}>
-                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label="Лайк" title="Лайк" onClick={() => void quickSwipe(person, "like")}>{iconLike}</IconButton>
-                    <IconButton class={`${styles.quickBtn} ${styles.quickPassActive}`} type="button" disabled aria-label="Скрыто из ленты" title="Скрыто из ленты">{iconPass}</IconButton>
+                    <IconButton class={styles.quickBtn} type="button" disabled={busy} aria-label={tr("Лайк")} title={tr("Лайк")} onClick={() => void quickSwipe(person, "like")}>{iconLike}</IconButton>
+                    <IconButton class={`${styles.quickBtn} ${styles.quickPassActive}`} type="button" disabled aria-label={tr("Скрыто из ленты")} title={tr("Скрыто из ленты")}>{iconPass}</IconButton>
                   </div>
-                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "restore" })}>только в ленту</Button>
+                  <Button variant="ghost" slim type="button" disabled={busy} onClick={() => setPending({ person, action: "restore" })}>{tr("только в ленту")}</Button>
                 </Row>
               ))}
             </Section>
-            <Section title="Блок" empty="В блоке никого нет." count={archive.blocks.length}>
+            <Section title={tr("Блок")} empty={tr("В блоке никого нет.")} count={archive.blocks.length}>
               {archive.blocks.map((person) => (
                 <Row key={person.id} person={person}>
-                  <Button variant="ghost" slim type="button" onClick={() => setPending({ person, action: "unblock" })}>разблокировать</Button>
+                  <Button variant="ghost" slim type="button" onClick={() => setPending({ person, action: "unblock" })}>{tr("разблокировать")}</Button>
                 </Row>
               ))}
             </Section>
@@ -210,7 +211,7 @@ export function DecisionsScreen({ host }: { host: ProfileHostBridge }) {
         onClose={() => { if (!busy) setPending(null); }}
         title={pending ? COPY[pending.action].title : ""}
         footer={pending ? <>
-          <Button variant="ghost" slim disabled={busy} onClick={() => setPending(null)}>отмена</Button>
+          <Button variant="ghost" slim disabled={busy} onClick={() => setPending(null)}>{tr("отмена")}</Button>
           <Button variant="solid" slim loading={busy} disabled={busy} onClick={() => void apply()}>{COPY[pending.action].confirm}</Button>
         </> : null}
       >
@@ -241,18 +242,18 @@ function Row({
   children: ComponentChildren;
 }) {
   const src = photoSrc(person);
-  const label = `${person.name || "Анкета"}${person.age ? `, ${person.age}` : ""}`;
+  const label = `${person.name || tr("Анкета")}${person.age ? `, ${person.age}` : ""}`;
   return (
     <li class={styles.row}>
       {href && onOpen ? (
         <a class={styles.who} href={href} onClick={onOpen}>
           {src ? <img src={src} alt="" /> : <span class={styles.fallback} aria-hidden="true">{String(person.name || "?").slice(0, 1)}</span>}
-          <span><strong>{label}</strong>{person.city ? <small>{person.city}</small> : null}</span>
+          <span><strong>{label}</strong>{person.city ? <small>{tr(person.city)}</small> : null}</span>
         </a>
       ) : (
         <div class={styles.who}>
           {src ? <img src={src} alt="" /> : <span class={styles.fallback} aria-hidden="true">{String(person.name || "?").slice(0, 1)}</span>}
-          <span><strong>{label}</strong>{person.city ? <small>{person.city}</small> : null}</span>
+          <span><strong>{label}</strong>{person.city ? <small>{tr(person.city)}</small> : null}</span>
         </div>
       )}
       <div class={styles.actions}>{children}</div>

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 export type ChatSendMode = "enter" | "ctrl-enter";
 
 const STORAGE_KEY = "wiring-chat-send-mode";
@@ -26,8 +27,8 @@ export function toggleChatSendMode(mode: ChatSendMode): ChatSendMode {
 }
 
 export function chatSendModeHint(mode: ChatSendMode): string {
-  if (mode === "enter") return "Enter — отправить, Shift+Enter — новая строка";
-  return "Ctrl+Enter — отправить, Enter — новая строка. На Mac — ⌘+Enter";
+  if (mode === "enter") return tr("Enter — отправить, Shift+Enter — новая строка");
+  return tr("Ctrl+Enter — отправить, Enter — новая строка. На Mac — ⌘+Enter");
 }
 
 export function shouldSendOnComposerKey(

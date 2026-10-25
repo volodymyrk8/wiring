@@ -1,3 +1,4 @@
+import { tr } from "./i18n";
 import type { PlaceBlock } from "@/features/profile/types";
 
 export function countryForCity(city: string, places: PlaceBlock[]): string {
@@ -23,8 +24,8 @@ export function citySelectOptions(
     ...head,
     ...cities.map((city) => ({
       value: city,
-      label: city,
-      searchText: cityOptionSearchText(city, citySearch),
+      label: tr(city),
+      searchText: [tr(city), cityOptionSearchText(city, citySearch)].join(" "),
     })),
   ];
 }

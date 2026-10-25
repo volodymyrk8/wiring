@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Checkbox, GuestFlowSteps, IconButton, Input, Modal, Select, TagPicker } from "@/components/ui";
@@ -113,7 +114,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
     showBetaBadge={false}
     showThemeSwatches
     onThemeSelect={host.onThemeSelect}
-    rightSlot={host.recommendations ? <span>Для тебя</span> : <IconButton onClick={onFilters} aria-label={filtered ? "Фильтры · применены" : "Фильтры"} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
+    rightSlot={host.recommendations ? <span>{tr("Для тебя")}</span> : <IconButton onClick={onFilters} aria-label={filtered ? tr("Фильтры · применены") : tr("Фильтры")} aria-expanded={filtersOpen} aria-haspopup="dialog">{iconFilter}{filtered ? <i class={styles.filterDot} aria-hidden="true" /> : null}</IconButton>}
   />;
 }
 
@@ -122,9 +123,9 @@ const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], m
 const recommendationCopy = (card: DeckCard, source: "api" | "local" | "taste" | undefined) => {
   const reasons = (card.recommendation_reasons || []).map((item) => String(item).trim()).filter(Boolean);
   const footnote = source === "taste"
-    ? "Это похоже на анкеты, которые ты уже лайкнула, а не гарантия."
-    : "Это совпадения в анкетах, а не гарантия совместимости.";
-  const provider = source === "local" ? "Jev сейчас недоступен: подбор по совпадениям анкет. " : source === "api" ? "Jev ранжирует предварительный список. " : "";
+    ? tr("Это похоже на анкеты, которые ты уже лайкнула, а не гарантия.")
+    : tr("Это совпадения в анкетах, а не гарантия совместимости.");
+  const provider = source === "local" ? tr("Jev сейчас недоступен: подбор по совпадениям анкет. ") : source === "api" ? tr("Jev ранжирует предварительный список. ") : "";
   return provider + (reasons.length ? `${reasons.join(". ")}. ${footnote}` : footnote);
 };
 
@@ -157,11 +158,11 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   const citySearch = host.catalog.city_search;
   const cities = [...new Set(places.flatMap((place) => place.cities))];
   const placeOptions = [
-    { value: "", label: "Отовсюду" },
-    ...places.map((place) => ({ value: place.country, label: place.country })),
+    { value: "", label: tr("Отовсюду") },
+    ...places.map((place) => ({ value: place.country, label: tr(place.country) })),
     ...cities.map((city) => ({
       value: city,
-      label: city,
+      label: tr(city),
       searchText: cityOptionSearchText(city, citySearch),
     })),
   ];
@@ -171,34 +172,34 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
     setMinAge("18");
     setMaxAge("99");
   };
-  return <Modal isOpen onClose={onClose} title="Фильтры" responsiveSheet
-    footer={<><Button variant="ghost" disabled={applying} onClick={reset}>Сбросить</Button><Button type="button" disabled={applying} loading={applying} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>Применить</Button></>}>
+  return <Modal isOpen onClose={onClose} title={tr("Фильтры")} responsiveSheet
+    footer={<><Button variant="ghost" disabled={applying} onClick={reset}>{tr("Сбросить")}</Button><Button type="button" disabled={applying} loading={applying} onClick={() => { const form = document.getElementById("deck-filters"); if (form instanceof HTMLFormElement) form.requestSubmit(); }}>{tr("Применить")}</Button></>}>
     <form id="deck-filters" class={styles.filters} onSubmit={(event) => {
       event.preventDefault();
       if (!applying) onApply({ ...draft, min_age: Number(minAge), max_age: Number(maxAge) }, discovery);
     }}>
       <fieldset class={styles.filterFields} disabled={applying}>
-        <h3 class={styles.filterSection}>Кого ищу я</h3>
-        <p class={styles.filterIntro}>Кого показывать в твоей ленте.</p>
+        <h3 class={styles.filterSection}>{tr("Кого ищу я")}</h3>
+        <p class={styles.filterIntro}>{tr("Кого показывать в твоей ленте.")}</p>
         <div class={styles.range}>
-          <Input label="Возраст от" name="deck-min-age" type="number" inputMode="numeric" required min={18} max={Number(maxAge) || 99} value={minAge} onInput={(event) => setMinAge(event.currentTarget.value)} />
-          <Input label="Возраст до" name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
+          <Input label={tr("Возраст от")} name="deck-min-age" type="number" inputMode="numeric" required min={18} max={Number(maxAge) || 99} value={minAge} onInput={(event) => setMinAge(event.currentTarget.value)} />
+          <Input label={tr("Возраст до")} name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
         </div>
-        <Select className={styles.citySelect} label="Пол" id="deck-gender" options={[{ value: "", label: "Любой" }, { value: "woman", label: "Женщины" }, { value: "man", label: "Мужчины" }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel="Пол в ленте" />
-        <Select className={styles.citySelect} label="Город" id="deck-city" placeholder="Любой" searchable searchPlaceholder="Город" options={citySelectOptions(cities, citySearch, { value: "", label: "Любой" })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel="Город в ленте" />
-        <TagPicker label="Цель поиска" options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
-        <TagPicker label="Диагнозы" options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder="Диагноз или расшифровка" searchHaystack={tagSearchHaystack} />
-        <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>Скрыть анкеты без диагноза</Checkbox>
-        <TagPicker label="Вайб" options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder="Вайб, body doubling…" searchHaystack={tagSearchHaystack} />
-        <h3 class={styles.filterSection}>Кто может искать меня</h3>
-        <p class={styles.filterIntro}>Кому ты сам виден. Это не то, кого видишь ты.</p>
+        <Select className={styles.citySelect} label={tr("Пол")} id="deck-gender" options={[{ value: "", label: tr("Любой") }, { value: "woman", label: tr("Женщины") }, { value: "man", label: tr("Мужчины") }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel={tr("Пол в ленте")} />
+        <Select className={styles.citySelect} label={tr("Город")} id="deck-city" placeholder={tr("Любой")} searchable searchPlaceholder={tr("Город")} options={citySelectOptions(cities, citySearch, { value: "", label: tr("Любой") })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город в ленте")} />
+        <TagPicker label={tr("Цель поиска")} options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
+        <TagPicker label={tr("Диагнозы")} options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder={tr("Диагноз или расшифровка")} searchHaystack={tagSearchHaystack} />
+        <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>{tr("Скрыть анкеты без диагноза")}</Checkbox>
+        <TagPicker label={tr("Вайб")} options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => update("vibe", value)} tone="vibe" searchable searchPlaceholder={tr("Вайб, body doubling…")} searchHaystack={tagSearchHaystack} />
+        <h3 class={styles.filterSection}>{tr("Кто может искать меня")}</h3>
+        <p class={styles.filterIntro}>{tr("Кому ты сам виден. Это не то, кого видишь ты.")}</p>
         <div class={styles.range}>
-          <Input label="Возраст от" name="seek-min-age" type="number" inputMode="numeric" required min={18} max={Number(discovery.seekMaxAge) || 99} value={discovery.seekMinAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMinAge: event.currentTarget.value }))} />
-          <Input label="Возраст до" name="seek-max-age" type="number" inputMode="numeric" required min={Number(discovery.seekMinAge) || 18} max={99} value={discovery.seekMaxAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMaxAge: event.currentTarget.value }))} />
+          <Input label={tr("Возраст от")} name="seek-min-age" type="number" inputMode="numeric" required min={18} max={Number(discovery.seekMaxAge) || 99} value={discovery.seekMinAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMinAge: event.currentTarget.value }))} />
+          <Input label={tr("Возраст до")} name="seek-max-age" type="number" inputMode="numeric" required min={Number(discovery.seekMinAge) || 18} max={99} value={discovery.seekMaxAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMaxAge: event.currentTarget.value }))} />
         </div>
-        <Select className={styles.citySelect} label="Откуда" id="deck-seek-place" searchable searchPlaceholder="Город или страна" options={placeOptions} value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel="Откуда могут искать" />
-        <TagPicker label="Не показывать меня людям с этими особенностями" options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: applyNeuroToggle(current.hideNeuro, value) }))} />
-        <TagPicker label="Не показывать меня людям с таким вайбом" options={host.catalog.vibe || []} selected={discovery.hideVibe} onChange={(value) => setDiscovery((current) => ({ ...current, hideVibe: value }))} tone="vibe" />
+        <Select className={styles.citySelect} label={tr("Откуда")} id="deck-seek-place" searchable searchPlaceholder={tr("Город или страна")} options={placeOptions} value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel={tr("Откуда могут искать")} />
+        <TagPicker label={tr("Не показывать меня людям с этими особенностями")} options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: applyNeuroToggle(current.hideNeuro, value) }))} />
+        <TagPicker label={tr("Не показывать меня людям с таким вайбом")} options={host.catalog.vibe || []} selected={discovery.hideVibe} onChange={(value) => setDiscovery((current) => ({ ...current, hideVibe: value }))} tone="vibe" />
       </fieldset>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </form>
@@ -232,9 +233,9 @@ function DeckCardView({ host, card, active, onVertical, heightLimit, source }: {
   };
   const labelsIntent = labels(host.catalog, "intents", card.intents?.length ? card.intents : card.intent);
   const showGender = card.gender && card.gender !== "hidden" && card.gender !== "other" && card.gender !== "nb";
-  const meta = [card.city, card.height ? `${card.height} см` : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
+  const meta = [card.city, card.height ? tr("{0} см", card.height) : "", ...(showGender ? labels(host.catalog, "genders", card.gender) : [])].filter(Boolean).join(" · ");
   const intentLine = openToIntentsLine(card.gender, labelsIntent);
-  const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => `ищет ${value}`), intentLine].filter(Boolean).join(" · ");
+  const secondary = [...labels(host.catalog, "looking_for", card.looking_for).map((value) => tr("ищет {0}", value)), intentLine].filter(Boolean).join(" · ");
   const jevReasons = (card.jev_match_reasons || []).slice(0, 2);
   const showJev = typeof card.jev_match_pct === "number";
   const split = splitCatalogTags(card.neuro, card.vibe, host.catalog);
@@ -254,12 +255,12 @@ function DeckCardView({ host, card, active, onVertical, heightLimit, source }: {
            />)}
       </div>
     </div>
-    {photos.length > 1 ? <span class={styles.srOnly} aria-live={active ? "polite" : "off"}>Фото {photoIndex + 1} из {photos.length}</span> : null}
+    {photos.length > 1 ? <span class={styles.srOnly} aria-live={active ? "polite" : "off"}>{tr("Фото ")}{photoIndex + 1} {tr(" из ")}{photos.length}</span> : null}
     {photos.length > 1 ? <div class={styles.photoNav}>
-      <button type="button" class={styles.photoNavBtn} aria-label="Предыдущее фото" onClick={() => changePhoto(-1)}>
+      <button type="button" class={styles.photoNavBtn} aria-label={tr("Предыдущее фото")} onClick={() => changePhoto(-1)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5" /></svg>
       </button>
-      <button type="button" class={styles.photoNavBtn} aria-label="Следующее фото" onClick={() => changePhoto(1)}>
+      <button type="button" class={styles.photoNavBtn} aria-label={tr("Следующее фото")} onClick={() => changePhoto(1)}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5" /></svg>
       </button>
     </div> : null}
@@ -268,17 +269,17 @@ function DeckCardView({ host, card, active, onVertical, heightLimit, source }: {
         <span key={index} class={index < photoIndex ? styles.photoSegmentDone : index === photoIndex ? styles.photoSegmentActive : undefined} />
       ))}</div>
       <input class={styles.photoSelector} type="range" min={0} max={photos.length - 1} step={1} value={photoIndex} tabIndex={active ? 0 : -1}
-        aria-label="Фотографии" aria-valuetext={`Фото ${photoIndex + 1} из ${photos.length}`} onInput={(event) => setPhotoIndex(Number(event.currentTarget.value))} />
+        aria-label={tr("Фотографии")} aria-valuetext={tr("Фото {0} из {1}", photoIndex + 1, photos.length)} onInput={(event) => setPhotoIndex(Number(event.currentTarget.value))} />
     </div> : null}
     <div class={styles.body}>
-      <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label="в сети" /> : null}{card.name}, {card.age}</h2></div>
+      <div class={styles.head}><h2>{card.online ? <span class={styles.online} aria-label={tr("в сети")} /> : null}{card.name}, {card.age}</h2></div>
       {meta || secondary ? <p class={styles.meta}>{meta}{meta && secondary ? <br /> : null}{secondary}</p> : null}
       {showJev ? (
-        <div class={styles.jevMatch} aria-label={`Оценка совместимости: ${card.jev_match_pct} процентов`}>
+        <div class={styles.jevMatch} aria-label={tr("Оценка совместимости: {0} процентов", card.jev_match_pct)}>
           <div class={styles.jevMatchHead}>
             <span class={styles.jevPct}>{card.jev_match_pct}%</span>
             <span class={styles.jevMatchLabel}>
-              {card.jev_match_source === "api" ? "взаимный интерес · Jev" : "ориентир · WIRING"}
+              {card.jev_match_source === "api" ? tr("взаимный интерес · Jev") : tr("ориентир · WIRING")}
             </span>
           </div>
           {jevReasons.length ? (
@@ -290,8 +291,8 @@ function DeckCardView({ host, card, active, onVertical, heightLimit, source }: {
           ) : null}
         </div>
       ) : null}
-      {host.recommendations ? <section class={styles.recommendationPanel} aria-label="Почему может подойти">
-        <strong class={styles.recommendationPanelTitle}>Почему может подойти</strong>
+      {host.recommendations ? <section class={styles.recommendationPanel} aria-label={tr("Почему может подойти")}>
+        <strong class={styles.recommendationPanelTitle}>{tr("Почему может подойти")}</strong>
         <p class={styles.recommendationPanelBody}>{recommendationCopy(card, source)}</p>
       </section> : null}
       {card.bio ? <p class={`${styles.bio}${showJev ? ` ${styles.bioCompact}` : ""}`}>{card.bio}</p> : null}
@@ -320,18 +321,18 @@ function DeckGuest({ host }: { host: DeckHostBridge }) {
     <AppHeader
       homeHref={host.hrefFor("home")}
       onHomeClick={navigate("home")}
-      sectionTitle="лента"
+      sectionTitle={tr("лента")}
       showThemeSwatches
       onThemeSelect={host.onThemeSelect}
     />
     <main class={styles.guestGate}>
-      <h2>Лента анкет</h2>
+      <h2>{tr("Лента анкет")}</h2>
       <GuestFlowSteps variant="feed" />
       <div class={styles.guestCta}>
-        <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>Создать профиль</Button>
+        <Button variant="solid" fullWidth href={host.hrefFor("register")} nav="register" onClick={navigate("register")}>{tr("Создать профиль")}</Button>
         <p class={styles.switchRow}>
-          <span class={styles.switchPrompt}>Уже есть профиль?</span>
-          <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>Войти</a>
+          <span class={styles.switchPrompt}>{tr("Уже есть профиль?")}</span>
+          <a class={styles.switchLink} href={host.hrefFor("login")} data-nav="login" onClick={navigate("login")}>{tr("Войти")}</a>
         </p>
       </div>
     </main>
@@ -594,7 +595,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         if (viewport && height > 0 && !gestureActive()) jumpReel(viewport, nextIndex * height, reelLock.current, true);
       });
       if (response.matched && response.match) host.onMatch(response.match);
-      else host.toast(direction === "like" ? "Лайк отправлен" : "Анкета больше не появится в ленте");
+      else host.toast(direction === "like" ? tr("Лайк отправлен") : tr("Анкета больше не появится в ленте"));
     } catch (caught) {
       if (!controller.signal.aborted) setError(getErrorMessage(caught));
     } finally {
@@ -658,19 +659,19 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
   return <div class={`${styles.root}${host.recommendations ? ` ${styles.recommendationsRoot}` : ""}`}>
     <DeckHeader host={host} filtered={filtered} filtersOpen={filtersOpen} onFilters={() => { setError(""); setFiltersOpen(true); }} />
     {filtersOpen ? <FilterPanel host={host} filters={filters} applying={applyingFilters} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!applyingFilters) setFiltersOpen(false); }} /> : null}
-    <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title="Больше не показывать?"
-      footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>Отмена</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>Исключить</Button></>}>
-      <p>Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.</p>
+    <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title={tr("Больше не показывать?")}
+      footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>{tr("Отмена")}</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>{tr("Исключить")}</Button></>}>
+      <p>{tr("Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.")}</p>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </Modal>
-    <main class={styles.content} aria-label={host.recommendations ? "Для тебя" : "Лента"}>
-      <Modal isOpen={resetOpen} onClose={() => { if (!busy) setResetOpen(false); }} title="Показать анкеты ещё раз?"
-        footer={<><Button variant="ghost" disabled={busy} onClick={() => setResetOpen(false)}>Отмена</Button><Button loading={busy} onClick={() => void repeatFeed()}>Показать ещё раз</Button></>}>
-        <p>Ранее показанные анкеты снова появятся в ленте. Исключённые анкеты не вернутся; лайки и чаты сохранятся.</p>
+    <main class={styles.content} aria-label={host.recommendations ? tr("Для тебя") : tr("Лента")}>
+      <Modal isOpen={resetOpen} onClose={() => { if (!busy) setResetOpen(false); }} title={tr("Показать анкеты ещё раз?")}
+        footer={<><Button variant="ghost" disabled={busy} onClick={() => setResetOpen(false)}>{tr("Отмена")}</Button><Button loading={busy} onClick={() => void repeatFeed()}>{tr("Показать ещё раз")}</Button></>}>
+        <p>{tr("Ранее показанные анкеты снова появятся в ленте. Исключённые анкеты не вернутся; лайки и чаты сохранятся.")}</p>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
       </Modal>
-      {paused ? <aside class={styles.pause}><span><strong>Анкета на паузе.</strong> Тебя временно не показывают в чужой ленте.</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>снять паузу</Button></aside> : null}
-      <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label="Анкеты" aria-busy={loading}
+      {paused ? <aside class={styles.pause}><span><strong>{tr("Анкета на паузе.")}</strong> {tr(" Тебя временно не показывают в чужой ленте.")}</span><Button variant="ghost" slim disabled={busy} onClick={() => void unpause()}>{tr("снять паузу")}</Button></aside> : null}
+      <div ref={viewportRef} class={`${styles.reels}${dragging ? ` ${styles.dragging}` : ""}${panelHold ? ` ${styles.freeScroll}` : ""}`} tabIndex={0} role="region" aria-label={tr("Анкеты")} aria-busy={loading}
         onScroll={(event) => {
           if (restoreRef.current || reelLock.current.pinning) return;
           const height = event.currentTarget.clientHeight;
@@ -764,13 +765,13 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         </section>)}
         <section class={styles.slide} aria-hidden={index < cards.length}>
           <div class={styles.empty}>
-            <h2>{loading ? "Ищем новые анкеты…" : host.recommendations ? "Подборка закончилась" : "Новых анкет пока нет"}</h2>
-            <p>{loading ? "Ещё немного." : !host.recommendations && filtered ? "Можно изменить фильтры." : "Загляни позже."}</p>
+            <h2>{loading ? tr("Ищем новые анкеты…") : host.recommendations ? tr("Подборка закончилась") : tr("Новых анкет пока нет")}</h2>
+            <p>{loading ? tr("Ещё немного.") : !host.recommendations && filtered ? tr("Можно изменить фильтры.") : tr("Загляни позже.")}</p>
             {!loading && index >= cards.length ? <div class={styles.emptyActions}>
-              <Button variant="ghost" disabled={busy} onClick={() => void loadPage(filters, Boolean(host.recommendations && !recommendationRestoreRef.current))}>{error ? "Повторить" : "Проверить новые"}</Button>
+              <Button variant="ghost" disabled={busy} onClick={() => void loadPage(filters, Boolean(host.recommendations && !recommendationRestoreRef.current))}>{error ? tr("Повторить") : tr("Проверить новые")}</Button>
               {!hasMore && !host.recommendations ? <>
-                <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}>Показать анкеты ещё раз</Button>
-                {!host.user.plus ? <p id="feed-plus-hint">Можно включить в профиле.</p> : null}
+                <Button className={styles.repeatButton} disabled={busy || !host.user.plus} ariaDescribedBy={!host.user.plus ? "feed-plus-hint" : undefined} onClick={() => { setError(""); setResetOpen(true); }}>{tr("Показать анкеты ещё раз")}</Button>
+                {!host.user.plus ? <p id="feed-plus-hint">{tr("Можно включить в профиле.")}</p> : null}
               </> : null}
             </div> : null}
           </div>
@@ -815,9 +816,9 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         }}
       >
         {current ? <>
-          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel="Скрыть — больше не показывать" title="Скрыть">{iconPass}</Button><span aria-hidden="true">Скрыть</span></div>
-          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: current.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: current.id }); }} ariaLabel="Профиль" title="Профиль">{iconProfile}</Button><span aria-hidden="true">Профиль</span></div>
-          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => void act("like")} ariaLabel="Лайк" title="Лайк">{iconLike}</Button><span aria-hidden="true">Лайк</span></div>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => setExcludeOpen(true)} ariaLabel={tr("Скрыть — больше не показывать")} title={tr("Скрыть")}>{iconPass}</Button><span aria-hidden="true">{tr("Скрыть")}</span></div>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} href={host.hrefFor("person", { id: current.id })} onClick={(event) => { event.preventDefault(); host.navigate("person", { id: current.id }); }} ariaLabel={tr("Профиль")} title={tr("Профиль")}>{iconProfile}</Button><span aria-hidden="true">{tr("Профиль")}</span></div>
+          <div class={styles.actionControl}><Button variant="ghost" className={styles.actionCircle} disabled={busy || loading} onClick={() => void act("like")} ariaLabel={tr("Лайк")} title={tr("Лайк")}>{iconLike}</Button><span aria-hidden="true">{tr("Лайк")}</span></div>
         </> : null}
       </div>
       {error && !filtersOpen && !excludeOpen && !resetOpen ? <p class={styles.error} role="alert">{error}</p> : null}

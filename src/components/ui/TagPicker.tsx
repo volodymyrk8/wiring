@@ -1,3 +1,4 @@
+import { tr, getLocale } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import styles from "./TagPicker.module.css";
@@ -115,7 +116,7 @@ export function TagPicker({
   tone = "default",
   id,
   searchable = false,
-  searchPlaceholder = "Найти…",
+  searchPlaceholder = tr("Найти…"),
   searchHaystack,
 }: TagPickerProps) {
   const [query, setQuery] = useState("");
@@ -137,11 +138,11 @@ export function TagPicker({
     onChange(next);
   };
 
-  const needle = query.trim().toLocaleLowerCase("ru");
+  const needle = query.trim().toLocaleLowerCase(getLocale());
   const visibleOptions = searchable && needle
     ? options.filter((option) => {
         if (selected.includes(option.id)) return true;
-        const hay = (searchHaystack ? searchHaystack(option) : `${option.id} ${option.label} ${option.hint || ""}`).toLocaleLowerCase("ru");
+        const hay = (searchHaystack ? searchHaystack(option) : `${option.id} ${option.label} ${option.hint || ""}`).toLocaleLowerCase(getLocale());
         return hay.includes(needle);
       })
     : options;
@@ -160,7 +161,7 @@ export function TagPicker({
         />
       ) : null}
       {searchable && needle && !visibleOptions.length ? (
-        <p class={styles.empty}>Ничего не нашлось</p>
+        <p class={styles.empty}>{tr("Ничего не нашлось")}</p>
       ) : null}
       <div class={styles.tags} ref={rootRef} role="group" aria-label={typeof label === "string" ? label : undefined}>
         {visibleOptions.map((option) => {

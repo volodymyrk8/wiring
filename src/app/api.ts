@@ -1,3 +1,4 @@
+import { tr, getLanguage } from "@/lib/i18n";
 export type ApiOptions = RequestInit & {
   headers?: Record<string, string>;
 };
@@ -18,14 +19,15 @@ export class ApiError extends Error {
 
 export function createApi(basePath = ""): ApiClient {
   return async function api<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
-    const headers = { ...(options.headers || {}) };
+    const headers: Record<string, string> = Object.fromEntries(new Headers(options.headers).entries());
+    headers["X-Wiring-Language"] = getLanguage();
     if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
     const response = await fetch(`${basePath}${path}`, {
+      ...options,
       credentials: "same-origin",
       headers,
-      ...options,
     });
     const raw = await response.text();
     let data: Record<string, unknown>;
@@ -34,14 +36,14 @@ export function createApi(basePath = ""): ApiClient {
     } catch {
       const hint =
         response.status === 413
-          ? "файл слишком большой — сожми фото"
+          ? tr("файл слишком большой — сожми фото")
           : response.status >= 500
-            ? "сервер временно недоступен"
-            : "сервер вернул неожиданный ответ";
+            ? tr("сервер временно недоступен")
+            : tr("сервер вернул неожиданный ответ");
       throw new ApiError(hint, { ok: false, error: hint }, response.status);
     }
     if (!response.ok || data.ok === false) {
-      throw new ApiError(String(data.error || `ошибка ${response.status}`), data, response.status);
+      throw new ApiError(String(data.error || tr("ошибка {0}", response.status)), data, response.status);
     }
     return data as T;
   };

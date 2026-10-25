@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import {
@@ -104,7 +105,7 @@ const photoSrc = (basePath: string, photo: unknown, name: string) => {
 };
 
 const PHOTO_CONSENT_LABEL =
-  "Загружаю только свои фото и разрешаю показывать их участникам WIRING";
+  tr("Загружаю только свои фото и разрешаю показывать их участникам WIRING");
 
 function PhotoManager({
   host,
@@ -129,7 +130,7 @@ function PhotoManager({
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const makePrimaryAfterCrop = useRef(false);
   const photos = allPhotos(user);
-  const name = valueOf(user.name, "Профиль");
+  const name = valueOf(user.name, tr("Профиль"));
   const needsPhotoConsent = Boolean(user.needs_photo_consent);
 
   const refresh = async () => onChange(await host.refreshUser());
@@ -139,7 +140,7 @@ function PhotoManager({
     const images = files.filter(isProfilePhotoFile);
     const rejected = files.length - images.length;
     if (rejected) {
-      setError("Нужно фото (jpg, png, webp), не видео. Screen recording из «Фото» — это mp4, его сюда не загрузить.");
+      setError(tr("Нужно фото (jpg, png, webp), не видео. Screen recording из «Фото» — это mp4, его сюда не загрузить."));
     }
     if (!images.length) return;
     setError("");
@@ -155,7 +156,7 @@ function PhotoManager({
     if (!files.length) return;
     if (needsPhotoConsent && !consent) {
       setConsentError(true);
-      setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
+      setError(tr("Сначала отметь галочку ниже — без неё фото не загрузятся."));
       return;
     }
     queuePhotoFiles(files);
@@ -164,7 +165,7 @@ function PhotoManager({
   const pickAvatar = () => {
     if (needsPhotoConsent && !consent) {
       setConsentError(true);
-      setError("Сначала отметь галочку ниже — без неё фото не загрузятся.");
+      setError(tr("Сначала отметь галочку ниже — без неё фото не загрузятся."));
       return;
     }
     setError("");
@@ -198,7 +199,7 @@ function PhotoManager({
       setCropQueue(rest);
       if (!rest.length) {
         disarmPicker();
-        host.toast(replaceAvatar ? "аватар обновлён" : batchRef.current > 1 ? "фото добавлены" : "фото добавлено");
+        host.toast(replaceAvatar ? tr("аватар обновлён") : batchRef.current > 1 ? tr("фото добавлены") : tr("фото добавлено"));
       }
     } catch (caught) {
       setCropError(getErrorMessage(caught));
@@ -225,7 +226,7 @@ function PhotoManager({
     try {
       await host.setPrimaryPhoto(id);
       await refresh();
-      host.toast("это теперь аватар");
+      host.toast(tr("это теперь аватар"));
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -234,12 +235,12 @@ function PhotoManager({
   };
 
   const remove = async (id: number) => {
-    if (!window.confirm("Убрать это фото?")) return;
+    if (!window.confirm(tr("Убрать это фото?"))) return;
     setBusy(true);
     try {
       await host.deletePhoto(id);
       await refresh();
-      host.toast("фото удалено");
+      host.toast(tr("фото удалено"));
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -259,7 +260,7 @@ function PhotoManager({
             onConsentChange(checked);
             if (checked) {
               setConsentError(false);
-              if (error.startsWith("Сначала отметь")) setError("");
+              if (error.startsWith(tr("Сначала отметь"))) setError("");
             }
           }}
         >
@@ -268,23 +269,23 @@ function PhotoManager({
         </div>
       ) : null}
       <div class={styles.photoToolbar}>
-        <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>Изменить аватар</Button>
-        <p class={styles.photoHint}>Меняй порядок стрелками под фото. Первое фото — аватар в ленте.</p>
+        <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>{tr("Изменить аватар")}</Button>
+        <p class={styles.photoHint}>{tr("Меняй порядок стрелками под фото. Первое фото — аватар в ленте.")}</p>
       </div>
       <input ref={avatarInputRef} class={styles.srOnly} type="file" accept={PROFILE_PHOTO_ACCEPT} disabled={busy || cropQueue.length > 0} onClick={armPicker} onCancel={disarmPicker} onChange={uploadAvatar} />
       <div class={styles.photoGrid}>
         {photos.map((photo, index) => (
           <div key={photo.id} class={`${styles.photoCell}${photo.is_primary ? ` ${styles.primary}` : ""}`}>
-            <button type="button" class={styles.photoPick} disabled={busy} onClick={() => makePrimary(photo.id)} aria-label={photo.is_primary ? "Это аватар" : "Сделать аватаром"}>
+            <button type="button" class={styles.photoPick} disabled={busy} onClick={() => makePrimary(photo.id)} aria-label={photo.is_primary ? tr("Это аватар") : tr("Сделать аватаром")}>
               <img src={photoSrc(host.basePath, photo.url, name)} alt="" />
             </button>
             <div class={styles.photoOrder}>
-              <button type="button" disabled={busy || index === 0} onClick={() => void movePhoto(index, -1)} aria-label={`Передвинуть фото ${index + 1} влево`}>←</button>
+              <button type="button" disabled={busy || index === 0} onClick={() => void movePhoto(index, -1)} aria-label={tr("Передвинуть фото {0} влево", index + 1)}>←</button>
               <span>{index + 1}</span>
-              <button type="button" disabled={busy || index === photos.length - 1} onClick={() => void movePhoto(index, 1)} aria-label={`Передвинуть фото ${index + 1} вправо`}>→</button>
+              <button type="button" disabled={busy || index === photos.length - 1} onClick={() => void movePhoto(index, 1)} aria-label={tr("Передвинуть фото {0} вправо", index + 1)}>→</button>
             </div>
-            {photo.is_primary && <span class={styles.avatarBadge}>аватар</span>}
-            <button type="button" class={styles.photoDelete} disabled={busy} onClick={() => remove(photo.id)} aria-label="Удалить фото">×</button>
+            {photo.is_primary && <span class={styles.avatarBadge}>{tr("аватар")}</span>}
+            <button type="button" class={styles.photoDelete} disabled={busy} onClick={() => remove(photo.id)} aria-label={tr("Удалить фото")}>×</button>
           </div>
         ))}
         <label class={`${styles.photoAdd}${busy ? ` ${styles.disabled}` : ""}`}>
@@ -296,7 +297,7 @@ function PhotoManager({
       {cropQueue[0] ? (
         <PhotoCropper
           file={cropQueue[0]}
-          title={batchRef.current > 1 ? `Кадр · ${batchRef.current - cropQueue.length + 1} из ${batchRef.current}` : "Кадр"}
+          title={batchRef.current > 1 ? tr("Кадр · {0} из {1}", batchRef.current - cropQueue.length + 1, batchRef.current) : tr("Кадр")}
           busy={busy}
           error={cropError}
           onCancel={() => { disarmPicker(); setCropQueue([]); setCropError(""); }}
@@ -413,7 +414,7 @@ export function ProfileScreen({ host }: Props) {
   const inputValue = (key: keyof Draft) => String(draft[key]);
   const places = host.catalog.places || [];
   const cityOptions = catalogCities(places, draft.country || undefined);
-  const countryOptions = [{ value: "", label: "Не указана" }, ...places.map((place) => ({ value: place.country, label: place.country }))];
+  const countryOptions = [{ value: "", label: tr("Не указана") }, ...places.map((place) => ({ value: place.country, label: tr(place.country) }))];
   const primaryPhoto = allPhotos(user).find((photo) => photo.is_primary) || allPhotos(user)[0];
 
   const setCity = (nextCity: string) => {
@@ -453,10 +454,10 @@ export function ProfileScreen({ host }: Props) {
 
   const validate = () => {
     const next: Record<string, string> = {};
-    if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = "Имя: 2–32 символа";
-    if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = "Возраст: 18–99";
-    if (!primaryPhoto && !user.photo) next.photos = "Нужно хотя бы одно фото";
-    if (!draft.neuro.length) next.neuro = "Укажи хотя бы одну особенность";
+    if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = tr("Имя: 2–32 символа");
+    if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = tr("Возраст: 18–99");
+    if (!primaryPhoto && !user.photo) next.photos = tr("Нужно хотя бы одно фото");
+    if (!draft.neuro.length) next.neuro = tr("Укажи хотя бы одну особенность");
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -470,7 +471,7 @@ export function ProfileScreen({ host }: Props) {
       });
       const nextUser = response.user as ProfileUser;
       setUser(nextUser); host.onUserUpdated(nextUser); setRecommendationsCode("");
-      host.toast(nextUser.jev_feed_unlocked ? "Подбор открыт — включи вкладку «Для тебя»" : "Промокод активирован");
+      host.toast(nextUser.jev_feed_unlocked ? tr("Подбор открыт — включи вкладку «Для тебя»") : tr("Промокод активирован"));
     } catch (caught) {
       setJevError(getErrorMessage(caught));
     } finally { setJevBusy(false); }
@@ -488,7 +489,7 @@ export function ProfileScreen({ host }: Props) {
       setUser(nextUser);
       host.onUserUpdated(nextUser);
 
-      host.toast(enabled ? "вкладка «Для тебя» включена" : "вкладка «Для тебя» выключена");
+      host.toast(enabled ? tr("вкладка «Для тебя» включена") : tr("вкладка «Для тебя» выключена"));
     } catch (caught) {
       setJevError(getErrorMessage(caught));
     } finally {
@@ -506,7 +507,7 @@ export function ProfileScreen({ host }: Props) {
     setBusy(true);
     try {
       await autosave.save(true);
-      host.toast("сохранено");
+      host.toast(tr("сохранено"));
     } catch (caught) {
       setServerError(getErrorMessage(caught));
     } finally {
@@ -535,7 +536,7 @@ export function ProfileScreen({ host }: Props) {
         backHref={host.hrefFor("deck")}
         backNav="deck"
         onBackClick={handleNav("deck")}
-        sectionTitle="Профиль"
+        sectionTitle={tr("Профиль")}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={signed ? (
@@ -560,45 +561,44 @@ export function ProfileScreen({ host }: Props) {
 
       {!signed ? (
         <main class={styles.guestCard}>
-          <h1>Собери свой профиль</h1>
+          <h1>{tr("Собери свой профиль")}</h1>
           <div class={styles.actions}>
-            <Button fullWidth href={host.hrefFor("register")} nav="register" onClick={handleNav("register")}>Создать профиль</Button>
-            <Button variant="ghost" fullWidth href={host.hrefFor("home")} nav="home" onClick={handleNav("home")}>На главную</Button>
+            <Button fullWidth href={host.hrefFor("register")} nav="register" onClick={handleNav("register")}>{tr("Создать профиль")}</Button>
+            <Button variant="ghost" fullWidth href={host.hrefFor("home")} nav="home" onClick={handleNav("home")}>{tr("На главную")}</Button>
           </div>
         </main>
       ) : (
         <main class={styles.content}>
           <div class={styles.heading}>
             <div>
-              <h1>{user.plus ? <>{valueOf(user.name)} <span class={styles.plusBadge}>WIRING+</span></> : valueOf(user.name, "Профиль")}</h1>
+              <h1>{user.plus ? <>{valueOf(user.name)} <span class={styles.plusBadge}>WIRING+</span></> : valueOf(user.name, tr("Профиль"))}</h1>
             </div>
           </div>
 
-          <p class={styles.draftHint}>Чем больше заполнишь анкету, тем проще будет начать разговор.</p>
+          <p class={styles.draftHint}>{tr("Чем больше заполнишь анкету, тем проще будет начать разговор.")}</p>
 
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
-              Анкета пока не в ленте — черновик сохраняется автоматически, можно вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.
-            </p>
+              {tr("Анкета пока не в ленте — черновик сохраняется автоматически, можно вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.")}</p>
           ) : null}
 
           <div class={styles.saveStatus}>
             <p role="status" aria-live="polite" aria-atomic="true">
-              {saveState.phase === "idle" ? "Изменения сохраняются автоматически" :
-                saveState.phase === "saved" ? "Все изменения сохранены" :
-                saveState.phase === "saving" ? "Сохраняем…" :
-                saveState.phase === "waiting" ? (saveState.local ? "Изменения на устройстве · ждём сохранения на сервере" : "Изменения ещё не сохранены") :
-                saveState.local ? "Черновик на этом устройстве · на сервере не сохранён" : "Изменения не сохранены — оставь страницу открытой"}
+              {saveState.phase === "idle" ? tr("Изменения сохраняются автоматически") :
+                saveState.phase === "saved" ? tr("Все изменения сохранены") :
+                saveState.phase === "saving" ? tr("Сохраняем…") :
+                saveState.phase === "waiting" ? (saveState.local ? tr("Изменения на устройстве · ждём сохранения на сервере") : tr("Изменения ещё не сохранены")) :
+                saveState.local ? tr("Черновик на этом устройстве · на сервере не сохранён") : tr("Изменения не сохранены — оставь страницу открытой")}
             </p>
             {saveState.phase === "error" ? <>
-              <p class={styles.error}>{saveState.error}</p>
-              <Button variant="ghost" slim type="button" disabled={busy} onClick={() => void autosave.save().catch(() => {})}>Повторить сохранение</Button>
+              <p class={styles.error}>{tr(saveState.error)}</p>
+              <Button variant="ghost" slim type="button" disabled={busy} onClick={() => void autosave.save().catch(() => {})}>{tr("Повторить сохранение")}</Button>
             </> : null}
           </div>
 
           <form class={styles.form} onSubmit={save} noValidate>
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Фото</h2></div>
+              <div class={styles.sectionTitle}><h2>{tr("Фото")}</h2></div>
               <PhotoManager
                 host={host}
                 user={user}
@@ -610,111 +610,109 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Основное</h2></div>
+              <div class={styles.sectionTitle}><h2>{tr("Основное")}</h2></div>
               <div class={styles.gridTwo}>
                 <NameEditor key={String(user.name)} user={user} saveName={(name, signal) => autosave.runExclusive(async () => {
                   if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
                   const response = await host.api("/api/me", { method: "PATCH", signal, body: JSON.stringify({ name, draft: true }) });
                   return response.user as ProfileUser;
                 })} onChanged={(next) => { setUser(next); host.onUserUpdated(next); setRenderedDraft((current) => ({ ...current, name: String(next.name || "") })); }} />
-                <Input label="Возраст" name="age" type="number" required value={draft.age} error={errors.age} onInput={(event) => setField("age", event.currentTarget.value)} />
+                <Input label={tr("Возраст")} name="age" type="number" required value={draft.age} error={errors.age} onInput={(event) => setField("age", event.currentTarget.value)} />
               </div>
               <div class={styles.gridTwo}>
-                <Select className={styles.selectControl} label="Пол" id="profile-gender" options={optionList(host.catalog.genders)} value={draft.gender} onChange={(value) => setField("gender", value)} ariaLabel="Пол" />
-                <Select className={styles.selectControl} label="Кого ищешь" id="profile-looking-for" options={optionList(host.catalog.looking_for)} value={draft.lookingFor} onChange={(value) => setField("lookingFor", value)} ariaLabel="Кого ищешь" />
+                <Select className={styles.selectControl} label={tr("Пол")} id="profile-gender" options={optionList(host.catalog.genders)} value={draft.gender} onChange={(value) => setField("gender", value)} ariaLabel={tr("Пол")} />
+                <Select className={styles.selectControl} label={tr("Кого ищешь")} id="profile-looking-for" options={optionList(host.catalog.looking_for)} value={draft.lookingFor} onChange={(value) => setField("lookingFor", value)} ariaLabel={tr("Кого ищешь")} />
               </div>
               <div class={styles.fieldGroup}>
                 <Select
                   className={styles.selectControl}
-                  label="Страна"
+                  label={tr("Страна")}
                   id="profile-country"
                   searchable
-                  searchPlaceholder="Найти страну"
-                  placeholder="Не указана"
+                  searchPlaceholder={tr("Найти страну")}
+                  placeholder={tr("Не указана")}
                   options={countryOptions}
                   value={draft.country}
                   onChange={setCountry}
-                  ariaLabel="Страна"
+                  ariaLabel={tr("Страна")}
                 />
                 <Select
                   className={styles.selectControl}
                   menuClassName={styles.citySelectMenu}
-                  label="Город"
+                  label={tr("Город")}
                   id="profile-city"
-                  placeholder="Не указан"
+                  placeholder={tr("Не указан")}
                   searchable
-                  searchPlaceholder="Город"
-                  options={citySelectOptions(cityOptions, host.catalog.city_search, { value: "", label: "Не указан" })}
+                  searchPlaceholder={tr("Город")}
+                  options={citySelectOptions(cityOptions, host.catalog.city_search, { value: "", label: tr("Не указан") })}
                   value={draft.city}
                   error={errors.city}
                   onChange={setCity}
-                  ariaLabel="Город"
+                  ariaLabel={tr("Город")}
                 />
               </div>
               <div class={styles.fieldGroup}>
-                <Input label="Рост, см" name="height" type="number" value={draft.height} hint="необязательно" onInput={(event) => setField("height", event.currentTarget.value)} />
-                <Input label="Занятость" name="job" maxLength={60} value={draft.job} hint="необязательно" onInput={(event) => setField("job", event.currentTarget.value)} />
+                <Input label={tr("Рост, см")} name="height" type="number" value={draft.height} hint={tr("необязательно")} onInput={(event) => setField("height", event.currentTarget.value)} />
+                <Input label={tr("Занятость")} name="job" maxLength={60} value={draft.job} hint={tr("необязательно")} onInput={(event) => setField("job", event.currentTarget.value)} />
               </div>
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>Детали и предпочтения</h2><span>по желанию</span></div>
-              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label="Особенности — хотя бы одна, иначе анкета не попадёт в ленту" />
+              <div class={styles.sectionTitle}><h2>{tr("Детали и предпочтения")}</h2><span>{tr("по желанию")}</span></div>
+              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label={tr("Особенности — хотя бы одна, иначе анкета не попадёт в ленту")} />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
-              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label="Как ты устроен(а) и как тебе комфортнее общаться" tone="vibe" />
-              <p class={styles.disclaimer}>Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.</p>
-              <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label="Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке" />
+              <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label={tr("Как ты устроен(а) и как тебе комфортнее общаться")} tone="vibe" />
+              <p class={styles.disclaimer}>{tr("Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.")}</p>
+              <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label={tr("Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке")} />
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>О себе</h2></div>
-              <Textarea label="Био" name="bio" maxLength={1200} value={draft.bio} hint="специальный интерес, сенсорные лимиты, чего лучше не делать" onInput={(event) => setField("bio", event.currentTarget.value)} />
-              <Textarea label="Как тебе писать" name="communication" maxLength={500} value={draft.communication} hint="голосовые ок / нет, small talk — сразу в блок" onInput={(event) => setField("communication", event.currentTarget.value)} />
+              <div class={styles.sectionTitle}><h2>{tr("О себе")}</h2></div>
+              <Textarea label={tr("Био")} name="bio" maxLength={1200} value={draft.bio} hint={tr("специальный интерес, сенсорные лимиты, чего лучше не делать")} onInput={(event) => setField("bio", event.currentTarget.value)} />
+              <Textarea label={tr("Как тебе писать")} name="communication" maxLength={500} value={draft.communication} hint={tr("голосовые ок / нет, small talk — сразу в блок")} onInput={(event) => setField("communication", event.currentTarget.value)} />
               <div class={styles.promptList}>
-                <div class={styles.subheading}><h3>Промпты</h3><span>до трёх</span></div>
+                <div class={styles.subheading}><h3>{tr("Промпты")}</h3><span>{tr("до трёх")}</span></div>
                 {draft.prompts.map((prompt, index) => {
                   const title = host.catalog.prompts?.find((item) => item.id === prompt.id)?.label || prompt.id;
-                  return <div class={styles.prompt} key={`${prompt.id}-${index}`}><div class={styles.promptHead}><strong>{title}</strong><button type="button" onClick={() => setField("prompts", draft.prompts.filter((_, itemIndex) => itemIndex !== index))}>убрать</button></div><textarea value={prompt.answer} maxLength={280} placeholder="твой ответ" onInput={(event) => { const next = draft.prompts.map((item, itemIndex) => itemIndex === index ? { ...item, answer: event.currentTarget.value } : item); setField("prompts", next); }} /></div>;
+                  return <div class={styles.prompt} key={`${prompt.id}-${index}`}><div class={styles.promptHead}><strong>{title}</strong><button type="button" onClick={() => setField("prompts", draft.prompts.filter((_, itemIndex) => itemIndex !== index))}>{tr("убрать")}</button></div><textarea value={prompt.answer} maxLength={280} placeholder={tr("твой ответ")} onInput={(event) => { const next = draft.prompts.map((item, itemIndex) => itemIndex === index ? { ...item, answer: event.currentTarget.value } : item); setField("prompts", next); }} /></div>;
                 })}
-                {draft.prompts.length < 3 && <select class={styles.addPrompt} defaultValue="" onChange={addPrompt}><option value="">Добавить вопрос…</option>{(host.catalog.prompts || []).filter((item) => !draft.prompts.some((prompt) => prompt.id === item.id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
+                {draft.prompts.length < 3 && <select class={styles.addPrompt} defaultValue="" onChange={addPrompt}><option value="">{tr("Добавить вопрос…")}</option>{(host.catalog.prompts || []).filter((item) => !draft.prompts.some((prompt) => prompt.id === item.id)).map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
               </div>
             </section>
 
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>WIRING+</h2></div>
-              <a class={styles.plusLink} href={host.hrefFor("plus")} data-nav="plus" onClick={handleNav("plus")}><span><strong>WIRING+</strong><small>{user.plus ? "активен" : "спокойный режим, инкогнито, пауза"}</small></span><span>настроить ↗</span></a>
-              {user.ref_url && <div class={styles.infoCard}><div><strong>Пригласи своих</strong><p>Ещё {user.ref_days || 30} дней WIRING+ вам обоим.</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast("ссылка скопирована"); }}>Копировать</Button></div>}
+              <a class={styles.plusLink} href={host.hrefFor("plus")} data-nav="plus" onClick={handleNav("plus")}><span><strong>WIRING+</strong><small>{user.plus ? tr("активен") : tr("спокойный режим, инкогнито, пауза")}</small></span><span>{tr("настроить ↗")}</span></a>
+              {user.ref_url && <div class={styles.infoCard}><div><strong>{tr("Пригласи своих")}</strong><p>{tr("Ещё ")}{user.ref_days || 30} {tr(" дней WIRING+ вам обоим.")}</p></div><Button variant="ghost" slim onClick={() => { void navigator.clipboard?.writeText(String(user.ref_url)); host.toast(tr("ссылка скопирована")); }}>{tr("Копировать")}</Button></div>}
             </section>
 
             <section class={styles.section}>
-                <div class={styles.sectionTitle}><h2>Для тебя</h2></div>
+                <div class={styles.sectionTitle}><h2>{tr("Для тебя")}</h2></div>
                 {user.jev_feed_unlocked ? <Checkbox
                   name="jev_feed_enabled"
                   checked={Boolean(user.jev_feed_enabled)}
                   disabled={jevBusy || (!user.jev_feed_available && !user.jev_feed_enabled)}
                   onChange={(enabled) => void setJevFeedEnabled(enabled)}
                 >
-                  Включить вкладку «Для тебя»
-                </Checkbox> : <div role="group" aria-label="Активация рекомендаций" onKeyDown={(event) => {
+                  {tr("Включить вкладку «Для тебя»")}</Checkbox> : <div role="group" aria-label={tr("Активация рекомендаций")} onKeyDown={(event) => {
                   if (event.key === "Enter") { event.preventDefault(); void redeemRecommendations(); }
                 }}>
-                  <p class={styles.recommendationsHint}>Доступ открывается по промокоду. После активации можно включить подбор.</p>
-                  <Input name="recommendations_code" label="Промокод для рекомендаций" value={recommendationsCode} maxLength={24} autoComplete="off" onInput={(event) => setRecommendationsCode(event.currentTarget.value)} />
-                  <Button type="button" disabled={jevBusy || !recommendationsCode.trim()} loading={jevBusy} onClick={() => void redeemRecommendations()}>Активировать</Button>
+                  <p class={styles.recommendationsHint}>{tr("Доступ открывается по промокоду. После активации можно включить подбор.")}</p>
+                  <Input name="recommendations_code" label={tr("Промокод для рекомендаций")} value={recommendationsCode} maxLength={24} autoComplete="off" onInput={(event) => setRecommendationsCode(event.currentTarget.value)} />
+                  <Button type="button" disabled={jevBusy || !recommendationsCode.trim()} loading={jevBusy} onClick={() => void redeemRecommendations()}>{tr("Активировать")}</Button>
                 </div>}
                 <p class={styles.recommendationsHint}>
-                  Показываем людей со всего WIRING. Если ты уже лайкаешь анкеты, подбор идёт по ним. Если лайков мало — по тому, что выбрано у тебя и зачем ты здесь. Человек не показывается, если такие люди тебе скрыты или он сам скрыл себя от людей с твоими особенностями. Под карточкой написано, что совпало. Чтобы расставить анкеты, мы отправляем только выбранные пункты, один ли город, близкий ли возраст и общую цель. Имя, фото, свои тексты и переписку не отправляем. Похожая анкета не значит, что человек тоже тебя выберет.
-                </p>
-                {user.jev_feed_unlocked && !user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.recommendationsHint}>Подбор пока недоступен. Попробуй позже.</p> : null}
+                  {tr("Показываем людей со всего WIRING. Если ты уже лайкаешь анкеты, подбор идёт по ним. Если лайков мало — по тому, что выбрано у тебя и зачем ты здесь. Человек не показывается, если такие люди тебе скрыты или он сам скрыл себя от людей с твоими особенностями. Под карточкой написано, что совпало. Чтобы расставить анкеты, мы отправляем только выбранные пункты, один ли город, близкий ли возраст и общую цель. Имя, фото, свои тексты и переписку не отправляем. Похожая анкета не значит, что человек тоже тебя выберет.")}</p>
+                {user.jev_feed_unlocked && !user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.recommendationsHint}>{tr("Подбор пока недоступен. Попробуй позже.")}</p> : null}
                 {jevError && <p class={styles.error} role="alert">{jevError}</p>}
               </section>
 
             {(serverError || errors.photos) && <div class={styles.serverError} role="alert">{serverError || errors.photos}</div>}
             <div class={styles.submitRow}>
-              <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Опубликовать в ленте"}</Button>
+              <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? tr("Сохраняем…") : tr("Опубликовать в ленте")}</Button>
               <div class={styles.accountActions}>
-                <Button variant="ghost" type="button" onClick={host.onLogout}>Выйти</Button>
-                <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>Удалить аккаунт</Button>
+                <Button variant="ghost" type="button" onClick={host.onLogout}>{tr("Выйти")}</Button>
+                <Button variant="ghost" type="button" onClick={() => host.navigate("delete-account")}>{tr("Удалить аккаунт")}</Button>
               </div>
             </div>
           </form>

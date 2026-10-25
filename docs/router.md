@@ -35,6 +35,8 @@ src/router/
 
 Legal/admin (`/rules`, `/privacy`, `/admin`, …) are **server templates**, not this router.
 
+Language is a preference, not a route prefix: existing URLs are unchanged. Server documents accept `?lang=ru|en`, set a language cookie and render their static copy with the matching `<html lang>`. The RU/EN header control saves through `PATCH /api/me/language` and reloads the same URL/hash; profile drafts, feed filters and text chat drafts retain their existing storage. Unsaved media/active recording/sending guard this reload. No new SPA path is introduced.
+
 Admin tabs use document fragments: `/admin#overview`, `#people`, `#analytics`, `#premium`, `#moderation`, `#support`, `#tasks`, `#marketing`. Existing `#reports` and `#bans` links reveal the moderation tab and corresponding heading. Back/forward and reload restore the section. Form actions include their tab fragment to retain context after validation errors and redirects. No SPA route or entrypoint is added.
 
 ## Shell integration

@@ -1,6 +1,8 @@
 """Moderator responses to profile reports and support requests; one shared channel."""
 from __future__ import annotations
 
+from i18n import tr, use_language
+
 import re
 import time
 from collections.abc import Callable
@@ -36,28 +38,28 @@ def reply_recipient(conn: Connection, kind: str, source_id: int) -> dict[str, An
         return None
     if not source:
         return None
-    user = conn.execute("SELECT id, email FROM users WHERE id = ? AND COALESCE(deleted_at, 0) = 0", (source["user_id"],)).fetchone() if source["user_id"] else None
+    user = conn.execute("SELECT id, email, language FROM users WHERE id = ? AND COALESCE(deleted_at, 0) = 0", (source["user_id"],)).fetchone() if source["user_id"] else None
     email = str(source["email"] or (user["email"] if user else "") or "").strip()
     if "@wiring.guest" in email or email in {"demo@wiring.app"} or email.endswith("@wiring.demo"):
         email = ""
-    return {"user_id": user["id"] if user else None, "email": email}
+    return {"user_id": user["id"] if user else None, "email": email, "language": user["language"] if user else "ru"}
 
 
 def save_reply(conn: Connection, kind: str, source_id: int, body: object, request_id: object,
                send_mail: Callable[[str, str, str], bool], site_url: str) -> int:
     body = str(body or "").strip()
     if not 1 <= len(body) <= 2000:
-        raise ValueError("Ответ должен содержать от 1 до 2000 символов")
+        raise ValueError(tr("Ответ должен содержать от 1 до 2000 символов"))
     if not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", str(request_id or "")):
-        raise ValueError("Обнови страницу и повтори отправку")
+        raise ValueError(tr("Обнови страницу и повтори отправку"))
     recipient = reply_recipient(conn, kind, source_id)
     if recipient is None:
-        raise LookupError("Обращение не найдено")
+        raise LookupError(tr("Обращение не найдено"))
     if not recipient["user_id"] and not recipient["email"]:
-        raise ValueError("У обращения нет аккаунта или почты для ответа")
+        raise ValueError(tr("У обращения нет аккаунта или почты для ответа"))
     existing = conn.execute("SELECT * FROM support_replies WHERE request_id = ?", (request_id,)).fetchone()
     if existing and (existing["source_kind"] != kind or existing["source_id"] != source_id or existing["body"] != body):
-        raise ValueError("Этот запрос уже использован для другого ответа; обнови страницу")
+        raise ValueError(tr("Этот запрос уже использован для другого ответа; обнови страницу"))
     now = int(time.time())
     if existing:
         reply_id = existing["id"]
@@ -71,10 +73,11 @@ def save_reply(conn: Connection, kind: str, source_id: int, body: object, reques
         reply_id = inserted.lastrowid
         email = recipient["email"]
         if recipient["user_id"]:
-            add_notice(conn, recipient["user_id"], "support", 0, "Поддержка ответила на твоё обращение. Ответ — в разделе «Поддержка».")
+            add_notice(conn, recipient["user_id"], "support", 0, tr("Поддержка ответила на твоё обращение. Ответ — в разделе «Поддержка»."))
     if email:
         try:
-            sent = send_mail(email, "Ответ поддержки WIRING", f"{body}\n\nПоддержка: {site_url}/support")
+            with use_language(recipient["language"]):
+                sent = send_mail(email, tr("Ответ поддержки WIRING"), tr("{0}\n\nПоддержка: {1}/support" ,body, site_url))
         except Exception:
             sent = False
         conn.execute("UPDATE support_replies SET email_attempted_at = ?, email_sent_at = ? WHERE id = ?", (now, now if sent else None, reply_id))

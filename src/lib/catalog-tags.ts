@@ -1,3 +1,4 @@
+import { tr, getLocale } from "@/lib/i18n";
 import type { CatalogItem } from "@/features/profile/types";
 
 const NEURO_COMBO = "audhd";
@@ -26,7 +27,7 @@ export function tagSearchHaystack(option: CatalogItem): string {
   return [option.id, option.label, option.hint, option.expand, option.tip, option.blurb]
     .filter(Boolean)
     .join(" ")
-    .toLocaleLowerCase("ru");
+    .toLocaleLowerCase(getLocale());
 }
 
 /** Tags shown in UI — current catalog only; neuro ids stored under vibe move to neuro. */

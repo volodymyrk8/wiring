@@ -1,3 +1,4 @@
+import { tr, getLocale } from "@/lib/i18n";
 import { useState, useRef, useEffect } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import type { ComponentChildren, JSX } from "preact";
@@ -56,7 +57,7 @@ export function Select<T extends string = string>({
   value: controlledValue,
   defaultValue,
   onChange,
-  placeholder = "Выбрать…",
+  placeholder = tr("Выбрать…"),
   label: fieldLabel,
   required,
   id,
@@ -72,7 +73,7 @@ export function Select<T extends string = string>({
   ariaLabel,
   title,
   searchable = false,
-  searchPlaceholder = "Найти…",
+  searchPlaceholder = tr("Найти…"),
 }: SelectProps<T>) {
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? options[0]?.value);
   const [isOpen, setIsOpen] = useState(false);
@@ -101,10 +102,10 @@ export function Select<T extends string = string>({
     return () => cancelAnimationFrame(frame);
   }, [isOpen, searchable]);
 
-  const needle = query.trim().toLocaleLowerCase("ru");
+  const needle = query.trim().toLocaleLowerCase(getLocale());
   const visibleOptions = searchable && needle
     ? options.filter((option) => {
-        const hay = (option.searchText || option.label).toLocaleLowerCase("ru");
+        const hay = (option.searchText || option.label).toLocaleLowerCase(getLocale());
         return hay.includes(needle);
       })
     : options;
@@ -251,7 +252,7 @@ export function Select<T extends string = string>({
               />
             </div>
           ) : null}
-          {searchable && needle && !visibleOptions.length ? <p class={styles.empty}>Ничего не нашлось</p> : null}
+          {searchable && needle && !visibleOptions.length ? <p class={styles.empty}>{tr("Ничего не нашлось")}</p> : null}
           {visibleOptions.map((option) => {
             const isSelected = option.value === selectedValue;
             return (

@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import styles from "./Modal.module.css";
@@ -113,7 +114,7 @@ export function Modal({
         role="dialog"
         tabIndex={-1}
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : ariaLabel || "диалоговое окно"}
+        aria-label={typeof title === "string" ? title : ariaLabel || tr("диалоговое окно")}
       >
         {(title || showCloseButton) && (
           <div class={styles.header}>
@@ -123,8 +124,8 @@ export function Modal({
                 type="button"
                 class={styles.closeBtn}
                 onClick={onClose}
-                aria-label="Закрыть"
-                title="Закрыть"
+                aria-label={tr("Закрыть")}
+                title={tr("Закрыть")}
               >
                 <svg
                   width="18"

@@ -15,7 +15,9 @@
     "test:ui:browser": "node tests/ui-bugs-browser.test.mjs",
     "test:admin:browser": "node tests/admin-tabs-browser.test.mjs",
     "test:inbox": "node --test tests/inbox.test.mjs",
-    "test:analytics": "node --test tests/registration-analytics.test.mjs"
+    "test:analytics": "node --test tests/registration-analytics.test.mjs",
+    "test:i18n": "node --test tests/i18n.test.mjs",
+    "test:i18n:browser": "node tests/i18n-browser.test.mjs"
   },
   "dependencies": {
     "preact": "^10.26.4"

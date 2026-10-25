@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from i18n import tr, get_language, use_language, install as install_i18n
+
 import os
 import json
 import random
@@ -121,6 +123,7 @@ ONLINE_WINDOW = 10 * 60
 ACCOUNT_DELETE_GRACE = 7 * 86400
 
 app = Flask(__name__, template_folder="templates", static_folder=None)
+install_i18n(app)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = APP_SECRET_KEY
 app.config.update(
@@ -587,6 +590,7 @@ def init_db() -> None:
     for name, ddl in {
         "name_changed_at": "INTEGER",
         "theme": "TEXT",
+        "language": "TEXT NOT NULL DEFAULT 'ru'",
         "job": "TEXT NOT NULL DEFAULT ''",
         "intent": "TEXT NOT NULL DEFAULT 'dating'",
         "height": "INTEGER",
@@ -743,12 +747,15 @@ def issue_email_verification(conn: Connection, user_id: int, email: str) -> str:
         "INSERT INTO email_verifications (token, user_id, created_at) VALUES (?, ?, ?)",
         (token, user_id, int(time.time())),
     )
-    link = f"{SITE_URL}/?verify={token}"
-    send_mail(
-        email,
-        "WIRING — подтверди почту",
-        f"Чтобы войти в WIRING, подтверди почту по ссылке (действует 48 часов):\n\n{link}\n\nЕсли это не ты — просто проигнорируй письмо.",
-    )
+    language_row = conn.execute("SELECT language FROM users WHERE id = ?", (user_id,)).fetchone()
+    language = language_row["language"] if language_row else get_language()
+    link = f"{SITE_URL}/?verify={token}&lang={language}"
+    with use_language(language):
+        send_mail(
+            email,
+            tr("WIRING — подтверди почту"),
+            tr("Чтобы войти в WIRING, подтверди почту по ссылке (действует 48 часов):\n\n{0}\n\nЕсли это не ты — просто проигнорируй письмо." ,link),
+        )
     return token
 
 
@@ -921,6 +928,7 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
     if include_email:
         payload["name_change_available_at"] = name_change_available_at(row)
         payload["theme"] = row["theme"] if "theme" in keys else None
+        payload["language"] = row["language"] if "language" in keys else "ru"
         payload["email"] = row["email"]
         payload["guest"] = is_guest_email(str(row["email"]))
         complete = profile_complete(row, tags, photos)
@@ -1035,7 +1043,7 @@ def login_required(fn):
     def wrapper(*args, **kwargs):
         uid = session.get("uid")
         if not uid:
-            return jsonify({"ok": False, "error": "нужна сессия"}), 401
+            return jsonify({"ok": False, "error": tr("нужна сессия")}), 401
         if not getattr(fn, "_report_ban_exempt", False):
             row = db().execute("SELECT report_banned_at FROM users WHERE id = ?", (uid,)).fetchone()
             if row and is_report_banned(row):
@@ -1057,10 +1065,10 @@ def real_account_required(fn):
     def wrapper(*args, **kwargs):
         uid = session.get("uid")
         if not uid:
-            return jsonify({"ok": False, "error": "нужна сессия"}), 401
+            return jsonify({"ok": False, "error": tr("нужна сессия")}), 401
         row = db().execute("SELECT email FROM users WHERE id = ?", (uid,)).fetchone()
         if not row or is_guest_email(str(row["email"])):
-            return jsonify({"ok": False, "error": "сначала собери свой профиль"}), 403
+            return jsonify({"ok": False, "error": tr("сначала собери свой профиль")}), 403
         return fn(*args, **kwargs)
 
     return wrapper
@@ -1068,17 +1076,17 @@ def real_account_required(fn):
 
 def parse_tags(raw: Any, allowed: set[str], *, required: bool) -> tuple[list[str] | None, str | None]:
     if raw is None:
-        return ([], None) if not required else (None, "выбери хотя бы один тег")
+        return ([], None) if not required else (None, tr("выбери хотя бы один тег"))
     if not isinstance(raw, list):
-        return None, "теги должны быть списком"
+        return None, tr("теги должны быть списком")
     cleaned: list[str] = []
     for item in raw:
         if not isinstance(item, str) or item not in allowed:
-            return None, f"неизвестный тег: {item}"
+            return None, tr("неизвестный тег: {0}" ,item)
         if item not in cleaned:
             cleaned.append(item)
     if required and not cleaned:
-        return None, "укажи хотя бы одну особенность"
+        return None, tr("укажи хотя бы одну особенность")
     return cleaned, None
 
 
@@ -1086,22 +1094,22 @@ def parse_prompts(raw: Any) -> tuple[list[dict[str, str]] | None, str | None]:
     if raw is None:
         return [], None
     if not isinstance(raw, list):
-        return None, "промпты должны быть списком"
+        return None, tr("промпты должны быть списком")
     if len(raw) > MAX_PROMPTS:
-        return None, "можно три промпта"
+        return None, tr("можно три промпта")
     cleaned: list[dict[str, str]] = []
     seen: set[str] = set()
     for item in raw:
         if not isinstance(item, dict):
-            return None, "промпт — объект с id и ответом"
+            return None, tr("промпт — объект с id и ответом")
         pid = str(item.get("id") or "")
         answer = str(item.get("answer") or "").strip()
         if pid not in PROMPT_IDS:
-            return None, "неизвестный промпт"
+            return None, tr("неизвестный промпт")
         if pid in seen:
             continue
         if not (4 <= len(answer) <= 280):
-            return None, "ответ промпта: 4–280 символов"
+            return None, tr("ответ промпта: 4–280 символов")
         seen.add(pid)
         cleaned.append({"id": pid, "answer": answer})
     return cleaned, None
@@ -1179,49 +1187,49 @@ def parse_profile(
     try:
         age = int(data.get("age"))
     except (TypeError, ValueError):
-        return None, "возраст — число"
+        return None, tr("возраст — число")
     height_raw = data.get("height")
     height = None
     if height_raw not in (None, "", 0, "0"):
         try:
             height = int(height_raw)
         except (TypeError, ValueError):
-            return None, "рост — число в см"
+            return None, tr("рост — число в см")
         if not (140 <= height <= 220):
-            return None, "рост: 140–220 см"
+            return None, tr("рост: 140–220 см")
     if not (2 <= len(name) <= 32):
-        return None, "имя: 2–32 символа"
+        return None, tr("имя: 2–32 символа")
     if not (18 <= age <= 99):
-        return None, "только 18+"
+        return None, tr("только 18+")
     if city:
         if len(city) < 2 or len(city) > 48:
             if draft:
                 city = "—"
             else:
-                return None, "город: 2–48 символов"
+                return None, tr("город: 2–48 символов")
         elif not is_catalog_city(city):
             if draft and len(city) >= 2:
                 pass
             else:
-                return None, "выбери город из списка"
+                return None, tr("выбери город из списка")
     if len(bio) > 1200:
-        return None, "био до 1200 символов"
+        return None, tr("био до 1200 символов")
     if len(job) > 60:
-        return None, "занятие до 60 символов"
+        return None, tr("занятие до 60 символов")
     if len(communication) > 500:
-        return None, "как тебе писать: до 500 символов"
+        return None, tr("как тебе писать: до 500 символов")
     for label, value in (
-        ("имя", name),
-        ("о себе", bio),
-        ("занятость", job),
-        ("как тебе писать", communication),
+        (tr("имя"), name),
+        (tr("о себе"), bio),
+        (tr("занятость"), job),
+        (tr("как тебе писать"), communication),
     ):
         if has_profanity(value):
-            return None, f"в поле «{label}» есть мат — переформулируй"
+            return None, tr("в поле «{0}» есть мат — переформулируй" ,label)
     if gender not in GENDER_IDS:
-        return None, "выбери гендер"
+        return None, tr("выбери гендер")
     if looking_for not in LOOKING_IDS:
-        return None, "кого ищешь?"
+        return None, tr("кого ищешь?")
     neuro, err = parse_tags(data.get("neuro"), NEURO_IDS, required=require_neuro)
     if err:
         return None, err
@@ -1233,7 +1241,7 @@ def parse_profile(
         return None, err
     for prompt in prompts or []:
         if has_profanity(str(prompt.get("answer") or "")):
-            return None, "в промпте есть мат — переформулируй"
+            return None, tr("в промпте есть мат — переформулируй")
     seek_min: int | None = None
     seek_max: int | None = None
     if "seek_min_age" in data or "seek_max_age" in data:
@@ -1241,7 +1249,7 @@ def parse_profile(
             seek_min = int(data.get("seek_min_age") if data.get("seek_min_age") not in (None, "") else 18)
             seek_max = int(data.get("seek_max_age") if data.get("seek_max_age") not in (None, "") else 99)
         except (TypeError, ValueError):
-            return None, "возраст видимости — числа"
+            return None, tr("возраст видимости — числа")
         seek_min = max(18, min(99, seek_min))
         seek_max = max(18, min(99, seek_max))
         if seek_min > seek_max:
@@ -1255,7 +1263,7 @@ def parse_profile(
             if as_city and is_catalog_city(as_city):
                 seek_place = as_city
             elif seek_place not in countries:
-                return None, "страна или город из списка"
+                return None, tr("страна или город из списка")
     hide: list[str] | None = None
     if "hide_tags" in data:
         hide = parse_hide_tags(data.get("hide_tags"))
@@ -1281,15 +1289,15 @@ def parse_profile(
     }
     photo = str(data.get("photo") or "").strip()
     if photo and photo not in SEED_PHOTOS:
-        return None, "выбери фото из набора или загрузи своё"
+        return None, tr("выбери фото из набора или загрузи своё")
     payload["photo"] = photo
     if require_password:
         email = str(data.get("email") or "").strip().lower()
         password = str(data.get("password") or "")
         if not EMAIL_RE.match(email):
-            return None, "нужна нормальная почта"
+            return None, tr("нужна нормальная почта")
         if len(password) < 6:
-            return None, "пароль минимум 6 символов"
+            return None, tr("пароль минимум 6 символов")
         payload["email"] = email
         payload["password"] = password
     return payload, None
@@ -1506,6 +1514,7 @@ def _scrub_deleted_user_row(conn: Connection, uid: int) -> None:
             intent = '',
             height = NULL,
             communication = '',
+            language = 'ru',
             last_seen = 0,
             premium_until = 0,
             referral_code = NULL,
@@ -1759,13 +1768,28 @@ def api_me():
     return jsonify({"ok": True, "user": user})
 
 
+@app.patch("/api/me/language")
+@login_required
+@report_ban_exempt
+def api_me_language():
+    language = (request.get_json(silent=True) or {}).get("language")
+    if language not in ("ru", "en"):
+        return jsonify({"ok": False, "error": tr("Неизвестный язык")}), 400
+    db().execute("UPDATE users SET language = ? WHERE id = ?", (language, session["uid"]))
+    db().commit()
+    response = jsonify({"ok": True, "language": language})
+    if not request.headers.get("Authorization", "").startswith("Bearer "):
+        response.set_cookie("wiring-language", language, max_age=31536000, samesite="Lax", secure=request.is_secure)
+    return response
+
+
 @app.patch("/api/me/theme")
 @login_required
 @report_ban_exempt
 def api_me_theme():
     theme = (request.get_json(silent=True) or {}).get("theme")
     if theme not in ("pastel", "mist", "dusk", "night", "slate"):
-        return jsonify({"ok": False, "error": "неизвестная тема"}), 400
+        return jsonify({"ok": False, "error": tr("неизвестная тема")}), 400
     conn = db()
     conn.execute("UPDATE users SET theme = ? WHERE id = ?", (theme, session["uid"]))
     conn.commit()
@@ -1781,13 +1805,13 @@ def api_jev_feed_setting():
     allowed, configured = jev_access(user)
     allowed = bool(allowed and not int(user["is_seed"] or 0))
     if not allowed:
-        return jsonify({"ok": False, "error": "сначала активируй промокод для рекомендаций"}), 404
+        return jsonify({"ok": False, "error": tr("сначала активируй промокод для рекомендаций")}), 404
     data = request.get_json(silent=True) or {}
     if not isinstance(data.get("enabled"), bool):
-        return jsonify({"ok": False, "error": "укажи состояние переключателя"}), 400
+        return jsonify({"ok": False, "error": tr("укажи состояние переключателя")}), 400
     enabled = data["enabled"]
     if enabled and not configured:
-        return jsonify({"ok": False, "error": "подбор пока недоступен"}), 503
+        return jsonify({"ok": False, "error": tr("подбор пока недоступен")}), 503
     db().execute("UPDATE users SET jev_feed_enabled = ? WHERE id = ?", (int(enabled), uid))
     db().commit()
     return jsonify({"ok": True, "user": current_user()})
@@ -1816,6 +1840,7 @@ def _create_registered_user(conn, email, password, name, consented_at, marketing
         ),
     )
     uid = int(cur.lastrowid)
+    conn.execute("UPDATE users SET language = ? WHERE id = ?", (get_language(), uid))
     grant_signup_plus(conn, uid)
     ensure_referral_code(conn, uid)
     referrer_id = apply_referral(conn, uid, ref)
@@ -1825,7 +1850,7 @@ def _create_registered_user(conn, email, password, name, consented_at, marketing
             referrer_id,
             "referral",
             0,
-            f"по твоей ссылке зарегистрировались — ещё {REFERRAL_DAYS} дней WIRING+",
+            tr("по твоей ссылке зарегистрировались — ещё {0} дней WIRING+" ,REFERRAL_DAYS),
         )
     return uid
 
@@ -1843,24 +1868,24 @@ social_auth.install(app, db=db, prefix=prefix, site_url=SITE_URL,
 def api_register():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"reg:{ip}", 8, 3600):
-        return jsonify({"ok": False, "error": "слишком много регистраций, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много регистраций, подожди")}), 429
     data = request.get_json(silent=True) or {}
     if not data.get("age_confirm"):
-        return jsonify({"ok": False, "error": "нужно подтвердить, что тебе есть 18"}), 400
+        return jsonify({"ok": False, "error": tr("нужно подтвердить, что тебе есть 18")}), 400
     if data.get("privacy_confirm") is not True:
-        return jsonify({"ok": False, "error": "нужно согласие на обработку персональных данных и политику конфиденциальности"}), 400
+        return jsonify({"ok": False, "error": tr("нужно согласие на обработку персональных данных и политику конфиденциальности")}), 400
     name = str(data.get("name") or "").strip()
     email = str(data.get("email") or "").strip().lower()
     password = str(data.get("password") or "")
     if not (2 <= len(name) <= 32):
-        return jsonify({"ok": False, "error": "имя: 2–32 символа"}), 400
+        return jsonify({"ok": False, "error": tr("имя: 2–32 символа")}), 400
     if not EMAIL_RE.match(email) or "@wiring.guest" in email or email.endswith("@wiring.demo"):
-        return jsonify({"ok": False, "error": "нужна нормальная почта"}), 400
+        return jsonify({"ok": False, "error": tr("нужна нормальная почта")}), 400
     if len(password) < 6:
-        return jsonify({"ok": False, "error": "пароль минимум 6 символов"}), 400
+        return jsonify({"ok": False, "error": tr("пароль минимум 6 символов")}), 400
     conn = db()
     if conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
-        return jsonify({"ok": False, "error": "такая почта уже есть"}), 409
+        return jsonify({"ok": False, "error": tr("такая почта уже есть")}), 409
     consented_at = int(time.time())
     marketing_at = consented_at if data.get("marketing_consent") is True else None
     need_verify = email_verify_enforced()
@@ -1882,7 +1907,7 @@ def _authenticate(email: str, password: str):
     """Shared by cookie login and token login. Returns (row, None) or (None, error_response)."""
     row = db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
-        return None, (jsonify({"ok": False, "error": "неверная почта или пароль"}), 401)
+        return None, (jsonify({"ok": False, "error": tr("неверная почта или пароль")}), 401)
     deleted_at = int(row["deleted_at"] or 0) if "deleted_at" in row.keys() and row["deleted_at"] else 0
     if deleted_at:
         if int(time.time()) - deleted_at > ACCOUNT_DELETE_GRACE:
@@ -1890,7 +1915,7 @@ def _authenticate(email: str, password: str):
                 jsonify(
                     {
                         "ok": False,
-                        "error": "аккаунт удалён, срок восстановления прошёл",
+                        "error": tr("аккаунт удалён, срок восстановления прошёл"),
                         "deleted": True,
                     }
                 ),
@@ -1906,7 +1931,7 @@ def _authenticate(email: str, password: str):
             jsonify(
                 {
                     "ok": False,
-                    "error": "подтверди почту — мы отправили ссылку",
+                    "error": tr("подтверди почту — мы отправили ссылку"),
                     "needs_email_verify": True,
                     "email": email,
                 }
@@ -1920,7 +1945,7 @@ def _authenticate(email: str, password: str):
 def api_login():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"login:{ip}", 20, 300):
-        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много попыток")}), 429
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
     password = str(data.get("password") or "")
@@ -1943,17 +1968,17 @@ def api_email_verify():
     data = request.get_json(silent=True) or {}
     token = str(data.get("token") or "").strip()
     if not token:
-        return jsonify({"ok": False, "error": "нет токена"}), 400
+        return jsonify({"ok": False, "error": tr("нет токена")}), 400
     conn = db()
     row = conn.execute(
         "SELECT token, user_id, created_at, used_at FROM email_verifications WHERE token = ? FOR UPDATE",
         (token,),
     ).fetchone()
     if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 172800:
-        return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
+        return jsonify({"ok": False, "error": tr("ссылка устарела или уже использована")}), 400
     user = conn.execute("SELECT * FROM users WHERE id = ?", (row["user_id"],)).fetchone()
     if not user or user["deleted_at"]:
-        return jsonify({"ok": False, "error": "аккаунт не найден"}), 400
+        return jsonify({"ok": False, "error": tr("аккаунт не найден")}), 400
     now = int(time.time())
     conn.execute(
         "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?), last_seen = ? WHERE id = ?",
@@ -1973,7 +1998,7 @@ def api_email_verify():
 def api_email_resend():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"emailverify:{ip}", 8, 600):
-        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много попыток")}), 429
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
     if EMAIL_RE.match(email) and "@wiring.guest" not in email and not email.endswith("@wiring.demo"):
@@ -1992,13 +2017,13 @@ def api_email_resend():
 def api_password_forgot():
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"pwforgot:{ip}", 8, 600):
-        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много попыток")}), 429
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
     if EMAIL_RE.match(email) and "@wiring.guest" not in email and not email.endswith("@wiring.demo"):
         conn = db()
         row = conn.execute(
-            "SELECT id FROM users WHERE email = ? AND COALESCE(is_seed, 0) = 0",
+            "SELECT id, language FROM users WHERE email = ? AND COALESCE(is_seed, 0) = 0",
             (email,),
         ).fetchone()
         if row:
@@ -2009,12 +2034,13 @@ def api_password_forgot():
                 (token, row["id"], int(time.time())),
             )
             conn.commit()
-            link = f"{SITE_URL}/?reset={token}"
-            send_mail(
-                email,
-                "WIRING — сброс пароля",
-                f"Ссылка действует 2 часа:\n\n{link}\n\nЕсли это не ты — просто проигнорируй письмо.",
-            )
+            link = f"{SITE_URL}/?reset={token}&lang={row['language']}"
+            with use_language(row["language"]):
+                send_mail(
+                    email,
+                    tr("WIRING — сброс пароля"),
+                    tr("Ссылка действует 2 часа:\n\n{0}\n\nЕсли это не ты — просто проигнорируй письмо." ,link),
+                )
     return jsonify({"ok": True})
 
 
@@ -2024,16 +2050,16 @@ def api_password_reset():
     token = str(data.get("token") or "").strip()
     password = str(data.get("password") or "")
     if len(password) < 6:
-        return jsonify({"ok": False, "error": "пароль минимум 6 символов"}), 400
+        return jsonify({"ok": False, "error": tr("пароль минимум 6 символов")}), 400
     if not token:
-        return jsonify({"ok": False, "error": "нет токена"}), 400
+        return jsonify({"ok": False, "error": tr("нет токена")}), 400
     conn = db()
     row = conn.execute(
         "SELECT token, user_id, created_at, used_at FROM password_resets WHERE token = ?",
         (token,),
     ).fetchone()
     if not row or row["used_at"] or int(time.time()) - int(row["created_at"]) > 7200:
-        return jsonify({"ok": False, "error": "ссылка устарела или уже использована"}), 400
+        return jsonify({"ok": False, "error": tr("ссылка устарела или уже использована")}), 400
     conn.execute(
         "UPDATE users SET password_hash = ? WHERE id = ?",
         (generate_password_hash(password, method="pbkdf2:sha256"), row["user_id"]),
@@ -2049,9 +2075,9 @@ def api_me_city():
     data = request.get_json(silent=True) or {}
     city = normalize_city(str(data.get("city") or "").strip())
     if not city or len(city) < 2 or len(city) > 48:
-        return jsonify({"ok": False, "error": "город: 2–48 символов"}), 400
+        return jsonify({"ok": False, "error": tr("город: 2–48 символов")}), 400
     if not is_catalog_city(city):
-        return jsonify({"ok": False, "error": "выбери город из списка"}), 400
+        return jsonify({"ok": False, "error": tr("выбери город из списка")}), 400
     conn = db()
     conn.execute("UPDATE users SET city = ? WHERE id = ?", (city, session["uid"]))
     conn.commit()
@@ -2099,7 +2125,7 @@ def api_delete_me():
     me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not me:
         session.clear()
-        return jsonify({"ok": False, "error": "нет профиля"}), 401
+        return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     now = int(time.time())
     # Database requirement: The user record in 'users' is NEVER deleted, only stamped with deleted_at!
     conn.execute("UPDATE users SET deleted_at = ? WHERE id = ?", (now, uid))
@@ -2145,7 +2171,7 @@ def api_patch_me():
     conn = db()
     me = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
     if not me:
-        return jsonify({"ok": False, "error": "нет профиля"}), 401
+        return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     payload_in = _merge_me_for_draft(me, data) if draft else {"name": me["name"], **data}
     # An uploaded photo lives on the photos row. It is not a seed portrait, and a
     # filter save must not fail just because that path is still on the profile.
@@ -2172,7 +2198,7 @@ def api_patch_me():
     if _consent_yes(data.get("photo_rights_consent")):
         photo_at = photo_at or now
     if parsed["neuro"] and not special_at and not draft:
-        return jsonify({"ok": False, "error": "нужно согласие на обработку и показ выбранных особенностей"}), 400
+        return jsonify({"ok": False, "error": tr("нужно согласие на обработку и показ выбранных особенностей")}), 400
     me_keys = set(me.keys())
     seek_min = parsed.get("seek_min_age")
     seek_max = parsed.get("seek_max_age")
@@ -2219,7 +2245,7 @@ def api_patch_me():
     _replace_prompts(conn, uid, parsed["prompts"])
     if parsed.get("photo"):
         if not photo_at:
-            return jsonify({"ok": False, "error": "подтверди, что загружаешь только свои фото"}), 400
+            return jsonify({"ok": False, "error": tr("подтверди, что загружаешь только свои фото")}), 400
         _attach_portrait(conn, uid, parsed["photo"])
         conn.execute("UPDATE photos SET is_primary = CASE WHEN path = ? THEN 1 ELSE 0 END WHERE user_id = ?", (parsed["photo"], uid))
         _sync_primary_photo(conn, uid)
@@ -2228,10 +2254,10 @@ def api_patch_me():
         try:
             pid = int(primary_id)
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "не то фото"}), 400
+            return jsonify({"ok": False, "error": tr("не то фото")}), 400
         photo = conn.execute("SELECT id FROM photos WHERE id = ? AND user_id = ?", (pid, uid)).fetchone()
         if not photo:
-            return jsonify({"ok": False, "error": "фото не найдено"}), 404
+            return jsonify({"ok": False, "error": tr("фото не найдено")}), 404
         conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (pid, uid))
         _sync_primary_photo(conn, uid)
     if not draft:
@@ -2249,7 +2275,7 @@ def api_patch_notifications():
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not row:
-        return jsonify({"ok": False, "error": "нет профиля"}), 401
+        return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     keys = set(row.keys())
     # A stored 0 is a real value: `x or 1` used to turn "off" back into "on" whenever the other
     # switch was changed, so the two toggles flipped each other.
@@ -2293,7 +2319,7 @@ def api_push_subscribe():
     conn = db()
     row = conn.execute("SELECT notify_enabled, notify_push FROM users WHERE id = ?", (uid,)).fetchone()
     if not row or not int(row["notify_enabled"] or 0) or not int(row["notify_push"] or 0):
-        return jsonify({"ok": False, "error": "сначала включи пуш в уведомлениях"}), 403
+        return jsonify({"ok": False, "error": tr("сначала включи пуш в уведомлениях")}), 403
     try:
         save_subscription(conn, uid, data)
     except ValueError as exc:
@@ -2378,7 +2404,7 @@ def api_recommendations():
     me = conn.execute("SELECT * FROM users WHERE id = ?", (session["uid"],)).fetchone()
     allowed, _ = jev_access(me)
     if not allowed or int(me["is_seed"] or 0) or not int(me["jev_feed_enabled"] or 0):
-        return jsonify({"ok": False, "error": "активируй промокод и включи подбор в профиле"}), 403
+        return jsonify({"ok": False, "error": tr("активируй промокод и включи подбор в профиле")}), 403
     tags = tags_for(int(me["id"]))
     viewer = {"id": int(me["id"]), "age": me["age"], "city": me["city"],
               "intents": intents_of(me), "neuro": tags["neuro"], "vibe": tags["vibe"]}
@@ -2405,7 +2431,7 @@ def api_recommendations():
 def api_feed():
     me = db().execute("SELECT * FROM users WHERE id = ?", (session["uid"],)).fetchone()
     if not me:
-        return jsonify({"ok": False, "error": "нет профиля"}), 401
+        return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     qa_feed = has_qa_feed(str(me["email"]))
     neuro_filter = [t for t in request.args.get("neuro", "").split(",") if t in NEURO_IDS]
     vibe_filter = [t for t in request.args.get("vibe", "").split(",") if t in VIBE_IDS]
@@ -2505,9 +2531,9 @@ def api_feed_view():
     try:
         target_id = int(data.get("target_id"))
     except (ValueError, TypeError):
-        return jsonify({"ok": False, "error": "нет цели"}), 400
+        return jsonify({"ok": False, "error": tr("нет цели")}), 400
     if not mark_viewed(db(), session["uid"], target_id):
-        return jsonify({"ok": False, "error": "анкета не выдавалась"}), 404
+        return jsonify({"ok": False, "error": tr("анкета не выдавалась")}), 404
     db().commit()
     return jsonify({"ok": True})
 
@@ -2518,11 +2544,11 @@ def api_feed_reset():
     data = request.get_json(silent=True) or {}
     generation = data.get("generation") if isinstance(data, dict) else None
     if type(generation) is not int or generation < 0:
-        return jsonify({"ok": False, "error": "неверная версия ленты"}), 400
+        return jsonify({"ok": False, "error": tr("неверная версия ленты")}), 400
     conn = db()
     viewer = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (session["uid"],)).fetchone()
     if not is_premium(viewer) and not has_qa_feed(str(viewer["email"])):
-        return jsonify({"ok": False, "error": "доступно только с WIRING+"}), 403
+        return jsonify({"ok": False, "error": tr("доступно только с WIRING+")}), 403
     reset, generation = reset_delivery(conn, viewer, generation)
     conn.commit()
     return jsonify({"ok": True, "reset": reset, "generation": generation})
@@ -2535,23 +2561,23 @@ def api_swipe():
     try:
         target_id = int(data.get("target_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет цели"}), 400
+        return jsonify({"ok": False, "error": tr("нет цели")}), 400
     direction = str(data.get("direction") or "")
     if direction not in {"like", "pass", "snooze"}:
-        return jsonify({"ok": False, "error": "like, pass или snooze"}), 400
+        return jsonify({"ok": False, "error": tr("like, pass или snooze")}), 400
     uid = session["uid"]
     if target_id == uid:
-        return jsonify({"ok": False, "error": "это ты"}), 400
+        return jsonify({"ok": False, "error": tr("это ты")}), 400
     conn = db()
     if target_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 403
     target = conn.execute("SELECT * FROM users WHERE id = ?", (target_id,)).fetchone()
     if not target or ("deleted_at" in target.keys() and target["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if direction == "snooze":
         if not is_premium(me_row):
-            return jsonify({"ok": False, "error": "отложить — это WIRING+", "need_plus": True}), 403
+            return jsonify({"ok": False, "error": tr("отложить — это WIRING+"), "need_plus": True}), 403
         until = snooze(conn, uid, target_id)
         conn.commit()
         return jsonify({"ok": True, "matched": False, "match": None, "snoozed_until": until})
@@ -2560,7 +2586,7 @@ def api_swipe():
         return jsonify(
             {
                 "ok": False,
-                "error": "это уже взаимный лайк — убрать можно только из чата",
+                "error": tr("это уже взаимный лайк — убрать можно только из чата"),
                 "matched": True,
                 "match": user_public(target),
             }
@@ -2669,12 +2695,12 @@ def api_rewind():
         conn.commit()
         return jsonify({"ok": True, "card": user_public(target) if target else None, "undid": "snooze"})
     if not last:
-        return jsonify({"ok": False, "error": "нечего возвращать"}), 404
+        return jsonify({"ok": False, "error": tr("нечего возвращать")}), 404
     if last["direction"] == "pass":
-        return jsonify({"ok": False, "error": "исключённые анкеты не возвращаются"}), 409
+        return jsonify({"ok": False, "error": tr("исключённые анкеты не возвращаются")}), 409
     if last["direction"] == "like" and _is_match(conn, uid, int(last["to_id"])):
         return jsonify(
-            {"ok": False, "error": "это уже взаимный лайк — убрать можно только из чата"}
+            {"ok": False, "error": tr("это уже взаимный лайк — убрать можно только из чата")}
         ), 409
     target = conn.execute("SELECT * FROM users WHERE id = ?", (last["to_id"],)).fetchone()
     _clear_pair(conn, uid, last["to_id"])
@@ -2686,7 +2712,7 @@ def api_rewind():
 @login_required
 def api_deck_restart():
     """Compatibility response for older clients: permanent exclusions cannot reset."""
-    return jsonify({"ok": False, "error": "исключённые анкеты не возвращаются"}), 410
+    return jsonify({"ok": False, "error": tr("исключённые анкеты не возвращаются")}), 410
 
 
 @app.get("/api/people/<int:other_id>")
@@ -2695,12 +2721,12 @@ def api_person(other_id: int):
     uid = session["uid"]
     conn = db()
     if other_id != uid and other_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 404
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 404
     row = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not row or ("deleted_at" in row.keys() and row["deleted_at"]) or (other_id != uid and is_guest_email(str(row["email"]))):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     if other_id != uid and is_report_banned(row):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     payload = user_public(row, include_email=(other_id == uid), detail=True)
     payload["matched"] = other_id != uid and _is_match(conn, uid, other_id)
     liked_you = bool(
@@ -2829,9 +2855,9 @@ def api_matches():
         has_photo = bool(last and str(last["photo"] or "").strip()) if last else False
         has_audio = bool(last and str(last["audio"] or "").strip()) if last else False
         if last and has_audio:
-            preview = "голосовое"
+            preview = tr("голосовое")
         elif last and not body and has_photo:
-            preview = "фото"
+            preview = tr("фото")
         else:
             preview = body
         item["last_message"] = preview
@@ -2855,12 +2881,12 @@ def api_matches():
 
 def _message_preview(body: str, photo: str = "", audio: str = "", transcript: str = "") -> str:
     if str(audio or "").strip():
-        return "голосовое"
+        return tr("голосовое")
     text_body = str(body or "").strip() or str(transcript or "").strip()
     if text_body:
         return text_body[:160]
     if str(photo or "").strip():
-        return "фото"
+        return tr("фото")
     return ""
 
 
@@ -2900,7 +2926,7 @@ def _message_payload(
         src_transcript = "" if gone else (str(src["transcript"] or "") if "transcript" in src_keys else "")
         reply_to = {
             "id": int(src["id"]),
-            "body": "сообщение удалено" if gone else _message_preview(str(src["body"] or ""), src_photo, src_audio, src_transcript),
+            "body": tr("сообщение удалено") if gone else _message_preview(str(src["body"] or ""), src_photo, src_audio, src_transcript),
             "mine": src["from_id"] == uid,
             "has_photo": bool(src_photo),
             "has_audio": bool(src_audio),
@@ -2985,12 +3011,12 @@ def api_messages(other_id: int):
     uid = session["uid"]
     conn = db()
     if other_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 403
     if not _is_match(conn, uid, other_id):
-        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+        return jsonify({"ok": False, "error": tr("написать можно после взаимного лайка")}), 403
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     after_id = max(0, request.args.get("after", type=int) or 0)
     before_id = max(0, request.args.get("before", type=int) or 0)
     limit = max(0, min(200, request.args.get("limit", type=int) or 0))
@@ -3053,26 +3079,26 @@ def api_send_message():
     try:
         other_id = int(data.get("to_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет адресата"}), 400
+        return jsonify({"ok": False, "error": tr("нет адресата")}), 400
     body = str(data.get("body") or "").strip()
     if not (1 <= len(body) <= 1000):
-        return jsonify({"ok": False, "error": "сообщение: 1–1000 символов"}), 400
+        return jsonify({"ok": False, "error": tr("сообщение: 1–1000 символов")}), 400
     conn = db()
     if other_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 403
     if not _is_match(conn, uid, other_id):
-        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+        return jsonify({"ok": False, "error": tr("написать можно после взаимного лайка")}), 403
     sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     reply_to_id = None
     raw_reply = data.get("reply_to_id")
     if raw_reply not in (None, "", 0, "0"):
         try:
             reply_to_id = int(raw_reply)
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "некорректный ответ"}), 400
+            return jsonify({"ok": False, "error": tr("некорректный ответ")}), 400
         src = conn.execute(
             """
             SELECT id FROM messages
@@ -3081,7 +3107,7 @@ def api_send_message():
             (reply_to_id, uid, other_id, other_id, uid),
         ).fetchone()
         if not src:
-            return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
+            return jsonify({"ok": False, "error": tr("сообщение для ответа не найдено")}), 400
     # A client-generated id makes retries after a dropped response safe: the same
     # (sender, client_id) never creates a second message.
     client_id = str(data.get("client_id") or "").strip()[:64] or None
@@ -3126,30 +3152,30 @@ def api_send_photo_message():
     uid = session["uid"]
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"chatphoto:{ip}", 40, 3600):
-        return jsonify({"ok": False, "error": "слишком много фото, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много фото, подожди")}), 429
     try:
         other_id = int(request.form.get("to_id") or 0)
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет адресата"}), 400
+        return jsonify({"ok": False, "error": tr("нет адресата")}), 400
     if not other_id:
-        return jsonify({"ok": False, "error": "нет адресата"}), 400
+        return jsonify({"ok": False, "error": tr("нет адресата")}), 400
     caption = str(request.form.get("body") or "").strip()[:500]
     conn = db()
     if other_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 403
     if not _is_match(conn, uid, other_id):
-        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+        return jsonify({"ok": False, "error": tr("написать можно после взаимного лайка")}), 403
     sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     reply_to_id = None
     raw_reply = request.form.get("reply_to_id")
     if raw_reply not in (None, "", 0, "0"):
         try:
             reply_to_id = int(raw_reply)
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "некорректный ответ"}), 400
+            return jsonify({"ok": False, "error": tr("некорректный ответ")}), 400
         src = conn.execute(
             """
             SELECT id FROM messages
@@ -3158,10 +3184,10 @@ def api_send_photo_message():
             (reply_to_id, uid, other_id, other_id, uid),
         ).fetchone()
         if not src:
-            return jsonify({"ok": False, "error": "сообщение для ответа не найдено"}), 400
+            return jsonify({"ok": False, "error": tr("сообщение для ответа не найдено")}), 400
     uploads = request.files.getlist("files") or request.files.getlist("file")
     if not 1 <= len(uploads) <= 10:
-        return jsonify({"ok": False, "error": "выбери от 1 до 10 фото"}), 400
+        return jsonify({"ok": False, "error": tr("выбери от 1 до 10 фото")}), 400
     try:
         images = []
         for upload in uploads:
@@ -3298,7 +3324,7 @@ def _reply_target(conn: Connection, uid: int, other_id: int, raw_reply: object) 
     try:
         reply_to_id = int(raw_reply)  # type: ignore[arg-type]
     except (TypeError, ValueError):
-        raise ValueError("некорректный ответ")
+        raise ValueError(tr("некорректный ответ"))
     src = conn.execute(
         """
         SELECT id FROM messages
@@ -3308,7 +3334,7 @@ def _reply_target(conn: Connection, uid: int, other_id: int, raw_reply: object) 
         (reply_to_id, uid, other_id, other_id, uid),
     ).fetchone()
     if not src:
-        raise ValueError("сообщение для ответа не найдено")
+        raise ValueError(tr("сообщение для ответа не найдено"))
     return reply_to_id
 
 
@@ -3319,13 +3345,13 @@ def api_edit_message(message_id: int):
     data = request.get_json(silent=True) or {}
     body = str(data.get("body") or "").strip()
     if not (1 <= len(body) <= 1000):
-        return jsonify({"ok": False, "error": "сообщение: 1–1000 символов"}), 400
+        return jsonify({"ok": False, "error": tr("сообщение: 1–1000 символов")}), 400
     conn = db()
     row = _thread_message(conn, uid, message_id)
     if not row or int(row["from_id"]) != uid:
-        return jsonify({"ok": False, "error": "это сообщение нельзя изменить"}), 404
+        return jsonify({"ok": False, "error": tr("это сообщение нельзя изменить")}), 404
     if str(row["audio"] or "").strip():
-        return jsonify({"ok": False, "error": "голосовое нельзя переписать текстом"}), 400
+        return jsonify({"ok": False, "error": tr("голосовое нельзя переписать текстом")}), 400
     conn.execute(
         "UPDATE messages SET body = ?, edited_at = ? WHERE id = ?",
         (body, int(time.time()), message_id),
@@ -3341,7 +3367,7 @@ def api_delete_message(message_id: int):
     conn = db()
     row = _thread_message(conn, uid, message_id)
     if not row or int(row["from_id"]) != uid:
-        return jsonify({"ok": False, "error": "это сообщение нельзя удалить"}), 404
+        return jsonify({"ok": False, "error": tr("это сообщение нельзя удалить")}), 404
     conn.execute("UPDATE messages SET deleted_at = ? WHERE id = ?", (int(time.time()), message_id))
     for photo in _message_photos(row):
         _unlink_upload(photo)
@@ -3356,13 +3382,13 @@ def api_transcribe_message(message_id: int):
     uid = session["uid"]
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"transcribe:{uid}", 30, 3600):
-        return jsonify({"ok": False, "error": "слишком много расшифровок, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много расшифровок, подожди")}), 429
     if too_many(f"transcribeip:{ip}", 60, 3600):
-        return jsonify({"ok": False, "error": "слишком много расшифровок, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много расшифровок, подожди")}), 429
     conn = db()
     row = _thread_message(conn, uid, message_id)
     if not row or not str(row["audio"] or "").strip():
-        return jsonify({"ok": False, "error": "голосовое не найдено"}), 404
+        return jsonify({"ok": False, "error": tr("голосовое не найдено")}), 404
     existing = str(row["transcript"] or "").strip()
     if existing:
         return jsonify({"ok": True, "transcript": existing})
@@ -3370,7 +3396,7 @@ def api_transcribe_message(message_id: int):
     full = os.path.abspath(os.path.join(UPLOAD_DIR, rel))
     root = os.path.abspath(UPLOAD_DIR)
     if not full.startswith(root + os.sep) or not os.path.isfile(full):
-        return jsonify({"ok": False, "error": "запись не найдена"}), 404
+        return jsonify({"ok": False, "error": tr("запись не найдена")}), 404
     with open(full, "rb") as handle:
         data = handle.read()
     mime = "audio/webm"
@@ -3398,33 +3424,33 @@ def api_send_voice_message():
     uid = session["uid"]
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"chatvoice:{uid}", 40, 3600):
-        return jsonify({"ok": False, "error": "слишком много голосовых, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много голосовых, подожди")}), 429
     try:
         other_id = int(request.form.get("to_id") or 0)
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет адресата"}), 400
+        return jsonify({"ok": False, "error": tr("нет адресата")}), 400
     if not other_id:
-        return jsonify({"ok": False, "error": "нет адресата"}), 400
+        return jsonify({"ok": False, "error": tr("нет адресата")}), 400
     conn = db()
     if other_id in blocked_ids(conn, uid):
-        return jsonify({"ok": False, "error": "этот человек скрыт"}), 403
+        return jsonify({"ok": False, "error": tr("этот человек скрыт")}), 403
     if not _is_match(conn, uid, other_id):
-        return jsonify({"ok": False, "error": "написать можно после взаимного лайка"}), 403
+        return jsonify({"ok": False, "error": tr("написать можно после взаимного лайка")}), 403
     sender = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     other = conn.execute("SELECT * FROM users WHERE id = ?", (other_id,)).fetchone()
     if not other or ("deleted_at" in other.keys() and other["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     try:
         reply_to_id = _reply_target(conn, uid, other_id, request.form.get("reply_to_id"))
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     upload = request.files.get("file")
     if upload is None:
-        return jsonify({"ok": False, "error": "нет записи"}), 400
+        return jsonify({"ok": False, "error": tr("нет записи")}), 400
     data = upload.read()
     kind = audio_kind(data, str(upload.mimetype or ""))
     if not kind:
-        return jsonify({"ok": False, "error": "это не голосовое"}), 400
+        return jsonify({"ok": False, "error": tr("это не голосовое")}), 400
     ext, _mime = kind
     try:
         duration = int(request.form.get("duration") or 0)
@@ -3456,7 +3482,7 @@ def api_send_voice_message():
             kind="message",
             from_id=uid,
             from_name=str(sender["name"]),
-            preview="голосовое",
+            preview=tr("голосовое"),
             last_seen=int(other["last_seen"] or 0) if "last_seen" in other.keys() else 0,
         )
     conn.commit()
@@ -3471,10 +3497,10 @@ def api_unmatch():
     try:
         other_id = int(data.get("user_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет человека"}), 400
+        return jsonify({"ok": False, "error": tr("нет человека")}), 400
     conn = db()
     if not _is_match(conn, uid, other_id):
-        return jsonify({"ok": False, "error": "размэтч возможен только после взаимного лайка"}), 400
+        return jsonify({"ok": False, "error": tr("размэтч возможен только после взаимного лайка")}), 400
     _unmatch_pair(conn, uid, other_id)
     conn.commit()
     return jsonify({"ok": True})
@@ -3488,12 +3514,12 @@ def api_block():
     try:
         other_id = int(data.get("user_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет человека"}), 400
+        return jsonify({"ok": False, "error": tr("нет человека")}), 400
     if other_id == uid:
-        return jsonify({"ok": False, "error": "это ты"}), 400
+        return jsonify({"ok": False, "error": tr("это ты")}), 400
     conn = db()
     if not conn.execute("SELECT id FROM users WHERE id = ?", (other_id,)).fetchone():
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     conn.execute(
         "INSERT INTO blocks (from_id, to_id, created_at) VALUES (?, ?, ?) ON CONFLICT(from_id, to_id) DO NOTHING",
         (uid, other_id, int(time.time())),
@@ -3517,47 +3543,47 @@ def api_archive_revise():
     data = request.get_json(silent=True) or {}
     action = str(data.get("action") or "")
     if action not in {"unlike", "restore", "unblock", "unmatch"}:
-        return jsonify({"ok": False, "error": "неизвестное действие"}), 400
+        return jsonify({"ok": False, "error": tr("неизвестное действие")}), 400
     try:
         other_id = int(data.get("user_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет человека"}), 400
+        return jsonify({"ok": False, "error": tr("нет человека")}), 400
     if other_id == uid:
-        return jsonify({"ok": False, "error": "это ты"}), 400
+        return jsonify({"ok": False, "error": tr("это ты")}), 400
     conn = db()
     target = conn.execute("SELECT id, deleted_at FROM users WHERE id = ?", (other_id,)).fetchone()
     if not target or ("deleted_at" in target.keys() and target["deleted_at"]):
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     if action == "unlike":
         swipe = conn.execute(
             "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
             (uid, other_id),
         ).fetchone()
         if not swipe or swipe["direction"] != "like":
-            return jsonify({"ok": False, "error": "лайка нет"}), 404
+            return jsonify({"ok": False, "error": tr("лайка нет")}), 404
         if _is_match(conn, uid, other_id):
-            return jsonify({"ok": False, "error": "это взаимный лайк — убрать можно из чатов"}), 409
+            return jsonify({"ok": False, "error": tr("это взаимный лайк — убрать можно из чатов")}), 409
         _release_to_feed(conn, uid, other_id)
     elif action == "restore":
         if conn.execute(
             "SELECT 1 FROM blocks WHERE from_id = ? AND to_id = ?",
             (uid, other_id),
         ).fetchone():
-            return jsonify({"ok": False, "error": "сначала разблокируй"}), 409
+            return jsonify({"ok": False, "error": tr("сначала разблокируй")}), 409
         swipe = conn.execute(
             "SELECT direction FROM swipes WHERE from_id = ? AND to_id = ?",
             (uid, other_id),
         ).fetchone()
         if not swipe or swipe["direction"] != "pass":
-            return jsonify({"ok": False, "error": "дизлайка нет"}), 404
+            return jsonify({"ok": False, "error": tr("дизлайка нет")}), 404
         _release_to_feed(conn, uid, other_id)
     elif action == "unblock":
         removed = conn.execute("DELETE FROM blocks WHERE from_id = ? AND to_id = ?", (uid, other_id))
         if not removed.rowcount:
-            return jsonify({"ok": False, "error": "блока нет"}), 404
+            return jsonify({"ok": False, "error": tr("блока нет")}), 404
     else:
         if not _is_match(conn, uid, other_id):
-            return jsonify({"ok": False, "error": "взаимного лайка нет"}), 400
+            return jsonify({"ok": False, "error": tr("взаимного лайка нет")}), 400
         _unmatch_pair(conn, uid, other_id)
     conn.commit()
     return jsonify({"ok": True, **_archive_lists(conn, uid)})
@@ -3579,18 +3605,18 @@ def api_report():
     try:
         other_id = int(data.get("user_id"))
     except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "нет человека"}), 400
+        return jsonify({"ok": False, "error": tr("нет человека")}), 400
     reason = str(data.get("reason") or "").strip()
     details = str(data.get("details") or "").strip()[:500]
     if reason not in REPORT_IDS:
-        return jsonify({"ok": False, "error": "выбери причину"}), 400
+        return jsonify({"ok": False, "error": tr("выбери причину")}), 400
     if other_id == uid:
-        return jsonify({"ok": False, "error": "это ты"}), 400
+        return jsonify({"ok": False, "error": tr("это ты")}), 400
     conn = db()
     if not conn.execute("SELECT id FROM users WHERE id = ?", (other_id,)).fetchone():
-        return jsonify({"ok": False, "error": "человек не найден"}), 404
+        return jsonify({"ok": False, "error": tr("человек не найден")}), 404
     if too_many(f"report:{uid}", 5, 3600):
-        return jsonify({"ok": False, "error": "Слишком много жалоб — подожди немного"}), 429
+        return jsonify({"ok": False, "error": tr("Слишком много жалоб — подожди немного")}), 429
     report_insert = conn.execute(
         "INSERT INTO reports (from_id, to_id, reason, details, created_at) VALUES (?, ?, ?, ?, ?)",
         (uid, other_id, reason, details, int(time.time())),
@@ -3603,13 +3629,13 @@ def api_report():
     newly_banned = apply_report_ban_if_needed(conn, other_id)
     conn.commit()
     _notify_report_support(
-        f"WIRING · новая жалоба #{report_insert.lastrowid}",
-        f"Новая жалоба #{report_insert.lastrowid}: участник #{uid} на участника #{other_id}. Причина: {reason}.\nРазобрать: {SITE_URL}/admin#reports",
+        tr("WIRING · новая жалоба #{0}" ,report_insert.lastrowid),
+        tr("Новая жалоба #{0}: участник #{1} на участника #{2}. Причина: {3}.\nРазобрать: {4}/admin#reports" ,report_insert.lastrowid, uid, other_id, reason, SITE_URL),
     )
     if newly_banned:
         _notify_report_support(
             f"WIRING auto-ban · #{other_id}",
-            f"Аккаунт #{other_id} скрыт после второй жалобы от разных участников. Проверь очередь: {SITE_URL}/admin#bans",
+            tr("Аккаунт #{0} скрыт после второй жалобы от разных участников. Проверь очередь: {1}/admin#bans" ,other_id, SITE_URL),
         )
     return jsonify({"ok": True})
 
@@ -3624,7 +3650,7 @@ def api_albums():
 @login_required
 @real_account_required
 def api_create_album():
-    return jsonify({"ok": False, "error": "один набор фото, без альбомов"}), 400
+    return jsonify({"ok": False, "error": tr("один набор фото, без альбомов")}), 400
 
 
 @app.patch("/api/albums/<int:album_id>")
@@ -3635,11 +3661,11 @@ def api_rename_album(album_id: int):
     data = request.get_json(silent=True) or {}
     title = str(data.get("title") or "").strip()[:32]
     if len(title) < 1:
-        return jsonify({"ok": False, "error": "нужно название"}), 400
+        return jsonify({"ok": False, "error": tr("нужно название")}), 400
     conn = db()
     row = conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone()
     if not row:
-        return jsonify({"ok": False, "error": "альбом не найден"}), 404
+        return jsonify({"ok": False, "error": tr("альбом не найден")}), 404
     conn.execute("UPDATE albums SET title = ? WHERE id = ?", (title, album_id))
     conn.commit()
     return jsonify({"ok": True, "albums": albums_for(uid)})
@@ -3653,7 +3679,7 @@ def api_delete_album(album_id: int):
     conn = db()
     row = conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone()
     if not row:
-        return jsonify({"ok": False, "error": "альбом не найден"}), 404
+        return jsonify({"ok": False, "error": tr("альбом не найден")}), 404
     fallback = _album_id(conn, uid, "я")
     if fallback == album_id:
         other = conn.execute(
@@ -3677,7 +3703,7 @@ def api_upload_photo():
     uid = session["uid"]
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"photo:{ip}", 40, 3600):
-        return jsonify({"ok": False, "error": "слишком много загрузок, подожди"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много загрузок, подожди")}), 429
     conn = db()
     me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     photo_at = me["photo_rights_consent_at"] if me and "photo_rights_consent_at" in me.keys() else None
@@ -3689,11 +3715,11 @@ def api_upload_photo():
         else:
             return jsonify({
                 "ok": False,
-                "error": "отметь галочку «Загружаю только свои фото» в блоке «Фото» и попробуй снова",
+                "error": tr("отметь галочку «Загружаю только свои фото» в блоке «Фото» и попробуй снова"),
             }), 400
     count = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
     if count >= MAX_PHOTOS:
-        return jsonify({"ok": False, "error": f"не больше {MAX_PHOTOS} фото"}), 400
+        return jsonify({"ok": False, "error": tr("не больше {0} фото" ,MAX_PHOTOS)}), 400
     try:
         jpeg = read_upload(request.files.get("file"), portrait=True)
         moderate_photo(jpeg)
@@ -3706,9 +3732,9 @@ def api_upload_photo():
         try:
             album_id = int(album_id_raw)
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "не тот альбом"}), 400
+            return jsonify({"ok": False, "error": tr("не тот альбом")}), 400
         if not conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone():
-            return jsonify({"ok": False, "error": "альбом не найден"}), 404
+            return jsonify({"ok": False, "error": tr("альбом не найден")}), 404
     if album_id is None:
         album_id = _album_id(conn, uid, album_title or "я")
     folder = os.path.join(UPLOAD_DIR, str(uid))
@@ -3741,12 +3767,12 @@ def api_photo_order():
     uid = session["uid"]
     ids = (request.get_json(silent=True) or {}).get("ids")
     if not isinstance(ids, list) or any(type(i) is not int for i in ids) or len(set(ids)) != len(ids):
-        return jsonify({"ok": False, "error": "укажи порядок всех фото"}), 400
+        return jsonify({"ok": False, "error": tr("укажи порядок всех фото")}), 400
     conn = db()
     conn.execute("SELECT id FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
     owned = {r["id"] for r in conn.execute("SELECT id FROM photos WHERE user_id = ? FOR UPDATE", (uid,)).fetchall()}
     if set(ids) != owned:
-        return jsonify({"ok": False, "error": "список фото изменился, обнови профиль"}), 409
+        return jsonify({"ok": False, "error": tr("список фото изменился, обнови профиль")}), 409
     for position, photo_id in enumerate(ids):
         conn.execute("UPDATE photos SET sort_order = ?, is_primary = ? WHERE id = ? AND user_id = ?", (position, int(position == 0), photo_id, uid))
     _sync_primary_photo(conn, uid)
@@ -3763,14 +3789,14 @@ def api_patch_photo(photo_id: int):
     conn = db()
     row = conn.execute("SELECT * FROM photos WHERE id = ? AND user_id = ?", (photo_id, uid)).fetchone()
     if not row:
-        return jsonify({"ok": False, "error": "фото не найдено"}), 404
+        return jsonify({"ok": False, "error": tr("фото не найдено")}), 404
     if "album_id" in data and data["album_id"] is not None:
         try:
             album_id = int(data["album_id"])
         except (TypeError, ValueError):
-            return jsonify({"ok": False, "error": "не тот альбом"}), 400
+            return jsonify({"ok": False, "error": tr("не тот альбом")}), 400
         if not conn.execute("SELECT id FROM albums WHERE id = ? AND user_id = ?", (album_id, uid)).fetchone():
-            return jsonify({"ok": False, "error": "альбом не найден"}), 404
+            return jsonify({"ok": False, "error": tr("альбом не найден")}), 404
         conn.execute("UPDATE photos SET album_id = ? WHERE id = ?", (album_id, photo_id))
     if data.get("is_primary"):
         conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (photo_id, uid))
@@ -3787,10 +3813,10 @@ def api_delete_photo(photo_id: int):
     conn = db()
     row = conn.execute("SELECT * FROM photos WHERE id = ? AND user_id = ?", (photo_id, uid)).fetchone()
     if not row:
-        return jsonify({"ok": False, "error": "фото не найдено"}), 404
+        return jsonify({"ok": False, "error": tr("фото не найдено")}), 404
     remaining_n = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
     if remaining_n <= 1:
-        return jsonify({"ok": False, "error": "нужно хотя бы одно фото"}), 400
+        return jsonify({"ok": False, "error": tr("нужно хотя бы одно фото")}), 400
     path = row["path"]
     conn.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
     if not str(path).startswith("portraits/"):
@@ -3855,6 +3881,15 @@ def service_worker():
 
 @app.get("/public/<path:filename>")
 def public_files(filename: str):
+    if filename == "manifest.webmanifest":
+        with open(os.path.join(PUBLIC_DIR, filename)) as source:
+            manifest = json.load(source)
+        manifest["description"] = tr(manifest.get("description", ""))
+        manifest["lang"] = get_language()
+        response = jsonify(manifest)
+        response.mimetype = "application/manifest+json"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
     if request.args.get("s") == "sm":
         return _send_thumb(PUBLIC_DIR, filename, "public")
     return send_from_directory(PUBLIC_DIR, filename)
@@ -3868,7 +3903,7 @@ def api_plus():
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not is_premium(row):
-        return jsonify({"ok": False, "error": "это WIRING+", "need_plus": True}), 403
+        return jsonify({"ok": False, "error": tr("это WIRING+"), "need_plus": True}), 403
     data = request.get_json(silent=True) or {}
     incognito = row["incognito"]
     paused = row["paused"]
@@ -3889,7 +3924,7 @@ def api_patch_me_consents():
     conn = db()
     me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     if not me:
-        return jsonify({"ok": False, "error": "нет профиля"}), 401
+        return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     now = int(time.time())
     special_at = now if _consent_yes(data.get("special_data_consent")) else None
     photo_at = now if _consent_yes(data.get("photo_rights_consent")) else None
@@ -3908,7 +3943,7 @@ def api_redeem():
     uid = session["uid"]
     ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
     if too_many(f"promo:{ip}", 12, 3600):
-        return jsonify({"ok": False, "error": "слишком много попыток"}), 429
+        return jsonify({"ok": False, "error": tr("слишком много попыток")}), 429
     data = request.get_json(silent=True) or {}
     conn = db()
     until, err = redeem_code(conn, uid, str(data.get("code") or ""))
@@ -4033,7 +4068,7 @@ def admin_page():
     if request.method == "POST":
         ip = request.headers.get("X-Forwarded-For", request.remote_addr or "x").split(",")[0].strip()
         if too_many(f"admin:{ip}", 12, 3600):
-            return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error="подожди немного", local_admin_login=local_login), 429
+            return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error=tr("подожди немного"), local_admin_login=local_login), 429
         submitted_token = str(request.form.get("token") or "")
         token_ok = any(_token_ok(submitted_token, token) for token in tokens)
         local_ok = bool(local_login and _token_ok(str(request.form.get("login") or ""), local_login)
@@ -4041,7 +4076,7 @@ def admin_page():
         if token_ok or local_ok:
             session["admin"] = True
         else:
-            error = "не тот токен или логин/пароль"
+            error = tr("не тот токен или логин/пароль")
             status = 403
     if not session.get("admin"):
         return render_template("admin.html", authed=False, s=None, codes=[], tickets=[], tasks=[], task_counts={}, task_threshold=task_threshold(), error=error, local_admin_login=local_login), status
@@ -4070,7 +4105,7 @@ def admin_reply(kind, source_id):
     if not expected or not _token_ok(str(request.form.get("csrf") or ""), expected):
         abort(403)
     if too_many(f"admin-reply:{expected}", 20, 3600):
-        return _admin_view("Слишком много ответов — подожди немного", 429)
+        return _admin_view(tr("Слишком много ответов — подожди немного"), 429)
     conn = db()
     try:
         save_reply(conn, kind, source_id, request.form.get("body"), request.form.get("request_id"), send_mail, SITE_URL)
@@ -4082,7 +4117,7 @@ def admin_reply(kind, source_id):
         return _admin_view(str(err), 404)
     except IntegrityError:
         conn.rollback()
-        return _admin_view("Запрос уже обработан; обнови страницу", 409)
+        return _admin_view(tr("Запрос уже обработан; обнови страницу"), 409)
     conn.commit()
     return redirect("/admin#reports" if kind == "report" else "/admin#support")
 
@@ -4102,15 +4137,15 @@ def admin_premium():
     try:
         days = int(request.form.get("days") or "30")
     except (TypeError, ValueError):
-        return _admin_view("дни — число", 400)
+        return _admin_view(tr("дни — число"), 400)
     if not who:
-        return _admin_view("укажи почту или id", 400)
+        return _admin_view(tr("укажи почту или id"), 400)
     conn = db()
     row = _admin_resolve_user(conn, who)
     if not row:
-        return _admin_view("человека нет", 404)
+        return _admin_view(tr("человека нет"), 404)
     if is_guest_email(str(row["email"])) or int(row["is_seed"] or 0):
-        return _admin_view("премиум только живым аккаунтам", 400)
+        return _admin_view(tr("премиум только живым аккаунтам"), 400)
     grant_premium(conn, int(row["id"]), days)
     conn.commit()
     return redirect("/admin")
@@ -4122,13 +4157,13 @@ def admin_report_ban_clear_by_who():
         abort(403)
     who = str(request.form.get("who") or "").strip()
     if not who:
-        return _admin_view("укажи почту или id", 400)
+        return _admin_view(tr("укажи почту или id"), 400)
     conn = db()
     row = _admin_resolve_user(conn, who)
     if not row:
-        return _admin_view("человека нет", 404)
+        return _admin_view(tr("человека нет"), 404)
     if not is_report_banned(row):
-        return _admin_view("автобана нет — анкета уже доступна", 400)
+        return _admin_view(tr("автобана нет — анкета уже доступна"), 400)
     clear_report_ban(conn, int(row["id"]))
     conn.commit()
     return redirect("/admin#bans")
@@ -4141,7 +4176,7 @@ def admin_clear_report_ban(user_id: int):
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
-        return _admin_view("человека нет", 404)
+        return _admin_view(tr("человека нет"), 404)
     if not is_report_banned(row):
         return redirect("/admin#bans")
     clear_report_ban(conn, user_id)
@@ -4170,7 +4205,7 @@ def admin_promo():
         days = int(request.form.get("days") or "90")
         max_uses = int(request.form.get("max_uses") or "0")
     except (TypeError, ValueError):
-        return _admin_view("дни и лимит — числа", 400)
+        return _admin_view(tr("дни и лимит — числа"), 400)
     err = add_code(db(), str(request.form.get("code") or ""), days, max_uses)
     if err:
         return _admin_view(err, 400)
@@ -4195,11 +4230,11 @@ def admin_task_decision(task_id: int):
         abort(403)
     decision = str(request.form.get("decision") or "").strip().lower()
     if decision not in {"approved", "rejected", "done", "candidate"}:
-        return _admin_view("неизвестное решение", 400)
+        return _admin_view(tr("неизвестное решение"), 400)
     conn = db()
     row = conn.execute("SELECT id FROM feature_tasks WHERE id = ?", (task_id,)).fetchone()
     if not row:
-        return _admin_view("задача не найдена", 404)
+        return _admin_view(tr("задача не найдена"), 404)
     now = int(time.time())
     if decision == "approved":
         conn.execute(
@@ -4219,8 +4254,8 @@ def admin_task_decision(task_id: int):
 def account_deletion():
     return render_template(
         "legal.html",
-        title="Удаление аккаунта и данных",
-        description="Как удалить аккаунт WIRING и что происходит с анкетой и данными.",
+        title=tr("Удаление аккаунта и данных"),
+        description=tr("Как удалить аккаунт WIRING и что происходит с анкетой и данными."),
         path="/account-deletion",
         site_url=SITE_URL,
         body=ACCOUNT_DELETION_HTML,
@@ -4231,8 +4266,8 @@ def account_deletion():
 def child_safety():
     return render_template(
         "legal.html",
-        title="Стандарты защиты детей в WIRING",
-        description="WIRING — только для взрослых. Запрет CSAE и CSAM, жалобы и контакт по вопросам защиты детей.",
+        title=tr("Стандарты защиты детей в WIRING"),
+        description=tr("WIRING — только для взрослых. Запрет CSAE и CSAM, жалобы и контакт по вопросам защиты детей."),
         path="/child-safety",
         site_url=SITE_URL,
         body=CHILD_SAFETY_HTML,
@@ -4243,8 +4278,8 @@ def child_safety():
 def privacy():
     return render_template(
         "legal.html",
-        title="Политика конфиденциальности",
-        description="Какие персональные данные обрабатывает WIRING и какие у вас есть права.",
+        title=tr("Политика конфиденциальности"),
+        description=tr("Какие персональные данные обрабатывает WIRING и какие у вас есть права."),
         path="/privacy",
         site_url=SITE_URL,
         body=PRIVACY_HTML,
@@ -4255,8 +4290,8 @@ def privacy():
 def legal_index():
     return render_template(
         "legal.html",
-        title="Документы и безопасность",
-        description="Соглашение, конфиденциальность, рассылка, защита детей и удаление аккаунта WIRING.",
+        title=tr("Документы и безопасность"),
+        description=tr("Соглашение, конфиденциальность, рассылка, защита детей и удаление аккаунта WIRING."),
         path="/legal",
         site_url=SITE_URL,
         body=LEGAL_INDEX_HTML,
@@ -4267,8 +4302,8 @@ def legal_index():
 def rules():
     return render_template(
         "legal.html",
-        title="Пользовательское соглашение",
-        description="Условия использования WIRING. 18+. Ограничения по законодательству РФ.",
+        title=tr("Пользовательское соглашение"),
+        description=tr("Условия использования WIRING. 18+. Ограничения по законодательству РФ."),
         path="/rules",
         site_url=SITE_URL,
         body=RULES_HTML,
@@ -4279,8 +4314,8 @@ def rules():
 def marketing_consent():
     return render_template(
         "legal.html",
-        title="Согласие на рассылку",
-        description="Отдельное согласие на рекламные сообщения WIRING. Для знакомств не обязательно.",
+        title=tr("Согласие на рассылку"),
+        description=tr("Отдельное согласие на рекламные сообщения WIRING. Для знакомств не обязательно."),
         path="/marketing",
         site_url=SITE_URL,
         body=MARKETING_HTML,
@@ -4291,8 +4326,8 @@ def marketing_consent():
 def glossary():
     return render_template(
         "legal.html",
-        title="Особенности и аббревиатуры",
-        description="Что значат ASD, ADHD, AuDHD, ПРЛ, RSD, PDA и остальные особенности на WIRING.",
+        title=tr("Особенности и аббревиатуры"),
+        description=tr("Что значат ASD, ADHD, AuDHD, ПРЛ, RSD, PDA и остальные особенности на WIRING."),
         path="/glossary",
         site_url=SITE_URL,
         body=glossary_html(),
@@ -4309,7 +4344,7 @@ def support():
     if not data:
         data = request.form
     if too_many(f"support:{ip}", 5, 3600):
-        error = "слишком часто — подожди немного"
+        error = tr("слишком часто — подожди немного")
     else:
         body = str(data.get("body") or "").strip()
         name = str(data.get("name") or "").strip()
@@ -4317,11 +4352,11 @@ def support():
         if me:
             name = name or str(me.get("name") or "")
         if len(body) < 8:
-            error = "напиши чуть подробнее"
+            error = tr("напиши чуть подробнее")
         elif len(body) > 2000:
-            error = "слишком длинно"
+            error = tr("слишком длинно")
         elif email and not EMAIL_RE.match(email):
-            error = "почта странная"
+            error = tr("почта странная")
         else:
             uid = session.get("uid")
             conn = db()
@@ -4333,10 +4368,10 @@ def support():
                 (uid, name[:80], email[:120], body[:2000], ip[:80], int(time.time())),
             )
             conn.commit()
-            who = name or (f"#{uid}" if uid else "гость")
-            contact = email or (f"аккаунт #{uid}" if uid else "без контакта")
-            notify_support(f"WIRING support от {who}", f"{who} · {contact}\n\n{body}")
-            notice = "отправили. Ответ появится в разделе «Поддержка» твоего аккаунта. Если указана почта, отправим и туда." if uid else "отправили. Ответим на почту, если ты её указал."
+            who = name or (f"#{uid}" if uid else tr("гость"))
+            contact = email or (tr("аккаунт #{0}" ,uid) if uid else tr("без контакта"))
+            notify_support(tr("WIRING support от {0}" ,who), f"{who} · {contact}\n\n{body}")
+            notice = tr("отправили. Ответ появится в разделе «Поддержка» твоего аккаунта. Если указана почта, отправим и туда.") if uid else tr("отправили. Ответим на почту, если ты её указал.")
 
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.headers.get("Accept", ""):
         if error:
@@ -4345,8 +4380,8 @@ def support():
 
     return render_template(
         "legal.html",
-        title="Поддержка",
-        description="Написать в поддержку WIRING. Почту указывать не обязательно.",
+        title=tr("Поддержка"),
+        description=tr("Написать в поддержку WIRING. Почту указывать не обязательно."),
         path="/support",
         site_url=SITE_URL,
         body=SUPPORT_HTML,

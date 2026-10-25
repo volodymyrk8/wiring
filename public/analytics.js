@@ -99,16 +99,17 @@
     const banner = document.createElement("aside");
     banner.className = "analytics-consent";
     banner.setAttribute("role", "dialog");
-    banner.setAttribute("aria-label", "аналитика посещений");
+    const english = document.documentElement?.lang === "en";
+    banner.setAttribute("aria-label", english ? "Optional analytics" : "аналитика посещений");
     banner.innerHTML = `
       <div class="analytics-consent-content">
-        <p>Можно разрешить необязательную аналитику посещений. Она помогает понять, какие страницы WIRING полезны. <a href="/privacy" target="_blank" rel="noopener">Подробнее</a></p>
+        <p>${english ? "You can allow optional visit analytics. It helps us understand which WIRING pages are useful." : "Можно разрешить необязательную аналитику посещений. Она помогает понять, какие страницы WIRING полезны."} <a href="/privacy" target="_blank" rel="noopener">${english ? "Learn more" : "Подробнее"}</a></p>
       </div>
       <div class="analytics-consent-actions">
-        <button type="button" class="ghost slim" data-analytics-deny>Не сейчас</button>
-        <button type="button" class="solid slim" data-analytics-allow>Разрешить</button>
+        <button type="button" class="ghost slim" data-analytics-deny>${english ? "Not now" : "Не сейчас"}</button>
+        <button type="button" class="solid slim" data-analytics-allow>${english ? "Allow" : "Разрешить"}</button>
       </div>
-      <button type="button" class="analytics-consent-close" data-analytics-close aria-label="Закрыть">✕</button>`;
+      <button type="button" class="analytics-consent-close" data-analytics-close aria-label="${english ? "Close" : "Закрыть"}">✕</button>`;
     document.body.appendChild(banner);
     banner.querySelector("[data-analytics-allow]").addEventListener("click", () => setConsent("granted"));
     banner.querySelector("[data-analytics-deny]").addEventListener("click", () => setConsent("denied"));

@@ -1,16 +1,18 @@
+import { tr } from "@/lib/i18n";
 import { useState, useEffect } from "preact/hooks";
 import type { ComponentChildren, JSX } from "preact";
 import { Tooltip } from "./Tooltip";
 import { Select, type SelectOption } from "./Select";
 import { Button } from "./Button";
+import { LanguageSwitch } from "./LanguageSwitch";
 import styles from "./AppHeader.module.css";
 
 export const THEME_LIST = [
-  { id: "pastel", label: "утро" },
-  { id: "mist", label: "день" },
-  { id: "dusk", label: "сумерки" },
-  { id: "night", label: "ночь" },
-  { id: "slate", label: "полночь" },
+  { id: "pastel", label: tr("утро") },
+  { id: "mist", label: tr("день") },
+  { id: "dusk", label: tr("сумерки") },
+  { id: "night", label: tr("ночь") },
+  { id: "slate", label: tr("полночь") },
 ] as const;
 
 export type ThemeName = (typeof THEME_LIST)[number]["id"];
@@ -54,11 +56,11 @@ export function ThemeIcon({ theme, size = 20 }: { theme: ThemeName; size?: numbe
 }
 
 export const THEME_OPTIONS: SelectOption<ThemeName>[] = [
-  { value: "pastel", label: "утро", icon: <ThemeIcon theme="pastel" /> },
-  { value: "mist", label: "день", icon: <ThemeIcon theme="mist" /> },
-  { value: "dusk", label: "сумерки", icon: <ThemeIcon theme="dusk" /> },
-  { value: "night", label: "ночь", icon: <ThemeIcon theme="night" /> },
-  { value: "slate", label: "полночь", icon: <ThemeIcon theme="slate" /> },
+  { value: "pastel", label: tr("утро"), icon: <ThemeIcon theme="pastel" /> },
+  { value: "mist", label: tr("день"), icon: <ThemeIcon theme="mist" /> },
+  { value: "dusk", label: tr("сумерки"), icon: <ThemeIcon theme="dusk" /> },
+  { value: "night", label: tr("ночь"), icon: <ThemeIcon theme="night" /> },
+  { value: "slate", label: tr("полночь"), icon: <ThemeIcon theme="slate" /> },
 ];
 
 export type AppHeaderProps = {
@@ -138,15 +140,15 @@ export function AppHeader({
                 showValue={false}
                 showChevron={false}
                 variant="iconOnly"
-                ariaLabel={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
-                title={`Оформление: ${THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme}`}
+                ariaLabel={tr("Оформление: {0}", THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme)}
+                title={tr("Оформление: {0}", THEME_OPTIONS.find((o) => o.value === activeTheme)?.label || activeTheme)}
               />
             );
 
   return (
     <header
       class={`${styles.header}${isCenter ? ` ${styles.center}` : ""}${brandPosition === "right" ? ` ${styles.right}` : ""}${className ? ` ${className}` : ""}`}
-      aria-label="шапка сайта"
+      aria-label={tr("шапка сайта")}
       data-logo-position={logoPosition}
     >
       <div class={styles.inner}>
@@ -159,7 +161,7 @@ export function AppHeader({
               nav={backNav || "back"}
               onClick={onBackClick}
               className={styles.backBtn}
-              ariaLabel="Вернуться назад"
+              ariaLabel={tr("Вернуться назад")}
             >
               <svg
                 class={styles.backArrow}
@@ -195,7 +197,7 @@ export function AppHeader({
             {showBetaBadge && !sectionTitle && (
               <Tooltip
                 className={styles.betaTooltipWrap}
-                content="Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис."
+                content={tr("Сайт в стадии беты: всё работает, но возможны небольшие ошибки. Мы постоянно улучшаем сервис.")}
               >
                 <span class={styles.betaLabel}>beta</span>
               </Tooltip>
@@ -213,6 +215,7 @@ export function AppHeader({
 
         {showActions && (
           <div class={styles.headerEnd}>
+            <LanguageSwitch />
             {themePosition === "end" && themeControl}
             {rightSlot}
             {children}

@@ -1,10 +1,10 @@
 {% macro reply_panel(kind, id, recipient) %}
   {% for reply in reply_history[kind].get(id, []) %}
     <blockquote><p>{{ reply.body }}</p><small>
-      {% if reply.user_id %}Доступен в поддержке аккаунта #{{ reply.user_id }}. {% endif %}
-      {% if reply.email_sent_at %}Письмо принято почтовым сервисом: {{ reply.email }}.
-      {% elif reply.email %}Почтовый сервис не подтвердил отправку: {{ reply.email }}.
-      {% else %}Почта не указана.{% endif %}
+      {% if reply.user_id %}{{ _("Доступен в поддержке аккаунта #") }}{{ reply.user_id }}. {% endif %}
+      {% if reply.email_sent_at %}{{ _("Письмо принято почтовым сервисом: ") }}{{ reply.email }}.
+      {% elif reply.email %}{{ _("Почтовый сервис не подтвердил отправку: ") }}{{ reply.email }}.
+      {% else %}{{ _("Почта не указана.") }}{% endif %}
     </small></blockquote>
     {% if reply.email and not reply.email_sent_at %}
     <div data-admin-reply data-retry="true" data-action="/admin/replies/{{ kind }}/{{ id }}#{{ 'moderation' if kind == 'report' else 'support' }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply.request_id }}" data-body="{{ reply.body }}"></div>
@@ -13,7 +13,7 @@
   <div data-admin-reply data-kind="{{ kind }}" data-source="{{ id }}" data-action="/admin/replies/{{ kind }}/{{ id }}#{{ 'moderation' if kind == 'report' else 'support' }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply_nonce() }}" data-recipient="{{ recipient }}"></div>
 {% endmacro %}
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ language }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -43,67 +43,67 @@
 <body class="admin-page">
   {% include "components/header.html" %}
   <main class="legal admin">
-    <h1>управление WIRING</h1>
+    <h1>{{ _("управление WIRING") }}</h1>
     {% if error %}<p class="err">{{ error }}</p>{% endif %}
     {% if not authed %}
       <form class="form" method="post" action="/admin">
-        <label>токен<input name="token" type="password" required autocomplete="current-password"></label>
-        <button class="solid" type="submit">войти</button>
+        <label>{{ _("токен") }}<input name="token" type="password" required autocomplete="current-password"></label>
+        <button class="solid" type="submit">{{ _("войти") }}</button>
       </form>
       {% if local_admin_login %}
       <form class="form" method="post" action="/admin">
-        <label>локальный логин<input name="login" type="text" value="{{ local_admin_login }}" autocomplete="username" required></label>
-        <label>локальный пароль<input name="password" type="password" autocomplete="current-password" required></label>
-        <button class="solid" type="submit">войти локально</button>
+        <label>{{ _("локальный логин") }}<input name="login" type="text" value="{{ local_admin_login }}" autocomplete="username" required></label>
+        <label>{{ _("локальный пароль") }}<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="solid" type="submit">{{ _("войти локально") }}</button>
       </form>
       {% endif %}
     {% else %}
       <div data-admin-tabs>
-        <nav aria-label="Разделы админки">
-          <a href="#overview" data-tab="overview">Обзор</a>
-          <a href="#people" data-tab="people">Участники</a>
-          <a href="#analytics" data-tab="analytics">Аналитика</a>
+        <nav aria-label="{{ _('Разделы админки') }}">
+          <a href="#overview" data-tab="overview">{{ _("Обзор") }}</a>
+          <a href="#people" data-tab="people">{{ _("Участники") }}</a>
+          <a href="#analytics" data-tab="analytics">{{ _("Аналитика") }}</a>
           <a href="#premium" data-tab="premium">WIRING+</a>
-          <a href="#moderation" data-tab="moderation">Модерация <span data-count title="Анкеты с автобаном">{{ s.report_banned }}</span></a>
-          <a href="#support" data-tab="support">Поддержка <span data-count title="Обращения в списке">{{ tickets|length }}</span></a>
-          <a href="#tasks" data-tab="tasks">Задачи <span data-count title="Кандидаты на разбор">{{ task_counts.get('candidate', 0) }}</span></a>
-          <a href="#marketing" data-tab="marketing">Рассылка</a>
+          <a href="#moderation" data-tab="moderation">{{ _("Модерация ") }}<span data-count title="{{ _('Анкеты с автобаном') }}">{{ s.report_banned }}</span></a>
+          <a href="#support" data-tab="support">{{ _("Поддержка ") }}<span data-count title="{{ _('Обращения в списке') }}">{{ tickets|length }}</span></a>
+          <a href="#tasks" data-tab="tasks">{{ _("Задачи ") }}<span data-count title="{{ _('Кандидаты на разбор') }}">{{ task_counts.get('candidate', 0) }}</span></a>
+          <a href="#marketing" data-tab="marketing">{{ _("Рассылка") }}</a>
         </nav>
       </div>
       <section id="overview" data-admin-panel="overview">
-        <h2>Основные показатели</h2>
-        <p class="hint">Участники, знакомства и активность в одном месте.</p>
+        <h2>{{ _("Основные показатели") }}</h2>
+        <p class="hint">{{ _("Участники, знакомства и активность в одном месте.") }}</p>
       <div class="admin-grid">
-        <div class="prompt-card"><div class="q">живые</div><p>{{ s.users_real }}</p></div>
-        <div class="prompt-card"><div class="q">гости</div><p>{{ s.users_guest }}</p></div>
-        <div class="prompt-card"><div class="q">сиды</div><p>{{ s.users_seed }}</p></div>
-        <div class="prompt-card"><div class="q">свайпы сегодня</div><p>{{ s.swipes_today }} <span class="hint">вчера {{ s.swipes_yesterday }}</span></p></div>
-        <div class="prompt-card"><div class="q">лайки / пропуски</div><p>{{ s.likes }} / {{ s.passes }}</p></div>
-        <div class="prompt-card"><div class="q">мэтчи</div><p>{{ s.matches_total }} <span class="hint">живые {{ s.matches_real }} · с сидами {{ s.matches_seed }}</span></p></div>
-        <div class="prompt-card"><div class="q">разговоры после мэтча</div><p>{{ s.match_chats }} <span class="hint">живые {{ s.match_chats_real }} · из {{ s.matches_total }} мэтчей</span></p></div>
-        <div class="prompt-card"><div class="q">сообщения</div><p>{{ s.messages }}</p></div>
-        <div class="prompt-card"><div class="q">жалобы / блоки</div><p>{{ s.reports }} / {{ s.blocks }} <span class="hint">автобан {{ s.report_banned }}</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("живые") }}</div><p>{{ s.users_real }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("гости") }}</div><p>{{ s.users_guest }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("сиды") }}</div><p>{{ s.users_seed }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("свайпы сегодня") }}</div><p>{{ s.swipes_today }} <span class="hint">{{ _("вчера ") }}{{ s.swipes_yesterday }}</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("лайки / пропуски") }}</div><p>{{ s.likes }} / {{ s.passes }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("мэтчи") }}</div><p>{{ s.matches_total }} <span class="hint">{{ _("живые ") }}{{ s.matches_real }}{{ _(" · с сидами ") }}{{ s.matches_seed }}</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("разговоры после мэтча") }}</div><p>{{ s.match_chats }} <span class="hint">{{ _("живые ") }}{{ s.match_chats_real }}{{ _(" · из ") }}{{ s.matches_total }}{{ _(" мэтчей") }}</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("сообщения") }}</div><p>{{ s.messages }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("жалобы / блоки") }}</div><p>{{ s.reports }} / {{ s.blocks }} <span class="hint">{{ _("автобан ") }}{{ s.report_banned }}</span></p></div>
         <div class="prompt-card"><div class="q">WIRING+</div><p>{{ s.users_plus }}</p></div>
-        <div class="prompt-card"><div class="q">фильтры 7д</div><p>{{ s.filter_sessions_7d }} <span class="hint">сессий</span></p></div>
-        <div class="prompt-card"><div class="q">фильтры 30д</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }} чел.</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("фильтры 7д") }}</div><p>{{ s.filter_sessions_7d }} <span class="hint">{{ _("сессий") }}</span></p></div>
+        <div class="prompt-card"><div class="q">{{ _("фильтры 30д") }}</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }}{{ _(" чел.") }}</span></p></div>
       </div>
 
       </section>
 
       <section id="people" data-admin-panel="people">
-        <h2>Участники</h2>
-        <p class="hint">Регистрации, новые анкеты и участники без свайпов.</p>
-      <h3>регистрации</h3>
+        <h2>{{ _("Участники") }}</h2>
+        <p class="hint">{{ _("Регистрации, новые анкеты и участники без свайпов.") }}</p>
+      <h3>{{ _("регистрации") }}</h3>
       <table class="admin-table">
-        <tr><th>день</th><th>живые</th><th>гости</th></tr>
+        <tr><th>{{ _("день") }}</th><th>{{ _("живые") }}</th><th>{{ _("гости") }}</th></tr>
         {% for row in s.days %}
         <tr><td>{{ row.day }}</td><td>{{ row.real }}</td><td>{{ row.guest }}</td></tr>
         {% else %}
-        <tr><td colspan="3">пока пусто</td></tr>
+        <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
         {% endfor %}
       </table>
 
-      <h3>молчат после регистрации</h3>
+      <h3>{{ _("молчат после регистрации") }}</h3>
       {% if s.silent %}
         <ul>
           {% for u in s.silent %}
@@ -111,19 +111,19 @@
           {% endfor %}
         </ul>
       {% else %}
-        <p class="hint">все живые хотя бы раз свайпнули</p>
+        <p class="hint">{{ _("все живые хотя бы раз свайпнули") }}</p>
       {% endif %}
 
-      <h3>новые анкеты</h3>
+      <h3>{{ _("новые анкеты") }}</h3>
       <table class="admin-table">
-        <tr><th>кто</th><th>город</th><th>свайпы</th><th>+</th></tr>
+        <tr><th>{{ _("кто") }}</th><th>{{ _("город") }}</th><th>{{ _("свайпы") }}</th><th>+</th></tr>
         {% for u in s.recent %}
         <tr>
           <td>{{ u.name }}, {{ u.age }} <span class="hint">#{{ u.id }}</span></td>
           <td>{{ u.city }}</td>
           <td>{{ u.swipes }}</td>
           <td>
-            {% if u.plus %}до {{ u.plus_until }}{% else %}—{% endif %}
+            {% if u.plus %}{{ _("до ") }}{{ u.plus_until }}{% else %}—{% endif %}
             <form method="post" action="/admin/premium#people" class="inline-grant">
               <input type="hidden" name="who" value="{{ u.id }}">
               <input type="hidden" name="days" value="90">
@@ -136,116 +136,116 @@
       </section>
 
       <section id="analytics" data-admin-panel="analytics">
-        <h2>Аналитика</h2>
-        <p class="hint">Устройства, визиты и популярные фильтры.</p>
-      <h3>устройства</h3>
-      <p class="hint">User-Agent с визитов на сайт и API. Один и тот же человек и тип устройства — не чаще раза в полчаса.</p>
+        <h2>{{ _("Аналитика") }}</h2>
+        <p class="hint">{{ _("Устройства, визиты и популярные фильтры.") }}</p>
+      <h3>{{ _("устройства") }}</h3>
+      <p class="hint">{{ _("User-Agent с визитов на сайт и API. Один и тот же человек и тип устройства — не чаще раза в полчаса.") }}</p>
       <div class="admin-grid">
-        <div class="prompt-card"><div class="q">визиты 7д</div><p>{{ s.device_visits_7d }}</p></div>
-        <div class="prompt-card"><div class="q">визиты 30д</div><p>{{ s.device_visits_30d }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("визиты 7д") }}</div><p>{{ s.device_visits_7d }}</p></div>
+        <div class="prompt-card"><div class="q">{{ _("визиты 30д") }}</div><p>{{ s.device_visits_30d }}</p></div>
       </div>
       <div class="admin-grid">
         <div>
-          <h3>тип · 30 дней</h3>
+          <h3>{{ _("тип · 30 дней") }}</h3>
           <table class="admin-table">
-            <tr><th>устройство</th><th>визиты</th><th>уник.</th></tr>
+            <tr><th>{{ _("устройство") }}</th><th>{{ _("визиты") }}</th><th>{{ _("уник.") }}</th></tr>
             {% for row in s.devices_30d %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>тип · 7 дней</h3>
+          <h3>{{ _("тип · 7 дней") }}</h3>
           <table class="admin-table">
-            <tr><th>устройство</th><th>визиты</th><th>уник.</th></tr>
+            <tr><th>{{ _("устройство") }}</th><th>{{ _("визиты") }}</th><th>{{ _("уник.") }}</th></tr>
             {% for row in s.devices_7d %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>ОС · 30 дней</h3>
+          <h3>{{ _("ОС · 30 дней") }}</h3>
           <table class="admin-table">
-            <tr><th>система</th><th>визиты</th><th>уник.</th></tr>
+            <tr><th>{{ _("система") }}</th><th>{{ _("визиты") }}</th><th>{{ _("уник.") }}</th></tr>
             {% for row in s.device_os_30d %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.visitors }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
       </div>
 
-      <h3>популярные фильтры</h3>
-      <p class="hint">Считаем применения в ленте и «кто лайкнул». Одинаковый набор от одного человека — не чаще раза в полчаса.</p>
+      <h3>{{ _("популярные фильтры") }}</h3>
+      <p class="hint">{{ _("Считаем применения в ленте и «кто лайкнул». Одинаковый набор от одного человека — не чаще раза в полчаса.") }}</p>
       <div class="admin-grid">
         <div>
-          <h3>диагнозы</h3>
+          <h3>{{ _("диагнозы") }}</h3>
           <table class="admin-table">
-            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("фильтр") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_neuro %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>вайб</h3>
+          <h3>{{ _("вайб") }}</h3>
           <table class="admin-table">
-            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("фильтр") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_vibe %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>формат</h3>
+          <h3>{{ _("формат") }}</h3>
           <table class="admin-table">
-            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("фильтр") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_intent %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>города</h3>
+          <h3>{{ _("города") }}</h3>
           <table class="admin-table">
-            <tr><th>город</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("город") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_city %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>возраст</h3>
+          <h3>{{ _("возраст") }}</h3>
           <table class="admin-table">
-            <tr><th>диапазон</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("диапазон") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_age %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
         <div>
-          <h3>за 7 дней · диагнозы</h3>
+          <h3>{{ _("за 7 дней · диагнозы") }}</h3>
           <table class="admin-table">
-            <tr><th>фильтр</th><th>раз</th><th>люди</th></tr>
+            <tr><th>{{ _("фильтр") }}</th><th>{{ _("раз") }}</th><th>{{ _("люди") }}</th></tr>
             {% for row in s.filters_neuro_7d %}
-            <tr><td>{{ row.label }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
+            <tr><td>{{ _(row.label) }}</td><td>{{ row.hits }}</td><td>{{ row.users }}</td></tr>
             {% else %}
-            <tr><td colspan="3">пока пусто</td></tr>
+            <tr><td colspan="3">{{ _("пока пусто") }}</td></tr>
             {% endfor %}
           </table>
         </div>
@@ -254,156 +254,155 @@
       </section>
 
       <section id="premium" data-admin-panel="premium">
-        <h2>WIRING+ и промокоды</h2>
-        <p class="hint">Управление доступом и кодами активации.</p>
-      <h3>выдать WIRING+</h3>
-      <p class="hint">Почта, id или точное имя. Дни прибавляются к текущему сроку. 0 — снять.</p>
+        <h2>{{ _("WIRING+ и промокоды") }}</h2>
+        <p class="hint">{{ _("Управление доступом и кодами активации.") }}</p>
+      <h3>{{ _("выдать WIRING+") }}</h3>
+      <p class="hint">{{ _("Почта, id или точное имя. Дни прибавляются к текущему сроку. 0 — снять.") }}</p>
       <form class="form" method="post" action="/admin/premium#premium">
-        <label>кто<input name="who" required placeholder="id, почта или имя"></label>
-        <label>дней
-          <select name="days">
+        <label>{{ _("кто") }}<input name="who" required placeholder="{{ _('id, почта или имя') }}"></label>
+        <label>{{ _("дней\n          ") }}<select name="days">
             <option value="30">30</option>
             <option value="90" selected>90</option>
             <option value="365">365</option>
-            <option value="36500">навсегда</option>
-            <option value="0">снять</option>
+            <option value="36500">{{ _("навсегда") }}</option>
+            <option value="0">{{ _("снять") }}</option>
           </select>
         </label>
-        <button class="solid" type="submit">выдать</button>
+        <button class="solid" type="submit">{{ _("выдать") }}</button>
       </form>
 
-      <h3>промокоды</h3>
+      <h3>{{ _("промокоды") }}</h3>
       <form class="form" method="post" action="/admin/promo#premium">
-        <label>код<input name="code" required placeholder="WIRINGPLUS" maxlength="24"></label>
-        <label>дней<input name="days" type="number" min="1" max="36500" value="90"></label>
-        <label>лимит использований<input name="max_uses" type="number" min="0" value="0" placeholder="0 = безлимит"></label>
-        <button class="ghost" type="submit">создать код</button>
+        <label>{{ _("код") }}<input name="code" required placeholder="WIRINGPLUS" maxlength="24"></label>
+        <label>{{ _("дней") }}<input name="days" type="number" min="1" max="36500" value="90"></label>
+        <label>{{ _("лимит использований") }}<input name="max_uses" type="number" min="0" value="0" placeholder="{{ _('0 = безлимит') }}"></label>
+        <button class="ghost" type="submit">{{ _("создать код") }}</button>
       </form>
       <table class="admin-table">
-        <tr><th>код</th><th>доступ</th><th>использовали</th></tr>
+        <tr><th>{{ _("код") }}</th><th>{{ _("доступ") }}</th><th>{{ _("использовали") }}</th></tr>
         {% for c in codes %}
-        <tr><td>{{ c.code }}</td><td>{% if c.benefit == "recommendations" %}Для тебя{% else %}{{ c.days }} дней WIRING+{% endif %}</td><td>{{ c.uses }}{% if c.max_uses %} / {{ c.max_uses }}{% else %} / ∞{% endif %}</td></tr>
+        <tr><td>{{ c.code }}</td><td>{% if c.benefit == "recommendations" %}{{ _("Для тебя") }}{% else %}{{ c.days }}{{ _(" дней WIRING+") }}{% endif %}</td><td>{{ c.uses }}{% if c.max_uses %} / {{ c.max_uses }}{% else %} / ∞{% endif %}</td></tr>
         {% else %}
-        <tr><td colspan="3">нет кодов</td></tr>
+        <tr><td colspan="3">{{ _("нет кодов") }}</td></tr>
         {% endfor %}
       </table>
 
       </section>
 
       <section id="moderation" data-admin-panel="moderation">
-        <h2>Модерация</h2>
-        <p class="hint">Жалобы участников и анкеты, скрытые автоматически.</p>
-      <h3 id="bans">разбан после жалоб</h3>
-      <p class="hint">Снимает автобан — скрытие анкеты после жалоб от двух разных людей. Укажи почту, id или точное имя.</p>
+        <h2>{{ _("Модерация") }}</h2>
+        <p class="hint">{{ _("Жалобы участников и анкеты, скрытые автоматически.") }}</p>
+      <h3 id="bans">{{ _("разбан после жалоб") }}</h3>
+      <p class="hint">{{ _("Снимает автобан — скрытие анкеты после жалоб от двух разных людей. Укажи почту, id или точное имя.") }}</p>
       <form class="form" method="post" action="/admin/report-ban-clear#moderation">
-        <label>кто<input name="who" required placeholder="id, почта или имя"></label>
-        <button class="solid" type="submit">разбанить</button>
+        <label>{{ _("кто") }}<input name="who" required placeholder="{{ _('id, почта или имя') }}"></label>
+        <button class="solid" type="submit">{{ _("разбанить") }}</button>
       </form>
       {% if s.report_banned_users %}
       <table class="admin-table">
-        <tr><th>кто</th><th>когда скрыли</th><th>жалобы</th><th></th></tr>
+        <tr><th>{{ _("кто") }}</th><th>{{ _("когда скрыли") }}</th><th>{{ _("жалобы") }}</th><th></th></tr>
         {% for u in s.report_banned_users %}
         <tr>
           <td><strong>{{ u.name }}</strong> <span class="hint">#{{ u.id }}</span><br><span class="hint">{{ u.email }}</span></td>
           <td>{{ u.banned_at }}</td>
-          <td>{{ u.report_count }} · от {{ u.reporter_count }} чел.</td>
+          <td>{{ u.report_count }}{{ _(" · от ") }}{{ u.reporter_count }}{{ _(" чел.") }}</td>
           <td>
             <form method="post" action="/admin/users/{{ u.id }}/report-ban-clear#moderation" class="inline-grant">
-              <button class="ghost slim" type="submit">разбанить</button>
+              <button class="ghost slim" type="submit">{{ _("разбанить") }}</button>
             </form>
           </td>
         </tr>
         {% endfor %}
       </table>
       {% else %}
-      <p class="hint">Сейчас никого с автобаном.</p>
+      <p class="hint">{{ _("Сейчас никого с автобаном.") }}</p>
       {% endif %}
 
-      <h3 id="reports">жалобы</h3>
-      <p class="hint">Кто пожаловался → на кого. После жалоб от <strong>двух разных участников</strong> анкета автоматически скрывается; человек может оспорить через <a href="/support">поддержку</a>. При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.</p>
+      <h3 id="reports">{{ _("жалобы") }}</h3>
+      <p class="hint">{{ _("Кто пожаловался → на кого. После жалоб от ") }}<strong>{{ _("двух разных участников") }}</strong>{{ _(" анкета автоматически скрывается; человек может оспорить через ") }}<a href="/support">{{ _("поддержку") }}</a>{{ _(". При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.") }}</p>
       <table class="admin-table">
-        <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th><th>ответ заявителю</th></tr>
+        <tr><th>{{ _("когда") }}</th><th>{{ _("на кого") }}</th><th>{{ _("от кого") }}</th><th>{{ _("причина") }}</th><th>{{ _("комментарий") }}</th><th>{{ _("ответ заявителю") }}</th></tr>
         {% for r in s.report_queue %}
         <tr>
           <td>{{ r.created_at }}</td>
-          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear#moderation" class="inline-grant"><button class="ghost slim" type="submit">разбанить</button></form>{% endif %}</td>
+          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %}{{ _(" · сид") }}{% endif %}{% if r.target_banned %} · <strong>{{ _("скрыт") }}</strong>{% endif %}{{ _(" · жалоб ") }}{{ r.target_report_count }}{{ _(" · от ") }}{{ r.target_reporter_count }}{{ _(" чел.") }}<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear#moderation" class="inline-grant"><button class="ghost slim" type="submit">{{ _("разбанить") }}</button></form>{% endif %}</td>
           <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
           <td>{{ r.reason }}</td>
           <td>{{ r.details or "—" }}</td>
-          <td>{{ reply_panel("report", r.id, "Заявителю: " ~ r.reporter_name ~ " · " ~ r.reporter_email) }}</td>
+          <td>{{ reply_panel("report", r.id, _("Заявителю: ") ~ r.reporter_name ~ " · " ~ r.reporter_email) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="6">пока пусто</td></tr>
+        <tr><td colspan="6">{{ _("пока пусто") }}</td></tr>
         {% endfor %}
       </table>
 
       </section>
 
       <section id="support" data-admin-panel="support">
-        <h2>Поддержка</h2>
-        <p class="hint">Обращения участников и история ответов.</p>
-      <h3>обращения</h3>
+        <h2>{{ _("Поддержка") }}</h2>
+        <p class="hint">{{ _("Обращения участников и история ответов.") }}</p>
+      <h3>{{ _("обращения") }}</h3>
       <table class="admin-table">
-        <tr><th>кто</th><th>контакт</th><th>текст</th><th>ответ</th></tr>
+        <tr><th>{{ _("кто") }}</th><th>{{ _("контакт") }}</th><th>{{ _("текст") }}</th><th>{{ _("ответ") }}</th></tr>
         {% for t in tickets %}
         <tr>
           <td>{{ t.name or "—" }}{% if t.user_id %} <span class="hint">#{{ t.user_id }}</span>{% endif %}</td>
           <td>{{ t.email or "—" }}</td>
           <td>{{ t.body }}</td>
-          <td>{{ reply_panel("ticket", t.id, "Заявителю: " ~ (t.email or ("аккаунт #" ~ t.user_id if t.user_id else "нет контакта для ответа"))) }}</td>
+          <td>{{ reply_panel("ticket", t.id, _("Заявителю: ") ~ (t.email or (_("аккаунт #") ~ t.user_id if t.user_id else _("нет контакта для ответа")))) }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="4">пока пусто</td></tr>
+        <tr><td colspan="4">{{ _("пока пусто") }}</td></tr>
         {% endfor %}
       </table>
 
       </section>
 
       <section id="tasks" data-admin-panel="tasks">
-        <h2>Задачи</h2>
-        <p class="hint">Предложения из поддержки и Telegram для разбора.</p>
+        <h2>{{ _("Задачи") }}</h2>
+        <p class="hint">{{ _("Предложения из поддержки и Telegram для разбора.") }}</p>
       <section class="task-board-wrap">
         <div class="task-board-head">
           <div>
-            <h3>черновики задач</h3>
-            <p class="hint">Сообщения из поддержки и Telegram превращаются в предложения. В работу попадают только после твоего одобрения.</p>
+            <h3>{{ _("черновики задач") }}</h3>
+            <p class="hint">{{ _("Сообщения из поддержки и Telegram превращаются в предложения. В работу попадают только после твоего одобрения.") }}</p>
           </div>
           <form method="post" action="/admin/tasks/import-support#tasks">
-            <button class="ghost" type="submit">собрать из поддержки</button>
+            <button class="ghost" type="submit">{{ _("собрать из поддержки") }}</button>
           </form>
         </div>
-        <p class="task-threshold">Порог: <strong>{{ "%.1f"|format(task_threshold) }}/10</strong> · кандидатов {{ task_counts.get('candidate', 0) }} · одобрено {{ task_counts.get('approved', 0) }} · отфильтровано {{ task_counts.get('filtered', 0) }} · дубликатов {{ task_counts.get('duplicate', 0) }}</p>
+        <p class="task-threshold">{{ _("Порог: ") }}<strong>{{ "%.1f"|format(task_threshold) }}/10</strong>{{ _(" · кандидатов ") }}{{ task_counts.get('candidate', 0) }}{{ _(" · одобрено ") }}{{ task_counts.get('approved', 0) }}{{ _(" · отфильтровано ") }}{{ task_counts.get('filtered', 0) }}{{ _(" · дубликатов ") }}{{ task_counts.get('duplicate', 0) }}</p>
         <div class="task-board">
           {% for t in tasks %}
           <article class="task-card task-{{ t.status }}">
             <div class="task-card-top">
               <span class="task-score">{{ "%.1f"|format(t.score) }}/10</span>
-              <span class="task-status">{% if t.status == 'candidate' %}кандидат{% elif t.status == 'approved' %}одобрено{% elif t.status == 'filtered' %}ниже порога{% elif t.status == 'duplicate' %}дубликат{% elif t.status == 'done' %}готово{% else %}отклонено{% endif %}</span>
+              <span class="task-status">{% if t.status == 'candidate' %}{{ _("кандидат") }}{% elif t.status == 'approved' %}{{ _("одобрено") }}{% elif t.status == 'filtered' %}{{ _("ниже порога") }}{% elif t.status == 'duplicate' %}{{ _("дубликат") }}{% elif t.status == 'done' %}{{ _("готово") }}{% else %}{{ _("отклонено") }}{% endif %}</span>
             </div>
             <h3>{{ t.title }}</h3>
             <p>{{ t.raw_text }}</p>
-            <div class="task-meta">{{ t.category }} · {{ t.source_chat or t.source_type }}{% if t.source_author %} · {{ t.source_author }}{% endif %}</div>
-            {% if t.duplicate_of %}<div class="hint">повтор задачи №{{ t.duplicate_of }}</div>{% endif %}
+            <div class="task-meta">{{ _(t.category) }} · {{ t.source_chat or t.source_type }}{% if t.source_author %} · {{ t.source_author }}{% endif %}</div>
+            {% if t.duplicate_of %}<div class="hint">{{ _("повтор задачи №") }}{{ t.duplicate_of }}</div>{% endif %}
             {% if t.status in ['candidate', 'filtered'] %}
             <div class="task-actions">
               <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks">
                 <input type="hidden" name="decision" value="approved">
-                <button class="solid slim" type="submit">одобрить</button>
+                <button class="solid slim" type="submit">{{ _("одобрить") }}</button>
               </form>
               <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks">
                 <input type="hidden" name="decision" value="rejected">
-                <button class="ghost slim" type="submit">отклонить</button>
+                <button class="ghost slim" type="submit">{{ _("отклонить") }}</button>
               </form>
             </div>
             {% elif t.status == 'approved' %}
             <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks" class="task-actions">
               <input type="hidden" name="decision" value="done">
-              <button class="ghost slim" type="submit">отметить готовой</button>
+              <button class="ghost slim" type="submit">{{ _("отметить готовой") }}</button>
             </form>
             {% endif %}
           </article>
           {% else %}
-          <p class="hint">Пока нет сообщений для разбора. Нажми «собрать из поддержки» или подключи Telegram-воркер.</p>
+          <p class="hint">{{ _("Пока нет сообщений для разбора. Нажми «собрать из поддержки» или подключи Telegram-воркер.") }}</p>
           {% endfor %}
         </div>
       </section>
@@ -411,14 +410,14 @@
       </section>
 
       <section id="marketing" data-admin-panel="marketing">
-        <h2>Рассылка</h2>
-        <p class="hint">Выгрузка аудитории для почтового сервиса.</p>
-      <p class="hint">Выгрузка для загрузки аудитории: 1-й столбец <strong>email</strong>, 2-й — <strong>name</strong>. Все живые аккаунты (как счётчик «живые» во вкладке «Обзор»), без гостей и сидов — сейчас <strong>{{ s.audience_export_count }}</strong> строк.</p>
-      <p><a class="ghost slim" href="/admin/export/marketing-audience">скачать TSV</a></p>
+        <h2>{{ _("Рассылка") }}</h2>
+        <p class="hint">{{ _("Выгрузка аудитории для почтового сервиса.") }}</p>
+      <p class="hint">{{ _("Выгрузка для загрузки аудитории: 1-й столбец ") }}<strong>email</strong>{{ _(", 2-й — ") }}<strong>name</strong>{{ _(". Все живые аккаунты (как счётчик «живые» во вкладке «Обзор»), без гостей и сидов — сейчас ") }}<strong>{{ s.audience_export_count }}</strong>{{ _(" строк.") }}</p>
+      <p><a class="ghost slim" href="/admin/export/marketing-audience">{{ _("скачать TSV") }}</a></p>
 
       </section>
 
-      <p class="legal-nav"><a href="/admin?out=1">выйти</a></p>
+      <p class="legal-nav"><a href="/admin?out=1">{{ _("выйти") }}</a></p>
     {% endif %}
   </main>
 </body>

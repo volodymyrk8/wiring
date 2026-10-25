@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from i18n import tr
+
 import time
 
 from database import Connection
@@ -9,8 +11,7 @@ from database import Connection
 REPORT_BAN_THRESHOLD = 2
 
 REPORT_BAN_USER_MESSAGE = (
-    "Аккаунт скрыт после жалоб от двух разных участников. "
-    "Если считаешь, что это ошибка, напиши в поддержку — разберём вручную."
+    tr("Аккаунт скрыт после жалоб от двух разных участников. Если считаешь, что это ошибка, напиши в поддержку — разберём вручную.")
 )
 
 

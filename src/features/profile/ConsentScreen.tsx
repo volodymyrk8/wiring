@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, Checkbox, LegalFooter, ProfileMenu } from "@/components/ui";
@@ -26,7 +27,7 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
         body: JSON.stringify({ special_data_consent: special, photo_rights_consent: photo }),
       });
       host.onUserUpdated(response.user);
-      host.toast("согласия сохранены");
+      host.toast(tr("согласия сохранены"));
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -42,7 +43,7 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
         showBack
         backHref={host.hrefFor("profile")}
         onBackClick={navigate("profile")}
-        sectionTitle="Согласия"
+        sectionTitle={tr("Согласия")}
         showThemeSwatches
         onThemeSelect={host.onThemeSelect}
         rightSlot={
@@ -65,16 +66,14 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
         }
       />
       <main class={styles.consentPage}>
-        <h1>Согласия</h1>
+        <h1>{tr("Согласия")}</h1>
         <form class={styles.consentForm} onSubmit={save}>
           <Checkbox name="special_data_consent" checked={special} onChange={setSpecial}>
-            Согласен(на) на обработку и показ выбранных особенностей
-          </Checkbox>
+            {tr("Согласен(на) на обработку и показ выбранных особенностей")}</Checkbox>
           <Checkbox name="photo_rights_consent" checked={photo} onChange={setPhoto}>
-            Загружаю только свои фото и разрешаю показывать их участникам WIRING
-          </Checkbox>
+            {tr("Загружаю только свои фото и разрешаю показывать их участникам WIRING")}</Checkbox>
           {error && <p class={styles.error} role="alert">{error}</p>}
-          <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? "Сохраняем…" : "Сохранить"}</Button>
+          <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? tr("Сохраняем…") : tr("Сохранить")}</Button>
         </form>
       </main>
       <LegalFooter />

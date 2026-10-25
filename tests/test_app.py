@@ -471,6 +471,66 @@ class WiringTest(unittest.TestCase):
         self.assertIn("СДВГ", adhd["expand"])
         self.assertTrue(adhd["tip"])
 
+    def test_language_preference_is_private_validated_and_shared_with_mobile_api(self):
+        anonymous = self.client.patch('/api/me/language', json={'language': 'en'}, headers={'X-Wiring-Language': 'en'})
+        self.assertEqual(anonymous.status_code, 401)
+        self.assertEqual(anonymous.get_json()['error'], 'Please sign in')
+        me = self._register()
+        saved = self.client.patch('/api/me/language', json={'language': 'en', 'user_id': 999})
+        self.assertEqual(saved.status_code, 200)
+        self.assertIn('wiring-language=en', saved.headers.get('Set-Cookie', ''))
+        self.assertEqual(self.client.get('/api/me').get_json()['user']['language'], 'en')
+        self.assertEqual(self.client.patch('/api/me/language', json={'language': 'fr'}).status_code, 400)
+        self.assertEqual(self.client.get('/api/me').get_json()['user']['language'], 'en')
+        with app.app_context():
+            from app import user_public
+            row = db().execute('SELECT * FROM users WHERE id = ?', (me['id'],)).fetchone()
+            self.assertNotIn('language', user_public(row))
+        # A second cookie session reads the same account preference.
+        other = app.test_client()
+        other.post('/api/login', json={'email': 'ada@example.com', 'password': 'secret1'})
+        self.assertEqual(other.get('/api/me').get_json()['user']['language'], 'en')
+
+    def test_english_catalog_pages_and_errors_keep_canonical_values_and_member_text(self):
+        headers = {'X-Wiring-Language': 'en'}
+        catalog = self.client.get('/api/catalog', headers=headers)
+        self.assertEqual(catalog.headers['Content-Language'], 'en')
+        data = catalog.get_json()
+        self.assertEqual(next(item for item in data['genders'] if item['id'] == 'woman')['label'], 'woman')
+        self.assertTrue(any(place['country'] == 'Сербия' for place in data['places']))
+        privacy = self.client.get('/privacy?lang=en').get_data(as_text=True)
+        self.assertIn('<html lang="en">', privacy)
+        self.assertIn('Privacy policy', privacy)
+        self.assertNotIn('Политика конфиденциальности', privacy)
+        self._register(name='Поддержка', bio='Сохранить')
+        user = self.client.get('/api/me', headers=headers).get_json()['user']
+        self.assertEqual(user['name'], 'Поддержка')
+        self.assertEqual(user['bio'], 'Сохранить')
+        self.assertEqual(self.client.get('/public/manifest.webmanifest', headers=headers).get_json()['lang'], 'en')
+
+    def test_recipient_language_controls_mail_push_and_old_notices(self):
+        from notify import notify_event, unread_notices
+        me = self._register()
+        self.client.patch('/api/me/language', json={'language': 'en'})
+        with app.app_context():
+            conn = db()
+            with patch('notify.send_user_push') as push:
+                notify_event(conn, user_id=me['id'], email='ada@example.com', is_guest=False,
+                             kind='like', from_id=me['id'], from_name='Поддержка')
+            self.assertEqual(push.call_args.kwargs['body'], 'Поддержка liked you')
+            from i18n import use_language
+            with use_language('en'):
+                self.assertEqual(unread_notices(conn, me['id'])[0]['body'], 'Поддержка liked you')
+            # Stored system notices follow a later language change, without translating names.
+            with use_language('ru'):
+                self.assertEqual(unread_notices(conn, me['id'])[0]['body'], 'Поддержка лайкнул(а) тебя')
+            conn.commit()
+        self.client.post('/api/logout')
+        with patch('app.send_mail') as mail:
+            self.client.post('/api/password/forgot', json={'email': 'ada@example.com'})
+        self.assertEqual(mail.call_args.args[1], 'WIRING — reset your password')
+        self.assertIn('lang=en', mail.call_args.args[2])
+
     def test_register_swipe_match(self):
         me = self._register()
         self.assertEqual(me["name"], "Ада")
@@ -1601,6 +1661,37 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(len(stale["openers"]), 3)
         self.assertTrue(stale.get("openers_after_silence"))
         self.assertEqual(len(stale["messages"]), 1)
+
+    def test_chat_openers_refresh_legacy_cache_and_changed_gender(self):
+        import json
+        from icebreakers import cached_openers
+
+        me = self._register()
+        self._logout()
+        peer = self._register(email="opener-gender@example.com", gender="woman")
+        original = ["Как ты пришёл в психологию?"]
+        neutral = ["Что привело тебя в психологию?", "Какая музыка тебе нравится?", "Во что любишь играть?"]
+        with app.app_context():
+            conn = db()
+            conn.execute("INSERT INTO chat_openers (user_id, other_id, lines, created_at) VALUES (?, ?, ?, ?)",
+                         (me["id"], peer["id"], json.dumps(original), int(time.time())))
+            conn.commit()
+            with patch("icebreakers.openers_for", return_value=neutral) as generate:
+                self.assertEqual(cached_openers(conn, me["id"], peer["id"], peer, me), neutral)
+                self.assertEqual(cached_openers(conn, me["id"], peer["id"], peer, me), neutral)
+                generate.assert_called_once()
+                peer = {**peer, "gender": "man"}
+                self.assertEqual(cached_openers(conn, me["id"], peer["id"], peer, me), neutral)
+                self.assertEqual(generate.call_count, 2)
+                me = {**me, "gender": "hidden"}
+                self.assertEqual(cached_openers(conn, me["id"], peer["id"], peer, me), neutral)
+                self.assertEqual(generate.call_count, 3)
+                from i18n import use_language
+                with use_language('en'):
+                    generate.return_value = ['What brought you to psychology?', 'What music do you enjoy?', 'What do you like playing?']
+                    self.assertEqual(cached_openers(conn, me['id'], peer['id'], peer, me), generate.return_value)
+                    self.assertEqual(cached_openers(conn, me['id'], peer['id'], peer, me), generate.return_value)
+                    self.assertEqual(generate.call_count, 4)
 
     def test_social_account_can_set_password_then_delete(self):
         from app import _create_social_user

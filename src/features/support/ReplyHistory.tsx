@@ -1,3 +1,4 @@
+import { tr, getLocale } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Button } from "@/components/ui";
 import type { SupportHostBridge } from "./types";
@@ -19,7 +20,7 @@ export function ReplyHistory({ host }: { host: SupportHostBridge }) {
       void host.api("/api/support/replies", { signal: request.signal }).then((response: { replies: Reply[] }) => {
         if (alive && !request.signal.aborted) { setReplies(response.replies); setError(""); }
       }).catch(() => {
-        if (alive && !request.signal.aborted) setError("Не удалось загрузить ответы поддержки");
+        if (alive && !request.signal.aborted) setError(tr("Не удалось загрузить ответы поддержки"));
       });
     };
     refresh.current = load;
@@ -28,13 +29,13 @@ export function ReplyHistory({ host }: { host: SupportHostBridge }) {
     return () => { alive = false; controller?.abort(); window.clearInterval(timer); refresh.current = () => {}; };
   }, [host.user?.id, host.api]);
   if (!host.user?.id) return null;
-  return <section class={styles.replyHistory} aria-label="Ответы поддержки" aria-live="polite">
-    {replies.length ? <h2>Ответы поддержки</h2> : null}
+  return <section class={styles.replyHistory} aria-label={tr("Ответы поддержки")} aria-live="polite">
+    {replies.length ? <h2>{tr("Ответы поддержки")}</h2> : null}
     {replies.map((reply) => <article key={reply.id} class={styles.reply}>
-      <strong>{reply.source_kind === "report" ? "Ответ на жалобу" : "Ответ на обращение"}</strong>
-      <time dateTime={new Date(reply.created_at * 1000).toISOString()}>{new Date(reply.created_at * 1000).toLocaleString("ru")}</time>
+      <strong>{reply.source_kind === "report" ? tr("Ответ на жалобу") : tr("Ответ на обращение")}</strong>
+      <time dateTime={new Date(reply.created_at * 1000).toISOString()}>{new Date(reply.created_at * 1000).toLocaleString(getLocale())}</time>
       <p>{reply.body}</p>
     </article>)}
-    {error ? <div role="alert"><p>{error}</p><Button variant="ghost" slim onClick={() => refresh.current()}>Повторить загрузку ответов</Button></div> : null}
+    {error ? <div role="alert"><p>{error}</p><Button variant="ghost" slim onClick={() => refresh.current()}>{tr("Повторить загрузку ответов")}</Button></div> : null}
   </section>;
 }

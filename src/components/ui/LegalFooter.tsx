@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { COMMUNITY_CHANNEL_URL, COMMUNITY_CHAT_URL } from "@/lib/community-links";
 import styles from "./LegalFooter.module.css";
 
@@ -23,23 +24,21 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
   return (
     <footer
       class={`${styles.footer}${showTopBorder ? "" : ` ${styles.noTopBorder}`}${className ? ` ${className}` : ""}`}
-      aria-label="юридическая информация"
+      aria-label={tr("юридическая информация")}
     >
       <span class={styles.badge18}>18+</span>
       <a class={styles.link} href="/legal#documents" draggable={false}>
-        Документы
-      </a>
+        {tr("Документы")}</a>
       <a class={styles.link} href="/legal#safety" draggable={false}>
-        Безопасность
-      </a>
+        {tr("Безопасность")}</a>
       <span class={styles.supportLinks}>
-        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHANNEL_URL} {...externalTelegram} title="Канал WIRING в Telegram">
+        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHANNEL_URL} {...externalTelegram} title={tr("Канал WIRING в Telegram")}>
           {telegramIcon}
-          <span>Канал</span>
+          <span>{tr("Канал")}</span>
         </a>
-        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHAT_URL} {...externalTelegram} title="Чат поддержки WIRING в Telegram">
+        <a class={`${styles.link} ${styles.telegramLink}`} href={COMMUNITY_CHAT_URL} {...externalTelegram} title={tr("Чат поддержки WIRING в Telegram")}>
           {telegramIcon}
-          <span>Чат</span>
+          <span>{tr("Чат")}</span>
         </a>
         <a
           class={styles.link}
@@ -48,8 +47,7 @@ export function LegalFooter({ className, showTopBorder = true, onSupportClick }:
           draggable={false}
           onClick={onSupportClick ? (e) => { e.preventDefault(); onSupportClick(); } : undefined}
         >
-          Поддержка
-        </a>
+          {tr("Поддержка")}</a>
       </span>
     </footer>
   );

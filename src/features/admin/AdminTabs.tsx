@@ -1,3 +1,4 @@
+import { tr } from "@/lib/i18n";
 import { render } from "preact";
 import { useLayoutEffect, useState } from "preact/hooks";
 import styles from "./AdminTabs.module.css";
@@ -41,7 +42,7 @@ function AdminTabs({ tabs, panels }: { tabs: Tab[]; panels: HTMLElement[] }) {
     setActive(id);
   }
 
-  return <div class={styles.tabs} role="tablist" aria-label="Разделы админки">
+  return <div class={styles.tabs} role="tablist" aria-label={tr("Разделы админки")}>
     {tabs.map((tab, index) => <a key={tab.id} id={`admin-tab-${tab.id}`} href={`#${tab.id}`}
       role="tab" aria-selected={active === tab.id} aria-controls={tab.id}
       tabIndex={active === tab.id ? 0 : -1} class={styles.tab}
@@ -82,7 +83,7 @@ export function mountAdminTabs() {
     wrapper.className = styles.tableScroll;
     wrapper.tabIndex = 0;
     wrapper.setAttribute("role", "region");
-    wrapper.setAttribute("aria-label", table.previousElementSibling?.textContent?.trim() || "Таблица админки");
+    wrapper.setAttribute("aria-label", table.previousElementSibling?.textContent?.trim() || tr("Таблица админки"));
     table.before(wrapper);
     wrapper.append(table);
   });
