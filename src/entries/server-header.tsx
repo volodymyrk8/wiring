@@ -1,5 +1,6 @@
 import { render } from "preact";
 import { AppHeader } from "@/components/ui/AppHeader";
+import { mountAdminTabs } from "@/features/admin/AdminTabs";
 import { mountAdminReplies } from "@/features/admin/ReplyComposer";
 import { applyTheme } from "@/lib/theme";
 
@@ -14,3 +15,5 @@ if (container) {
 if (document.querySelector("[data-admin-reply]")) {
   mountAdminReplies();
 }
+
+mountAdminTabs();

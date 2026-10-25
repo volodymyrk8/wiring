@@ -7,10 +7,10 @@
       {% else %}Почта не указана.{% endif %}
     </small></blockquote>
     {% if reply.email and not reply.email_sent_at %}
-    <div data-admin-reply data-retry="true" data-action="/admin/replies/{{ kind }}/{{ id }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply.request_id }}" data-body="{{ reply.body }}"></div>
+    <div data-admin-reply data-retry="true" data-action="/admin/replies/{{ kind }}/{{ id }}#{{ 'moderation' if kind == 'report' else 'support' }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply.request_id }}" data-body="{{ reply.body }}"></div>
     {% endif %}
   {% endfor %}
-  <div data-admin-reply data-kind="{{ kind }}" data-source="{{ id }}" data-action="/admin/replies/{{ kind }}/{{ id }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply_nonce() }}" data-recipient="{{ recipient }}"></div>
+  <div data-admin-reply data-kind="{{ kind }}" data-source="{{ id }}" data-action="/admin/replies/{{ kind }}/{{ id }}#{{ 'moderation' if kind == 'report' else 'support' }}" data-csrf="{{ reply_csrf }}" data-request-id="{{ reply_nonce() }}" data-recipient="{{ recipient }}"></div>
 {% endmacro %}
 <!DOCTYPE html>
 <html lang="ru">
@@ -43,7 +43,7 @@
 <body class="admin-page">
   {% include "components/header.html" %}
   <main class="legal admin">
-    <h1>статистика</h1>
+    <h1>управление WIRING</h1>
     {% if error %}<p class="err">{{ error }}</p>{% endif %}
     {% if not authed %}
       <form class="form" method="post" action="/admin">
@@ -58,6 +58,21 @@
       </form>
       {% endif %}
     {% else %}
+      <div data-admin-tabs>
+        <nav aria-label="Разделы админки">
+          <a href="#overview" data-tab="overview">Обзор</a>
+          <a href="#people" data-tab="people">Участники</a>
+          <a href="#analytics" data-tab="analytics">Аналитика</a>
+          <a href="#premium" data-tab="premium">WIRING+</a>
+          <a href="#moderation" data-tab="moderation">Модерация <span data-count title="Анкеты с автобаном">{{ s.report_banned }}</span></a>
+          <a href="#support" data-tab="support">Поддержка <span data-count title="Обращения в списке">{{ tickets|length }}</span></a>
+          <a href="#tasks" data-tab="tasks">Задачи <span data-count title="Кандидаты на разбор">{{ task_counts.get('candidate', 0) }}</span></a>
+          <a href="#marketing" data-tab="marketing">Рассылка</a>
+        </nav>
+      </div>
+      <section id="overview" data-admin-panel="overview">
+        <h2>Основные показатели</h2>
+        <p class="hint">Участники, знакомства и активность в одном месте.</p>
       <div class="admin-grid">
         <div class="prompt-card"><div class="q">живые</div><p>{{ s.users_real }}</p></div>
         <div class="prompt-card"><div class="q">гости</div><p>{{ s.users_guest }}</p></div>
@@ -73,7 +88,57 @@
         <div class="prompt-card"><div class="q">фильтры 30д</div><p>{{ s.filter_sessions_30d }} <span class="hint">{{ s.filter_users_30d }} чел.</span></p></div>
       </div>
 
-      <h2>устройства</h2>
+      </section>
+
+      <section id="people" data-admin-panel="people">
+        <h2>Участники</h2>
+        <p class="hint">Регистрации, новые анкеты и участники без свайпов.</p>
+      <h3>регистрации</h3>
+      <table class="admin-table">
+        <tr><th>день</th><th>живые</th><th>гости</th></tr>
+        {% for row in s.days %}
+        <tr><td>{{ row.day }}</td><td>{{ row.real }}</td><td>{{ row.guest }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">пока пусто</td></tr>
+        {% endfor %}
+      </table>
+
+      <h3>молчат после регистрации</h3>
+      {% if s.silent %}
+        <ul>
+          {% for u in s.silent %}
+          <li>{{ u.name }}, {{ u.age }} · {{ u.city }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="hint">все живые хотя бы раз свайпнули</p>
+      {% endif %}
+
+      <h3>новые анкеты</h3>
+      <table class="admin-table">
+        <tr><th>кто</th><th>город</th><th>свайпы</th><th>+</th></tr>
+        {% for u in s.recent %}
+        <tr>
+          <td>{{ u.name }}, {{ u.age }} <span class="hint">#{{ u.id }}</span></td>
+          <td>{{ u.city }}</td>
+          <td>{{ u.swipes }}</td>
+          <td>
+            {% if u.plus %}до {{ u.plus_until }}{% else %}—{% endif %}
+            <form method="post" action="/admin/premium#people" class="inline-grant">
+              <input type="hidden" name="who" value="{{ u.id }}">
+              <input type="hidden" name="days" value="90">
+              <button class="ghost slim" type="submit">+90</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      </section>
+
+      <section id="analytics" data-admin-panel="analytics">
+        <h2>Аналитика</h2>
+        <p class="hint">Устройства, визиты и популярные фильтры.</p>
+      <h3>устройства</h3>
       <p class="hint">User-Agent с визитов на сайт и API. Один и тот же человек и тип устройства — не чаще раза в полчаса.</p>
       <div class="admin-grid">
         <div class="prompt-card"><div class="q">визиты 7д</div><p>{{ s.device_visits_7d }}</p></div>
@@ -115,7 +180,7 @@
         </div>
       </div>
 
-      <h2>популярные фильтры</h2>
+      <h3>популярные фильтры</h3>
       <p class="hint">Считаем применения в ленте и «кто лайкнул». Одинаковый набор от одного человека — не чаще раза в полчаса.</p>
       <div class="admin-grid">
         <div>
@@ -186,9 +251,14 @@
         </div>
       </div>
 
-      <h2>выдать WIRING+</h2>
+      </section>
+
+      <section id="premium" data-admin-panel="premium">
+        <h2>WIRING+ и промокоды</h2>
+        <p class="hint">Управление доступом и кодами активации.</p>
+      <h3>выдать WIRING+</h3>
       <p class="hint">Почта, id или точное имя. Дни прибавляются к текущему сроку. 0 — снять.</p>
-      <form class="form" method="post" action="/admin/premium">
+      <form class="form" method="post" action="/admin/premium#premium">
         <label>кто<input name="who" required placeholder="id, почта или имя"></label>
         <label>дней
           <select name="days">
@@ -202,8 +272,8 @@
         <button class="solid" type="submit">выдать</button>
       </form>
 
-      <h2>промокоды</h2>
-      <form class="form" method="post" action="/admin/promo">
+      <h3>промокоды</h3>
+      <form class="form" method="post" action="/admin/promo#premium">
         <label>код<input name="code" required placeholder="WIRINGPLUS" maxlength="24"></label>
         <label>дней<input name="days" type="number" min="1" max="36500" value="90"></label>
         <label>лимит использований<input name="max_uses" type="number" min="0" value="0" placeholder="0 = безлимит"></label>
@@ -218,34 +288,14 @@
         {% endfor %}
       </table>
 
-      <h2>рассылка</h2>
-      <p class="hint">Выгрузка для загрузки аудитории: 1-й столбец <strong>email</strong>, 2-й — <strong>name</strong>. Все живые аккаунты (как счётчик «живые» выше), без гостей и сидов — сейчас <strong>{{ s.audience_export_count }}</strong> строк.</p>
-      <p><a class="ghost slim" href="/admin/export/marketing-audience">скачать TSV</a></p>
+      </section>
 
-      <h2>регистрации</h2>
-      <table class="admin-table">
-        <tr><th>день</th><th>живые</th><th>гости</th></tr>
-        {% for row in s.days %}
-        <tr><td>{{ row.day }}</td><td>{{ row.real }}</td><td>{{ row.guest }}</td></tr>
-        {% else %}
-        <tr><td colspan="3">пока пусто</td></tr>
-        {% endfor %}
-      </table>
-
-      <h2>молчат после регистрации</h2>
-      {% if s.silent %}
-        <ul>
-          {% for u in s.silent %}
-          <li>{{ u.name }}, {{ u.age }} · {{ u.city }}</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="hint">все живые хотя бы раз свайпнули</p>
-      {% endif %}
-
-      <h2 id="bans">разбан после жалоб</h2>
-      <p class="hint">Снимает автобан (скрытие анкеты после двух жалоб от разных людей). Почта, id или точное имя — как в блоке WIRING+.</p>
-      <form class="form" method="post" action="/admin/report-ban-clear">
+      <section id="moderation" data-admin-panel="moderation">
+        <h2>Модерация</h2>
+        <p class="hint">Жалобы участников и анкеты, скрытые автоматически.</p>
+      <h3 id="bans">разбан после жалоб</h3>
+      <p class="hint">Снимает автобан — скрытие анкеты после жалоб от двух разных людей. Укажи почту, id или точное имя.</p>
+      <form class="form" method="post" action="/admin/report-ban-clear#moderation">
         <label>кто<input name="who" required placeholder="id, почта или имя"></label>
         <button class="solid" type="submit">разбанить</button>
       </form>
@@ -258,7 +308,7 @@
           <td>{{ u.banned_at }}</td>
           <td>{{ u.report_count }} · от {{ u.reporter_count }} чел.</td>
           <td>
-            <form method="post" action="/admin/users/{{ u.id }}/report-ban-clear" class="inline-grant">
+            <form method="post" action="/admin/users/{{ u.id }}/report-ban-clear#moderation" class="inline-grant">
               <button class="ghost slim" type="submit">разбанить</button>
             </form>
           </td>
@@ -269,14 +319,14 @@
       <p class="hint">Сейчас никого с автобаном.</p>
       {% endif %}
 
-      <h2 id="reports">жалобы</h2>
+      <h3 id="reports">жалобы</h3>
       <p class="hint">Кто пожаловался → на кого. После жалоб от <strong>двух разных участников</strong> анкета автоматически скрывается; человек может оспорить через <a href="/support">поддержку</a>. При жалобе заявитель блокирует нарушителя у себя, мэтч снимается. Разбор — вручную; при underage/CSAM — по правилам и закону.</p>
       <table class="admin-table">
         <tr><th>когда</th><th>на кого</th><th>от кого</th><th>причина</th><th>комментарий</th><th>ответ заявителю</th></tr>
         {% for r in s.report_queue %}
         <tr>
           <td>{{ r.created_at }}</td>
-          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear" class="inline-grant"><button class="ghost slim" type="submit">разбанить</button></form>{% endif %}</td>
+          <td><strong>{{ r.target_name }}</strong> <span class="hint">#{{ r.target_id }}</span>{% if r.target_seed %} · сид{% endif %}{% if r.target_banned %} · <strong>скрыт</strong>{% endif %} · жалоб {{ r.target_report_count }} · от {{ r.target_reporter_count }} чел.<br><span class="hint">{{ r.target_email }}</span>{% if r.target_banned %}<br><form method="post" action="/admin/users/{{ r.target_id }}/report-ban-clear#moderation" class="inline-grant"><button class="ghost slim" type="submit">разбанить</button></form>{% endif %}</td>
           <td>{{ r.reporter_name }} <span class="hint">#{{ r.reporter_id }}</span><br><span class="hint">{{ r.reporter_email }}</span></td>
           <td>{{ r.reason }}</td>
           <td>{{ r.details or "—" }}</td>
@@ -287,7 +337,12 @@
         {% endfor %}
       </table>
 
-      <h2 id="support">поддержка</h2>
+      </section>
+
+      <section id="support" data-admin-panel="support">
+        <h2>Поддержка</h2>
+        <p class="hint">Обращения участников и история ответов.</p>
+      <h3>обращения</h3>
       <table class="admin-table">
         <tr><th>кто</th><th>контакт</th><th>текст</th><th>ответ</th></tr>
         {% for t in tickets %}
@@ -302,13 +357,18 @@
         {% endfor %}
       </table>
 
-      <section id="tasks" class="task-board-wrap">
+      </section>
+
+      <section id="tasks" data-admin-panel="tasks">
+        <h2>Задачи</h2>
+        <p class="hint">Предложения из поддержки и Telegram для разбора.</p>
+      <section class="task-board-wrap">
         <div class="task-board-head">
           <div>
-            <h2>черновики задач</h2>
+            <h3>черновики задач</h3>
             <p class="hint">Сообщения из поддержки и Telegram превращаются в предложения. В работу попадают только после твоего одобрения.</p>
           </div>
-          <form method="post" action="/admin/tasks/import-support">
+          <form method="post" action="/admin/tasks/import-support#tasks">
             <button class="ghost" type="submit">собрать из поддержки</button>
           </form>
         </div>
@@ -326,17 +386,17 @@
             {% if t.duplicate_of %}<div class="hint">повтор задачи №{{ t.duplicate_of }}</div>{% endif %}
             {% if t.status in ['candidate', 'filtered'] %}
             <div class="task-actions">
-              <form method="post" action="/admin/tasks/{{ t.id }}/decision">
+              <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks">
                 <input type="hidden" name="decision" value="approved">
                 <button class="solid slim" type="submit">одобрить</button>
               </form>
-              <form method="post" action="/admin/tasks/{{ t.id }}/decision">
+              <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks">
                 <input type="hidden" name="decision" value="rejected">
                 <button class="ghost slim" type="submit">отклонить</button>
               </form>
             </div>
             {% elif t.status == 'approved' %}
-            <form method="post" action="/admin/tasks/{{ t.id }}/decision" class="task-actions">
+            <form method="post" action="/admin/tasks/{{ t.id }}/decision#tasks" class="task-actions">
               <input type="hidden" name="decision" value="done">
               <button class="ghost slim" type="submit">отметить готовой</button>
             </form>
@@ -348,25 +408,16 @@
         </div>
       </section>
 
-      <h2>новые анкеты</h2>
-      <table class="admin-table">
-        <tr><th>кто</th><th>город</th><th>свайпы</th><th>+</th></tr>
-        {% for u in s.recent %}
-        <tr>
-          <td>{{ u.name }}, {{ u.age }} <span class="hint">#{{ u.id }}</span></td>
-          <td>{{ u.city }}</td>
-          <td>{{ u.swipes }}</td>
-          <td>
-            {% if u.plus %}до {{ u.plus_until }}{% else %}—{% endif %}
-            <form method="post" action="/admin/premium" class="inline-grant">
-              <input type="hidden" name="who" value="{{ u.id }}">
-              <input type="hidden" name="days" value="90">
-              <button class="ghost slim" type="submit">+90</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </table>
+      </section>
+
+      <section id="marketing" data-admin-panel="marketing">
+        <h2>Рассылка</h2>
+        <p class="hint">Выгрузка аудитории для почтового сервиса.</p>
+      <p class="hint">Выгрузка для загрузки аудитории: 1-й столбец <strong>email</strong>, 2-й — <strong>name</strong>. Все живые аккаунты (как счётчик «живые» во вкладке «Обзор»), без гостей и сидов — сейчас <strong>{{ s.audience_export_count }}</strong> строк.</p>
+      <p><a class="ghost slim" href="/admin/export/marketing-audience">скачать TSV</a></p>
+
+      </section>
+
       <p class="legal-nav"><a href="/admin?out=1">выйти</a></p>
     {% endif %}
   </main>

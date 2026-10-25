@@ -1,0 +1,67 @@
+.root { min-width: 0; }
+.navigation {
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  margin: 0 0 24px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg);
+  box-shadow: 0 6px 20px #0000000a;
+}
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 0 auto;
+  gap: 7px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--muted);
+  font: 500 14px/1.3 var(--sans);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--ink); background: var(--card); }
+.tab[aria-selected="true"] { color: var(--ink); background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--line); }
+.tab:focus-visible, .tableScroll:focus-visible, .root [role="tabpanel"]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.count {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 20px;
+  background: var(--card);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.root [data-admin-panel] { min-width: 0; min-height: 350px; scroll-margin-top: 88px; }
+.root [data-admin-panel][hidden] { display: none; }
+.root [data-admin-panel] > h2:first-child { margin-top: 0; margin-bottom: 8px; }
+.root [data-admin-panel] > h3 { margin-top: 28px; }
+.root :global(.admin-grid) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.root :global(.admin-grid) > div { min-width: 0; }
+.root :global(.prompt-card) p { overflow-wrap: anywhere; }
+.root :global(.prompt-card) .hint { display: block; margin-top: 6px; font-size: 13px; line-height: 1.5; }
+.tableScroll { max-width: 100%; overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 14px; }
+.tableScroll table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tableScroll th, .tableScroll td { padding: 12px; vertical-align: top; }
+.tableScroll th { white-space: nowrap; background: var(--bg-2); }
+.tableScroll td { overflow-wrap: anywhere; min-width: 110px; max-width: 400px; }
+.tableScroll td:last-child:has([data-admin-reply]) { min-width: 290px; }
+.tableScroll tr:last-child td { border-bottom: 0; }
+.root :global(.form) { max-width: 560px; }
+.root :global(.task-board) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.root :global(.task-board-head) h3 { margin-top: 0; margin-bottom: 4px; }
+.root :global(#bans), .root :global(#reports) { scroll-margin-top: 88px; }
+@media (max-width: 600px) {
+  .navigation { top: max(4px, env(safe-area-inset-top)); margin-bottom: 20px; }
+  .tab { padding-inline: 12px; }
+  .root :global(.admin-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .root :global(.admin-grid):has(table) { grid-template-columns: minmax(0, 1fr); }
+}

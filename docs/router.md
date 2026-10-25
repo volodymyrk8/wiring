@@ -35,6 +35,8 @@ src/router/
 
 Legal/admin (`/rules`, `/privacy`, `/admin`, …) are **server templates**, not this router.
 
+Admin tabs use document fragments: `/admin#overview`, `#people`, `#analytics`, `#premium`, `#moderation`, `#support`, `#tasks`, `#marketing`. Existing `#reports` and `#bans` links reveal the moderation tab and corresponding heading. Back/forward and reload restore the section. Form actions include their tab fragment to retain context after validation errors and redirects. No SPA route or entrypoint is added.
+
 ## Shell integration
 
 1. `ensureRouting()` loads `router.js` from the built distribution.
