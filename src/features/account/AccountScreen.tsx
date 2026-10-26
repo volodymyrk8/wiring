@@ -188,17 +188,11 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
   const batchRef = useRef(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [photoConsent, setPhotoConsent] = useState(!host.user.needs_photo_consent);
-  const needsPhotoConsent = Boolean(host.user.needs_photo_consent);
   const cities = (host.catalog.places || []).flatMap((place) => place.cities).filter((value, index, list) => list.indexOf(value) === index);
   const existingPhotos = photosOf(user);
   const addFiles = (event: JSX.TargetedEvent<HTMLInputElement, Event>) => {
     const next = Array.from(event.currentTarget.files || []);
     if (!next.length) return;
-    if (needsPhotoConsent && !photoConsent) {
-      setError(tr("Сначала отметь галочку про свои фото — ниже, над кнопкой «+»."));
-      return;
-    }
     event.currentTarget.value = "";
     batchRef.current = next.length;
     setCropQueue(next);
@@ -216,14 +210,10 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
   const submit = async (event: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     event.preventDefault();
     if (!city) { setError(tr("выбери город")); return; }
-    if (files.length && needsPhotoConsent && !photoConsent) {
-      setError(tr("Сначала отметь галочку про свои фото."));
-      return;
-    }
     if (busy) return;
     setBusy(true); setError("");
     try {
-      for (const file of files) await host.uploadPhoto(file, photoConsent);
+      for (const file of files) await host.uploadPhoto(file);
       const response = await host.api("/api/me", { method: "PATCH", body: JSON.stringify({
         name: user.name,
         age: user.age,
@@ -252,10 +242,6 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
       <form class={styles.onboard} onSubmit={submit}>
         <div>
           <p class={styles.subtle}>{tr("фото — хотя бы ещё одно")}</p>
-          {needsPhotoConsent ? (
-            <Checkbox name="photo_rights_consent" checked={photoConsent} onChange={setPhotoConsent}>
-              {tr("Загружаю только свои фото и разрешаю показывать их участникам WIRING")}</Checkbox>
-          ) : null}
           <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || tr("Профиль")))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt={tr("новое фото")} /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy || cropQueue.length > 0} onChange={addFiles} /></label></div>
           {cropQueue[0] ? <PhotoCropper file={cropQueue[0]} title={batchRef.current > 1 ? tr("Кадр · {0} из {1}", batchRef.current - cropQueue.length + 1, batchRef.current) : tr("Кадр")} onCancel={() => setCropQueue([])} onConfirm={acceptCrop} /> : null}
         </div>

@@ -103,7 +103,7 @@ PROMPTS = [
 
 REPORT_REASONS = [
     {"id": "spam", "label": "спам / реклама"},
-    {"id": "fake", "label": "фейк или чужие фото"},
+    {"id": "fake", "label": "выдаёт себя за другого человека"},
     {"id": "harassment", "label": "домогательство / угрозы"},
     {"id": "underage", "label": "похоже, нет 18"},
     {"id": "other", "label": "другое"},

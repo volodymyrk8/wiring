@@ -320,15 +320,13 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     return blob || file;
   };
 
-  const uploadPhoto = async (file, rightsConsent = false) => {
+  const uploadPhoto = async (file) => {
     const compressed = await compressImage(file);
     const blob = compressed instanceof Blob ? compressed : file;
     const fallbackName = blob.type === "image/png" ? "photo.png" : blob.type === "image/webp" ? "photo.webp" : "photo.jpg";
     const uploadName = file.name && /\.(jpe?g|png|webp)$/i.test(file.name) ? file.name : fallbackName;
     const fd = new FormData();
     fd.append("file", blob, uploadName);
-    const rights = root.querySelector("#photo-rights-consent");
-    if (rights?.checked || rightsConsent) fd.append("photo_rights_consent", "1");
     return api("/api/photos", { method: "POST", body: fd });
   };
 
@@ -380,7 +378,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const pip = (n) => (n ? `<span class="pip">${n > 9 ? "9+" : n}</span>` : "");
   const QUIET_VIEWS = new Set(["register", "forgot", "reset", "verify", "onboard", "invite", "chat", "delete-account"]);
-  const showsTabbar = () => !QUIET_VIEWS.has(state.view);
+  const showsTabbar = () => !state.user?.needs_profile_setup && !QUIET_VIEWS.has(state.view);
   const countSlot = (kind) => {
     const n = kind === "likes" ? state.user?.likes_in || state.likesIn || 0 : state.unread || 0;
     return `<span class="pip-slot" data-count="${kind}">${pip(n)}</span>`;
@@ -922,6 +920,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   });
 
   const goToView = async (next, meta = {}) => {
+    if (state.user?.needs_profile_setup && !["edit-profile", "consents", "support", "delete-account"].includes(next)) next = "edit-profile";
     featureLoader.prefetch(next);
     if (meta.neuro && next === "register") sessionStorage.setItem("wiring_pick_neuro", meta.neuro);
     if (meta.neuro && next === "deck") {
@@ -1407,7 +1406,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     const matched = routing.matchRoute(location.pathname || "/", BASE);
     if (matched.inviteRef) rememberRef(matched.inviteRef);
     const session = state.user
-      ? { loggedIn: true, isGuest: !!state.user.guest }
+      ? { loggedIn: true, isGuest: !!state.user.guest, needsProfileSetup: !!state.user.needs_profile_setup }
       : { loggedIn: false };
     const plan = routing.planRoute(matched, session, pathOf());
 

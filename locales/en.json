@@ -1952,5 +1952,15 @@
   "Только текст. Без голосовых и звонков.": "Text only. No voice notes and no calls.",
   "Кружочек в чате — внезапный концерт. Пиши буквами.": "A video bubble in chat is a surprise concert. Use letters.",
   "Голос и голосовые — нормально.": "Voice and voice notes are fine.",
-  "Сказать легче, чем напечатать. Если слушаешь в маршрутке и нельзя — просто напиши.": "Saying it is easier than typing it. If you are on a bus and cannot listen, just say so."
+  "Сказать легче, чем напечатать. Если слушаешь в маршрутке и нельзя — просто напиши.": "Saying it is easier than typing it. If you are on a bus and cannot listen, just say so.",
+  "Заверши анкету": "Finish your profile",
+  "Укажи имя, возраст и добавь изображение. Остальное можно заполнить позже.": "Enter your name and age, and add an image. You can fill in the rest later.",
+  "Анкета появится в ленте только после публикации.": "Your profile will appear in the feed only after you publish it.",
+  "Можно загрузить фото, рисунок или мем. Показывать лицо не обязательно.": "You can upload a photo, drawing or meme. You do not have to show your face.",
+  "Укажи имя и возраст от 18 до 99 лет": "Enter your name and an age between 18 and 99",
+  "Добавь изображение для анкеты": "Add an image for your profile",
+  "Укажи имя для анкеты": "Enter a name for your profile",
+  "Анкета пока не в ленте. Для публикации нужны имя, возраст и изображение. Остальное — по желанию.": "Your profile is not in the feed yet. Add your name, age and an image to publish it. Everything else is optional.",
+  "выдаёт себя за другого человека": "impersonating another person",
+  "Особенности — по желанию": "Traits — optional"
 }

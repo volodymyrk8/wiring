@@ -119,8 +119,8 @@ def exchange_identity(provider, code, redirect_uri, verifier):
     # Third-party addresses in Google accounts aren't authoritative for linking.
     authoritative = (email.endswith('@gmail.com') or bool(info.get('hd'))) if provider == 'google' else provider == 'yandex' and email.rsplit('@', 1)[1] in {
         'yandex.ru', 'yandex.com', 'ya.ru', 'yandex.by', 'yandex.kz', 'yandex.ua', 'yandex.com.tr'}
-    name = str(info.get('given_name' if provider == 'google' else 'first_name') or info.get('display_name') or tr("Участник")).strip()[:32]
-    return subject, email, name if len(name) >= 2 else tr("Участник"), authoritative
+    name = str(info.get('given_name' if provider == 'google' else 'first_name') or info.get('display_name') or "").strip()[:32]
+    return subject, email, name if len(name) >= 2 else "", authoritative
 
 
 def install(app, *, db, prefix, site_url, create_user, too_many, grace):

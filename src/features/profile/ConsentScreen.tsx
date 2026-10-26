@@ -9,7 +9,6 @@ import styles from "./ProfileScreen.module.css";
 
 export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
   const [special, setSpecial] = useState(!host.user.needs_special_consent);
-  const [photo, setPhoto] = useState(!host.user.needs_photo_consent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const navigate = (view: string) => (event: JSX.TargetedMouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
@@ -24,7 +23,7 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
     try {
       const response = await host.api("/api/me/consents", {
         method: "PATCH",
-        body: JSON.stringify({ special_data_consent: special, photo_rights_consent: photo }),
+        body: JSON.stringify({ special_data_consent: special }),
       });
       host.onUserUpdated(response.user);
       host.toast(tr("согласия сохранены"));
@@ -70,8 +69,6 @@ export function ConsentScreen({ host }: { host: ProfileHostBridge }) {
         <form class={styles.consentForm} onSubmit={save}>
           <Checkbox name="special_data_consent" checked={special} onChange={setSpecial}>
             {tr("Согласен(на) на обработку и показ выбранных особенностей")}</Checkbox>
-          <Checkbox name="photo_rights_consent" checked={photo} onChange={setPhoto}>
-            {tr("Загружаю только свои фото и разрешаю показывать их участникам WIRING")}</Checkbox>
           {error && <p class={styles.error} role="alert">{error}</p>}
           <Button type="submit" fullWidth disabled={busy} loading={busy}>{busy ? tr("Сохраняем…") : tr("Сохранить")}</Button>
         </form>

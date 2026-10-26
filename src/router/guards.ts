@@ -10,6 +10,10 @@ export function planRoute(route: MatchedRoute, session: Session, pathname: strin
     return { kind: "login", pendingPath: pathname };
   }
 
+  if (!session.isGuest && session.needsProfileSetup && !["edit-profile", "consents", "support", "delete-account"].includes(route.view)) {
+    return { kind: "show", view: "edit-profile" };
+  }
+
   if (route.view === "onboard" || ((route.view === "login" || route.view === "register") && !session.isGuest)) {
     return { kind: "feed" };
   }
