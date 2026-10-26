@@ -54,7 +54,7 @@ class AppleIdentityTest(unittest.TestCase):
     def test_exchange_signed_identity_and_private_email(self):
         with patch('social_auth._json_request', side_effect=[{'id_token': self.token()}, {'keys': [self.jwk]}]) as call:
             self.assertEqual(exchange_identity('apple', 'code', 'callback', 'nonce'),
-                             ('apple-user', 'hidden@privaterelay.appleid.com', 'Участник', False))
+                             ('apple-user', 'hidden@privaterelay.appleid.com', '', False))
             data = call.call_args_list[0].kwargs['data']
             self.assertNotIn('code_verifier', data)
             self.assertEqual(data['client_secret'], 'test-secret')

@@ -37,6 +37,7 @@ export type GuestSession = {
 export type UserSession = {
   loggedIn: true;
   isGuest: boolean;
+  needsProfileSetup?: boolean;
 };
 
 export type Session = GuestSession | UserSession;

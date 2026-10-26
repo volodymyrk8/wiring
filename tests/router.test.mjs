@@ -78,3 +78,10 @@ assert.equal(hrefFor(BASE, "recommendations"), "/for-you");
 assert.deepEqual(matchRoute("/for-you", BASE), { view: "recommendations" });
 assert.equal(planRoute({ view: "recommendations" }, guest, "/for-you").kind, "login");
 assert.equal(planRoute({ view: "recommendations" }, member, "/for-you").kind, "show");
+
+const unfinished = { loggedIn: true, isGuest: false, needsProfileSetup: true };
+for (const view of ["home", "deck", "profile", "onboard", "likes", "matches", "recommendations", "login", "register"]) {
+  assert.deepEqual(planRoute({ view }, unfinished, "/feed"), { kind: "show", view: "edit-profile" });
+}
+assert.equal(planRoute({ view: "support" }, unfinished, "/support").view, "support");
+assert.equal(planRoute({ view: "delete-account" }, unfinished, "/delete-account").view, "delete-account");

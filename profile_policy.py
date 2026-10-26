@@ -14,6 +14,8 @@ def name_change_available_at(user) -> int:
 
 
 def name_change_error(user, name: str, now: int) -> tuple[str, int] | None:
+    if ("profile_setup_required" in user.keys() and user["profile_setup_required"]) or str(user["name"] or "").strip().casefold() in {"", "участник", "participant"}:
+        return None
     available = name_change_available_at(user)
     if name != user["name"] and available > now:
         date = datetime.fromtimestamp(available, timezone.utc).strftime("%d.%m.%Y %H:%M UTC")

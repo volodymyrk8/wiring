@@ -44,7 +44,7 @@ type Draft = {
   hideNeuro: string[];
   hideVibe: string[];
   prompts: Prompt[];
-  photoConsent: boolean;
+  specialConsent: boolean;
 };
 
 type Props = { host: ProfileHostBridge };
@@ -79,6 +79,7 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
     job: valueOf(user.job),
     bio: valueOf(user.bio),
     communication: valueOf(user.communication),
+    specialConsent: !user.needs_special_consent,
     neuro: tags.neuro,
     vibe: tags.vibe,
     intents,
@@ -88,7 +89,6 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
     hideNeuro: hidden.filter((id) => neuroIds.has(id)),
     hideVibe: hidden.filter((id) => vibeIds.has(id)),
     prompts: (Array.isArray(user.prompts) ? user.prompts : []).map((prompt) => ({ id: String(prompt.id), answer: String(prompt.answer || "") })),
-    photoConsent: !user.needs_photo_consent,
   };
 }
 
@@ -104,25 +104,19 @@ const photoSrc = (basePath: string, photo: unknown, name: string) => {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="hsl(${hue} 32% 28%)"/><text x="32" y="32" dominant-baseline="central" text-anchor="middle" fill="#d8ff3c" font-size="26" font-family="Georgia">${initial}</text></svg>`)}`;
 };
 
-const PHOTO_CONSENT_LABEL =
-  tr("Загружаю только свои фото и разрешаю показывать их участникам WIRING");
-
 function PhotoManager({
   host,
   user,
-  consent,
-  onConsentChange,
   onChange,
+  compact = false,
 }: {
   host: ProfileHostBridge;
   user: ProfileUser;
-  consent: boolean;
-  onConsentChange: (value: boolean) => void;
   onChange: (user: ProfileUser) => void;
+  compact?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [consentError, setConsentError] = useState(false);
   const [cropQueue, setCropQueue] = useState<File[]>([]);
   const [cropError, setCropError] = useState("");
   const batchRef = useRef(1);
@@ -131,7 +125,6 @@ function PhotoManager({
   const makePrimaryAfterCrop = useRef(false);
   const photos = allPhotos(user);
   const name = valueOf(user.name, tr("Профиль"));
-  const needsPhotoConsent = Boolean(user.needs_photo_consent);
 
   const refresh = async () => onChange(await host.refreshUser());
   const armPicker = () => host.armFilePickerHistoryGuard?.();
@@ -144,7 +137,6 @@ function PhotoManager({
     }
     if (!images.length) return;
     setError("");
-    setConsentError(false);
     setCropError("");
     batchRef.current = images.length;
     setCropQueue(images);
@@ -154,22 +146,11 @@ function PhotoManager({
     event.currentTarget.value = "";
     disarmPicker();
     if (!files.length) return;
-    if (needsPhotoConsent && !consent) {
-      setConsentError(true);
-      setError(tr("Сначала отметь галочку ниже — без неё фото не загрузятся."));
-      return;
-    }
     queuePhotoFiles(files);
   };
 
   const pickAvatar = () => {
-    if (needsPhotoConsent && !consent) {
-      setConsentError(true);
-      setError(tr("Сначала отметь галочку ниже — без неё фото не загрузятся."));
-      return;
-    }
     setError("");
-    setConsentError(false);
     avatarInputRef.current?.click();
   };
 
@@ -189,7 +170,7 @@ function PhotoManager({
     setCropError("");
     try {
       const replaceAvatar = makePrimaryAfterCrop.current;
-      const uploaded = await host.uploadPhoto(file, consent);
+      const uploaded = await host.uploadPhoto(file);
       if (replaceAvatar && uploaded.photo?.id) {
         await host.setPrimaryPhoto(uploaded.photo.id);
       }
@@ -250,28 +231,11 @@ function PhotoManager({
 
   return (
     <div class={styles.photosBlock}>
-      {needsPhotoConsent ? (
-        <div class={styles.photoConsent}>
-        <Checkbox
-          name="photo_rights_consent"
-          checked={consent}
-          error={consentError}
-          onChange={(checked) => {
-            onConsentChange(checked);
-            if (checked) {
-              setConsentError(false);
-              if (error.startsWith(tr("Сначала отметь"))) setError("");
-            }
-          }}
-        >
-          {PHOTO_CONSENT_LABEL}
-        </Checkbox>
-        </div>
-      ) : null}
-      <div class={styles.photoToolbar}>
+      <p class={styles.photoHint}>{tr("Можно загрузить фото, рисунок или мем. Показывать лицо не обязательно.")}</p>
+      {!compact && <div class={styles.photoToolbar}>
         <Button type="button" variant="ghost" slim disabled={busy || cropQueue.length > 0} onClick={pickAvatar}>{tr("Изменить аватар")}</Button>
         <p class={styles.photoHint}>{tr("Меняй порядок стрелками под фото. Первое фото — аватар в ленте.")}</p>
-      </div>
+      </div>}
       <input ref={avatarInputRef} class={styles.srOnly} type="file" accept={PROFILE_PHOTO_ACCEPT} disabled={busy || cropQueue.length > 0} onClick={armPicker} onCancel={disarmPicker} onChange={uploadAvatar} />
       <div class={styles.photoGrid}>
         {photos.map((photo, index) => (
@@ -330,8 +294,7 @@ const profilePayload = (draft: Draft) => ({
   seek_place: draft.seekPlace,
   hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
   prompts: draft.prompts,
-  special_data_consent: draft.neuro.length ? true : undefined,
-  photo_rights_consent: draft.photoConsent ? true : undefined,
+  special_data_consent: draft.specialConsent ? true : undefined,
 });
 
 function restoreDraft(host: ProfileHostBridge): { value: Draft; restored: boolean } {
@@ -353,7 +316,7 @@ function restoreDraft(host: ProfileHostBridge): { value: Draft; restored: boolea
     });
     const merged = Object.fromEntries(entries) as Draft;
     const tags = splitCatalogTags(merged.neuro, merged.vibe, host.catalog);
-    const value = { ...merged, name: initial.name, neuro: tags.neuro, vibe: tags.vibe };
+    const value = { ...merged, name: host.user.needs_profile_setup ? merged.name : initial.name, neuro: tags.neuro, vibe: tags.vibe };
     return { value, restored: JSON.stringify(value) !== JSON.stringify(initial) };
   } catch {
     return { value: initial, restored: false };
@@ -381,7 +344,8 @@ export function ProfileScreen({ host }: Props) {
     storage: () => localStorage,
     save: (value, publish) => {
       // Only the explicit NameEditor may rename; stale drafts/devices must not.
-      const { name: _name, ...payload } = profilePayload(value);
+      const { name, ...fields } = profilePayload(value);
+      const payload = host.user.needs_profile_setup ? { ...fields, name } : fields;
       return host.api("/api/me", { method: "PATCH", body: JSON.stringify({ ...payload, draft: !publish }) });
     },
     onSaved: (response) => {
@@ -455,9 +419,8 @@ export function ProfileScreen({ host }: Props) {
   const validate = () => {
     const next: Record<string, string> = {};
     if (draft.name.trim().length < 2 || draft.name.trim().length > 32) next.name = tr("Имя: 2–32 символа");
-    if (!draft.age || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = tr("Возраст: 18–99");
+    if (!draft.age || !Number.isInteger(Number(draft.age)) || Number(draft.age) < 18 || Number(draft.age) > 99) next.age = tr("Возраст: 18–99");
     if (!primaryPhoto && !user.photo) next.photos = tr("Нужно хотя бы одно фото");
-    if (!draft.neuro.length) next.neuro = tr("Укажи хотя бы одну особенность");
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -508,6 +471,7 @@ export function ProfileScreen({ host }: Props) {
     try {
       await autosave.save(true);
       host.toast(tr("сохранено"));
+      if (host.user.needs_profile_setup) host.navigate("deck");
     } catch (caught) {
       setServerError(getErrorMessage(caught));
     } finally {
@@ -526,6 +490,27 @@ export function ProfileScreen({ host }: Props) {
     event.preventDefault();
     host.navigate(view);
   };
+
+  if (user.needs_profile_setup) return (
+    <div class={styles.root}>
+      <AppHeader homeHref={host.hrefFor("home")} sectionTitle={tr("Заверши анкету")} />
+      <main class={`${styles.content} ${styles.setupContent}`}>
+        <div class={styles.heading}><h1>{tr("Заверши анкету")}</h1></div>
+        <p class={styles.disclaimer}>{tr("Укажи имя, возраст и добавь изображение. Остальное можно заполнить позже.")}</p>
+        <p class={styles.disclaimer}>{tr("Анкета появится в ленте только после публикации.")}</p>
+        <form class={styles.form} onSubmit={save} noValidate>
+          <Input label={tr("Имя")} name="name" value={draft.name} error={errors.name} onInput={event => setField("name", event.currentTarget.value)} />
+          <Input label={tr("Возраст")} name="age" type="number" min={18} max={99} value={draft.age} error={errors.age} onInput={event => setField("age", event.currentTarget.value)} />
+          <PhotoManager compact host={host} user={user} onChange={next => { setUser(next); host.onUserUpdated(next); if (allPhotos(next).length || next.photo) setErrors(current => ({ ...current, photos: "" })); }} />
+          {draft.neuro.length > 0 && <Checkbox name="special_data_consent" checked={draft.specialConsent} onChange={value => setField("specialConsent", value)}>{tr("Согласен(на) на обработку и показ выбранных особенностей")}</Checkbox>}
+          {errors.photos && <p class={styles.error}>{errors.photos}</p>}
+          {serverError && <p class={styles.error} role="alert">{serverError}</p>}
+          {saveState.phase === "error" && <p class={styles.error}>{saveState.error}</p>}
+          <Button type="submit" variant="solid" loading={busy} disabled={busy}>{tr("Опубликовать анкету")}</Button>
+        </form>
+      </main>
+    </div>
+  );
 
   return (
     <div class={styles.root}>
@@ -579,7 +564,7 @@ export function ProfileScreen({ host }: Props) {
 
           {user.needs_profile ? (
             <p class={styles.draftHint} role="status">
-              {tr("Анкета пока не в ленте — черновик сохраняется автоматически, можно вернуться позже. Для публикации нужны фото, пол и «кого ищешь». Город и детали — по желанию.")}</p>
+              {tr("Анкета пока не в ленте. Для публикации нужны имя, возраст и изображение. Остальное — по желанию.")}</p>
           ) : null}
 
           <div class={styles.saveStatus}>
@@ -602,8 +587,6 @@ export function ProfileScreen({ host }: Props) {
               <PhotoManager
                 host={host}
                 user={user}
-                consent={draft.photoConsent}
-                onConsentChange={(value) => setField("photoConsent", value)}
                 onChange={setUser}
               />
               {errors.photos && <p class={styles.error}>{errors.photos}</p>}
@@ -659,8 +642,9 @@ export function ProfileScreen({ host }: Props) {
 
             <section class={styles.section}>
               <div class={styles.sectionTitle}><h2>{tr("Детали и предпочтения")}</h2><span>{tr("по желанию")}</span></div>
-              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label={tr("Особенности — хотя бы одна, иначе анкета не попадёт в ленту")} />
+              <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label={tr("Особенности — по желанию")} />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
+              {draft.neuro.length > 0 && <Checkbox name="special_data_consent" checked={draft.specialConsent} onChange={value => setField("specialConsent", value)}>{tr("Согласен(на) на обработку и показ выбранных особенностей")}</Checkbox>}
               <TagPicker options={host.catalog.vibe || []} selected={draft.vibe} onChange={(value) => setField("vibe", value)} label={tr("Как ты устроен(а) и как тебе комфортнее общаться")} tone="vibe" />
               <p class={styles.disclaimer}>{tr("Диагнозы не проверяем: люди указывают их сами. Если заметим ложь, аккаунт может быть забанен.")}</p>
               <TagPicker options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => setField("intents", value)} label={tr("Зачем ты здесь — можно несколько сразу; формат общения решаете в переписке")} />

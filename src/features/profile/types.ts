@@ -8,7 +8,7 @@ export type ProfileUser = {
   id?: number;
   name?: string;
   name_change_available_at?: number;
-  age?: number | string;
+  age?: number | string | null;
   city?: string;
   gender?: string;
   looking_for?: string;
@@ -32,6 +32,7 @@ export type ProfileUser = {
   plus_until?: number;
   guest?: boolean;
   needs_profile?: boolean;
+  needs_profile_setup?: boolean;
   needs_special_consent?: boolean;
   needs_photo_consent?: boolean;
   ref_url?: string;
@@ -68,7 +69,7 @@ export type ProfileHostBridge = {
   navigate: (view: string, params?: Record<string, string | number>) => void;
   api: (path: string, init?: RequestInit) => Promise<any>;
   toast: (message: string) => void;
-  uploadPhoto: (file: File, rightsConsent: boolean) => Promise<{ photo?: { id: number } }>;
+  uploadPhoto: (file: File, rightsConsent?: boolean) => Promise<{ photo?: { id: number } }>;
   refreshUser: () => Promise<ProfileUser>;
   setPrimaryPhoto: (id: number) => Promise<void>;
   deletePhoto: (id: number) => Promise<void>;

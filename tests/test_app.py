@@ -738,7 +738,7 @@ class WiringTest(unittest.TestCase):
             self.assertIsNotNone(row["excluded_at"])
         self.assertEqual(self.client.get("/api/feed").get_json()["cards"], [])
 
-    def test_publish_requires_a_diagnosis_and_hides_empty_profiles(self):
+    def test_publish_allows_optional_traits_but_feed_filters_still_apply(self):
         self._register()
         denied = self.client.patch(
             "/api/me",
@@ -755,8 +755,8 @@ class WiringTest(unittest.TestCase):
                 "photo": "portraits/p01.jpg",
             },
         )
-        self.assertEqual(denied.status_code, 400)
-        self.assertIn("особен", denied.get_json()["error"])
+        self.assertEqual(denied.status_code, 200)
+        self.assertFalse(denied.get_json()["user"]["needs_profile"])
         peer = self._register(email="empty-dx@example.com", name="Пусто", gender="man", photo="portraits/p02.jpg")
         conn = open_request_connection()
         try:

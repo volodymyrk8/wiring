@@ -597,6 +597,7 @@ def init_db() -> None:
         "communication": "TEXT NOT NULL DEFAULT ''",
         "last_seen": "INTEGER NOT NULL DEFAULT 0",
         "onboard_done": "INTEGER NOT NULL DEFAULT 0",
+        "profile_setup_required": "INTEGER NOT NULL DEFAULT 0",
         "premium_until": "INTEGER NOT NULL DEFAULT 0",
         "incognito": "INTEGER NOT NULL DEFAULT 0",
         "paused": "INTEGER NOT NULL DEFAULT 0",
@@ -661,6 +662,7 @@ def init_db() -> None:
     ensure_push_tables(conn)
     mobile_api.ensure_mobile_tables(conn)
     social_auth.ensure_tables(conn)
+    conn.execute("UPDATE users SET profile_setup_required = 1 WHERE LOWER(TRIM(name)) IN (?, ?)", ("участник", "participant"))
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
     seed_ids = [
@@ -795,13 +797,18 @@ def _consent_yes(value: Any) -> bool:
 
 
 def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos: list | None = None) -> bool:
-    """Ready to appear in the feed: age, photo, consents (city optional). Diagnosis is a feed filter."""
+    """Published identity and an image; optional traits require their own consent."""
     if int(row["is_seed"] or 0) or is_guest_email(str(row["email"] or "")):
         return True
+    keys = set(row.keys())
+    if ("profile_setup_required" in keys and row["profile_setup_required"]) or str(row["name"] or "").strip().casefold() in {"", "участник", "participant"}:
+        return False
+    if not 2 <= len(str(row["name"] or "").strip()) <= 32:
+        return False
     tags = tags if tags is not None else tags_for(row["id"])
     if photos is None:
         photos = photos_for(row["id"])
-    if int(row["age"] or 0) < 18:
+    if not 18 <= int(row["age"] or 0) <= 99:
         return False
     if str(row["gender"] or "") not in GENDER_IDS:
         return False
@@ -809,8 +816,6 @@ def profile_complete(row: Row, tags: dict[str, list[str]] | None = None, photos:
         return False
     keys = set(row.keys())
     if (tags.get("neuro") or []) and "special_data_consent_at" in keys and not row["special_data_consent_at"]:
-        return False
-    if "photo_rights_consent_at" in keys and not row["photo_rights_consent_at"]:
         return False
     return True
 
@@ -899,8 +904,8 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
     last_seen = int(row["last_seen"] or 0) if "last_seen" in keys else 0
     payload = {
         "id": row["id"],
-        "name": row["name"],
-        "age": row["age"],
+        "name": "" if str(row["name"] or "").strip().casefold() in {"участник", "participant"} else row["name"],
+        "age": None if str(row["name"] or "").strip().casefold() in {"участник", "participant"} else (row["age"] or None),
         "city": row["city"],
         "gender": row["gender"],
         "looking_for": row["looking_for"],
@@ -934,9 +939,10 @@ def user_public(row: Row, include_email: bool = False, detail: bool = False) -> 
         complete = profile_complete(row, tags, photos)
         payload["needs_profile"] = not complete and not payload["guest"]
         payload["needs_onboard"] = payload["needs_profile"]
+        payload["needs_profile_setup"] = bool(row["profile_setup_required"] if "profile_setup_required" in keys else False) or str(row["name"] or "").strip().casefold() in {"", "участник", "participant"}
         payload["needs_city"] = False
         payload["needs_special_consent"] = not bool(row["special_data_consent_at"] if "special_data_consent_at" in keys else True)
-        payload["needs_photo_consent"] = not bool(row["photo_rights_consent_at"] if "photo_rights_consent_at" in keys else True)
+        payload["needs_photo_consent"] = False  # Compatibility for older clients; images need no ownership checkbox.
         payload["plus"] = is_premium(row)
         payload["plus_until"] = plus_until(row)
         payload["incognito"] = bool(int(row["incognito"] or 0)) if "incognito" in keys else False
@@ -1185,7 +1191,7 @@ def parse_profile(
     if not intents:
         intents = ["dating"]
     try:
-        age = int(data.get("age"))
+        age = 0 if draft and data.get("age") in (None, "") else int(data.get("age"))
     except (TypeError, ValueError):
         return None, tr("возраст — число")
     height_raw = data.get("height")
@@ -1197,9 +1203,11 @@ def parse_profile(
             return None, tr("рост — число в см")
         if not (140 <= height <= 220):
             return None, tr("рост: 140–220 см")
-    if not (2 <= len(name) <= 32):
+    if not (draft and not name) and not (2 <= len(name) <= 32):
         return None, tr("имя: 2–32 символа")
-    if not (18 <= age <= 99):
+    if not draft and name.casefold() in {"участник", "participant"}:
+        return None, tr("Укажи имя для анкеты")
+    if not (draft and age == 0) and not (18 <= age <= 99):
         return None, tr("только 18+")
     if city:
         if len(city) < 2 or len(city) > 48:
@@ -1824,9 +1832,9 @@ def _create_registered_user(conn, email, password, name, consented_at, marketing
             email, password_hash, name, age, city, gender, looking_for, bio, photo,
             job, intent, height, communication, privacy_accepted_at,
             special_data_consent_at, photo_rights_consent_at, marketing_consent_at,
-            email_verified_at, onboard_done, is_seed, created_at, last_seen
+            email_verified_at, onboard_done, profile_setup_required, is_seed, created_at, last_seen
         )
-        VALUES (?, ?, ?, 18, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, ?, 0, 0, ?, ?)
+        VALUES (?, ?, ?, 0, '', 'other', 'everyone', '', '', '', 'dating', NULL, '', ?, NULL, NULL, ?, ?, 0, 1, 0, ?, ?)
         """,
         (
             email,
@@ -2172,7 +2180,7 @@ def api_patch_me():
     me = conn.execute("SELECT * FROM users WHERE id = ? FOR UPDATE", (uid,)).fetchone()
     if not me:
         return jsonify({"ok": False, "error": tr("нет профиля")}), 401
-    payload_in = _merge_me_for_draft(me, data) if draft else {"name": me["name"], **data}
+    payload_in = _merge_me_for_draft(me, data)
     # An uploaded photo lives on the photos row. It is not a seed portrait, and a
     # filter save must not fail just because that path is still on the profile.
     if str(payload_in.get("photo") or "") not in SEED_PHOTOS:
@@ -2180,11 +2188,13 @@ def api_patch_me():
     parsed, err = parse_profile(
         {**payload_in, "email": "x@y.zz", "password": "ignore1"},
         require_password=False,
-        require_neuro=not draft,
+        require_neuro=False,
         draft=draft,
     )
     if err or parsed is None:
         return jsonify({"ok": False, "error": err}), 400
+    if not draft and not (photos_for(uid) or parsed.get("photo") or str(me["photo"] or "").strip()):
+        return jsonify({"ok": False, "error": tr("Добавь изображение для анкеты")}), 400
     now = int(time.time())
     blocked_name = name_change_error(me, parsed["name"], now)
     if blocked_name:
@@ -2244,8 +2254,6 @@ def api_patch_me():
     replace_tags(conn, uid, parsed["neuro"], parsed["vibe"])
     _replace_prompts(conn, uid, parsed["prompts"])
     if parsed.get("photo"):
-        if not photo_at:
-            return jsonify({"ok": False, "error": tr("подтверди, что загружаешь только свои фото")}), 400
         _attach_portrait(conn, uid, parsed["photo"])
         conn.execute("UPDATE photos SET is_primary = CASE WHEN path = ? THEN 1 ELSE 0 END WHERE user_id = ?", (parsed["photo"], uid))
         _sync_primary_photo(conn, uid)
@@ -2261,6 +2269,7 @@ def api_patch_me():
         conn.execute("UPDATE photos SET is_primary = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE user_id = ?", (pid, uid))
         _sync_primary_photo(conn, uid)
     if not draft:
+        conn.execute("UPDATE users SET profile_setup_required = 0 WHERE id = ?", (uid,))
         maybe_finish_onboard(conn, uid)
     conn.commit()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
@@ -3706,17 +3715,6 @@ def api_upload_photo():
         return jsonify({"ok": False, "error": tr("слишком много загрузок, подожди")}), 429
     conn = db()
     me = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    photo_at = me["photo_rights_consent_at"] if me and "photo_rights_consent_at" in me.keys() else None
-    if not photo_at:
-        flag = str(request.form.get("photo_rights_consent") or "").lower()
-        if flag in {"1", "true", "yes", "on"}:
-            photo_at = int(time.time())
-            conn.execute("UPDATE users SET photo_rights_consent_at = ? WHERE id = ?", (photo_at, uid))
-        else:
-            return jsonify({
-                "ok": False,
-                "error": tr("отметь галочку «Загружаю только свои фото» в блоке «Фото» и попробуй снова"),
-            }), 400
     count = conn.execute("SELECT COUNT(*) AS n FROM photos WHERE user_id = ?", (uid,)).fetchone()["n"]
     if count >= MAX_PHOTOS:
         return jsonify({"ok": False, "error": tr("не больше {0} фото" ,MAX_PHOTOS)}), 400
@@ -3927,7 +3925,9 @@ def api_patch_me_consents():
         return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     now = int(time.time())
     special_at = now if _consent_yes(data.get("special_data_consent")) else None
-    photo_at = now if _consent_yes(data.get("photo_rights_consent")) else None
+    photo_at = me["photo_rights_consent_at"]
+    if "photo_rights_consent" in data:
+        photo_at = now if _consent_yes(data["photo_rights_consent"]) else None
     conn.execute(
         "UPDATE users SET special_data_consent_at = ?, photo_rights_consent_at = ? WHERE id = ?",
         (special_at, photo_at, uid),
