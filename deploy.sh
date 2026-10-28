@@ -9,6 +9,14 @@ SERVICE_NAME="wiring.service"
 SSH_OPTIONS=(-p "$REMOTE_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes)
 RSYNC_SSH="ssh -p $REMOTE_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
 
+# rsync --delete must not remove a landing omitted from the source checkout.
+for required_file in templates/landing.html public/landing.css public/landing.js; do
+  if [ ! -f "$SCRIPT_DIR/$required_file" ]; then
+    echo "Deploy aborted: missing /m landing file $required_file"
+    exit 1
+  fi
+done
+
 echo "== Sync files to $REMOTE_HOST:$REMOTE_DIR =="
 ssh "${SSH_OPTIONS[@]}" "$REMOTE_HOST" "mkdir -p '$REMOTE_DIR'"
 ssh "${SSH_OPTIONS[@]}" "$REMOTE_HOST" bash -s <<'PRE'
@@ -156,5 +164,15 @@ printf '%s\n' "$date_headers" | grep -Eq '^HTTP/.* (301|308)' || {
 }
 echo
 curl -sI "https://wiring.club/" | head -15
+echo
+landing_html="$(curl -fsS "https://wiring.club/m")"
+if ! grep -q 'id="hero-title"' <<< "$landing_html"; then
+  echo "Mobile landing /m did not render"
+  exit 1
+fi
+for asset in landing.css landing.js; do
+  curl -fsS -o /dev/null "https://wiring.club/public/$asset"
+done
+echo "Mobile landing /m and its assets are available"
 echo
 echo "Deploy complete: https://wiring.club/"

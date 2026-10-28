@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="{{ language }}" data-theme="{{ theme }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ _("WIRING для iPhone и Android") }}</title>
+  <meta name="description" content="{{ description }}">
+  <link rel="canonical" href="{{ site_url }}{{ path }}">
+  <link rel="alternate" hreflang="ru" href="{{ site_url }}{{ path }}?lang=ru">
+  <link rel="alternate" hreflang="en" href="{{ site_url }}{{ path }}?lang=en">
+  <meta name="theme-color" content="#f3eee6">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ _('WIRING для iPhone и Android') }}">
+  <meta property="og:description" content="{{ description }}">
+  <meta property="og:url" content="{{ site_url }}{{ path }}">
+  <meta property="og:image" content="{{ site_url }}/public/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <script>
+    (function () {
+      // Same storage key and colors as src/lib/theme.ts; the landing defaults to pastel.
+      var colors = { pastel: "#f3eee6", mist: "#e9ebf3", dusk: "#3c365c", night: "#110e0c", slate: "#0b0f14" };
+      var root = document.documentElement;
+      var saved = "";
+      try { saved = localStorage.getItem("wiring-theme") || ""; } catch (e) {}
+      var theme = colors[saved] ? saved : (colors[root.dataset.theme] ? root.dataset.theme : "pastel");
+      root.dataset.theme = theme;
+      root.classList.add("js");
+      document.querySelector('meta[name="theme-color"]').content = colors[theme];
+    })();
+  </script>
+  <link rel="icon" href="/public/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/public/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/public/landing.css?v=3">
+  <script src="/public/landing.js?v=3" defer></script>
+  {% if google_analytics_id or yandex_metrika_id %}
+  <script>
+    window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
+    window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
+  </script>
+  <script src="/public/analytics.js?v=5" defer></script>
+  {% endif %}
+</head>
+{%- macro apple_icon() -%}
+<svg class="store__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.8-4.1ZM13.9 5.1c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.7-1.2 1.9-1.1 3.1 1.2.1 2.3-.6 3.1-1.5Z"/></svg>
+{%- endmacro -%}
+{%- macro android_icon() -%}
+<svg class="store__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.5 18a8.5 8.5 0 0 1 17 0Z"/><path d="m6.2 9.6-1.7-2.9M17.8 9.6l1.7-2.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8.6" cy="14.4" r="1.05" fill="var(--btn-bg)"/><circle cx="15.4" cy="14.4" r="1.05" fill="var(--btn-bg)"/></svg>
+{%- endmacro -%}
+{#- Theme icons are the ones from ThemeIcon in src/components/ui/AppHeader.tsx. -#}
+{%- macro theme_icon(id) -%}
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if id == "mist" -%}<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"/>
+{%- elif id == "pastel" -%}<path d="M12 3v3M6.3 6.3l2.1 2.1M17.7 6.3l-2.1 2.1M2 16h20M6 16a6 6 0 0 1 12 0M4 20h16"/>
+{%- elif id == "dusk" -%}<path d="M2 16h20M7 16a5 5 0 0 1 10 0M5 20h14M12 7v4M10 9l2 2 2-2M18.5 4l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>
+{%- elif id == "night" -%}<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+{%- else -%}<path d="M18.5 13.5A8.5 8.5 0 1 1 9.5 4.5a6.8 6.8 0 0 0 9 9z"/><path d="M19 3l.4 1 1 .4-1 .4-.4 1-.4-1-1-.4 1-.4zM15 9l.3.7.7.3-.7.3-.3.7-.3-.7-.7-.3.7-.3z"/>
+{%- endif -%}
+</svg>
+{%- endmacro -%}
+{%- macro ios_button(label) -%}
+<a class="store store--ios" href="{{ testflight_url }}" data-store="ios"{% if not testflight_ready %} data-placeholder{% else %} target="_blank" rel="noopener"{% endif %}>
+  {{ apple_icon() }}<span class="store__text"><small>{{ _("бета для iPhone") }}</small><b>{{ label }}</b></span>
+</a>
+{%- endmacro -%}
+{%- macro android_button() -%}
+<a class="store store--android" href="{{ apk_url }}" data-store="android"{% if not apk_ready %} data-placeholder{% else %} download{% endif %}>
+  {{ android_icon() }}<span class="store__text"><small>{{ _("бета для Android") }}</small><b>{{ _("Скачать APK") }}</b></span>
+</a>
+{%- endmacro -%}
+<body>
+  <header class="top">
+    <a class="brand" href="/" aria-label="{{ _('WIRING — на главную') }}">WIRING<span aria-hidden="true">.</span></a>
+    <div class="prefs">
+      <nav class="lang" aria-label="{{ _('Язык') }}">
+        <a href="?lang=ru" hreflang="ru" lang="ru"{% if language == 'ru' %} aria-current="true"{% endif %}>RU</a>
+        <a href="?lang=en" hreflang="en" lang="en"{% if language == 'en' %} aria-current="true"{% endif %}>EN</a>
+      </nav>
+      <div class="theme-pick" data-theme-pick>
+        <button class="theme-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="{{ _('Тема') }}" data-theme-toggle>
+          {% for item in themes %}<span class="theme-btn__icon" data-for="{{ item.id }}">{{ theme_icon(item.id) }}</span>{% endfor %}
+        </button>
+        <div class="theme-menu" role="group" aria-label="{{ _('Тема') }}" hidden data-theme-menu>
+          {% for item in themes %}
+          <button type="button" class="theme-opt" data-theme-set="{{ item.id }}" aria-pressed="{{ 'true' if item.id == theme else 'false' }}">
+            <span class="theme-opt__swatch" data-swatch="{{ item.id }}">{{ theme_icon(item.id) }}</span>
+            <span>{{ item.label }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__copy">
+        <p class="pill"><span class="pill__dot" aria-hidden="true"></span>{{ _("бета · iOS и Android") }}</p>
+        <h1 id="hero-title" class="hero__title">{{ _("Общение для тех, у кого") }} <em>{{ _("своя проводка") }}</em></h1>
+        <p class="hero__lead">{{ _("Аккаунт тот же, что на сайте.") }}</p>
+      </div>
+
+      {#- The card shows the "Ева" profile from scripts/seed_test_social.py. -#}
+      <div class="hero__stage" aria-hidden="true">
+        <div class="card card--ghost"><img src="/public/portraits/p05.jpg" alt="" loading="lazy" decoding="async"></div>
+        <div class="card-wrap">
+          <div class="card">
+            <img src="/public/portraits/p07.jpg" alt="" decoding="async" fetchpriority="high">
+            <div class="card__info">
+              <p class="card__name">{{ _("Ева") }}, 26</p>
+              <div class="card__tags"><span>{{ _("ОКР (OCD)") }}</span><span>{{ _("без смолл-тока") }}</span></div>
+            </div>
+            <span class="card__like">♥</span>
+          </div>
+          <span class="float">{{ _("мэтч") }} ✦</span>
+        </div>
+      </div>
+
+      <div class="hero__cta">
+        <div class="stores">{{ ios_button("TestFlight") }}{{ android_button() }}</div>
+        <a class="web-link" href="/">{{ _("или открыть в браузере") }} ↗</a>
+      </div>
+    </section>
+
+    <section class="install" id="download" aria-labelledby="install-title">
+      <h2 id="install-title" class="install__title">{{ _("Как поставить") }}</h2>
+      <div class="platforms">
+        <article class="platform platform--ios">
+          <h3>iPhone</h3>
+          <ol>
+            <li>{{ _("Поставь") }} <a href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noopener">TestFlight</a> {{ _("из App Store.") }}</li>
+            <li>{{ _("Открой приглашение по кнопке ниже.") }}</li>
+          </ol>
+          {{ ios_button(_("Открыть в TestFlight")) }}
+        </article>
+        <article class="platform platform--android">
+          <h3>Android</h3>
+          <ol>
+            <li>{{ _("Скачай APK по кнопке ниже.") }}</li>
+            <li>{{ _("Разреши установку из этого источника, если Android спросит.") }}</li>
+          </ol>
+          {{ android_button() }}
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="badge-18">18+</span>
+    <a href="/legal#documents">{{ _("Документы") }}</a>
+    <a href="/support">{{ _("Поддержка") }}</a>
+    <a href="https://t.me/+ger6KkmL2NZkMGNi" target="_blank" rel="noopener noreferrer">{{ _("Канал") }}</a>
+  </footer>
+
+  <div class="toast" role="status" aria-live="polite" data-toast data-text="{{ _('Ссылка появится совсем скоро — загляни чуть позже.') }}"></div>
+</body>
+</html>

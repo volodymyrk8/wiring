@@ -19,10 +19,10 @@ export class ApiError extends Error {
 
 export function createApi(basePath = ""): ApiClient {
   return async function api<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
-    const headers: Record<string, string> = Object.fromEntries(new Headers(options.headers).entries());
-    headers["X-Wiring-Language"] = getLanguage();
-    if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
-      headers["Content-Type"] = "application/json";
+    const headers = new Headers(options.headers);
+    headers.set("X-Wiring-Language", getLanguage());
+    if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
     }
     const response = await fetch(`${basePath}${path}`, {
       ...options,
