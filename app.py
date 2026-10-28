@@ -112,6 +112,8 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "data", "upload
 THUMB_DIR = os.environ.get("THUMB_DIR", os.path.join(os.path.dirname(UPLOAD_DIR) or BASE_DIR, "thumbs"))
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY") or secrets.token_hex(32)
 SITE_URL = os.environ.get("SITE_URL", "https://wiring.date").rstrip("/")
+# Theme ids and labels from THEME_LIST (src/components/ui/AppHeader.tsx).
+LANDING_THEMES = {"pastel": "утро", "mist": "день", "dusk": "сумерки", "night": "ночь", "slate": "полночь"}
 GOOGLE_ANALYTICS_ID = os.environ.get("GOOGLE_ANALYTICS_ID", "G-WH72XL7E2J").strip()
 YANDEX_METRIKA_ID = os.environ.get("YANDEX_METRIKA_ID", "").strip()
 
@@ -4334,6 +4336,28 @@ def glossary():
     )
 
 
+@app.get("/m")
+def app_landing():
+    # Beta builds are distributed outside the stores; until a link is configured the
+    # button keeps its "#..." placeholder and the page says the link is coming soon.
+    testflight_url = os.environ.get("WIRING_TESTFLIGHT_URL", "").strip()
+    apk_url = os.environ.get("WIRING_ANDROID_APK_URL", "").strip()
+    # Same theme ids and cookie as the site; the landing alone defaults to the pastel one.
+    theme = request.cookies.get("wiring-theme", "")
+    return render_template(
+        "landing.html",
+        description=tr(SITE_META_DESCRIPTION),
+        path="/m",
+        site_url=SITE_URL,
+        theme=theme if theme in LANDING_THEMES else "pastel",
+        themes=[{"id": theme_id, "label": tr(label)} for theme_id, label in LANDING_THEMES.items()],
+        testflight_url=testflight_url or "#testflight",
+        testflight_ready=bool(testflight_url),
+        apk_url=apk_url or "#android-apk",
+        apk_ready=bool(apk_url),
+    )
+
+
 @app.post("/support")
 def support():
     me = current_user()
@@ -4420,7 +4444,7 @@ def robots():
 
 @app.get("/sitemap.xml")
 def sitemap():
-    urls = ["/", "/legal", "/rules", "/privacy", "/marketing", "/support", "/child-safety", "/account-deletion"]
+    urls = ["/", "/m", "/legal", "/rules", "/privacy", "/marketing", "/support", "/child-safety", "/account-deletion"]
     items = "".join(f"<url><loc>{SITE_URL}{path}</loc></url>" for path in urls)
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{items}</urlset>'
     return app.response_class(xml, mimetype="application/xml")

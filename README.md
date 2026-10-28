@@ -225,6 +225,8 @@ Production работает только с PostgreSQL. Серверные на�
 
 Публичные [стандарты защиты детей](https://wiring.date/child-safety) доступны без входа и JavaScript по `/child-safety`. [Удаление аккаунта и данных](https://wiring.date/account-deletion) — такая же серверная страница. Обе собраны в `legal_pages.py` и `templates/legal.html`, ссылки есть в юридическом подвале и sitemap. `/delete-account` по-прежнему открывает экран подтверждения в приложении. Для iOS и Android остаётся follow-up: в юридический раздел или поддержку добавить «Защита детей» и «Удаление аккаунта и данных» на те же адреса; новый API не нужен.
 
+Лендинг мобильных приложений — серверная страница `/m` (`templates/landing.html`, `public/landing.css`, `public/landing.js`), без SPA и без входа. Ссылки на бету задаются в окружении: `WIRING_TESTFLIGHT_URL` для iPhone и `WIRING_ANDROID_APK_URL` для Android. Пока переменная пуста, кнопка остаётся плейсхолдером с пометкой «скоро» и по нажатию показывает уведомление, что ссылка скоро появится. Темы те же, что на сайте (токены скопированы из `public/styles.css`, тест следит за совпадением), выбор хранится в том же `wiring-theme`; без сохранённого выбора лендинг открывается в теме «утро». Язык переключается ссылками `?lang=ru` / `?lang=en`.
+
 ### Вход через Google и Яндекс
 
 На входе и регистрации доступны OAuth-кнопки после настройки `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `YANDEX_CLIENT_ID`, `YANDEX_CLIENT_SECRET` и корректного `SITE_URL`. WIRING использует имя и адрес почты для создания аккаунта и входа. Настройка callback URL, безопасное связывание аккаунтов и мобильный follow-up: [docs/social-login.md](docs/social-login.md).
