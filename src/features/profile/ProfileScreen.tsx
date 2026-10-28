@@ -641,7 +641,7 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>{tr("Детали и предпочтения")}</h2><span>{tr("по желанию")}</span></div>
+              <div class={styles.sectionTitle}><h2>{tr("Мои особенности")}</h2><span>{tr("по желанию")}</span></div>
               <TagPicker options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => { setField("neuro", applyNeuroToggle(draft.neuro, value)); setErrors((current) => ({ ...current, neuro: "" })); }} label={tr("Особенности — по желанию")} />
               {errors.neuro && <p class={styles.error}>{errors.neuro}</p>}
               {draft.neuro.length > 0 && <Checkbox name="special_data_consent" checked={draft.specialConsent} onChange={value => setField("specialConsent", value)}>{tr("Согласен(на) на обработку и показ выбранных особенностей")}</Checkbox>}
@@ -651,7 +651,6 @@ export function ProfileScreen({ host }: Props) {
             </section>
 
             <section class={styles.section}>
-              <div class={styles.sectionTitle}><h2>{tr("О себе")}</h2></div>
               <Textarea label={tr("Био")} name="bio" maxLength={1200} value={draft.bio} hint={tr("специальный интерес, сенсорные лимиты, чего лучше не делать")} onInput={(event) => setField("bio", event.currentTarget.value)} />
               <Textarea label={tr("Как тебе писать")} name="communication" maxLength={500} value={draft.communication} hint={tr("голосовые ок / нет, small talk — сразу в блок")} onInput={(event) => setField("communication", event.currentTarget.value)} />
               <div class={styles.promptList}>
