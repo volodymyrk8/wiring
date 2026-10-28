@@ -1,8 +1,10 @@
 import os
+import re
 import tempfile
 import time
 import unittest
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 os.environ["DATABASE_URL"] = (
@@ -32,6 +34,8 @@ from app import app, db, init_db, _rate  # noqa: E402
 from database import open_request_connection, table_names  # noqa: E402
 from media import MediaError  # noqa: E402
 from tests.spa_paths import SPA_SHELL_PATHS  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class WiringTest(unittest.TestCase):
@@ -990,6 +994,46 @@ class WiringTest(unittest.TestCase):
                 json={"email": "verify-me@example.com", "password": "secret1"},
             )
             self.assertEqual(login.status_code, 200)
+
+    def test_app_landing_uses_placeholders_until_links_are_set(self):
+        with patch.dict(os.environ, {"WIRING_TESTFLIGHT_URL": "", "WIRING_ANDROID_APK_URL": ""}):
+            text = self.client.get("/m").get_data(as_text=True)
+        self.assertIn('href="#testflight"', text)
+        self.assertIn('href="#android-apk"', text)
+        self.assertIn("data-placeholder", text)
+        self.assertIn(b"/m<", self.client.get("/sitemap.xml").data)
+
+        links = {"WIRING_TESTFLIGHT_URL": "https://testflight.apple.com/join/TEST1234",
+                 "WIRING_ANDROID_APK_URL": "https://example.test/wiring.apk"}
+        with patch.dict(os.environ, links):
+            text = self.client.get("/m").get_data(as_text=True)
+        self.assertIn('href="https://testflight.apple.com/join/TEST1234"', text)
+        self.assertIn('href="https://example.test/wiring.apk"', text)
+        self.assertNotIn("data-placeholder", text)
+
+        english = self.client.get("/m?lang=en").get_data(as_text=True)
+        self.assertIn("wired differently", english)
+        self.assertIn('href="?lang=ru"', english)
+
+    def test_app_landing_themes_match_site(self):
+        self.assertIn('data-theme="pastel"', self.client.get("/m").get_data(as_text=True))
+        self.client.set_cookie("wiring-theme", "night")
+        text = self.client.get("/m").get_data(as_text=True)
+        self.assertIn('data-theme="night"', text)
+        for theme in ("pastel", "mist", "dusk", "night", "slate"):
+            self.assertIn(f'data-theme-set="{theme}"', text)
+
+        def tokens(path):
+            css = (ROOT / path).read_text()
+            return {theme: dict(re.findall(r"--([\w-]+):\s*([^;]+);", body))
+                    for theme, body in re.findall(r'html\[data-theme="(\w+)"\] \{(.*?)\n\}', css, re.S)}
+
+        site, landing = tokens("public/styles.css"), tokens("public/landing.css")
+        self.assertEqual(set(landing), set(site))
+        for theme, values in landing.items():
+            for name, value in values.items():
+                with self.subTest(theme=theme, token=name):
+                    self.assertEqual(value, site[theme][name])
 
     def test_legal_and_sitemap(self):
         legal = self.client.get("/legal")
