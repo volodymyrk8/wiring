@@ -57,7 +57,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   const FILTER_STORAGE_KEY = "wiring-deck-filters";
   const defaultDeckFilters = () => ({
     neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "",
-    hide_undiagnosed: true, real_only: false,
+    hide_undiagnosed: false, real_only: false,
   });
   const readStoredFilters = (userId) => {
     if (userId == null) return null;

@@ -118,7 +118,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
   />;
 }
 
-const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "", real_only: false, hide_undiagnosed: true });
+const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "", real_only: false, hide_undiagnosed: false });
 
 const recommendationCopy = (card: DeckCard, source: "api" | "local" | "taste" | undefined) => {
   const reasons = (card.recommendation_reasons || []).map((item) => String(item).trim()).filter(Boolean);
@@ -393,7 +393,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     if (scroll && viewportRef.current) viewportRef.current.style.scrollSnapType = scroll.previousSnap;
     touchScrollRef.current = null;
   };
-  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === false);
+  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === true);
 
   useLayoutEffect(() => {
     host.onFeedChange(cards, index, filters, hasMore, generation);
