@@ -57,6 +57,8 @@ SERVICE_NAME='$SERVICE_NAME'
 
 mkdir -p /var/lib/wiring/uploads
 chmod 750 /var/lib/wiring /var/lib/wiring/uploads
+mkdir -p /var/www/wiring-downloads
+chmod 755 /var/www/wiring-downloads
 
 . /root/bots/bin/activate
 pip install -q -r "\$REMOTE_DIR/requirements.txt"
@@ -174,5 +176,6 @@ for asset in landing.css landing.js; do
   curl -fsS -o /dev/null "https://wiring.club/public/$asset"
 done
 echo "Mobile landing /m and its assets are available"
+printf '%s' "$landing_html" | python3 "$SCRIPT_DIR/scripts/check_apk_downloads.py" "https://wiring.club/m"
 echo
 echo "Deploy complete: https://wiring.club/"
