@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/public/landing.css?v=3">
+  <link rel="stylesheet" href="/public/landing.css?v=5">
   <script src="/public/landing.js?v=3" defer></script>
   {% if google_analytics_id or yandex_metrika_id %}
   <script>
@@ -122,6 +122,11 @@
         <div class="stores">{{ ios_button("TestFlight") }}{{ android_button() }}</div>
         <a class="web-link" href="/">{{ _("или открыть в браузере") }} ↗</a>
       </div>
+    </section>
+
+    <section class="product" aria-labelledby="product-title">
+      <h2 id="product-title" class="product__title">{{ _("Диагноз стоит на карточке.") }}</h2>
+      <p class="product__lead">{{ _("У Евы под именем написано ОКР, рядом тег «без смолл-тока». В анкету это кладётся своими руками. Картинкой может быть мем.") }}</p>
     </section>
 
     <section class="install" id="download" aria-labelledby="install-title">
