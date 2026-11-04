@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/public/landing.css?v=copy2-5">
+  <link rel="stylesheet" href="/public/landing.css?v=copy3">
   <script src="/public/landing.js?v=3" defer></script>
   {% if google_analytics_id or yandex_metrika_id %}
   <script>
@@ -125,8 +125,22 @@
     </section>
 
     <section class="product" aria-labelledby="product-title">
+      {% if language == 'ru' %}
+      <h2 id="product-title" class="product__title">WIRING CLUB: знакомьтесь и общайтесь без маскинга</h2>
+      <p class="product__lead">Мы нейроотличные люди и делаем проект для таких же, как мы. Создаём пространство, где можно быть собой.</p>
+      <p class="product__lead"><strong>WIRING CLUB</strong> — платформа для тех, кому бывает сложно находить общий язык в привычных социальных форматах. Здесь можно найти друзей, партнёра или просто человека, с которым будет интересно поговорить.</p>
+
+      <h3 class="product__subtitle">Анкета на ваших условиях</h3>
+      <p class="product__lead">Вы сами решаете, какую информацию о себе указывать: интересы, особенности общения и психики. Никаких подтверждающих документов не требуется.</p>
+
+      <h3 class="product__subtitle">Знакомства по интересам и взаимной симпатии</h3>
+      <p class="product__lead">Выбирайте людей по городу, особенностям и предпочтениям в общении. Ищите тех, кому тоже не нравится светская беседа или кто предпочитает сразу переходить к интересным темам. Общайтесь голосовыми или текстом, сервис расшифрует запись.</p>
+      <p class="product__lead">Если общение с человеком перестало быть комфортным, вы можете в любой момент остановить диалог, заблокировать пользователя или отправить жалобу.</p>
+      <p class="product__lead">Создайте анкету и найдите близких по духу людей.</p>
+      {% else %}
       <h2 id="product-title" class="product__title">{{ _("Диагноз стоит на карточке.") }}</h2>
       <p class="product__lead">{{ _("У Евы под именем написано ОКР, рядом тег «без смолл-тока». В анкету это кладётся своими руками. Картинкой может быть мем.") }}</p>
+      {% endif %}
     </section>
 
     <section class="install" id="download" aria-labelledby="install-title">
