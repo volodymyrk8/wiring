@@ -192,7 +192,7 @@ case "$cmd" in
     "${SSH[@]}" "$NEW" "systemctl enable --now $TIMERS && systemctl list-timers --no-pager | grep wiring"
 
     say "New nginx trusts X-Forwarded-For only from the old server's private IP"
-    "${SSH[@]}" "$NEW" "printf 'set_real_ip_from $OLD_PRIVATE;\nreal_ip_header X-Forwarded-For;\n' > /etc/nginx/conf.d/wiring-old-forwarder.conf && nginx -t -q && systemctl reload nginx"
+    "${SSH[@]}" "$NEW" "printf 'set_real_ip_from $OLD_PRIVATE;\n' > /etc/nginx/conf.d/wiring-old-forwarder.conf && nginx -t -q && systemctl reload nginx"
 
     say "Old nginx forwards wiring.club / wiring.date to the new server"
     "${SSH[@]}" "$OLD" "test -f /root/wiring-nginx.before-cutover.conf || cp /etc/nginx/sites-available/wiring.conf /root/wiring-nginx.before-cutover.conf"

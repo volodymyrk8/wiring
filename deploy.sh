@@ -103,6 +103,7 @@ install -m 644 "\$REMOTE_DIR/deploy/wiring-sendpulse.timer" /etc/systemd/system/
 install -m 644 "\$REMOTE_DIR/deploy/wiring-registrations.service" /etc/systemd/system/wiring-registrations.service
 install -m 644 "\$REMOTE_DIR/deploy/wiring-registrations.timer" /etc/systemd/system/wiring-registrations.timer
 install -m 644 "\$REMOTE_DIR/deploy/nginx-dating.conf" /etc/nginx/snippets/dating.conf
+install -m 644 "\$REMOTE_DIR/deploy/nginx-cloudflare-realip.conf" /etc/nginx/conf.d/cloudflare-realip.conf
 install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.conf" /etc/nginx/sites-available/wiring.conf
 ln -sfn /etc/nginx/sites-available/wiring.conf /etc/nginx/sites-enabled/wiring.conf
 install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.date.conf" /etc/nginx/sites-available/wiring.date.conf
