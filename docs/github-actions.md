@@ -13,7 +13,7 @@ Production deploy uses SSH (same as local `./deploy.sh`). Add a **repository sec
 
 | Secret | Value |
 |--------|--------|
-| `DEPLOY_SSH_KEY` | Private key that can `ssh root@188.166.105.108` (ed25519, full PEM including `BEGIN`/`END` lines) |
+| `DEPLOY_SSH_KEY` | Private key that can `ssh root@164.92.147.23` (ed25519, full PEM including `BEGIN`/`END` lines) |
 
 GitHub → **Settings → Secrets and variables → Actions → New repository secret**.
 
@@ -21,7 +21,7 @@ Optional **variables** (defaults shown in the workflow):
 
 | Variable | Default |
 |----------|---------|
-| `DEPLOY_HOST` | `188.166.105.108` |
+| `DEPLOY_HOST` | `164.92.147.23` |
 | `DEPLOY_SSH_PORT` | `22` |
 
 The `production` environment on `deploy` allows adding required reviewers later (Settings → Environments).

@@ -67,16 +67,16 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           if [ -z "$DEPLOY_SSH_KEY" ]; then
-            echo "::error::Missing repository secret DEPLOY_SSH_KEY (private key for root@188.166.105.108)."
+            echo "::error::Missing repository secret DEPLOY_SSH_KEY (private key for root@164.92.147.23)."
             exit 1
           fi
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H -p "${{ vars.DEPLOY_SSH_PORT || 22 }}" "${{ vars.DEPLOY_HOST || '188.166.105.108' }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p "${{ vars.DEPLOY_SSH_PORT || 22 }}" "${{ vars.DEPLOY_HOST || '164.92.147.23' }}" >> ~/.ssh/known_hosts
 
       - name: Deploy to production
         env:
-          REMOTE_HOST: root@${{ vars.DEPLOY_HOST || '188.166.105.108' }}
+          REMOTE_HOST: root@${{ vars.DEPLOY_HOST || '164.92.147.23' }}
           REMOTE_PORT: ${{ vars.DEPLOY_SSH_PORT || '22' }}
         run: ./deploy.sh

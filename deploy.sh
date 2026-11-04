@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REMOTE_HOST="${REMOTE_HOST:-root@188.166.105.108}"
+REMOTE_HOST="${REMOTE_HOST:-root@164.92.147.23}"
 REMOTE_PORT="${REMOTE_PORT:-22}"
 REMOTE_DIR="${REMOTE_DIR:-/root/repos/dating}"
 SERVICE_NAME="wiring.service"
@@ -114,8 +114,9 @@ systemctl enable --now wiring-sendpulse.timer
 systemctl enable --now wiring-registrations.timer
 systemctl restart "\$SERVICE_NAME"
 
+# The old lizaisyourfriend.lol/dating redirect lives only where that site is hosted.
 NGINX_CONF=/etc/nginx/sites-available/lizaisyourfriend.lol.conf
-if ! grep -qF 'include /etc/nginx/snippets/dating.conf;' "\$NGINX_CONF"; then
+if [ -f "\$NGINX_CONF" ] && ! grep -qF 'include /etc/nginx/snippets/dating.conf;' "\$NGINX_CONF"; then
   cp "\$NGINX_CONF" "\$NGINX_CONF.before-dating"
   python3 - <<'PY'
 from pathlib import Path
