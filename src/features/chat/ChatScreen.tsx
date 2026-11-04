@@ -1,5 +1,5 @@
 import { tr, getLocale } from "@/lib/i18n";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import { AppHeader, Button, GuestFlowSteps, Modal, ProfileMenu } from "@/components/ui";
 import { readChatSendMode, shouldSendOnComposerKey, type ChatSendMode } from "@/lib/chat-send-mode";
@@ -7,6 +7,7 @@ import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types";
 import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { micToastMessage, requestMicStream, shouldShowMicToast } from "./mic-access";
+import { Reactions } from "./Reactions";
 import styles from "./ChatScreen.module.css";
 
 const errorMessage = (caught: unknown, fallback: string) =>
@@ -431,6 +432,7 @@ function MessageBubble({
   onDelete,
   onTranscribe,
   onJump,
+  onRefresh,
   revealedTranscript = "",
 }: {
   message: ChatMessage;
@@ -441,6 +443,7 @@ function MessageBubble({
   onDelete: () => void;
   onTranscribe: () => void;
   onJump: (id: number) => void;
+  onRefresh: () => Promise<void>;
   revealedTranscript?: string;
 }) {
   const photos = (message.photo_urls?.length ? message.photo_urls : message.photo_url ? [message.photo_url] : []).map((url) => photoUrl(host.basePath, url));
@@ -461,6 +464,7 @@ function MessageBubble({
           {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? tr("прочитано") : tr("отправлено")}>{message.read ? "✓✓" : "✓"}</i> : null}
         </span>
       </div>
+      <Reactions message={message} host={host} refresh={onRefresh} disabled={busy} />
       <div class="bubble-actions">
         <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>{tr("Ответить")}</button>
         {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>{tr("Расшифровать")}</button> : null}
@@ -485,6 +489,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [sendMode] = useState<ChatSendMode>(() => readChatSendMode());
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -510,20 +515,26 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const scrollToEnd = () => {
     const element = threadRef.current;
     if (!element) return;
-    element.scrollTop = element.scrollHeight;
+    element.scrollTo({ top: element.scrollHeight, behavior: "instant" });
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = threadRef.current;
-    if (!element) return;
+    const content = contentRef.current;
+    if (!element || !content) return;
     let height = element.clientHeight;
+    let contentHeight = element.scrollHeight;
     let frame = 0;
     const remember = () => {
-      // A resize-generated scroll must not replace the reader's previous intent.
-      if (element.clientHeight === height) followsEndRef.current = element.scrollHeight - element.scrollTop - height <= 80;
+      // Layout-generated scrolls must not replace the reader's intent. Media
+      // anywhere in the conversation can grow without resizing the viewport.
+      if (element.clientHeight === height && element.scrollHeight === contentHeight) {
+        followsEndRef.current = element.scrollHeight - element.scrollTop - height <= 80;
+      }
     };
     const observer = new ResizeObserver(() => {
       height = element.clientHeight;
+      contentHeight = element.scrollHeight;
       if (followsEndRef.current) {
         scrollToEnd();
         cancelAnimationFrame(frame);
@@ -532,20 +543,21 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     });
     element.addEventListener("scroll", remember, { passive: true });
     observer.observe(element);
+    observer.observe(content);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); element.removeEventListener("scroll", remember); };
-  }, [chatId]);
+  }, [chatId, error]);
 
   const loadThread = async (scroll = false) => {
     const request = ++requestRef.current;
     try {
-      const element = threadRef.current;
-      const nearBottom = !element || element.scrollHeight - element.scrollTop - element.clientHeight <= 120;
       const next = await host.api(`/api/messages/${chatId}`) as ChatThread;
       if (!aliveRef.current || request !== requestRef.current) return;
-      if (scroll || nearBottom) { shouldScrollRef.current = true; followsEndRef.current = true; }
+      const nearBottom = followsEndRef.current;
+      if (scroll) { followsEndRef.current = true; scrollToEnd(); }
       setThread((current) => {
-        if (current && current.messages.length !== next.messages.length && nearBottom) shouldScrollRef.current = true;
-        return current && JSON.stringify(current) === JSON.stringify(next) ? current : next;
+        if (current && JSON.stringify(current) === JSON.stringify(next)) return current;
+        shouldScrollRef.current = scroll || nearBottom;
+        return next;
       });
       setError("");
     } catch (caught) {
@@ -590,6 +602,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     setRecordingNotice("");
     setError("");
     shouldScrollRef.current = true;
+    followsEndRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
       if (alive && request === requestRef.current) setThread(data as ChatThread);
     }).catch((caught) => {
@@ -606,39 +619,11 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     };
   }, [chatId, host]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!thread || !shouldScrollRef.current) return;
     shouldScrollRef.current = false;
-    const element = threadRef.current;
-    if (!element) return;
-    let alive = true;
-    let userMoved = false;
-    const markMoved = () => { userMoved = true; };
-    const pin = () => {
-      if (alive && !userMoved) scrollToEnd();
-    };
-    pin();
-    const frame = window.requestAnimationFrame(() => {
-      pin();
-      window.requestAnimationFrame(pin);
-    });
-    element.addEventListener("wheel", markMoved, { passive: true });
-    element.addEventListener("touchmove", markMoved, { passive: true });
-    element.addEventListener("pointerdown", markMoved);
-    const observer = new ResizeObserver(() => pin());
-    observer.observe(element);
-    if (element.lastElementChild) observer.observe(element.lastElementChild);
-    const stop = window.setTimeout(() => observer.disconnect(), 2500);
-    return () => {
-      alive = false;
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(stop);
-      observer.disconnect();
-      element.removeEventListener("wheel", markMoved);
-      element.removeEventListener("touchmove", markMoved);
-      element.removeEventListener("pointerdown", markMoved);
-    };
-  }, [thread?.messages.length, chatId]);
+    scrollToEnd();
+  }, [thread, chatId]);
 
   useEffect(() => () => {
     discardRecRef.current = true;
@@ -920,6 +905,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       {error ? <p class={styles.error}>{error}</p> : (
         <>
           <div class="thread" id="thread" ref={threadRef}>
+            <div class={styles.threadContent} ref={contentRef}>
             {thread?.messages?.length ? thread.messages.map((message) => (
               <MessageBubble
                 key={message.id}
@@ -931,6 +917,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
                 onDelete={() => setPendingDelete(message)}
                 onTranscribe={() => void transcribe(message)}
                 onJump={jumpTo}
+                onRefresh={() => loadThread()}
                 revealedTranscript={revealed[message.id] || ""}
               />
             )) : thread && !(thread.openers?.length) ? <p class="hint">{tr("загрузка…")}</p> : null}
@@ -945,6 +932,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
               </div>
             ) : null}
             {!thread ? <p class="hint">{tr("загрузка…")}</p> : null}
+            </div>
           </div>
           <div class="composer-dock">
             {recordingNotice ? <p class={styles.recordingNotice} role="status">{recordingNotice}</p> : null}

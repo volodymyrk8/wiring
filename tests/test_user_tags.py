@@ -16,13 +16,13 @@ class UserTagsTests(unittest.TestCase):
 
     def test_filter_hide_tags_strips_legacy(self):
         out = filter_hide_tags(["asd", "neurospicy", "nonsmalltalk"])
-        self.assertEqual(out, ["asd", "nonsmalltalk"])
+        self.assertEqual(out, ["nonsmalltalk"])
 
     def test_audhd_drops_asd_and_adhd(self):
         neuro, vibe = normalize_user_tags(["asd", "audhd", "adhd", "ocd"], ["nonsmalltalk"])
         self.assertEqual(neuro, ["audhd", "ocd"])
         self.assertEqual(vibe, ["nonsmalltalk"])
-        self.assertEqual(filter_hide_tags(["asd", "audhd", "adhd", "nonsmalltalk"]), ["audhd", "nonsmalltalk"])
+        self.assertEqual(filter_hide_tags(["asd", "audhd", "adhd", "nonsmalltalk"]), ["nonsmalltalk"])
 
 
 if __name__ == "__main__":

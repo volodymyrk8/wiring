@@ -275,6 +275,25 @@ class MobileApiTest(unittest.TestCase):
         conn.close()
         self.assertEqual(left, 0)
 
+    def test_push_provider_failure_logs_reason_without_tokens_or_content(self):
+        user = self._user()
+        conn = self._seed_device(user["id"])
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"data":[{"status":"error","details":{"error":"InvalidCredentials"},"message":"sensitive provider message"}]}'
+        with patch("mobile_api.urllib.request.urlopen", return_value=response) as opened, self.assertLogs("mobile_api", level="WARNING") as logs:
+            mobile_api.send_device_push(conn, user["id"], body="private message", url="/chats/2", tag="message-2")
+        import json
+        payload = json.loads(opened.call_args.args[0].data)[0]
+        self.assertEqual(payload["priority"], "high")
+        self.assertEqual(payload["ttl"], 43200)
+        self.assertIn("InvalidCredentials", " ".join(logs.output))
+        self.assertNotIn("sensitive", " ".join(logs.output))
+        self.assertNotIn("private message", " ".join(logs.output))
+        self.assertNotIn(payload["to"], " ".join(logs.output))
+        self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM mobile_devices").fetchone()["n"], 1)
+        conn.close()
+
     def test_send_device_push_survives_network_failure(self):
         user = self._user()
         conn = self._seed_device(user["id"])

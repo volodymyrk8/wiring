@@ -52,10 +52,6 @@ def _taste_priority(likes: list[dict], passes: list[dict], candidate: dict) -> i
     return int(round(like_score * 10 - pass_score * 6))
 
 
-def _nearest_like(likes: list[dict], candidate: dict) -> dict:
-    return max(likes, key=lambda liked: (recommendation_priority(liked, candidate), -int(liked.get("id") or 0)))
-
-
 def select_recommendations(
     conn: Connection, viewer: dict, eligible: Callable[[Row], dict[str, Any] | None],
 ) -> tuple[list[dict[str, Any]], str]:
@@ -99,6 +95,7 @@ def select_recommendations(
         card.pop("jev_match_pct", None)
         card.pop("jev_match_reasons", None)
         card.pop("jev_match_source", None)
-        prototype = _nearest_like(likes, card) if by_taste else viewer
-        card["recommendation_reasons"] = match_reasons(prototype, card)
+        # Taste affects ordering, but "shared" facts always describe the two
+        # people on screen, using the viewer's current saved profile.
+        card["recommendation_reasons"] = match_reasons(viewer, card)
     return cards, source

@@ -1,3 +1,4 @@
+import { CitySelect } from "@/components/ui/CitySelect";
 import { tr } from "@/lib/i18n";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
@@ -6,7 +7,7 @@ import { applyNeuroToggle, labelForTag, splitCatalogTags, tagSearchHaystack } fr
 import { openToIntentsLine } from "@/lib/open-to-intents";
 import { sharedNeuroIdSet } from "@/lib/shared-vibes";
 import { getErrorMessage } from "@/lib/get-error-message";
-import { cityOptionSearchText, citySelectOptions } from "@/lib/places";
+import { countrySelectOptions, withCountry } from "@/lib/places";
 import { usePhotoSwipe } from "@/lib/usePhotoSwipe";
 import type { DeckCard, DeckFilters, DeckHostBridge } from "./types";
 import { feedSwipeTarget, lockFeedSwipeAxis, type FeedSwipe } from "./vertical-swipe";
@@ -118,7 +119,7 @@ function DeckHeader({ host, filtersOpen, filtered, onFilters }: { host: DeckHost
   />;
 }
 
-const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "", real_only: false, hide_undiagnosed: false });
+const defaultFilters = (): DeckFilters => ({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, country: "", city: "", gender: "", real_only: false, hide_undiagnosed: false });
 
 const recommendationCopy = (card: DeckCard, source: "api" | "local" | "taste" | undefined) => {
   const reasons = (card.recommendation_reasons || []).map((item) => String(item).trim()).filter(Boolean);
@@ -133,19 +134,15 @@ type DiscoveryDraft = {
   seekMinAge: string;
   seekMaxAge: string;
   seekPlace: string;
-  hideNeuro: string[];
   hideVibe: string[];
 };
 
 function discoveryFromUser(host: DeckHostBridge): DiscoveryDraft {
-  const neuroIds = new Set((host.catalog.neuro || []).map((item) => item.id));
-  const hidden = host.user?.hide_tags || [];
   return {
     seekMinAge: String(host.user?.seek_min_age || 18),
     seekMaxAge: String(host.user?.seek_max_age || 99),
     seekPlace: String(host.user?.seek_place || ""),
-    hideNeuro: hidden.filter((id) => neuroIds.has(id)),
-    hideVibe: hidden.filter((id) => !neuroIds.has(id)),
+    hideVibe: (host.user?.hide_tags || []).filter((id) => host.catalog.vibe?.some((tag) => tag.id === id)),
   };
 }
 
@@ -155,17 +152,7 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
   const [maxAge, setMaxAge] = useState(String(filters.max_age));
   const [discovery, setDiscovery] = useState(() => discoveryFromUser(host));
   const places = host.catalog.places || [];
-  const citySearch = host.catalog.city_search;
-  const cities = [...new Set(places.flatMap((place) => place.cities))];
-  const placeOptions = [
-    { value: "", label: tr("Отовсюду") },
-    ...places.map((place) => ({ value: place.country, label: tr(place.country) })),
-    ...cities.map((city) => ({
-      value: city,
-      label: tr(city),
-      searchText: cityOptionSearchText(city, citySearch),
-    })),
-  ];
+  const countryOptions = countrySelectOptions(places, host.catalog.country_search, { value: "", label: tr("Любая") });
   const update = <K extends keyof DeckFilters>(key: K, value: DeckFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const reset = () => {
     setDraft(defaultFilters());
@@ -186,7 +173,8 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
           <Input label={tr("Возраст до")} name="deck-max-age" type="number" inputMode="numeric" required min={Number(minAge) || 18} max={99} value={maxAge} onInput={(event) => setMaxAge(event.currentTarget.value)} />
         </div>
         <Select className={styles.citySelect} label={tr("Пол")} id="deck-gender" options={[{ value: "", label: tr("Любой") }, { value: "woman", label: tr("Женщины") }, { value: "man", label: tr("Мужчины") }]} value={draft.gender || ""} onChange={(value) => update("gender", value === "woman" || value === "man" ? value : "")} ariaLabel={tr("Пол в ленте")} />
-        <Select className={styles.citySelect} label={tr("Город")} id="deck-city" placeholder={tr("Любой")} searchable searchPlaceholder={tr("Город")} options={citySelectOptions(cities, citySearch, { value: "", label: tr("Любой") })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город в ленте")} />
+        <Select className={styles.citySelect} label={tr("Страна")} id="deck-country" searchable searchPlaceholder={tr("Страна")} options={countryOptions} value={draft.country || ""} onChange={(value) => setDraft((current) => withCountry(current, value, places))} ariaLabel={tr("Страна в ленте")} />
+        <CitySelect api={host.api} places={places} country={draft.country} className={styles.citySelect} label={tr("Город")} id="deck-city" value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город в ленте")} />
         <TagPicker label={tr("Цель поиска")} options={host.catalog.intents || []} selected={draft.intents} onChange={(value) => update("intents", value)} />
         <TagPicker label={tr("Диагнозы")} options={host.catalog.neuro || []} selected={draft.neuro} onChange={(value) => update("neuro", applyNeuroToggle(draft.neuro, value))} searchable searchPlaceholder={tr("Диагноз или расшифровка")} searchHaystack={tagSearchHaystack} />
         <Checkbox name="hide-undiagnosed" checked={draft.hide_undiagnosed !== false} onChange={(checked) => update("hide_undiagnosed", checked)}>{tr("Скрыть анкеты без диагноза")}</Checkbox>
@@ -197,8 +185,7 @@ function FilterPanel({ host, filters, applying, error, onApply, onClose }: { hos
           <Input label={tr("Возраст от")} name="seek-min-age" type="number" inputMode="numeric" required min={18} max={Number(discovery.seekMaxAge) || 99} value={discovery.seekMinAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMinAge: event.currentTarget.value }))} />
           <Input label={tr("Возраст до")} name="seek-max-age" type="number" inputMode="numeric" required min={Number(discovery.seekMinAge) || 18} max={99} value={discovery.seekMaxAge} onInput={(event) => setDiscovery((current) => ({ ...current, seekMaxAge: event.currentTarget.value }))} />
         </div>
-        <Select className={styles.citySelect} label={tr("Откуда")} id="deck-seek-place" searchable searchPlaceholder={tr("Город или страна")} options={placeOptions} value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel={tr("Откуда могут искать")} />
-        <TagPicker label={tr("Не показывать меня людям с этими особенностями")} options={host.catalog.neuro || []} selected={discovery.hideNeuro} onChange={(value) => setDiscovery((current) => ({ ...current, hideNeuro: applyNeuroToggle(current.hideNeuro, value) }))} />
+        <CitySelect api={host.api} places={places} includeCountries emptyLabel={tr("Отовсюду")} className={styles.citySelect} label={tr("Откуда")} id="deck-seek-place" value={discovery.seekPlace} onChange={(value) => setDiscovery((current) => ({ ...current, seekPlace: value }))} ariaLabel={tr("Откуда могут искать")} />
         <TagPicker label={tr("Не показывать меня людям с таким вайбом")} options={host.catalog.vibe || []} selected={discovery.hideVibe} onChange={(value) => setDiscovery((current) => ({ ...current, hideVibe: value }))} tone="vibe" />
       </fieldset>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
@@ -393,7 +380,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     if (scroll && viewportRef.current) viewportRef.current.style.scrollSnapType = scroll.previousSnap;
     touchScrollRef.current = null;
   };
-  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === true);
+  const filtered = Boolean(filters.neuro.length || filters.vibe.length || filters.intents.length || filters.country || filters.city || filters.gender || filters.min_age !== 18 || filters.max_age !== 99 || filters.hide_undiagnosed === true);
 
   useLayoutEffect(() => {
     host.onFeedChange(cards, index, filters, hasMore, generation);
@@ -504,7 +491,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
         seek_min_age: Number(discovery.seekMinAge || 18),
         seek_max_age: Number(discovery.seekMaxAge || 99),
         seek_place: discovery.seekPlace,
-        hide_tags: [...discovery.hideNeuro, ...discovery.hideVibe],
+        hide_tags: discovery.hideVibe,
         draft: true,
       }),
     });
@@ -661,7 +648,7 @@ function DeckFeed({ host }: { host: DeckHostBridge & { user: NonNullable<DeckHos
     {filtersOpen ? <FilterPanel host={host} filters={filters} applying={applyingFilters} error={error} onApply={(value, discovery) => void applyFilters(value, discovery)} onClose={() => { if (!applyingFilters) setFiltersOpen(false); }} /> : null}
     <Modal isOpen={excludeOpen} onClose={() => { if (!busy) setExcludeOpen(false); }} title={tr("Больше не показывать?")}
       footer={<><Button variant="ghost" disabled={busy} onClick={() => setExcludeOpen(false)}>{tr("Отмена")}</Button><Button loading={busy} disabled={loading} onClick={() => void act("pass")}>{tr("Исключить")}</Button></>}>
-      <p>{tr("Эта анкета больше не появится в твоей ленте. Обычное листание никого не исключает.")}</p>
+      <p>{tr("Эта анкета не будет появляться в ленте. Вернуть её можно в архиве, в разделе «Дизлайки». Обычное листание никого не исключает.")}</p>
       {error ? <p class={styles.error} role="alert">{error}</p> : null}
     </Modal>
     <main class={styles.content} aria-label={host.recommendations ? tr("Для тебя") : tr("Лента")}>

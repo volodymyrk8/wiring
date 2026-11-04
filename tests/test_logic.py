@@ -2,7 +2,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from cities import catalog_city, city_search_index, normalize_city, places_payload
+from cities import catalog_city, city_search_index, country_search_index, normalize_city, places_payload
 from icebreakers import _openai_openers, _slim, openers_for
 from matchmaker import heuristic_like, _mutual_looking_ok
 from profanity import has_profanity
@@ -41,6 +41,13 @@ class LogicTest(unittest.TestCase):
         index = city_search_index()
         self.assertIn("dublin", " ".join(index["Дублин"]))
         self.assertIn("даблин", " ".join(index["Дублин"]))
+
+    def test_country_search_index_includes_everyday_names(self):
+        index = country_search_index()
+        self.assertIn("америка", " ".join(index["США"]))
+        self.assertIn("united states", " ".join(index["США"]))
+        self.assertIn("англия", " ".join(index["Великобритания"]))
+        self.assertIn("голландия", " ".join(index["Нидерланды"]))
 
     def test_countries_are_alphabetical(self):
         names = [str(block["country"]) for block in places_payload()]

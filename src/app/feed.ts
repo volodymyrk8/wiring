@@ -13,6 +13,7 @@ export function fetchFeed(api: ApiClient, filters: DeckFilters, signal?: AbortSi
   if (filters.intents.length) query.set("intent", filters.intents.join(","));
   if (filters.min_age !== 18) query.set("min_age", String(filters.min_age));
   if (filters.max_age !== 99) query.set("max_age", String(filters.max_age));
+  if (filters.country) query.set("country", filters.country);
   if (filters.city) query.set("city", filters.city);
   if (filters.gender) query.set("gender", filters.gender);
   query.set("hide_empty", filters.hide_undiagnosed === false ? "0" : "1");

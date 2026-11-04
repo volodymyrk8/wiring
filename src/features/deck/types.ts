@@ -8,6 +8,7 @@ export type DeckFilters = {
   min_age: number;
   max_age: number;
   city: string;
+  country?: string;
   /** Empty shows every gender. Hidden profiles stay out of a chosen gender. */
   gender?: "" | "woman" | "man";
   real_only?: boolean;
@@ -47,6 +48,7 @@ export type DeckCatalog = {
   looking_for?: CatalogItem[];
   places?: PlaceBlock[];
   city_search?: Record<string, string[]>;
+  country_search?: Record<string, string[]>;
 };
 
 export type FeedPage = {

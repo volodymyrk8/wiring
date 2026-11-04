@@ -476,10 +476,34 @@ def _build_city_set() -> set[str]:
     return out
 
 
+# The curated values remain stable for existing profiles; add every world country.
+from world_places import countries as world_countries
+_existing_countries = {str(block["country"]) for block in PLACES}
+for _country in world_countries().values():
+    if _country["name"] not in _existing_countries:
+        PLACES.append({"country": _country["name"], "cities": []})
+
 CITIES: list[str] = []
 for _block in PLACES:
     CITIES.extend(str(c) for c in _block["cities"])  # type: ignore[index]
 CITY_SET: set[str] = _build_city_set()
+_CITY_COUNTRY = {str(city): str(block['country']) for block in PLACES for city in block['cities']}
+
+
+def _legacy_city(value: str) -> str | None:
+    key = _key(value)
+    compact = key.replace(' ', '')
+    if key in _ALIASES:
+        return _ALIASES[key]
+    if compact in _ALIASES:
+        return _ALIASES[compact]
+    return next((city for city in CITY_SET if _key(city) == key or _key(city).replace(' ', '') == compact), None)
+
+
+def _preserve_legacy(value: str) -> str:
+    parts = value.split(' · ')
+    legacy = _legacy_city(parts[0])
+    return legacy if legacy and len(parts) > 1 and _CITY_COUNTRY.get(legacy) == parts[-1] else value
 
 
 def normalize_city(raw: str) -> str:
@@ -489,16 +513,13 @@ def normalize_city(raw: str) -> str:
         return value
     if value in CITY_SET:
         return value
-    key = _key(value)
-    compact = key.replace(" ", "")
-    if key in _ALIASES:
-        return _ALIASES[key]
-    if compact in _ALIASES:
-        return _ALIASES[compact]
-    # Exact case-insensitive catalog hit
-    for city in CITY_SET:
-        if _key(city) == key or _key(city).replace(" ", "") == compact:
-            return city
+    legacy = _legacy_city(value)
+    if legacy:
+        return legacy
+    from world_places import resolve
+    resolved = resolve(value)
+    if resolved:
+        return _preserve_legacy(resolved)
     cleaned = [part[:1].upper() + part[1:] if part else part for part in value.split()]
     return " ".join(cleaned)
 
@@ -511,11 +532,44 @@ def catalog_city(raw: str) -> str | None:
     if value in CITY_SET:
         return value
     resolved = normalize_city(value)
-    return resolved if resolved in CITY_SET else None
+    if resolved in CITY_SET:
+        return resolved
+    from world_places import resolve
+    return resolve(resolved)
 
 
 def is_catalog_city(raw: str) -> bool:
     return catalog_city(raw) is not None
+
+
+# Names people type that are not the catalog label or the English CLDR name.
+_COUNTRY_ALIASES: dict[str, tuple[str, ...]] = {
+    "США": ("америка", "штаты", "соединенные штаты", "соединённые штаты", "usa", "us", "america", "united states"),
+    "Великобритания": ("англия", "британия", "england", "britain", "uk", "great britain", "united kingdom"),
+    "Нидерланды": ("голландия", "holland"),
+    "ОАЭ": ("эмираты", "uae", "emirates"),
+    "Южная Корея": ("корея", "korea", "south korea"),
+    "КНДР": ("северная корея", "north korea"),
+    "Чехия": ("czech", "czechia"),
+    "Мьянма (Бирма)": ("бирма", "burma", "мьянма"),
+}
+
+
+def country_search_index() -> dict[str, list[str]]:
+    """Search tokens per country: catalog name, English name, and common aliases."""
+    from world_places import countries, key as fold
+    english = {item["name"]: str(item.get("en") or "") for item in countries().values()}
+    out: dict[str, list[str]] = {}
+    for block in PLACES:
+        name = str(block["country"])
+        tokens = {fold(name)}
+        if english.get(name):
+            tokens.add(fold(english[name]))
+        for alias in _COUNTRY_ALIASES.get(name, ()):
+            tokens.add(fold(alias))
+        tokens.discard("")
+        out[name] = sorted(tokens)
+    return out
 
 
 def city_search_index() -> dict[str, list[str]]:
@@ -547,9 +601,16 @@ def places_payload() -> list[dict[str, object]]:
 
 
 def country_of_city(raw: str) -> str:
+    from world_places import qualified_country
+    country = qualified_country(raw)
+    if country:
+        return country
     city = catalog_city(raw) or str(raw or "").strip()
     if not city:
         return ""
+    country = qualified_country(city)
+    if country:
+        return country
     for block in PLACES:
         if city in (block.get("cities") or []):
             return str(block.get("country") or "")

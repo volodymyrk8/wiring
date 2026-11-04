@@ -33,10 +33,10 @@
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
     window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
   </script>
-  <script src="/public/analytics.js?v=5" defer></script>
+  <script src="/public/analytics.js?v=8" defer></script>
   {% endif %}
 </head>
-<body class="legal-page{% if support_form %} support-page{% endif %}">
+<body class="ym-hide-content legal-page{% if support_form %} support-page{% endif %}">
   {% set show_back = true %}
   {% set back_href = '/' %}
   {% set section_title = _('поддержка') if support_form else '' %}

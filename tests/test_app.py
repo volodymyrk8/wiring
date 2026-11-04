@@ -774,6 +774,40 @@ class WiringTest(unittest.TestCase):
         shown = {card["id"] for card in self.client.get("/api/feed?hide_empty=0&limit=10").get_json()["cards"]}
         self.assertIn(peer["id"], shown)
 
+    def test_country_filter_feed_and_likes_share_catalog_and_intersect_city(self):
+        viewer = self._register()
+        peers = []
+        for index, city in enumerate(("Белград", "Нови-Сад", "Москва", "")):
+            peers.append(self._register(email=f"country-{index}@example.com", name=f"Страна{index}", gender="man", city=city, photo="portraits/p03.jpg"))
+        self._login("ada@example.com")
+        with app.app_context():
+            conn = db()
+            conn.execute("UPDATE users SET premium_until = ? WHERE id = ?", (int(time.time()) + 86400, viewer["id"]))
+            for peer in peers:
+                conn.execute("INSERT INTO swipes (from_id, to_id, direction, created_at) VALUES (?, ?, 'like', ?)", (peer["id"], viewer["id"], int(time.time())))
+            conn.commit()
+        # Country spans multiple cities, without consuming candidates in other countries.
+        for endpoint, key in (("/api/feed", "cards"), ("/api/likes", "likes")):
+            def ids(**query):
+                response = self.client.get(endpoint, query_string={"limit": 10, "hide_empty": 0, **query})
+                self.assertEqual(response.status_code, 200)
+                return [card["id"] for card in response.get_json()[key]]
+            country_ids = ids(country="Сербия")
+            self.assertCountEqual(country_ids, [peers[0]["id"], peers[1]["id"]])
+            self.assertEqual(ids(country="Сербия", city="Белград"), [peers[0]["id"]])
+            self.assertEqual(ids(country="Сербия", city="Belgrade · Сербия"), [peers[0]["id"]])
+            self.assertEqual(ids(country="Россия", city="Белград"), [])
+            self.assertEqual(ids(country="NoSuchCountry"), [])
+            self.assertEqual(ids(country="Сербия", city="NoSuchCity"), [])
+            self.assertEqual(ids(country="Россия"), [peers[2]["id"]])
+        # Country narrowing can revisit delivered cards, but respects explicit exclusions.
+        self.client.post("/api/swipe", json={"target_id": peers[0]["id"], "direction": "pass"})
+        page = self.client.get("/api/feed", query_string={"country": "Сербия", "hide_empty": 0}).get_json()
+        self.assertEqual([card["id"] for card in page["cards"]], [peers[1]["id"]])
+        with app.app_context():
+            # A rejected country/city combination did not reserve the city-less profile.
+            self.assertIsNone(db().execute("SELECT 1 FROM feed_history WHERE user_id = ? AND other_id = ?", (viewer["id"], peers[3]["id"])).fetchone())
+
     def test_city_filter_still_finds_already_seen_profiles(self):
         self._register()
         peer = self._register(email="city-peer@example.com", name="Град", gender="man", city="Белград", photo="portraits/p03.jpg")
@@ -1243,6 +1277,46 @@ class WiringTest(unittest.TestCase):
         with patch.dict(os.environ, {"JEV_BETA_USER_ID": "", "JEV_API_KEY": "test-key"}):
             self.assertEqual(self.client.post("/api/me/jev-feed", json={"enabled": True}).status_code, 200)
 
+    def test_recommendations_refresh_diagnoses_after_profile_save(self):
+        me = self._register(neuro=["asd"])
+        _rate.clear()
+        peers = self._peers(4)
+        self._login("ada@example.com")
+        with app.app_context():
+            from app import replace_tags
+            conn = db()
+            conn.execute("UPDATE users SET jev_feed_enabled = 1, jev_recommendations_unlocked = 1 WHERE id = ?", (me["id"],))
+            for peer in peers:
+                replace_tags(conn, peer["id"], ["asd", "adhd"], [])
+            conn.commit()
+
+        with patch("recommendations.rank_profiles", return_value=None):
+            for source in ("local", "taste"):
+                if source == "taste":
+                    for peer in peers[:3]:
+                        response = self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "like"})
+                        self.assertEqual(response.status_code, 200)
+                for diagnoses, present, absent in (
+                    (["asd"], "РАС", "СДВГ"),
+                    (["adhd"], "СДВГ", "РАС"),
+                    ([], None, "диагнозах"),
+                ):
+                    with self.subTest(source=source, diagnoses=diagnoses):
+                        saved = self.client.patch("/api/me", json={"draft": True, "neuro": diagnoses})
+                        self.assertEqual(saved.status_code, 200)
+                        self.assertEqual(saved.get_json()["user"]["neuro"], diagnoses)
+                        self.assertEqual(self.client.get("/api/me").get_json()["user"]["neuro"], diagnoses)
+                        response = self.client.get("/api/recommendations")
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.headers["Cache-Control"], "no-store")
+                        payload = response.get_json()
+                        self.assertEqual(payload["recommendation_source"], source)
+                        card = next(card for card in payload["cards"] if card["id"] == peers[3]["id"])
+                        reasons = ". ".join(card["recommendation_reasons"])
+                        if present:
+                            self.assertIn(present, reasons)
+                        self.assertNotIn(absent, reasons)
+
     def test_recommendations_apply_both_owners_visibility_and_exclusions(self):
         me = self._register()
         _rate.clear()  # Fixture registrations stay independent of the signup rate limit.
@@ -1569,8 +1643,8 @@ class WiringTest(unittest.TestCase):
                 "photo": "portraits/p01.jpg",
             },
         )
-        self.assertEqual(bad.status_code, 400)
-        self.assertIn("списка", bad.get_json()["error"])
+        self.assertEqual(bad.status_code, 503)
+        self.assertIn("Проверка города", bad.get_json()["error"])
 
     def test_tags_survive_bio_edit(self):
         user = self._register(neuro=["asd", "anxiety"], vibe=["intherapy", "nonsmalltalk"])
@@ -2074,6 +2148,24 @@ class WiringTest(unittest.TestCase):
         self.assertTrue(on.get_json()["user"]["notify_enabled"])
         self.assertTrue(on.get_json()["user"]["notify_push"])
 
+    def test_push_is_not_lost_immediately_after_app_or_site_closes(self):
+        from push import send_user_push
+        user = self._register(email="push-close@wiring.test")
+        self.client.post("/api/push/subscribe", json={"endpoint": "https://push.example/close", "keys": {"p256dh": "pad", "auth": "auth"}})
+        with app.app_context():
+            conn = db()
+            # A recent API request does not prove that any client is still open.
+            for seconds_ago in (0, 1, 30, 119, 121):
+                with patch("push._deliver", return_value="ok") as web, patch("push.send_device_push") as native:
+                    send_user_push(conn, user["id"], body="new message", url="/chats/2", tag="message-2", last_seen=int(time.time()) - seconds_ago)
+                    web.assert_called_once()
+                    native.assert_called_once()
+            conn.execute("UPDATE users SET notify_push = 0 WHERE id = ?", (user["id"],))
+            with patch("push._deliver") as web, patch("push.send_device_push") as native:
+                send_user_push(conn, user["id"], body="new message", url="/chats/2", tag="message-2")
+                web.assert_not_called()
+                native.assert_not_called()
+
     def test_web_push_like_when_site_is_closed(self):
         first = self._register(email="push-a@wiring.test")
         key = self.client.get("/api/push/public-key")
@@ -2123,6 +2215,61 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(back.status_code, 200)
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
         self.assertNotIn(target["id"], ids)
+
+    def test_archive_restores_snoozed_profile_without_plus_or_rewind(self):
+        self._register()
+        self._peers(2)
+        self._login("ada@example.com")
+        self._plus()
+        target = self.client.get("/api/feed").get_json()["cards"][0]
+        self.assertEqual(self.client.post("/api/swipe", json={
+            "target_id": target["id"], "direction": "snooze",
+        }).status_code, 200)
+        listed = self.client.get("/api/archive").get_json()
+        self.assertEqual([p["id"] for p in listed["snoozes"]], [target["id"]])
+        owner = self._me_id("ada@example.com")
+        with app.app_context():
+            db().execute("UPDATE users SET premium_until = 0 WHERE id = ?", (owner,))
+            db().commit()
+        restored = self.client.post("/api/archive", json={"user_id": target["id"], "action": "unsnooze"})
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.get_json()["snoozes"], [])
+        self.assertIn(target["id"], {p["id"] for p in self.client.get("/api/feed").get_json()["cards"]})
+        self.assertEqual(self.client.post("/api/archive", json={"user_id": target["id"], "action": "unsnooze"}).status_code, 200)
+        with app.app_context():
+            self.assertIsNotNone(db().execute(
+                "SELECT 1 FROM feed_history WHERE user_id = ? AND other_id = ?", (owner, target["id"]),
+            ).fetchone())
+
+    def test_archive_snoozes_expiry_privacy_and_permanent_decisions(self):
+        self._register()
+        peers = self._peers(4)
+        self._login("ada@example.com")
+        self._plus()
+        uid = self._me_id("ada@example.com")
+        for peer in peers:
+            self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "snooze"})
+        self.client.post("/api/block", json={"user_id": peers[1]["id"]})
+        self.client.post("/api/swipe", json={"target_id": peers[2]["id"], "direction": "pass"})
+        with app.app_context():
+            db().execute("UPDATE snoozes SET until_at = 1 WHERE user_id = ? AND other_id = ?", (uid, peers[0]["id"]))
+            db().execute("UPDATE users SET deleted_at = 1 WHERE id = ?", (peers[3]["id"],))
+            db().commit()
+        listed = self.client.get("/api/archive").get_json()["snoozes"]
+        self.assertEqual([p["id"] for p in listed], [peers[2]["id"]])
+        for peer in peers[1:3]:
+            self.assertEqual(self.client.post("/api/archive", json={"user_id": peer["id"], "action": "unsnooze"}).status_code, 200)
+        after = self.client.get("/api/archive").get_json()
+        self.assertEqual([p["id"] for p in after["blocks"]], [peers[1]["id"]])
+        self.assertIn(peers[2]["id"], [p["id"] for p in after["passes"]])
+        self.client.post("/api/swipe", json={"target_id": peers[2]["id"], "direction": "snooze"})
+        restored = self.client.post("/api/archive", json={"user_id": peers[2]["id"], "action": "restore"})
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.get_json()["snoozes"], [])
+        self.assertNotIn(peers[2]["id"], [p["id"] for p in restored.get_json()["passes"]])
+        shown = {p["id"] for p in self.client.get("/api/feed").get_json()["cards"]}
+        self.assertNotIn(peers[1]["id"], shown)
+        self.assertIn(peers[2]["id"], shown)
 
     def test_admin_can_grant_plus(self):
         self._register()
@@ -2504,6 +2651,107 @@ class WiringTest(unittest.TestCase):
         ids = {c["id"] for c in self.client.get("/api/feed?limit=20").get_json()["cards"]}
         self.assertIn(gay_man["id"], ids)
 
+    def test_worldwide_city_search_and_ai_spelling_validation(self):
+        self.assertEqual(self.client.get("/api/places?q=Sao").status_code, 401)
+        self._register()
+        for query in ("сан паулу", "сан-паулу", "São Paulo", "Sao Paulo"):
+            result = self.client.get("/api/places", query_string={"q": query, "country": "Бразилия"})
+            self.assertEqual(result.status_code, 200)
+            self.assertTrue(any(item["value"].startswith("São Paulo ·") and item["country"] == "Бразилия" for item in result.get_json()["places"]))
+        from world_places import rows
+        self.assertGreater(len(rows()), 200000)
+        from cities import country_of_city
+        self.assertEqual(country_of_city("Sao Paulo"), "Бразилия")
+        with patch("place_validation._ask_openai", return_value={"valid": True, "city": "São Paulo", "country_code": "BR"}) as ai:
+            result = self.client.post("/api/places/resolve", json={"city": "Сан Паулло · Бразилия", "country": "Бразилия"})
+            self.assertEqual(result.status_code, 200, result.get_data(as_text=True))
+            corrected = result.get_json()["city"]
+            self.assertTrue(corrected.startswith("São Paulo ·"))
+            ai.assert_called_once_with("Сан Паулло", "Бразилия")
+        with patch("place_validation._ask_openai") as ai:
+            saved = self.client.patch("/api/me", json={"city": "Сан Паулло · Бразилия", "draft": True})
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(saved.get_json()["user"]["city"], corrected)
+            ai.assert_not_called()
+        # Country-qualified valid smaller settlements need not be in cities500.
+        with patch("place_validation._ask_openai", return_value={"valid": True, "city": "Little Test Village", "country_code": "BR"}):
+            result = self.client.post("/api/places/resolve", json={"city": "Little Test Vilage", "country": "Бразилия"})
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.get_json()["city"], "Little Test Village · Бразилия")
+
+    def test_city_ai_rejects_invalid_ambiguous_country_mismatch_and_failures(self):
+        self._register()
+        original = self.client.get("/api/me").get_json()["user"]["city"]
+        for answer in ({"valid": False, "city": "", "country_code": ""}, {"valid": True, "city": "Tokyo", "country_code": "JP"}, [], {"valid": True, "city": "X", "country_code": []}):
+            with patch("place_validation._ask_openai", return_value=answer):
+                response = self.client.post("/api/places/resolve", json={"city": "Unknown Fictional City", "country": "Бразилия"})
+                self.assertEqual(response.status_code, 400)
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}):
+            response = self.client.post("/api/places/resolve", json={"city": "Another Unknown City", "country": "Бразилия"})
+            self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.client.get("/api/me").get_json()["user"]["city"], original)
+
+    def test_city_ai_profile_saves_share_the_paid_request_budget(self):
+        self._register()
+        with patch('place_validation._ask_openai', return_value={'valid': False, 'city': '', 'country_code': ''}) as ai:
+            for index in range(12):
+                response = self.client.patch('/api/me', json={'draft': True, 'city': f'Unconfirmedville{index}'})
+                self.assertEqual(response.status_code, 400)
+            response = self.client.post('/api/places/resolve', json={'city': 'Anotherunconfirmedville'})
+            self.assertEqual(response.status_code, 429)
+            self.assertEqual(ai.call_count, 12)
+            response = self.client.patch('/api/me', json={'draft': True, 'city': 'Белград'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(ai.call_count, 12)
+
+    def test_vibe_visibility_is_restored_without_diagnosis_exclusions(self):
+        owner = self._register(hide_tags=["adhd", "nonsmalltalk"], vibe=["intherapy"])
+        self.assertEqual(owner["hide_tags"], ["nonsmalltalk"])
+        blocked = self._register(email="vibe-hidden@example.com", neuro=["adhd"], vibe=["nonsmalltalk"])
+        control = self._register(email="vibe-visible@example.com", neuro=["adhd"], vibe=["intherapy"])
+        self._login("vibe-hidden@example.com")
+        self.assertNotIn(owner["id"], {card["id"] for card in self.client.get("/api/feed").get_json()["cards"]})
+        self._login("vibe-visible@example.com")
+        self.assertIn(owner["id"], {card["id"] for card in self.client.get("/api/feed").get_json()["cards"]})
+        self._login("ada@example.com")
+        saved = self.client.patch("/api/me", json={"draft": True, "bio": "Отредактировано"})
+        self.assertEqual(saved.get_json()["user"]["hide_tags"], ["nonsmalltalk"])
+        self.client.patch("/api/me", json={"draft": True, "hide_tags": ["adhd"]})
+        self._login("vibe-hidden@example.com")
+        self.assertIn(owner["id"], {card["id"] for card in self.client.get("/api/feed", query_string={"city": "Нови-Сад"}).get_json()["cards"]})
+
+    def test_retired_trait_exclusions_do_not_hide_profiles_or_return_from_old_clients(self):
+        me = self._register()
+        peer = self._register(email="retired-tags@example.com", name="Тима", neuro=["adhd"])
+        self._login("ada@example.com")
+        with app.app_context():
+            conn = db()
+            # Simulate saved exclusions from both sides before the feature was retired.
+            conn.execute("UPDATE users SET hide_tags = ?, jev_feed_enabled = 1, jev_recommendations_unlocked = 1 WHERE id = ?", ("adhd", me["id"]))
+            conn.execute("UPDATE users SET hide_tags = ? WHERE id = ?", ("asd", peer["id"]))
+            conn.commit()
+        self.assertEqual(self.client.get("/api/me").get_json()["user"]["hide_tags"], [])
+        self.assertIn(peer["id"], {card["id"] for card in self.client.get("/api/feed").get_json()["cards"]})
+        with patch("recommendations.rank_profiles", return_value=None):
+            response = self.client.get("/api/recommendations")
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(peer["id"], {card["id"] for card in response.get_json()["cards"]})
+        # A cached browser draft or older native client cannot re-enable exclusion.
+        mobile = app.test_client(use_cookies=False)
+        tokens = mobile.post("/api/auth/token", json={"email": "ada@example.com", "password": "secret1", "device": "retired-tags-test"})
+        self.assertEqual(tokens.status_code, 200)
+        headers = {"Authorization": "Bearer " + tokens.get_json()["access_token"]}
+        for raw in (["adhd"], "adhd"):
+            response = mobile.patch("/api/me", json={"draft": True, "hide_tags": raw}, headers=headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["user"]["hide_tags"], [])
+            with app.app_context():
+                self.assertEqual(db().execute("SELECT hide_tags FROM users WHERE id = ?", (me["id"],)).fetchone()["hide_tags"], "")
+        # Personal safety blocks still apply.
+        self.assertEqual(self.client.post("/api/block", json={"user_id": peer["id"]}).status_code, 200)
+        with patch("recommendations.rank_profiles", return_value=None):
+            self.assertEqual(self.client.get("/api/recommendations").get_json()["cards"], [])
+
     def test_feed_respects_discovery_filters(self):
         host = self._register(
             email="host@example.com",
@@ -2522,7 +2770,7 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(host["seek_min_age"], 25)
         self.assertEqual(host["seek_max_age"], 35)
         self.assertEqual(host["seek_place"], "Сербия")
-        self.assertIn("adhd", host["hide_tags"])
+        self.assertEqual(host["hide_tags"], [])
         self.client.post("/api/logout")
         young = self._register(
             email="young@example.com",
@@ -2569,7 +2817,7 @@ class WiringTest(unittest.TestCase):
             self.client.post("/api/logout")
             self.client.post("/api/login", json={"email": email, "password": "secret1"})
             ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
-            if email == "ok@example.com":
+            if email in {"ok@example.com", "tagged@example.com"}:
                 self.assertIn(host_id, ids)
             else:
                 self.assertNotIn(host_id, ids)
@@ -2598,7 +2846,7 @@ class WiringTest(unittest.TestCase):
         user = keep.get_json()["user"]
         self.assertEqual(user["seek_min_age"], 25)
         self.assertEqual(user["seek_place"], "Сербия")
-        self.assertIn("adhd", user["hide_tags"])
+        self.assertEqual(user["hide_tags"], [])
         # фильтры «кто меня находит» не сужают мою ленту
         ok_id = ok["id"]
         ids = {c["id"] for c in self.client.get("/api/feed").get_json()["cards"]}
@@ -2835,6 +3083,83 @@ class WiringTest(unittest.TestCase):
         brought_back = self.client.post("/api/archive", json={"user_id": banned["id"], "action": "restore"})
         self.assertEqual(brought_back.status_code, 200)
         self.assertEqual([item["id"] for item in brought_back.get_json()["passes"]], [mutual["id"]])
+
+    def test_message_reactions_replace_remove_permissions_and_retention(self):
+        self._register()
+        peer, stranger = self._peers(2)
+        ada = self._me_id("ada@example.com")
+        self._login(peer["email"])
+        self.client.post("/api/swipe", json={"target_id": ada, "direction": "like"})
+        self._login("ada@example.com")
+        self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "like"})
+        self.client.post("/api/messages", json={"to_id": peer["id"], "body": "Привет"})
+        thread_url = f"/api/messages/{peer['id']}"
+        message = self.client.get(thread_url).get_json()["messages"][0]
+        self.assertEqual(message["reactions"], [])
+        mid = message["id"]
+        url = f"/api/messages/{mid}/reaction"
+        for invalid in ({}, {"emoji": "x"}, {"emoji": []}, []):
+            self.assertEqual(self.client.put(url, json=invalid).status_code, 400)
+        for _ in range(2):
+            r = self.client.put(url, json={"emoji": "❤️"})
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json()["reactions"], [{"emoji": "❤️", "count": 1, "mine": True}])
+        self._login(peer["email"])
+        self.assertEqual(self.client.get(f"/api/messages/{ada}").get_json()["messages"][0]["reactions"][0]["mine"], False)
+        self.assertEqual(self.client.put(url, json={"emoji": "❤️"}).get_json()["reactions"], [{"emoji": "❤️", "count": 2, "mine": True}])
+        changed = self.client.put(url, json={"emoji": "🎉"}).get_json()["reactions"]
+        self.assertEqual(changed, [{"emoji": "❤️", "count": 1, "mine": False}, {"emoji": "🎉", "count": 1, "mine": True}])
+        self.client.put(url, json={"emoji": None})
+        self.assertEqual(self.client.put(url, json={"emoji": None}).get_json()["reactions"], [{"emoji": "❤️", "count": 1, "mine": False}])
+        self._login(stranger["email"])
+        self.assertEqual(self.client.put(url, json={"emoji": "👍"}).status_code, 404)
+        self._logout()
+        self.assertEqual(self.client.put(url, json={"emoji": "👍"}).status_code, 401)
+        self._login("ada@example.com")
+        mobile = app.test_client(use_cookies=False)
+        token = mobile.post("/api/auth/token", json={"email": "ada@example.com", "password": "secret1", "device": "reaction-test"})
+        self.assertEqual(token.status_code, 200)
+        headers = {"Authorization": "Bearer " + token.get_json()["access_token"]}
+        self.assertEqual(mobile.put(url, json={"emoji": "👍"}, headers=headers).status_code, 200)
+        page = mobile.get(thread_url + "?limit=1", headers=headers).get_json()["messages"][0]
+        self.assertEqual(page["reactions"], [{"emoji": "👍", "count": 1, "mine": True}])
+        self.client.delete(f"/api/messages/{mid}")
+        self.assertEqual(self.client.put(url, json={"emoji": "👍"}).status_code, 404)
+        self.assertEqual(self.client.get(thread_url).get_json()["messages"], [])
+        with app.app_context():
+            conn = db()
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM messages WHERE id = ?", (mid,)).fetchone()["n"], 1)
+            from app import purge_user_aux_data
+            purge_user_aux_data(conn, ada)
+            conn.commit()
+            self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM message_reactions").fetchone()["n"], 0)
+
+    def test_message_reactions_unmatch_and_block(self):
+        self._register()
+        peer = self._peers(1)[0]
+        ada = self._me_id("ada@example.com")
+        self._login(peer["email"])
+        self.client.post("/api/swipe", json={"target_id": ada, "direction": "like"})
+        self._login("ada@example.com")
+        self.client.post("/api/swipe", json={"target_id": peer["id"], "direction": "like"})
+        self.client.post("/api/messages", json={"to_id": peer["id"], "body": "Привет"})
+        mid = self.client.get(f"/api/messages/{peer['id']}").get_json()["messages"][0]["id"]
+        url = f"/api/messages/{mid}/reaction"
+        self.client.put(url, json={"emoji": "👍"})
+        with app.app_context():
+            conn = db()
+            conn.execute("INSERT INTO blocks (from_id, to_id, created_at) VALUES (?, ?, ?)", (peer["id"], ada, int(time.time())))
+            conn.commit()
+        self.assertEqual(self.client.put(url, json={"emoji": "❤️"}).status_code, 404)
+        with app.app_context():
+            conn = db()
+            conn.execute("DELETE FROM blocks WHERE from_id = ? AND to_id = ?", (peer["id"], ada))
+            conn.commit()
+        self.assertEqual(self.client.post("/api/unmatch", json={"user_id": peer["id"]}).status_code, 200)
+        self.assertEqual(self.client.put(url, json={"emoji": None}).status_code, 404)
+        with app.app_context():
+            self.assertTrue(db().execute("SELECT deleted_at FROM messages WHERE id = ?", (mid,)).fetchone()["deleted_at"])
+            self.assertEqual(db().execute("SELECT COUNT(*) AS n FROM message_reactions WHERE message_id = ?", (mid,)).fetchone()["n"], 1)
 
     def test_message_reply_edit_delete_and_voice(self):
         import struct

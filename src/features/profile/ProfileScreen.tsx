@@ -1,3 +1,4 @@
+import { CitySelect } from "@/components/ui/CitySelect";
 import { tr } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
@@ -15,8 +16,8 @@ import {
 } from "@/components/ui";
 import { getErrorMessage } from "@/lib/get-error-message";
 import { isProfilePhotoFile, PROFILE_PHOTO_ACCEPT } from "@/lib/profile-photo-file";
-import { applyNeuroToggle, catalogIdSet, splitCatalogTags } from "@/lib/catalog-tags";
-import { catalogCities, citySelectOptions, countryForCity } from "@/lib/places";
+import { applyNeuroToggle, splitCatalogTags } from "@/lib/catalog-tags";
+import { countryForCity, countrySelectOptions } from "@/lib/places";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { CatalogItem, ProfileHostBridge, ProfilePhoto, ProfileUser } from "./types";
 import styles from "./ProfileScreen.module.css";
@@ -41,8 +42,6 @@ type Draft = {
   seekMinAge: string;
   seekMaxAge: string;
   seekPlace: string;
-  hideNeuro: string[];
-  hideVibe: string[];
   prompts: Prompt[];
   specialConsent: boolean;
 };
@@ -63,11 +62,8 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
   const city = valueOf(user.city);
   const places = catalog.places || [];
   const country = countryForCity(city, places);
-  const hidden = idsOf(user.hide_tags);
   const intents = idsOf(user.intents, user.intent ? [user.intent] : ["dating"]);
   const tags = splitCatalogTags(idsOf(user.neuro), idsOf(user.vibe), catalog);
-  const vibeIds = catalogIdSet(catalog.vibe);
-  const neuroIds = catalogIdSet(catalog.neuro);
   return {
     name: valueOf(user.name),
     age: valueOf(user.age),
@@ -86,8 +82,6 @@ function makeDraft(user: ProfileUser, catalog: ProfileHostBridge["catalog"]): Dr
     seekMinAge: valueOf(user.seek_min_age, "18"),
     seekMaxAge: valueOf(user.seek_max_age, "99"),
     seekPlace: valueOf(user.seek_place),
-    hideNeuro: hidden.filter((id) => neuroIds.has(id)),
-    hideVibe: hidden.filter((id) => vibeIds.has(id)),
     prompts: (Array.isArray(user.prompts) ? user.prompts : []).map((prompt) => ({ id: String(prompt.id), answer: String(prompt.answer || "") })),
   };
 }
@@ -292,7 +286,6 @@ const profilePayload = (draft: Draft) => ({
   seek_min_age: Number(draft.seekMinAge || 18),
   seek_max_age: Number(draft.seekMaxAge || 99),
   seek_place: draft.seekPlace,
-  hide_tags: [...draft.hideNeuro, ...draft.hideVibe],
   prompts: draft.prompts,
   special_data_consent: draft.specialConsent ? true : undefined,
 });
@@ -377,8 +370,7 @@ export function ProfileScreen({ host }: Props) {
   };
   const inputValue = (key: keyof Draft) => String(draft[key]);
   const places = host.catalog.places || [];
-  const cityOptions = catalogCities(places, draft.country || undefined);
-  const countryOptions = [{ value: "", label: tr("Не указана") }, ...places.map((place) => ({ value: place.country, label: tr(place.country) }))];
+  const countryOptions = countrySelectOptions(places, host.catalog.country_search, { value: "", label: tr("Не указана") });
   const primaryPhoto = allPhotos(user).find((photo) => photo.is_primary) || allPhotos(user)[0];
 
   const setCity = (nextCity: string) => {
@@ -405,7 +397,7 @@ export function ProfileScreen({ host }: Props) {
         return { ...current, country: "", city: "" };
       }
       const citiesInCountry = places.find((place) => place.country === nextCountry)?.cities || [];
-      const cityOk = !current.city || citiesInCountry.includes(current.city);
+      const cityOk = !current.city || countryForCity(current.city, places) === nextCountry;
       return {
         ...current,
         country: nextCountry,
@@ -619,20 +611,7 @@ export function ProfileScreen({ host }: Props) {
                   onChange={setCountry}
                   ariaLabel={tr("Страна")}
                 />
-                <Select
-                  className={styles.selectControl}
-                  menuClassName={styles.citySelectMenu}
-                  label={tr("Город")}
-                  id="profile-city"
-                  placeholder={tr("Не указан")}
-                  searchable
-                  searchPlaceholder={tr("Город")}
-                  options={citySelectOptions(cityOptions, host.catalog.city_search, { value: "", label: tr("Не указан") })}
-                  value={draft.city}
-                  error={errors.city}
-                  onChange={setCity}
-                  ariaLabel={tr("Город")}
-                />
+                <CitySelect api={host.api} places={places} country={draft.country} emptyLabel={tr("Не указан")} className={styles.selectControl} menuClassName={styles.citySelectMenu} label={tr("Город")} id="profile-city" value={draft.city} error={errors.city} onChange={setCity} ariaLabel={tr("Город")} />
               </div>
               <div class={styles.fieldGroup}>
                 <Input label={tr("Рост, см")} name="height" type="number" value={draft.height} hint={tr("необязательно")} onInput={(event) => setField("height", event.currentTarget.value)} />
@@ -685,7 +664,7 @@ export function ProfileScreen({ host }: Props) {
                   <Button type="button" disabled={jevBusy || !recommendationsCode.trim()} loading={jevBusy} onClick={() => void redeemRecommendations()}>{tr("Активировать")}</Button>
                 </div>}
                 <p class={styles.recommendationsHint}>
-                  {tr("Показываем людей со всего WIRING. Если ты уже лайкаешь анкеты, подбор идёт по ним. Если лайков мало — по тому, что выбрано у тебя и зачем ты здесь. Человек не показывается, если такие люди тебе скрыты или он сам скрыл себя от людей с твоими особенностями. Под карточкой написано, что совпало. Чтобы расставить анкеты, мы отправляем только выбранные пункты, один ли город, близкий ли возраст и общую цель. Имя, фото, свои тексты и переписку не отправляем. Похожая анкета не значит, что человек тоже тебя выберет.")}</p>
+                  {tr("Показываем людей со всего WIRING. Если ты уже лайкаешь анкеты, подбор идёт по ним. Если лайков мало — по тому, что выбрано у тебя и зачем ты здесь. Человек не показывается, если такие люди тебе скрыты или он сам скрыл себя от людей с твоими вайбами. Под карточкой написано, что совпало. Чтобы расставить анкеты, мы отправляем только выбранные пункты, один ли город, близкий ли возраст и общую цель. Имя, фото, свои тексты и переписку не отправляем. Похожая анкета не значит, что человек тоже тебя выберет.")}</p>
                 {user.jev_feed_unlocked && !user.jev_feed_available && !user.jev_feed_enabled ? <p class={styles.recommendationsHint}>{tr("Подбор пока недоступен. Попробуй позже.")}</p> : null}
                 {jevError && <p class={styles.error} role="alert">{jevError}</p>}
               </section>

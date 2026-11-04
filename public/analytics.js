@@ -5,6 +5,14 @@
   const hasYm = /^\d{5,15}$/.test(ymId);
   const consentKey = "wiring-analytics-consent";
   if (!hasGa && !hasYm) return;
+  // The vendor's initialization and click requests also read the browser URL.
+  // Never initialize on account links carrying private tokens or addresses.
+  if (/[?&](?:reset|verify|token|code|state|email)=/i.test(location.search || "")) return;
+
+  let consentGranted = false;
+  let lastPage = "";
+  // Reset/verification tokens and other query values never belong in analytics.
+  const pagePath = (path) => String(path || location.pathname).split(/[?#]/)[0];
 
   const loadGa = () => {
     if (window.__wiringAnalyticsLoaded) return;
@@ -21,6 +29,7 @@
     window.gtag("consent", "update", { analytics_storage: "granted" });
     window.gtag("js", new Date());
     window.gtag("config", gaId, {
+      send_page_view: false,
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
     });
@@ -40,27 +49,35 @@
     script.src = "https://mc.yandex.ru/metrika/tag.js";
     document.head.appendChild(script);
     window.ym(Number(ymId), "init", {
-      clickmap: false,
+      defer: true,
+      clickmap: true,
       trackLinks: true,
       accurateTrackBounce: true,
-      webvisor: false,
+      webvisor: true,
+      sendTitle: false,
       ecommerce: false,
     });
   };
 
   const loadAnalytics = () => {
+    consentGranted = true;
     if (hasGa) loadGa();
     if (hasYm) loadYm();
+    page();
     document.dispatchEvent(new Event("wiring:analytics-change"));
   };
 
   const page = (path) => {
-    const url = path || location.pathname;
+    if (!consentGranted) return;
+    const url = pagePath(path);
+    if (url === lastPage) return;
+    const referer = lastPage;
+    lastPage = url;
     if (hasGa && typeof window.gtag === "function") {
       window.gtag("event", "page_view", { page_path: url });
     }
     if (hasYm && typeof window.ym === "function") {
-      window.ym(Number(ymId), "hit", url);
+      window.ym(Number(ymId), "hit", url, { referer, title: "WIRING" });
     }
   };
 
@@ -73,12 +90,33 @@
 
   const setConsent = (value) => {
     try { localStorage.setItem(consentKey, value); } catch (_) {}
+    document.cookie = `wiring-analytics-consent=${value === "granted" ? "granted" : "denied"}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
     removeBanner();
     if (value === "granted") loadAnalytics();
-    else document.dispatchEvent(new Event("wiring:analytics-change"));
+    else {
+      consentGranted = false;
+      lastPage = "";
+      if (hasYm && window.__wiringMetrikaLoaded) {
+        window.ym(Number(ymId), "destruct");
+        window.__wiringMetrikaLoaded = false;
+      }
+      document.dispatchEvent(new Event("wiring:analytics-change"));
+    }
   };
 
   window.WIRING_ANALYTICS = { page, setConsent, removeBanner, requestConsent: () => showBanner(true) };
+
+  // The legacy shell uses both history methods, plus browser back/forward.
+  // Observe URL changes here so server pages and the SPA share one integration.
+  for (const method of ["pushState", "replaceState"]) {
+    const original = window.history[method];
+    window.history[method] = function (...args) {
+      const result = original.apply(this, args);
+      page();
+      return result;
+    };
+  }
+  window.addEventListener("popstate", () => page());
 
   const isAuthPage = () => {
     const p = location.pathname;
@@ -103,7 +141,7 @@
     banner.setAttribute("aria-label", english ? "Optional analytics" : "аналитика посещений");
     banner.innerHTML = `
       <div class="analytics-consent-content">
-        <p>${english ? "You can allow optional visit analytics. It helps us understand which WIRING pages are useful." : "Можно разрешить необязательную аналитику посещений. Она помогает понять, какие страницы WIRING полезны."} <a href="/privacy" target="_blank" rel="noopener">${english ? "Learn more" : "Подробнее"}</a></p>
+        <p>${english ? "You can allow optional visit analytics, click and scroll maps. Page content is masked in session recordings; input values are not recorded." : "Можно разрешить необязательную аналитику посещений, карты кликов и прокрутки. Содержимое страниц маскируется в записях, значения полей не записываются."} <a href="/privacy" target="_blank" rel="noopener">${english ? "Learn more" : "Подробнее"}</a></p>
       </div>
       <div class="analytics-consent-actions">
         <button type="button" class="ghost slim" data-analytics-deny>${english ? "Not now" : "Не сейчас"}</button>
@@ -118,6 +156,9 @@
 
   let stored = "";
   try { stored = localStorage.getItem(consentKey) || ""; } catch (_) {}
+  if (stored === "granted" || stored === "denied") {
+    document.cookie = `wiring-analytics-consent=${stored}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+  }
   if (stored === "granted") loadAnalytics();
   else if (!stored) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => showBanner(), { once: true });

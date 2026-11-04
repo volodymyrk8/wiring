@@ -273,4 +273,33 @@
 .photoGroup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
 .photoGroup img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
 
+.threadContent {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 100%;
+  min-width: 0;
+}
+
+.threadContent > :global(.bubble-wrap):last-child { margin-bottom: 10px; }
+.threadContent > :global(.hint) {
+  align-self: center;
+  max-width: 330px;
+  margin: auto 0 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-2);
+  text-align: center;
+  line-height: 1.45;
+}
+
 .recordingNotice { margin: 0; padding: 8px 14px; color: var(--ink); font-size: 12px; line-height: 1.4; background: var(--bg-2); }
+
+.reactions { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; max-width: 100%; }
+.reaction { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 36px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: var(--ink); font-size: 17px; }
+.reaction[aria-pressed="true"] { border-color: var(--ink); background: var(--bg-2); }
+.reaction:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.reaction:disabled { opacity: .5; cursor: default; }
+.reactionPicker { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; padding: 4px 0; }

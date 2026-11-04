@@ -7,6 +7,7 @@ export type LikesFilters = {
   min_age: number;
   max_age: number;
   city: string;
+  country?: string;
 };
 
 export type LikeCard = {
@@ -33,6 +34,7 @@ export type LikesCatalog = {
   intents?: CatalogItem[];
   places?: PlaceBlock[];
   city_search?: Record<string, string[]>;
+  country_search?: Record<string, string[]>;
 };
 
 export type LikesHostBridge = {

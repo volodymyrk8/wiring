@@ -21,6 +21,9 @@ export function createApi(basePath = ""): ApiClient {
   return async function api<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
     const headers = new Headers(options.headers);
     headers.set("X-Wiring-Language", getLanguage());
+    if (path === "/api/register" || /^\/api\/auth\/[^/]+\/start$/.test(path)) {
+      headers.set("X-Wiring-Registration-Tracking", "server-v1");
+    }
     if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }

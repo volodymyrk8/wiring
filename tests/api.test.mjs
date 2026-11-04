@@ -11,6 +11,19 @@ const { outputText } = ts.transpileModule(source, {
 });
 const { createApi } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 
+test("new web registration and OAuth explicitly opt into server goal ownership", async (t) => {
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    requests.push(new Request(`http://localhost${url}`, init));
+    return Response.json({ ok: true });
+  });
+  const api = createApi();
+  for (const path of ["/api/register", "/api/auth/google/start", "/api/login"]) {
+    await api(path, { method: "POST", body: "{}" });
+  }
+  assert.deepEqual(requests.map(r => r.headers.get("X-Wiring-Registration-Tracking")), ["server-v1", "server-v1", null]);
+});
+
 for (const headerName of ["Content-Type", "content-type", "CONTENT-TYPE"]) {
   test(`support JSON has a single content type with ${headerName}`, async (t) => {
     let request;

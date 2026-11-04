@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import time
 from typing import Any
@@ -157,9 +158,11 @@ def send_user_push(
     tag: str,
     last_seen: int = 0,
 ) -> None:
-    """Deliver a push when the site is not being polled. Failures stay local."""
-    if last_seen and time.time() - int(last_seen) < 120:
-        return
+    """Send to opted-in devices regardless of recent API activity.
+
+    last_seen cannot distinguish a background tab or a just-closed app from
+    someone reading. Dropping here permanently lost notifications after closing.
+    """
     if not _push_allowed(conn, user_id):
         return
     ensure_push_tables(conn)
@@ -204,6 +207,7 @@ def _deliver(subscription: dict[str, Any], payload: str, private_pem: str, subje
     try:
         from pywebpush import WebPushException, webpush
     except ImportError:
+        logging.getLogger(__name__).error("Web push unavailable: pywebpush is not installed")
         return "skip"
     try:
         webpush(
@@ -217,6 +221,7 @@ def _deliver(subscription: dict[str, Any], payload: str, private_pem: str, subje
     except WebPushException as exc:
         response = getattr(exc, "response", None)
         code = getattr(response, "status_code", None)
+        logging.getLogger(__name__).warning("Web push rejected: HTTP %s", code if isinstance(code, int) else "unknown")
         if code in {404, 410}:
             return "gone"
         return "fail"

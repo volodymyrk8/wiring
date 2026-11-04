@@ -28,6 +28,7 @@ if [[ -f package.json ]]; then
   npm run test:deck
   npm run test:analytics
   npm run test:inbox
+  npm run test:push
 fi
 
 if [[ -x .venv/bin/python ]]; then

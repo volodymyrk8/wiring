@@ -329,5 +329,5 @@ def last_snooze(conn: Connection, uid: int):
     ).fetchone()
 
 
-def unsnooze(conn: Connection, uid: int, other_id: int) -> None:
-    conn.execute("DELETE FROM snoozes WHERE user_id = ? AND other_id = ?", (uid, other_id))
+def unsnooze(conn: Connection, uid: int, other_id: int) -> bool:
+    return bool(conn.execute("DELETE FROM snoozes WHERE user_id = ? AND other_id = ?", (uid, other_id)).rowcount)

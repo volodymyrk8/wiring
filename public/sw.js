@@ -7,8 +7,7 @@ self.addEventListener("push", (event) => {
   }
   event.waitUntil(
     (async () => {
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      if (windows.some((client) => client.visibilityState === "visible")) return;
+      // Every userVisibleOnly push must produce a notification, even with a visible tab.
       await self.registration.showNotification(payload.title || "WIRING", {
         body: payload.body || "",
         icon: "/public/icon-180.png",

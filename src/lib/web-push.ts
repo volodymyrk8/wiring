@@ -22,8 +22,10 @@ export function iosNeedsHomeScreen(): boolean {
 /** Subscribe or drop the browser push endpoint. Never requests permission. */
 export async function syncWebPush(api: ApiClient, enabled: boolean): Promise<"ok" | "unsupported" | "unavailable"> {
   if (!webPushSupported()) return "unsupported";
-  const registration = await navigator.serviceWorker.register("/sw.js");
-  const existing = await registration.pushManager.getSubscription();
+  await navigator.serviceWorker.register("/sw.js");
+  // register() may resolve while the first worker is still installing.
+  const registration = await navigator.serviceWorker.ready;
+  let existing = await registration.pushManager.getSubscription();
   if (!enabled) {
     if (existing) {
       await api("/api/push/unsubscribe", {
@@ -37,11 +39,19 @@ export async function syncWebPush(api: ApiClient, enabled: boolean): Promise<"ok
   if (Notification.permission !== "granted") return "unavailable";
   const key = await api<{ publicKey?: string }>("/api/push/public-key");
   if (!key.publicKey) return "unavailable";
+  const applicationServerKey = urlBase64ToBytes(key.publicKey);
+  const previousKey = existing?.options?.applicationServerKey;
+  if (existing && previousKey && !sameKey(new Uint8Array(previousKey), applicationServerKey)) {
+    const endpoint = existing.endpoint;
+    await existing.unsubscribe();
+    await api("/api/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) });
+    existing = null;
+  }
   const subscription =
     existing ||
     (await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToBytes(key.publicKey) as BufferSource,
+      applicationServerKey: applicationServerKey as BufferSource,
     }));
   await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(subscription.toJSON()) });
   return "ok";
@@ -51,4 +61,24 @@ export function syncWebPushIfGranted(api: ApiClient, user: { notify_enabled?: bo
   if (!user || user.notify_enabled === false || user.notify_push === false) return;
   if (!webPushSupported() || Notification.permission !== "granted") return;
   void syncWebPush(api, true).catch(() => undefined);
+}
+
+function sameKey(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, index) => byte === b[index]);
+}
+
+/** Polling fallback for browsers without a registered push subscription. */
+export async function pingBrowserFallback(text: string): Promise<void> {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted" || !text) return;
+  if (webPushSupported()) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      if (await registration?.pushManager.getSubscription()) return;
+    } catch { /* Keep the fallback when worker lookup is unavailable. */ }
+  }
+  try {
+    const note = new Notification("WIRING", { body: text, icon: "/public/favicon.svg", tag: text.slice(0, 48), requireInteraction: true });
+    note.onclick = () => { window.focus(); note.close(); };
+    setTimeout(() => note.close(), 20000);
+  } catch { /* Some mobile browsers only support service worker notifications. */ }
 }

@@ -50,6 +50,7 @@ export type SelectProps<T extends string = string> = {
   title?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  onSearchChange?: (query: string) => void;
 };
 
 export function Select<T extends string = string>({
@@ -74,6 +75,7 @@ export function Select<T extends string = string>({
   title,
   searchable = false,
   searchPlaceholder = tr("Найти…"),
+  onSearchChange,
 }: SelectProps<T>) {
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? options[0]?.value);
   const [isOpen, setIsOpen] = useState(false);
@@ -95,6 +97,7 @@ export function Select<T extends string = string>({
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
+      onSearchChange?.("");
       return;
     }
     if (!searchable) return;
@@ -102,12 +105,10 @@ export function Select<T extends string = string>({
     return () => cancelAnimationFrame(frame);
   }, [isOpen, searchable]);
 
-  const needle = query.trim().toLocaleLowerCase(getLocale());
+  const fold = (value: string) => value.toLocaleLowerCase(getLocale()).replaceAll("ё", "е");
+  const needle = fold(query.trim());
   const visibleOptions = searchable && needle
-    ? options.filter((option) => {
-        const hay = (option.searchText || option.label).toLocaleLowerCase(getLocale());
-        return hay.includes(needle);
-      })
+    ? options.filter((option) => fold(`${option.label} ${option.searchText || ""}`).includes(needle))
     : options;
 
   useEffect(() => {
@@ -248,7 +249,7 @@ export function Select<T extends string = string>({
                   event.stopPropagation();
                   if (event.key === "Enter") event.preventDefault();
                 }}
-                onInput={(event) => setQuery(event.currentTarget.value)}
+                onInput={(event) => { setQuery(event.currentTarget.value); onSearchChange?.(event.currentTarget.value); }}
               />
             </div>
           ) : null}

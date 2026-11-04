@@ -71,12 +71,15 @@ def claim_feed(
         "AND EXISTS (SELECT 1 FROM feed_history h WHERE h.user_id = ? AND h.other_id = users.id AND h.excluded_at IS NULL)"
     )
     cards: list[dict[str, Any]] = []
+    selected_ids: set[int] = set()
     has_more = False
     now = int(time.time())
 
     def take(rows: list[Row], *, replay: bool) -> None:
         nonlocal has_more
         for row in rows:
+            if int(row["id"]) in selected_ids:
+                continue
             card = eligible(row)
             if card is None:
                 continue
@@ -84,6 +87,7 @@ def claim_feed(
                 has_more = True
                 return
             if replay:
+                selected_ids.add(int(row["id"]))
                 cards.append(card)
                 continue
             inserted = conn.execute("""
@@ -91,6 +95,7 @@ def claim_feed(
                 VALUES (?, ?, ?) ON CONFLICT (user_id, other_id) DO NOTHING
             """, (user_id, row["id"], now)).rowcount
             if inserted:
+                selected_ids.add(int(row["id"]))
                 cards.append(card)
 
     take(fetch(unseen_sql), replay=False)

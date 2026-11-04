@@ -77,3 +77,24 @@ class RecommendationsTests(unittest.TestCase):
         self.assertEqual(source, "taste")
         self.assertEqual(result[0]["id"], 3)
         rank.assert_not_called()
+
+    def test_taste_reasons_use_current_viewer_diagnoses_not_liked_profiles(self):
+        viewer = {"id": 1, "age": 30, "neuro": ["adhd"]}
+        likes = [{"id": i, "age": 30, "neuro": ["asd"]} for i in range(20, 23)]
+        candidate = {"id": 2, "age": 30, "neuro": ["asd", "adhd"]}
+        conn = FakeConnection([candidate], likes=likes)
+        first, source = select_recommendations(conn, viewer, lambda card: dict(card))
+        self.assertEqual(source, "taste")
+        first_reasons = ". ".join(first[0]["recommendation_reasons"])
+        self.assertIn("СДВГ", first_reasons)
+        self.assertNotIn("РАС", first_reasons)
+
+        viewer["neuro"] = ["asd"]
+        updated, _ = select_recommendations(conn, viewer, lambda card: dict(card))
+        updated_reasons = ". ".join(updated[0]["recommendation_reasons"])
+        self.assertIn("РАС", updated_reasons)
+        self.assertNotIn("СДВГ", updated_reasons)
+
+        viewer["neuro"] = []
+        cleared, _ = select_recommendations(conn, viewer, lambda card: dict(card))
+        self.assertNotIn("диагнозах", ". ".join(cleared[0]["recommendation_reasons"]))

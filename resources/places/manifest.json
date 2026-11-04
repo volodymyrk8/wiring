@@ -1,0 +1,14 @@
+{
+  "source": "https://download.geonames.org/export/dump/cities500.zip",
+  "source_sha256": "fc89c44c54a66fe05d1d0060209bb1dd5090ee1cc86f0bd92c198a606c81103e",
+  "countries_source": "https://github.com/unicode-org/cldr-json",
+  "input_sha256": {
+    "cities500.zip": "fc89c44c54a66fe05d1d0060209bb1dd5090ee1cc86f0bd92c198a606c81103e",
+    "countries-ru.json": "305ba1f9eecb1b0151ab081a111aaa8a5898d38c9d57bfbfa125734e508a2389",
+    "countries-en.json": "1326fb3bcdf8b8cf63df73ea02ea7f8bf7a8362cbb60bd12bcdb53f3ad22bf04",
+    "admin1CodesASCII.txt": "2e4867f5397acb056ea26377601b57af37cb4c81399770225018e9e439e91ad3"
+  },
+  "records": 230662,
+  "city_license": "CC BY 4.0",
+  "country_license": "Unicode-3.0"
+}

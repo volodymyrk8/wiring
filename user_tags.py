@@ -47,7 +47,8 @@ def normalize_user_tags(neuro: list[str], vibe: list[str]) -> tuple[list[str], l
 
 
 def filter_hide_tags(items: list[str]) -> list[str]:
-    allowed = NEURO_IDS | ACTIVE_VIBE_IDS
+    # Visibility restrictions may contain vibes only, never diagnoses.
+    allowed = ACTIVE_VIBE_IDS
     out: list[str] = []
     seen: set[str] = set()
     for item in items:

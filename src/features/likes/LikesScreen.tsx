@@ -1,3 +1,4 @@
+import { CitySelect } from "@/components/ui/CitySelect";
 import { tr } from "@/lib/i18n";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
@@ -6,7 +7,7 @@ import { getErrorMessage } from "@/lib/get-error-message";
 import { profileMenuAvatarUrl } from "@/lib/profile-photo";
 import type { ProfileUser } from "@/features/profile/types";
 import { applyNeuroToggle, splitCatalogTags, tagSearchHaystack } from "@/lib/catalog-tags";
-import { citySelectOptions } from "@/lib/places";
+import { countrySelectOptions, withCountry } from "@/lib/places";
 import { sharedVibeIdSet } from "@/lib/shared-vibes";
 import { LIKES_SORT_OPTIONS, readLikesSort, sortLikeCards, storeLikesSort } from "./sort-likes";
 import type { LikeCard, LikesFilters, LikesHostBridge, LikesSort } from "./types";
@@ -29,7 +30,7 @@ const iconSort = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const iconLike = "♡";
 
 const activeFilters = (filters: LikesFilters) => Boolean(
-  filters.neuro.length || filters.vibe.length || filters.intents.length || filters.city || filters.min_age !== 18 || filters.max_age !== 99,
+  filters.neuro.length || filters.vibe.length || filters.intents.length || filters.country || filters.city || filters.min_age !== 18 || filters.max_age !== 99,
 );
 
 const photoFor = (host: LikesHostBridge, item: LikeCard) => avatarUrl(host.basePath, item.photo, item.name);
@@ -40,7 +41,7 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
     setDraft(filters);
   }, [filters]);
   const places = host.catalog.places || [];
-  const cities = places.flatMap((place) => place.cities).filter((city, index, list) => list.indexOf(city) === index);
+  const countryOptions = countrySelectOptions(places, host.catalog.country_search, { value: "", label: tr("Любая") });
   const update = <K extends keyof LikesFilters>(key: K, value: LikesFilters[K]) => setDraft((current) => ({ ...current, [key]: value }));
   return (
     <div class={styles.filters}>
@@ -60,7 +61,8 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
         <label>{tr("от")}<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
         <label>{tr("до")}<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
       </div>
-      <Select className={styles.cityField} label={tr("Город")} id="likes-city" placeholder={tr("неважно")} searchable searchPlaceholder={tr("Город")} options={citySelectOptions(cities, host.catalog.city_search, { value: "", label: tr("неважно") })} value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город")} />
+      <Select className={styles.cityField} label={tr("Страна")} id="likes-country" searchable searchPlaceholder={tr("Страна")} options={countryOptions} value={draft.country || ""} onChange={(value) => setDraft((current) => withCountry(current, value, places))} ariaLabel={tr("Страна в лайках")} />
+      <CitySelect api={host.api} places={places} country={draft.country} emptyLabel={tr("неважно")} className={styles.cityField} label={tr("Город")} id="likes-city" value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город")} />
       <div class={styles.filterFooter}>
         <Button variant="ghost" slim onClick={onClear}>{tr("сбросить")}</Button>
         <Button variant="solid" slim onClick={() => onApply(draft)}>{tr("применить")}</Button>
@@ -181,7 +183,7 @@ export function LikesScreen({ host }: { host: LikesHostBridge }) {
     }
   };
 
-  const clear = () => void apply({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" });
+  const clear = () => void apply({ neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, country: "", city: "" });
 
   const redeem = async () => {
     if (!code.trim() || busy) return;

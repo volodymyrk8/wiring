@@ -14,11 +14,14 @@
     "test:deck:browser": "node tests/deck-browser.test.mjs",
     "test:profile:browser": "node tests/own-profile-browser.test.mjs",
     "test:ui:browser": "node tests/ui-bugs-browser.test.mjs",
+    "test:trello:browser": "node tests/trello-bugs-browser.test.mjs",
     "test:admin:browser": "node tests/admin-tabs-browser.test.mjs",
     "test:inbox": "node --test tests/inbox.test.mjs",
     "test:analytics": "node --test tests/registration-analytics.test.mjs",
     "test:i18n": "node --test tests/i18n.test.mjs",
-    "test:i18n:browser": "node tests/i18n-browser.test.mjs"
+    "test:i18n:browser": "node tests/i18n-browser.test.mjs",
+    "test:push": "node --test tests/web-push.test.mjs",
+    "test:push:browser": "node tests/web-push-browser.test.mjs"
   },
   "dependencies": {
     "preact": "^10.26.4"

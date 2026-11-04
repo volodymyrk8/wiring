@@ -7,6 +7,10 @@ NEURO: list[dict[str, str]] = [
     {"id": "adhd", "label": "СДВГ (ADHD)", "hint": "сто мыслей в минуту 24/7"},
     {"id": "audhd", "label": "АуСДВГ (AuDHD)", "hint": "к-к-комбо! РАС и СДВГ в одном флаконе"},
     {"id": "bpd", "label": "ПРЛ (BPD)", "hint": "интенсивность, крайности и фонтан эмоций"},
+    {"id": "schizoid", "label": "ШРЛ", "hint": "Шизоидное расстройство личности"},
+    {"id": "ocpd", "label": "ОКРЛ", "hint": "Ананкастное (обсессивно-компульсивное) расстройство личности"},
+    {"id": "npd", "label": "НРЛ", "hint": "Нарциссическое расстройство личности"},
+    {"id": "schizoaffective", "label": "ШАР", "hint": "Шизоаффективное расстройство"},
     {"id": "ocd", "label": "ОКР (OCD)", "hint": "мозг требует навязчивых ритуалов"},
     {"id": "bipolar", "label": "БАР-спектр", "hint": "эра прайма, эра депрессии, и так по кругу"},
     {"id": "cptsd", "label": "КПТСР (CPTSD)", "hint": "всегда настороже из-за длительной травмы"},
@@ -126,7 +130,7 @@ SEED_PHOTOS = set(PORTRAITS) | set(PEOPLE)
 
 
 def catalog_payload() -> dict:
-    from cities import city_search_index, places_payload
+    from cities import city_search_index, country_search_index, places_payload
     from glossary import enrich
 
     return {
@@ -137,6 +141,7 @@ def catalog_payload() -> dict:
         "intents": INTENTS,
         "places": places_payload(),
         "city_search": city_search_index(),
+        "country_search": country_search_index(),
         "prompts": PROMPTS,
         "report_reasons": REPORT_REASONS,
         "default_albums": DEFAULT_ALBUMS,

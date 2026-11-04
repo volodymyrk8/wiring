@@ -46,11 +46,11 @@
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
     window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
   </script>
-  <script src="{{ base_path }}/public/analytics.js?v=5" defer></script>
+  <script src="{{ base_path }}/public/analytics.js?v=8" defer></script>
   {% endif %}
 </head>
-<body>
-  <div id="app" data-base="{{ base_path }}" data-registration-created="{{ 'true' if registration_created else 'false' }}"></div>
-  <script type="module" src="{{ base_path }}/public/dist/app.js?v=94"></script>
+<body class="ym-hide-content">
+  <div id="app" data-base="{{ base_path }}" data-registration-created="{{ 'true' if registration_created else 'false' }}" data-registration-managed="{{ 'true' if registration_managed else 'false' }}"></div>
+  <script type="module" src="{{ base_path }}/public/dist/app.js?v=20261102-archive-order"></script>
 </body>
 </html>

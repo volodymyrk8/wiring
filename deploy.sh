@@ -100,6 +100,8 @@ install -m 644 "\$REMOTE_DIR/deploy/wiring-purge.service" /etc/systemd/system/wi
 install -m 644 "\$REMOTE_DIR/deploy/wiring-purge.timer" /etc/systemd/system/wiring-purge.timer
 install -m 644 "\$REMOTE_DIR/deploy/wiring-sendpulse.service" /etc/systemd/system/wiring-sendpulse.service
 install -m 644 "\$REMOTE_DIR/deploy/wiring-sendpulse.timer" /etc/systemd/system/wiring-sendpulse.timer
+install -m 644 "\$REMOTE_DIR/deploy/wiring-registrations.service" /etc/systemd/system/wiring-registrations.service
+install -m 644 "\$REMOTE_DIR/deploy/wiring-registrations.timer" /etc/systemd/system/wiring-registrations.timer
 install -m 644 "\$REMOTE_DIR/deploy/nginx-dating.conf" /etc/nginx/snippets/dating.conf
 install -m 644 "\$REMOTE_DIR/deploy/nginx-wiring.conf" /etc/nginx/sites-available/wiring.conf
 ln -sfn /etc/nginx/sites-available/wiring.conf /etc/nginx/sites-enabled/wiring.conf
@@ -109,6 +111,7 @@ systemctl daemon-reload
 systemctl enable "\$SERVICE_NAME"
 systemctl enable --now wiring-purge.timer
 systemctl enable --now wiring-sendpulse.timer
+systemctl enable --now wiring-registrations.timer
 systemctl restart "\$SERVICE_NAME"
 
 NGINX_CONF=/etc/nginx/sites-available/lizaisyourfriend.lol.conf

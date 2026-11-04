@@ -1,5 +1,6 @@
 import { tr } from "@/lib/i18n";
 import { useEffect, useRef } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import type { ComponentChildren, JSX } from "preact";
 import styles from "./Modal.module.css";
 
@@ -102,7 +103,7 @@ export function Modal({
     }
   };
 
-  return (
+  return createPortal(
     <div
       class={`${styles.backdrop}${responsiveSheet ? ` ${styles.responsiveSheet}` : ""}`}
       onClick={handleBackdropClick}
@@ -149,6 +150,7 @@ export function Modal({
 
         {footer && <div class={styles.footer}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

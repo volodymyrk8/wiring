@@ -1,4 +1,5 @@
 import { tr, syncAccountLanguage } from "@/lib/i18n";
+import { pingBrowserFallback } from "@/lib/web-push";
 import { showToast } from "./toasts";
 import { applyTheme, themeNow } from "../lib/theme";
 import { fetchFeed, resetFeed, fetchRecommendations } from "./feed";
@@ -56,7 +57,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
   window.visualViewport?.addEventListener("scroll", pinChatHeight);
   const FILTER_STORAGE_KEY = "wiring-deck-filters";
   const defaultDeckFilters = () => ({
-    neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "", gender: "",
+    neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, country: "", city: "", gender: "",
     hide_undiagnosed: false, real_only: false,
   });
   const readStoredFilters = (userId) => {
@@ -96,7 +97,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     personFrom: "deck",
     filters: defaultDeckFilters(),
     filtersOpen: false,
-    likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, city: "" },
+    likesFilters: { neuro: [], vibe: [], intents: [], min_age: 18, max_age: 99, country: "", city: "" },
     resetToken: "",
     verifyEmail: "",
     recycled: false,
@@ -277,22 +278,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
 
   const pingBrowser = (text) => {
     if (state.user?.notify_enabled === false || state.user?.notify_push === false) return;
-    if (typeof Notification === "undefined" || Notification.permission !== "granted" || !text) return;
-    try {
-      const note = new Notification("WIRING", {
-        body: text,
-        icon: "/public/favicon.svg",
-        tag: text.slice(0, 48),
-        requireInteraction: true,
-      });
-      note.onclick = () => {
-        window.focus();
-        note.close();
-      };
-      setTimeout(() => note.close(), 20000);
-    } catch {
-      /* Safari / denied */
-    }
+    void pingBrowserFallback(text);
   };
 
 
@@ -339,6 +325,7 @@ import { initRegistrationAnalytics } from "./registration-analytics";
     if ((f.intents || []).length) q.set("intent", f.intents.join(","));
     if (f.min_age && f.min_age !== 18) q.set("min_age", String(f.min_age));
     if (f.max_age && f.max_age !== 99) q.set("max_age", String(f.max_age));
+    if (f.country) q.set("country", f.country);
     if (f.city) q.set("city", f.city);
     const data = await api(`/api/likes?${q.toString()}`);
     state.likes = data.likes || [];

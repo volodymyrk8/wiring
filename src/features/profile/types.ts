@@ -20,6 +20,7 @@ export type ProfileUser = {
   intents?: string[];
   neuro?: string[];
   vibe?: string[];
+  /** Visibility exclusions for active vibe IDs only; diagnosis IDs are ignored. */
   hide_tags?: string[];
   seek_min_age?: number;
   seek_max_age?: number;
@@ -59,6 +60,7 @@ export type ProfileCatalog = {
   prompts?: CatalogItem[];
   places?: PlaceBlock[];
   city_search?: Record<string, string[]>;
+  country_search?: Record<string, string[]>;
 };
 
 export type ProfileHostBridge = {

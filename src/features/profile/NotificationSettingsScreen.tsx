@@ -47,7 +47,7 @@ export function NotificationSettingsScreen({ host }: { host: ProfileHostBridge }
       const nextUser = response.user as ProfileUser;
       setUser(nextUser);
       host.onUserUpdated(nextUser);
-      if (nextUser.notify_push && nextUser.notify_enabled !== false && Notification.permission === "granted") {
+      if (nextUser.notify_push && nextUser.notify_enabled !== false && typeof Notification !== "undefined" && Notification.permission === "granted") {
         const pushState = await syncWebPush(host.api, true);
         if (pushState === "unsupported") {
           host.toast(tr("в этом браузере пуш при закрытом сайте недоступен — останутся уведомления, пока вкладка открыта"));
@@ -105,7 +105,7 @@ export function NotificationSettingsScreen({ host }: { host: ProfileHostBridge }
           {enabled && permission === "denied" ? <p class={styles.hint}>{tr("Браузер запретил уведомления. Их можно включить в настройках сайта в Safari или Chrome.")}</p> : null}
           {enabled && permission === "unsupported" ? <p class={styles.hint}>{tr("Этот браузер не показывает системные уведомления — останутся подсказки на сайте и счётчики в меню.")}</p> : null}
           {enabled && permission !== "unsupported" && !webPushSupported() ? <p class={styles.hint}>{tr("Закрытый сайт этот браузер не будит. Уведомления останутся, пока вкладка WIRING открыта.")}</p> : null}
-          {enabled && webPushSupported() && iosNeedsHomeScreen() ? <p class={styles.hint}>{tr("На iPhone пуш при закрытом Safari приходит, если добавить WIRING на экран «Домой». В обычной вкладке уведомления работают, пока сайт открыт.")}</p> : null}
+          {enabled && iosNeedsHomeScreen() ? <p class={styles.hint}>{tr("На iPhone пуш при закрытом Safari приходит, если добавить WIRING на экран «Домой». В обычной вкладке уведомления работают, пока сайт открыт.")}</p> : null}
           {error ? <p class={styles.error} role="alert">{error}</p> : null}
         </section>
       </main>

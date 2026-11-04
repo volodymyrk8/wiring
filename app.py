@@ -16,11 +16,13 @@ from functools import wraps
 from typing import Any
 from urllib.parse import urlencode, urlparse
 
-from flask import Flask, Response, abort, g, jsonify, make_response, redirect, render_template, request, send_file, send_from_directory, session
+from flask import Flask, Response, abort, g, has_request_context, jsonify, make_response, redirect, render_template, request, send_file, send_from_directory, session
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from admin import collect_stats, ensure_filter_tables, marketing_audience_tsv, track_filters
+from place_validation import CityError, ensure_place_resolutions, validate_city
+from message_reactions import REACTIONS, reactions_for, set_reaction
 from database import (
     Connection,
     IntegrityError,
@@ -55,6 +57,7 @@ from icebreakers import (
 from jev_ranker import jev_access
 from recommendations import select_recommendations
 from sendpulse_sync import ensure_sync_table
+import registration_events
 from glossary import glossary_html
 from legal_pages import ACCOUNT_DELETION_HTML, CHILD_SAFETY_HTML, LEGAL_INDEX_HTML, MARKETING_HTML, PRIVACY_HTML, RULES_HTML, SUPPORT_HTML
 from matchmaker import pack_profile, seed_decides_like
@@ -464,6 +467,12 @@ def init_db() -> None:
             FOREIGN KEY (from_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (to_id) REFERENCES users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS message_reactions (
+            message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            emoji TEXT NOT NULL,
+            PRIMARY KEY (message_id, user_id)
+        );
         CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_id, to_id, id);
         CREATE TABLE IF NOT EXISTS blocks (
             from_id INTEGER NOT NULL,
@@ -662,8 +671,10 @@ def init_db() -> None:
 
     ensure_legacy_vibe_cleanup(conn)
     ensure_push_tables(conn)
+    ensure_place_resolutions(conn)
     mobile_api.ensure_mobile_tables(conn)
     social_auth.ensure_tables(conn)
+    registration_events.ensure_tables(conn)
     conn.execute("UPDATE users SET profile_setup_required = 1 WHERE LOWER(TRIM(name)) IN (?, ?)", ("участник", "participant"))
 
     # Fake deck fillers are retired: wipe any leftover seed rows on boot.
@@ -1212,11 +1223,11 @@ def parse_profile(
     if not (draft and age == 0) and not (18 <= age <= 99):
         return None, tr("только 18+")
     if city:
-        if len(city) < 2 or len(city) > 48:
+        if len(city) < 2 or len(city) > 256:
             if draft:
                 city = "—"
             else:
-                return None, tr("город: 2–48 символов")
+                return None, tr("город: 2–256 символов")
         elif not is_catalog_city(city):
             if draft and len(city) >= 2:
                 pass
@@ -1274,9 +1285,6 @@ def parse_profile(
                 seek_place = as_city
             elif seek_place not in countries:
                 return None, tr("страна или город из списка")
-    hide: list[str] | None = None
-    if "hide_tags" in data:
-        hide = parse_hide_tags(data.get("hide_tags"))
     payload: dict[str, Any] = {
         "name": name,
         "age": age,
@@ -1295,7 +1303,6 @@ def parse_profile(
         "seek_min_age": seek_min,
         "seek_max_age": seek_max,
         "seek_place": seek_place,
-        "hide_tags": hide,
     }
     photo = str(data.get("photo") or "").strip()
     if photo and photo not in SEED_PHOTOS:
@@ -1340,24 +1347,10 @@ def mutual_looking_ok(a_looking: str, a_gender: str, b_looking: str, b_gender: s
     return looking_matches(a_looking, b_gender) and looking_matches(b_looking, a_gender)
 
 
-def parse_hide_tags(raw: Any) -> list[str]:
+def hide_tags_of(row) -> list[str]:
     from user_tags import filter_hide_tags
-
-    if isinstance(raw, list):
-        items = [str(x).strip() for x in raw if str(x).strip()]
-    else:
-        items = [p.strip() for p in str(raw or "").split(",") if p.strip()]
-    return filter_hide_tags(items)
-
-
-def hide_tags_of(row: Row | dict[str, Any] | None) -> list[str]:
-    if not row:
-        return []
-    keys = set(row.keys()) if hasattr(row, "keys") else set()
-    if "hide_tags" not in keys and not isinstance(row, dict):
-        return []
-    raw = row["hide_tags"] if not isinstance(row, dict) else row.get("hide_tags")
-    return parse_hide_tags(raw)
+    raw = row.get("hide_tags", "") if row else ""
+    return filter_hide_tags(raw if isinstance(raw, list) else str(raw or "").split(","))
 
 
 def discovery_allows(owner: Row, viewer: Row) -> bool:
@@ -1378,12 +1371,9 @@ def discovery_allows(owner: Row, viewer: Row) -> bool:
         viewer_country = country_of_city(viewer_city)
         if place != viewer_city and place != viewer_country:
             return False
-    blocked = hide_tags_of(owner)
-    if blocked:
-        tags = tags_for(int(viewer["id"]))
-        mine = set(tags.get("neuro") or []) | set(tags.get("vibe") or [])
-        if mine & set(blocked):
-            return False
+    hidden_vibes = hide_tags_of(owner)
+    if hidden_vibes and set(tags_for(int(viewer["id"]))["vibe"]) & set(hidden_vibes):
+        return False
     return True
 
 
@@ -1467,6 +1457,9 @@ def purge_user_aux_data(conn: Connection, uid: int) -> None:
     Database requirement: The user record in 'users' is NEVER deleted!
     """
     conn.execute("DELETE FROM sendpulse_contacts WHERE user_id = ?", (uid,))
+    conn.execute("""UPDATE registration_events SET client_id = NULL, consent_at = NULL,
+                 delivery_state = CASE WHEN delivery_state IN ('pending', 'needs_attribution', 'sending')
+                 THEN 'erased' ELSE delivery_state END WHERE user_id = ?""", (uid,))
     for message in conn.execute("SELECT * FROM messages WHERE from_id = ? OR to_id = ?", (uid, uid)).fetchall():
         for photo in _message_photos(message):
             _unlink_upload(photo)
@@ -1668,7 +1661,23 @@ def _archive_lists(conn: Connection, uid: int) -> dict[str, list[dict[str, Any]]
             (uid,),
         )
     ]
-    return {"likes": likes, "passes": passes, "blocks": blocks}
+    snoozes = [
+        _archive_card(row)
+        for row in conn.execute(
+            """
+            SELECT u.* FROM users u
+            JOIN snoozes s ON s.other_id = u.id AND s.user_id = ?
+            WHERE COALESCE(u.deleted_at, 0) = 0 AND s.until_at > ?
+              AND NOT EXISTS (SELECT 1 FROM blocks b
+                  WHERE (b.from_id = ? AND b.to_id = u.id)
+                     OR (b.from_id = u.id AND b.to_id = ?))
+            ORDER BY s.created_at DESC, u.id DESC
+            LIMIT 200
+            """,
+            (uid, int(time.time()), uid, uid),
+        )
+    ]
+    return {"likes": likes, "passes": passes, "blocks": blocks, "snoozes": snoozes}
 
 
 def _release_to_feed(conn: Connection, uid: int, other_id: int) -> None:
@@ -1712,6 +1721,7 @@ def _unmatch_pair(conn: Connection, uid: int, other_id: int) -> None:
 
 
 def _spa() -> Response:
+    token = session.pop("registration_receipt", "")
     response = make_response(render_template(
         "index.html",
         base_path=BASE_PATH,
@@ -1720,9 +1730,12 @@ def _spa() -> Response:
         meta_description=SITE_META_DESCRIPTION,
         og_description=SITE_OG_DESCRIPTION,
         registration_created=bool(session.pop("registration_created", False)),
+        registration_managed=bool(token),
     ))
     # OAuth registration is a one-shot signal, never replayed from cached HTML.
     response.headers["Cache-Control"] = "no-store"
+    if token:
+        _set_registration_receipt(response, token)
     return response
 
 
@@ -1765,6 +1778,64 @@ def spa_app(**_kwargs):
 def health():
     count = db().execute("SELECT COUNT(*) AS n FROM users WHERE COALESCE(deleted_at, 0) = 0").fetchone()["n"]
     return jsonify({"ok": True, "users": count})
+
+
+def validate_user_city(conn, raw: str, country: str = "") -> str:
+    def budget():
+        if too_many(f"city-ai:{session['uid']}", 12, 60):
+            raise CityError("Подожди немного перед следующей проверкой города", 429)
+    return validate_city(conn, raw, country, before_ai=budget)
+
+
+@app.post("/api/places/resolve")
+@login_required
+def api_resolve_place():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": tr("Проверь название города")}), 400
+    if too_many(f"place-resolve:{session['uid']}", 12, 60):
+        return jsonify({"ok": False, "error": tr("Подожди немного перед следующей проверкой города")}), 429
+    try:
+        value = validate_user_city(db(), str(data.get("city") or ""), str(data.get("country") or ""))
+    except CityError as error:
+        return jsonify({"ok": False, "error": tr(str(error))}), error.status
+    if not value:
+        return jsonify({"ok": False, "error": tr("Проверь название города")}), 400
+    db().commit()
+    return jsonify({"ok": True, "city": value, "country": country_of_city(value)})
+
+
+@app.get("/api/places")
+@login_required
+def api_places():
+    from world_places import key, search
+    query = str(request.args.get("q") or "").strip()[:120]
+    country = str(request.args.get("country") or "").strip()[:100]
+    include_countries = request.args.get("countries") == "1"
+    if too_many(f"place-search:{session['uid']}", 180, 60):
+        return jsonify({"ok": False, "error": tr("Подожди немного перед следующей проверкой города")}), 429
+    needle = key(query)
+    normalized_query = normalize_city(query) if needle else ''
+    options = []
+    if include_countries:
+        from cities import country_search_index
+        country_tokens = country_search_index()
+        for block in PLACES:
+            name = str(block["country"])
+            hay = " ".join(country_tokens.get(name, []))
+            if not needle or needle in hay or needle in key(tr(name)):
+                options.append({"value": name, "label": tr(name), "country": name})
+    for block in PLACES:
+        if country and country != block["country"]: continue
+        for city in block["cities"]:
+            if not needle or needle in key(str(city)) or normalized_query == city:
+                options.append({"value": city, "label": tr(str(city)), "country": block["country"]})
+    for item in search(query, country) if len(needle) >= 2 or country else []:
+        value = catalog_city(item['value']) or item['value']
+        options.append({**item, 'value': value, 'label': tr(value)})
+    seen = set()
+    options = [item for item in options if not (item["value"] in seen or seen.add(item["value"]))][:60]
+    return jsonify({"ok": True, "places": options})
 
 
 @app.get("/api/catalog")
@@ -1850,6 +1921,16 @@ def _create_registered_user(conn, email, password, name, consented_at, marketing
         ),
     )
     uid = int(cur.lastrowid)
+    headers = request.headers if has_request_context() else {}
+    cookies = request.cookies if has_request_context() else {}
+    native = headers.get("X-App-Platform") in ("ios", "android")
+    channel = getattr(g, "registration_channel", "native_email" if native else "web_email")
+    managed = getattr(g, "registration_server_managed", headers.get("X-Wiring-Registration-Tracking") == "server-v1" and not native)
+    managed = bool(managed and registration_events.load_config())
+    registration_events.record(conn, uid, consented_at, channel=channel, managed=managed,
+                               cookies=getattr(g, "registration_cookies", cookies))
+    if managed:
+        g.registration_receipt = registration_events.receipt(app.secret_key, uid)
     conn.execute("UPDATE users SET language = ? WHERE id = ?", (get_language(), uid))
     grant_signup_plus(conn, uid)
     ensure_referral_code(conn, uid)
@@ -1905,12 +1986,41 @@ def api_register():
         issue_email_verification(conn, uid, email)
         conn.commit()
         session.clear()
-        return jsonify({"ok": True, "needs_email_verify": True, "email": email})
+        return _registration_response({"ok": True, "needs_email_verify": True, "email": email})
     conn.commit()
     session.clear()
     session.permanent = True
     session["uid"] = uid
-    return jsonify({"ok": True, "user": current_user()})
+    return _registration_response({"ok": True, "user": current_user()})
+
+
+def _set_registration_receipt(response, token):
+    response.set_cookie("wiring-registration-receipt", token, max_age=registration_events.MAX_AGE,
+                        httponly=True, secure=request.is_secure, samesite="Lax", path=prefix("/api/analytics"))
+
+
+def _registration_response(payload):
+    token = getattr(g, "registration_receipt", "")
+    if token:
+        payload["registration_tracking"] = "server"
+    response = jsonify(payload)
+    if token:
+        _set_registration_receipt(response, token)
+    return response
+
+
+@app.post("/api/analytics/registration")
+def registration_attribution():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify(ok=False), 400
+    uid = registration_events.receipt_user(app.secret_key, request.cookies.get("wiring-registration-receipt"))
+    if not uid:
+        return jsonify(ok=False), 400
+    conn = db()
+    accepted = registration_events.attach(conn, uid, consent=data.get("consent"), client_id=data.get("client_id"))
+    conn.commit()
+    return jsonify(ok=accepted), 200 if accepted else 400
 
 
 def _authenticate(email: str, password: str):
@@ -2083,9 +2193,12 @@ def api_password_reset():
 @login_required
 def api_me_city():
     data = request.get_json(silent=True) or {}
-    city = normalize_city(str(data.get("city") or "").strip())
-    if not city or len(city) < 2 or len(city) > 48:
-        return jsonify({"ok": False, "error": tr("город: 2–48 символов")}), 400
+    try:
+        city = validate_user_city(db(), str(data.get("city") or "").strip())
+    except CityError as error:
+        return jsonify({"ok": False, "error": tr(str(error))}), error.status
+    if not city or len(city) < 2 or len(city) > 256:
+        return jsonify({"ok": False, "error": tr("город: 2–256 символов")}), 400
     if not is_catalog_city(city):
         return jsonify({"ok": False, "error": tr("выбери город из списка")}), 400
     conn = db()
@@ -2165,7 +2278,6 @@ def _merge_me_for_draft(me: Row, data: dict[str, Any]) -> dict[str, Any]:
         "seek_min_age": data.get("seek_min_age", me["seek_min_age"] if "seek_min_age" in me.keys() else 18),
         "seek_max_age": data.get("seek_max_age", me["seek_max_age"] if "seek_max_age" in me.keys() else 99),
         "seek_place": data.get("seek_place", me["seek_place"] if "seek_place" in me.keys() else ""),
-        "hide_tags": data.get("hide_tags", hide_tags_of(me)),
         "photo": data.get("photo", me["photo"]),
         "special_data_consent": data.get("special_data_consent"),
         "photo_rights_consent": data.get("photo_rights_consent"),
@@ -2183,6 +2295,17 @@ def api_patch_me():
     if not me:
         return jsonify({"ok": False, "error": tr("нет профиля")}), 401
     payload_in = _merge_me_for_draft(me, data)
+    if payload_in.get("city") and ("city" in data or not draft):
+        try:
+            payload_in["city"] = validate_user_city(conn, str(payload_in["city"]))
+        except CityError as error:
+            return jsonify({"ok": False, "error": tr(str(error))}), error.status
+    if data.get("seek_place") and country_of_city(str(data["seek_place"])):
+        try:
+            payload_in["seek_place"] = validate_user_city(conn, str(data["seek_place"]))
+        except CityError as error:
+            return jsonify({"ok": False, "error": tr(str(error))}), error.status
+
     # An uploaded photo lives on the photos row. It is not a seed portrait, and a
     # filter save must not fail just because that path is still on the profile.
     if str(payload_in.get("photo") or "") not in SEED_PHOTOS:
@@ -2215,15 +2338,13 @@ def api_patch_me():
     seek_min = parsed.get("seek_min_age")
     seek_max = parsed.get("seek_max_age")
     seek_place = parsed.get("seek_place")
-    hide = parsed.get("hide_tags")
     if seek_min is None:
         seek_min = int(me["seek_min_age"] or 18) if "seek_min_age" in me_keys else 18
     if seek_max is None:
         seek_max = int(me["seek_max_age"] or 99) if "seek_max_age" in me_keys else 99
     if seek_place is None:
         seek_place = str(me["seek_place"] or "") if "seek_place" in me_keys else ""
-    if hide is None:
-        hide = hide_tags_of(me)
+    hidden_vibes = hide_tags_of({"hide_tags": data["hide_tags"]}) if "hide_tags" in data else hide_tags_of(me)
     conn.execute(
         """
         UPDATE users SET name = ?, name_changed_at = ?, age = ?, city = ?, gender = ?, looking_for = ?, bio = ?,
@@ -2249,7 +2370,7 @@ def api_patch_me():
             seek_min,
             seek_max,
             seek_place,
-            ",".join(hide or []),
+            ",".join(hidden_vibes),
             uid,
         ),
     )
@@ -2452,6 +2573,7 @@ def api_feed():
     city_raw = str(request.args.get("city") or "").strip()
     city_q = catalog_city(city_raw) or ""
     unknown_city = bool(city_raw) and not city_q
+    country_q = str(request.args.get("country") or "").strip()
     real_only = str(request.args.get("real") or "") in {"1", "true", "yes"}
     hide_undiagnosed = str(request.args.get("hide_empty", "1")).lower() not in {"0", "false", "no"}
     gender_q = str(request.args.get("gender") or "").strip()
@@ -2492,6 +2614,8 @@ def api_feed():
     limit = max(1, min(limit_cap, request.args.get("limit", type=int) or limit_cap))
 
     def eligible(row):
+        if country_q and country_of_city(str(row["city"] or "")) != country_q:
+            return None
         if intent_filter and not any(i in intent_filter for i in intents_for_discovery(row)):
             return None
         return _eligible_card(me, row, neuro_filter, vibe_filter, blocked,
@@ -2499,7 +2623,7 @@ def api_feed():
                               hide_undiagnosed=hide_undiagnosed)
 
     narrowed = qa_feed or bool(
-        city_raw or gender_q or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99
+        country_q or city_raw or gender_q or neuro_filter or vibe_filter or intent_filter or min_age != 18 or max_age != 99
     )
     cards, has_more, generation = claim_feed(
         db(), int(me["id"]), min_age=min_age, max_age=max_age,
@@ -2771,6 +2895,7 @@ def api_likes():
     city_raw = str(request.args.get("city") or "").strip()
     city_q = catalog_city(city_raw) or ""
     unknown_city = bool(city_raw) and not city_q
+    country_q = str(request.args.get("country") or "").strip()
     min_age = max(18, min(99, min_age))
     max_age = max(18, min(99, max_age))
     if min_age > max_age:
@@ -2810,6 +2935,8 @@ def api_likes():
     plus = is_premium(me)
     people = []
     for row in rows:
+        if country_q and country_of_city(str(row["city"] or "")) != country_q:
+            continue
         if row["id"] in blocked or is_guest_email(str(row["email"])):
             continue
         if neuro_filter or vibe_filter:
@@ -3059,7 +3186,9 @@ def api_messages(other_id: int):
     peer_read_id = int(peer_read["last_read_id"]) if peer_read else 0
     by_id = {int(r["id"]): r for r in rows}
     _attach_reply_sources(conn, rows, by_id)
-    messages = [_message_payload(r, uid, peer_read_id, by_id) for r in rows]
+    reactions = reactions_for(conn, [int(r["id"]) for r in rows], uid)
+    messages = [{**_message_payload(r, uid, peer_read_id, by_id),
+                 "reactions": reactions.get(int(r["id"]), [])} for r in rows]
     peer = user_public(other, detail=True)
     me_row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
     me = user_public(me_row, detail=True) if me_row else None
@@ -3349,6 +3478,22 @@ def _reply_target(conn: Connection, uid: int, other_id: int, raw_reply: object) 
     return reply_to_id
 
 
+@app.put("/api/messages/<int:message_id>/reaction")
+@login_required
+def api_message_reaction(message_id: int):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or "emoji" not in data or (data["emoji"] is not None and data["emoji"] not in REACTIONS):
+        return jsonify({"ok": False, "error": tr("Недопустимая реакция")}), 400
+    conn = db()
+    # Serialize reactions on the message, including retries from multiple devices.
+    conn.execute("SELECT id FROM messages WHERE id = ? FOR UPDATE", (message_id,)).fetchone()
+    if not _thread_message(conn, session["uid"], message_id):
+        return jsonify({"ok": False, "error": tr("Сообщение недоступно")}), 404
+    reactions = set_reaction(conn, message_id, session["uid"], data["emoji"])
+    conn.commit()
+    return jsonify({"ok": True, "reactions": reactions})
+
+
 @app.patch("/api/messages/<int:message_id>")
 @login_required
 def api_edit_message(message_id: int):
@@ -3553,7 +3698,7 @@ def api_archive_revise():
     uid = session["uid"]
     data = request.get_json(silent=True) or {}
     action = str(data.get("action") or "")
-    if action not in {"unlike", "restore", "unblock", "unmatch"}:
+    if action not in {"unlike", "restore", "unblock", "unmatch", "unsnooze"}:
         return jsonify({"ok": False, "error": tr("неизвестное действие")}), 400
     try:
         other_id = int(data.get("user_id"))
@@ -3587,7 +3732,15 @@ def api_archive_revise():
         ).fetchone()
         if not swipe or swipe["direction"] != "pass":
             return jsonify({"ok": False, "error": tr("дизлайка нет")}), 404
+        unsnooze(conn, uid, other_id)
         _release_to_feed(conn, uid, other_id)
+    elif action == "unsnooze":
+        # Release delivery only: likes, permanent exclusions and blocks stay intact.
+        if unsnooze(conn, uid, other_id):
+            conn.execute(
+                "DELETE FROM feed_history WHERE user_id = ? AND other_id = ? AND excluded_at IS NULL",
+                (uid, other_id),
+            )
     elif action == "unblock":
         removed = conn.execute("DELETE FROM blocks WHERE from_id = ? AND to_id = ?", (uid, other_id))
         if not removed.rowcount:

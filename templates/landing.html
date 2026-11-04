@@ -33,14 +33,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/public/landing.css?v=5">
+  <link rel="stylesheet" href="/public/landing.css?v=copy2-5">
   <script src="/public/landing.js?v=3" defer></script>
   {% if google_analytics_id or yandex_metrika_id %}
   <script>
     window.WIRING_ANALYTICS_ID = {{ google_analytics_id | tojson }};
     window.WIRING_METRIKA_ID = {{ yandex_metrika_id | tojson }};
   </script>
-  <script src="/public/analytics.js?v=5" defer></script>
+  <script src="/public/analytics.js?v=8" defer></script>
   {% endif %}
 </head>
 {%- macro apple_icon() -%}
@@ -70,7 +70,7 @@
   {{ android_icon() }}<span class="store__text"><small>{{ _("бета для Android") }}</small><b>{{ _("Скачать APK") }}</b></span>
 </a>
 {%- endmacro -%}
-<body>
+<body class="ym-hide-content">
   <header class="top">
     <a class="brand" href="/" aria-label="{{ _('WIRING — на главную') }}">WIRING<span aria-hidden="true">.</span></a>
     <div class="prefs">
@@ -98,7 +98,7 @@
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero__copy">
         <p class="pill"><span class="pill__dot" aria-hidden="true"></span>{{ _("бета · iOS и Android") }}</p>
-        <h1 id="hero-title" class="hero__title">{{ _("Общение для тех, у кого") }} <em>{{ _("своя проводка") }}</em></h1>
+        <h1 id="hero-title" class="hero__title">{{ _("Общение для тех, у кого") }} <em>{{ _("другая проводка") }}</em></h1>
         <p class="hero__lead">{{ _("Аккаунт тот же, что на сайте.") }}</p>
       </div>
 
@@ -130,7 +130,7 @@
     </section>
 
     <section class="install" id="download" aria-labelledby="install-title">
-      <h2 id="install-title" class="install__title">{{ _("Как поставить") }}</h2>
+      <h2 id="install-title" class="install__title">{{ _("Как установить") }}</h2>
       <div class="platforms">
         <article class="platform platform--ios">
           <h3>iPhone</h3>

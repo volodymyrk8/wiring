@@ -11,6 +11,8 @@ from typing import Any, Iterable
 from catalog import INTENTS, NEURO, REPORT_REASONS, VIBE
 from report_moderation import report_count_against, report_reporter_count_against
 from devices import device_usage_stats
+from registration_events import summary as registration_summary
+from i18n import tr
 
 
 def _is_guest(email: str) -> bool:
@@ -386,6 +388,23 @@ def collect_stats(conn: Connection) -> dict[str, Any]:
     }
     payload.update(filter_usage_stats(conn))
     payload.update(device_usage_stats(conn))
+    labels = {
+        'historical': tr('Исторические — без отправки'),
+        'legacy_browser': tr('Браузерная цель (старый клиент)'),
+        'no_consent': tr('Нет согласия на аналитику'),
+        'needs_attribution': tr('Нет ClientID'),
+        'pending': tr('Ожидает отправки'),
+        'sending': tr('Отправляется'),
+        'submitted': tr('Принято Метрикой (API)'),
+        'rejected': tr('Отклонено Метрикой'),
+        'unknown': tr('Неизвестный результат — нужна сверка'),
+        'expired': tr('Истёк срок отправки'),
+        'erased': tr('Данные удалены'),
+    }
+    payload['registration_delivery'] = [
+        {**row, 'label': labels.get(row['delivery_state'], row['delivery_state'])}
+        for row in registration_summary(conn)
+    ]
     return payload
 
 

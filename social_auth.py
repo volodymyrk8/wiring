@@ -15,7 +15,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import jwt
-from flask import current_app, jsonify, redirect, request, session
+from flask import current_app, g, jsonify, redirect, request, session
+import registration_events
 from database import IntegrityError
 
 PROVIDERS = {
@@ -54,6 +55,9 @@ def ensure_tables(conn):
     ''')
     conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS native_challenge TEXT")
     conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS native_state TEXT")
+    conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS registration_managed INTEGER NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS analytics_client_id TEXT")
+    conn.execute("ALTER TABLE oauth_flows ADD COLUMN IF NOT EXISTS analytics_consent INTEGER NOT NULL DEFAULT 0")
     conn.execute('''CREATE TABLE IF NOT EXISTS oauth_native_codes (
         code_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id),
         challenge TEXT NOT NULL, created_at BIGINT NOT NULL
@@ -178,6 +182,10 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         conn.execute('INSERT INTO oauth_flows (state_hash, browser, provider, verifier, mode, referral, redirect_uri, created_at, native_challenge, native_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                      (hashlib.sha256(state.encode()).hexdigest(), browser, provider, verifier, mode,
                       str(data.get('ref') or '')[:100], callback, int(time.time()), challenge if native else None, native_state if native else None))
+        consent, cid = registration_events.attribution(request.cookies) if not native else (False, None)
+        conn.execute('''UPDATE oauth_flows SET registration_managed = ?, analytics_client_id = ?, analytics_consent = ? WHERE state_hash = ?''',
+                     (int(not native and request.headers.get('X-Wiring-Registration-Tracking') == 'server-v1'),
+                      cid, int(consent), hashlib.sha256(state.encode()).hexdigest()))
         conn.commit()
         if not native:
             session['oauth_browser'] = browser
@@ -280,6 +288,10 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
                 if not row:
                     if mode != 'register':
                         raise OAuthError(tr("Аккаунта ещё нет. Открой «Создать профиль» и зарегистрируйся через этот сервис."))
+                    g.registration_channel = ('native_oauth_' if flow['native_challenge'] else 'web_oauth_') + provider
+                    g.registration_server_managed = bool(flow['registration_managed'])
+                    g.registration_cookies = {'wiring-analytics-consent': 'granted' if flow['analytics_consent'] else 'denied',
+                                              '_ym_uid': flow['analytics_client_id'] or ''}
                     uid = create_user(conn, email, name, flow['referral'])
                     created = True
                     row = conn.execute('SELECT * FROM users WHERE id = ?', (uid,)).fetchone()
@@ -304,4 +316,6 @@ def install(app, *, db, prefix, site_url, create_user, too_many, grace):
         session['uid'] = row['id']
         if created:
             session['registration_created'] = True
+            if getattr(g, 'registration_receipt', ''):
+                session['registration_receipt'] = g.registration_receipt
         return redirect(prefix('/me' if not row['onboard_done'] else '/feed'))

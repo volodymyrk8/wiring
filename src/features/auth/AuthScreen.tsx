@@ -154,7 +154,7 @@ export function AuthScreen({ host }: AuthScreenProps) {
         body: JSON.stringify(body),
       })) as Record<string, unknown>;
 
-      if (isRegister) registrationCreated();
+      if (isRegister) registrationCreated(data.registration_tracking === "server");
       if (isRegister && data.needs_email_verify) {
         host.onRegisterVerify(String(data.email || trimmedEmail));
         return;

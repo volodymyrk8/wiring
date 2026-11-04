@@ -372,6 +372,7 @@ html[data-platform="android"] .platform--android { order: -1; }
 /* Product overview */
 .product { max-width: var(--max); margin: 0 auto; padding: 32px var(--gutter) 8px; }
 .product__title { font-family: var(--serif); font-weight: 500; font-size: 32px; line-height: 1.15; letter-spacing: -0.02em; }
+.product__subtitle { max-width: 640px; margin-top: 28px; font-family: var(--serif); font-weight: 500; font-size: 24px; line-height: 1.2; }
 .product__lead { max-width: 640px; margin-top: 14px; color: var(--ink); font-size: 18px; line-height: 1.45; }
 
 /* Install steps */

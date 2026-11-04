@@ -38,6 +38,7 @@ export type ChatMessage = {
   created_at: number;
   read?: boolean;
   reply_to?: ChatReply | null;
+  reactions?: Array<{ emoji: string; count: number; mine: boolean }>;
 };
 
 export type ChatThread = {

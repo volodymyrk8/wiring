@@ -1,3 +1,4 @@
+import { CitySelect } from "@/components/ui/CitySelect";
 import { tr } from "@/lib/i18n";
 import { useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
@@ -160,7 +161,7 @@ export function CityGateScreen({ host }: { host: AccountHostBridge }) {
       <p class={styles.lede}>{tr("Сначала страна, потом город из списка.")}</p>
       <form class={styles.onboard} onSubmit={submit}>
         <label>{tr("страна")}<select value={country} onChange={(event) => { setCountry(event.currentTarget.value); setCity(""); }} required>{(host.catalog.places || []).map((place) => <option key={place.country} value={place.country}>{tr(place.country)}</option>)}</select></label>
-        <label>{tr("город")}<select value={city} onChange={(event) => setCity(event.currentTarget.value)} required><option value="">{tr("выбери город")}</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <CitySelect api={host.api} places={host.catalog.places || []} label={tr("город")} value={city} onChange={setCity} required />
         {error ? <p class={styles.error} role="alert">{error}</p> : null}
         <div class={styles.actions}><Button variant="solid" type="submit" disabled={busy} loading={busy}>{tr("сохранить и продолжить")}</Button></div>
       </form>
@@ -245,7 +246,7 @@ export function OnboardScreen({ host }: { host: AccountHostBridge }) {
           <div class={styles.photoGrid}>{existingPhotos.map((photo) => <div class={styles.photoCell} key={photo.id}><img src={photoSrc(host, photo.url, String(user.name || tr("Профиль")))} alt="" /></div>)}{previews.map((src, index) => <div class={styles.photoCell} key={`${src}-${index}`}><img src={src} alt={tr("новое фото")} /></div>)}<label class={styles.fileAdd}><span aria-hidden="true">+</span><input type="file" accept="image/*" multiple disabled={busy || cropQueue.length > 0} onChange={addFiles} /></label></div>
           {cropQueue[0] ? <PhotoCropper file={cropQueue[0]} title={batchRef.current > 1 ? tr("Кадр · {0} из {1}", batchRef.current - cropQueue.length + 1, batchRef.current) : tr("Кадр")} onCancel={() => setCropQueue([])} onConfirm={acceptCrop} /> : null}
         </div>
-        <label>{tr("город ")}<span class={styles.subtle}>{tr("(необязательно)")}</span><select value={city} onChange={(event) => setCity(event.currentTarget.value)}><option value="">{tr("не указывать")}</option>{cities.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <CitySelect api={host.api} places={host.catalog.places || []} label={tr("город")} value={city} onChange={setCity} />
         <label>{tr("как тебе писать")}<textarea maxlength={500} placeholder={tr("сразу по делу, голосовые ок / нет")} value={communication} onInput={(event) => setCommunication(event.currentTarget.value)} /></label>
         <label>{host.catalog.prompts?.find((item) => item.id === promptId)?.label || tr("один промпт")}<textarea maxlength={280} placeholder={tr("расскажи что-то важное о себе")} value={promptAnswer} onInput={(event) => setPromptAnswer(event.currentTarget.value)} /></label>
         {error ? <p class={styles.error} role="alert">{error}</p> : null}

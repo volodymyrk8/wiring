@@ -15,6 +15,7 @@ from i18n import tr
 
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -341,6 +342,8 @@ def send_device_push(conn: Connection, user_id: int, *, body: str, url: str, tag
             "title": "WIRING",
             "body": body[:180],
             "sound": "default",
+            "priority": "high",
+            "ttl": 43200,
             "data": {"url": url, "tag": tag[:80]},
             "channelId": "default",
         }
@@ -355,8 +358,19 @@ def send_device_push(conn: Connection, user_id: int, *, body: str, url: str, tag
     try:
         with urllib.request.urlopen(request_, timeout=5) as response:  # noqa: S310 - fixed https URL
             result = json.loads(response.read().decode() or "{}")
-    except (urllib.error.URLError, OSError, ValueError):
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        # Never log payloads, provider messages, device tokens or credentials.
+        logging.getLogger(__name__).warning("Native push request failed: %s", type(exc).__name__)
         return
+    for ticket in (result.get("data") or []):
+        if isinstance(ticket, dict) and ticket.get("status") == "error":
+            code = (ticket.get("details") or {}).get("error", "unknown")
+            safe_code = code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_]{1,64}", code) else "unknown"
+            logging.getLogger(__name__).warning("Native push rejected: %s", safe_code)
+    for error in (result.get("errors") or []):
+        code = error.get("code", "unknown") if isinstance(error, dict) else "unknown"
+        safe_code = code if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_]{1,64}", code) else "unknown"
+        logging.getLogger(__name__).warning("Native push request rejected: %s", safe_code)
     dead = [
         message["to"]
         for message, ticket in zip(messages, result.get("data") or [])
