@@ -23,3 +23,28 @@ test('chrome counts conversations, retains message totals and refreshes a conver
  await controller.applyInbox({unread:3}); // Compatibility while an older server is still running.
  assert.equal(slot.innerHTML,'3');assert.ok(renders>=2);
 });
+
+test('a failed read acknowledgement is retried without repeating a match toast', async () => {
+  globalThis.document = { title: 'WIRING' };
+  const state = { view: 'deck', chatId: null, user: { id: 1 }, likesIn: 0, unread: 0, matches: [] };
+  const toasts = [];
+  const acknowledgements = [];
+  const controller = createInboxController({
+    state, root: { querySelectorAll: () => [] }, pageTitle: 'WIRING', pip: String,
+    api: async (path, options) => {
+      assert.equal(path, '/api/notices/read');
+      assert.equal(options.keepalive, true);
+      acknowledgements.push(JSON.parse(options.body).ids);
+      if (acknowledgements.length === 1) throw new Error('offline');
+      return {};
+    },
+    toast: message => toasts.push(message), pingBrowser: () => {}, render: () => {},
+  });
+  const data = { notices: [{ id: 7, kind: 'match', from_id: 2, body: 'взаимно с Сашей' }] };
+  await controller.applyInbox(data);
+  await new Promise(resolve => setImmediate(resolve));
+  state.view = 'likes';
+  await controller.applyInbox(data);
+  assert.deepEqual(toasts, ['взаимно с Сашей']);
+  assert.deepEqual(acknowledgements, [[7], [7]]);
+});

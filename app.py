@@ -1832,7 +1832,8 @@ def api_places():
                 options.append({"value": city, "label": tr(str(city)), "country": block["country"]})
     for item in search(query, country) if len(needle) >= 2 or country else []:
         value = catalog_city(item['value']) or item['value']
-        options.append({**item, 'value': value, 'label': tr(value)})
+        label = tr("Энгельс · Россия") if value == "Engels · Россия" else tr(value)
+        options.append({**item, 'value': value, 'label': label})
     seen = set()
     options = [item for item in options if not (item["value"] in seen or seen.add(item["value"]))][:60]
     return jsonify({"ok": True, "places": options})
@@ -2766,17 +2767,7 @@ def api_swipe():
         was_match = bool(prev and prev["direction"] == "like" and back and back["direction"] == "like")
         if matched:
             if not was_match:
-                if _notifiable(me_row):
-                    notify_event(
-                        conn,
-                        user_id=uid,
-                        email=str(me_row["email"]),
-                        is_guest=False,
-                        kind="match",
-                        from_id=target_id,
-                        from_name=str(target["name"]),
-                        last_seen=int(me_row["last_seen"] or 0) if "last_seen" in me_row.keys() else 0,
-                    )
+                # The initiator gets the match in the swipe response.
                 if _notifiable(target):
                     notify_event(
                         conn,

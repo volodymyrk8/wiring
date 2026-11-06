@@ -12,6 +12,7 @@ export function useDismissibleLayer(
   ref: RefObject<HTMLElement | null> | Array<RefObject<HTMLElement | null>>,
   open: boolean,
   onClose: () => void,
+  inline = false,
 ) {
   const refs = Array.isArray(ref) ? ref : [ref];
   useEffect(() => {
@@ -33,14 +34,16 @@ export function useDismissibleLayer(
       onClose();
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (inline) event.preventDefault();
+      onClose();
     };
 
-    window.addEventListener("pointerdown", closeOnPointerDown, true);
-    window.addEventListener("keydown", closeOnEscape);
+    if (!inline) window.addEventListener("pointerdown", closeOnPointerDown, true);
+    window.addEventListener("keydown", closeOnEscape, inline);
     return () => {
       window.removeEventListener("pointerdown", closeOnPointerDown, true);
-      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", closeOnEscape, inline);
     };
-  }, [open, onClose, ref]);
+  }, [open, onClose, ref, inline]);
 }

@@ -8,6 +8,7 @@ import type { ChatHostBridge, ChatMatch, ChatMessage, ChatThread } from "./types
 import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { micToastMessage, requestMicStream, shouldShowMicToast } from "./mic-access";
 import { Reactions } from "./Reactions";
+import { LONG_PRESS_MS, longPressCancelled, replySwipeCommits, replySwipePull, REPLY_COMMIT, type ReplyGesture } from "./message-gesture";
 import styles from "./ChatScreen.module.css";
 
 const errorMessage = (caught: unknown, fallback: string) =>
@@ -43,6 +44,13 @@ const UserIcon = () => (
 );
 
 const draftStorageKey = (id: number) => `wiring-chat-draft:${id}`;
+
+const ReplyIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h9a7 7 0 0 1 7 7v3" />
+  </svg>
+);
 
 const PencilIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -189,7 +197,7 @@ function MatchRow({ match, host, onOpen, onRemove }: { match: ChatMatch; host: C
             <h3>{match.name}, {match.age}</h3>
             {match.last_at ? <time class="match-time">{timeLabel(match.last_at)}</time> : null}
           </div>
-          <p>{match.last_message ? `${match.last_from_id === host.user?.id ? tr("ты: ") : ""}${match.last_message}` : tr("взаимно · начни разговор")}</p>
+          <p>{match.last_message ? `${match.last_from_id === host.user?.id ? tr("ты: ") : ""}${match.last_message}` : tr("взаимно · начать разговор?")}</p>
         </div>
         {hasUnread ? <span class={styles.unreadBadge}>{(match.unread || 0) > 9 ? "9+" : match.unread}</span> : null}
       </a>
@@ -450,27 +458,167 @@ function MessageBubble({
   const photo = photos[0] || "";
   const audio = message.audio_url ? photoUrl(host.basePath, message.audio_url) : "";
   const quote = message.reply_to?.body || (message.reply_to?.has_audio ? tr("голосовое") : message.reply_to?.has_photo ? tr("фото") : "");
+  const [pull, setPull] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const gesture = useRef<ReplyGesture | null>(null);
+  const longTimer = useRef(0);
+  const suppressClick = useRef(false);
+  const swipeRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const clearLong = () => {
+    if (!longTimer.current) return;
+    window.clearTimeout(longTimer.current);
+    longTimer.current = 0;
+  };
+  useEffect(() => () => clearLong(), []);
+  useEffect(() => {
+    const closeIfOther = (event: Event) => {
+      if ((event as CustomEvent<number>).detail !== message.id) setMenu(false);
+    };
+    window.addEventListener("wiring:message-menu", closeIfOther);
+    return () => window.removeEventListener("wiring:message-menu", closeIfOther);
+  }, [message.id]);
+  const openMenu = (focus = false) => {
+    clearLong();
+    gesture.current = null;
+    setDragging(false);
+    setPull(0);
+    window.dispatchEvent(new CustomEvent("wiring:message-menu", { detail: message.id }));
+    setMenu(true);
+    if (!focus) return;
+    window.requestAnimationFrame(() => {
+      const first = menuRef.current?.querySelector("button");
+      if (first instanceof HTMLElement) first.focus();
+    });
+  };
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenu(false); };
+    const onDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target) || swipeRef.current?.contains(target)) return;
+      setMenu(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [menu]);
+  const heldControl = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest("button, input, textarea, label"));
+  const onPointerDown = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary || event.button !== 0 || busy || heldControl(event.target)) return;
+    if (menu) setMenu(false);
+    gesture.current = { x: event.clientX, y: event.clientY, axis: null };
+    if (event.pointerType === "mouse") event.currentTarget.setPointerCapture(event.pointerId);
+    clearLong();
+    longTimer.current = window.setTimeout(() => {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) return;
+      suppressClick.current = true;
+      openMenu(false);
+    }, LONG_PRESS_MS);
+  };
+  const onPointerMove = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
+    const start = gesture.current;
+    if (!start) return;
+    if (longPressCancelled(start, event.clientX, event.clientY)) clearLong();
+    const next = replySwipePull(start, event.clientX, event.clientY);
+    if (start.axis === "y") {
+      gesture.current = null;
+      clearLong();
+      setDragging(false);
+      setPull(0);
+      return;
+    }
+    if (start.axis !== "x") return;
+    try {
+      if (!event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
+    } catch { /* the pointer can end between move events */ }
+    setDragging(true);
+    setPull(next);
+  };
+  const finishSwipe = (event: JSX.TargetedPointerEvent<HTMLDivElement>) => {
+    const start = gesture.current;
+    clearLong();
+    gesture.current = null;
+    setDragging(false);
+    const commit = Boolean(start && replySwipeCommits(start, event.clientX, event.clientY));
+    setPull(0);
+    if (commit) {
+      suppressClick.current = true;
+      setMenu(false);
+      onReply();
+    }
+    if (suppressClick.current) window.setTimeout(() => { suppressClick.current = false; }, 0);
+  };
+  const onContextMenu = (event: JSX.TargetedMouseEvent<HTMLDivElement>) => {
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && event.currentTarget.contains(selection.anchorNode)) return;
+    event.preventDefault();
+    openMenu(true);
+  };
+  const copyBody = async () => {
+    const text = message.body?.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setMenu(false);
+    } catch {
+      host.toast(tr("не удалось скопировать"));
+    }
+  };
+  const act = (action: () => void) => {
+    setMenu(false);
+    action();
+  };
   return (
-    <div class={`bubble-wrap${message.mine ? " mine" : ""}`} data-msg={message.id}>
-      <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`}>
-        {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || tr("сообщение")}</button> : null}
-        {photos.length ? <div class={photos.length > 1 ? styles.photoGroup : ""}>{photos.map((src, index) => <a key={src} class="bubble-photo" href={src} target="_blank" rel="noopener"><img src={src} alt={tr("Фото {0}", index + 1)} decoding="async" loading="lazy" /></a>)}</div> : null}
-        {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
-        {revealedTranscript ? <div class="bubble-transcript">{revealedTranscript}</div> : null}
-        {message.body ? <div class="bubble-body">{message.body}</div> : null}
-        <span class="time">
-          {message.edited ? <span>{tr("изменено")}</span> : null}
-          {chatTimeLabel(message.created_at)}
-          {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? tr("прочитано") : tr("отправлено")}>{message.read ? "✓✓" : "✓"}</i> : null}
-        </span>
+    <div class={`bubble-wrap${message.mine ? " mine" : ""} ${styles.wrap}`} data-msg={message.id}>
+      <div
+        ref={swipeRef}
+        class={`${styles.swipe}${dragging ? ` ${styles.dragging}` : ""}`}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={finishSwipe}
+        onPointerCancel={finishSwipe}
+        onContextMenu={onContextMenu}
+        onClickCapture={(event) => {
+          if (!suppressClick.current) return;
+          suppressClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+      >
+        <span class={styles.replyGlyph} style={{ opacity: Math.min(1, pull / REPLY_COMMIT) }} aria-hidden="true"><ReplyIcon /></span>
+        <div class={styles.shift} style={{ transform: pull ? `translateX(${pull}px)` : undefined }}>
+          <div class={`bubble${message.mine ? " mine" : ""}${photo ? " has-photo" : ""}${audio ? " has-audio" : ""}`}>
+            {message.reply_to ? <button type="button" class="bubble-quote" onClick={() => onJump(message.reply_to!.id)}>{quote || tr("сообщение")}</button> : null}
+            {photos.length ? <div class={photos.length > 1 ? styles.photoGroup : ""}>{photos.map((src, index) => <a key={src} class="bubble-photo" href={src} target="_blank" rel="noopener"><img src={src} alt={tr("Фото {0}", index + 1)} decoding="async" loading="lazy" /></a>)}</div> : null}
+            {audio ? <VoiceNote src={audio} duration={message.audio_duration || 0} /> : null}
+            {revealedTranscript ? <div class="bubble-transcript">{revealedTranscript}</div> : null}
+            {message.body ? <div class="bubble-body">{message.body}</div> : null}
+            <span class="time">
+              {message.edited ? <span>{tr("изменено")}</span> : null}
+              {chatTimeLabel(message.created_at)}
+              {message.mine ? <i class={`receipt${message.read ? " on" : ""}`} title={message.read ? tr("прочитано") : tr("отправлено")}>{message.read ? "✓✓" : "✓"}</i> : null}
+            </span>
+          </div>
+        </div>
+        <button type="button" class={`bubble-action icon ${styles.quickReply}`} disabled={busy} aria-label={tr("Ответить")} title={tr("Ответить")} onClick={() => act(onReply)}><ReplyIcon /></button>
       </div>
       <Reactions message={message} host={host} refresh={onRefresh} disabled={busy} />
-      <div class="bubble-actions">
-        <button type="button" class="bubble-action" disabled={busy} onClick={onReply}>{tr("Ответить")}</button>
-        {audio && !revealedTranscript ? <button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>{tr("Расшифровать")}</button> : null}
-        {message.mine && !audio ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onEdit} aria-label={tr("Изменить")} title={tr("Изменить")}><PencilIcon /></button> : null}
-        {message.mine ? <button type="button" class="bubble-action icon" disabled={busy} onClick={onDelete} aria-label={tr("Удалить")} title={tr("Удалить")}><TrashIcon /></button> : null}
-      </div>
+      {audio && !revealedTranscript ? <div class="bubble-actions"><button type="button" class="bubble-action" disabled={busy} onClick={onTranscribe}>{tr("Расшифровать")}</button></div> : null}
+      {menu ? (
+        <div ref={menuRef} class={styles.menu} role="menu" aria-label={tr("Сообщение")}>
+          <button type="button" class="bubble-action is-primary" role="menuitem" disabled={busy} onClick={() => act(onReply)}>{tr("Ответить")}</button>
+          {message.body?.trim() ? <button type="button" class="bubble-action" role="menuitem" disabled={busy} onClick={() => void copyBody()}>{tr("Копировать")}</button> : null}
+          {message.mine && !audio ? <button type="button" class="bubble-action icon" role="menuitem" disabled={busy} onClick={() => act(onEdit)} aria-label={tr("Изменить")} title={tr("Изменить")}><PencilIcon /></button> : null}
+          {message.mine ? <button type="button" class="bubble-action icon" role="menuitem" disabled={busy} onClick={() => act(onDelete)} aria-label={tr("Удалить")} title={tr("Удалить")}><TrashIcon /></button> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -490,7 +638,6 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   const [revealed, setRevealed] = useState<Record<number, string>>({});
   const threadRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const shouldScrollRef = useRef(true);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -538,7 +685,9 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
       if (followsEndRef.current) {
         scrollToEnd();
         cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(scrollToEnd);
+        frame = requestAnimationFrame(() => {
+          if (followsEndRef.current) scrollToEnd();
+        });
       }
     });
     element.addEventListener("scroll", remember, { passive: true });
@@ -548,17 +697,16 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   }, [chatId, error]);
 
   const loadThread = async (scroll = false) => {
+    if (!aliveRef.current) return;
+    if (scroll) {
+      followsEndRef.current = true;
+      scrollToEnd();
+    }
     const request = ++requestRef.current;
     try {
       const next = await host.api(`/api/messages/${chatId}`) as ChatThread;
       if (!aliveRef.current || request !== requestRef.current) return;
-      const nearBottom = followsEndRef.current;
-      if (scroll) { followsEndRef.current = true; scrollToEnd(); }
-      setThread((current) => {
-        if (current && JSON.stringify(current) === JSON.stringify(next)) return current;
-        shouldScrollRef.current = scroll || nearBottom;
-        return next;
-      });
+      setThread((current) => current && JSON.stringify(current) === JSON.stringify(next) ? current : next);
       setError("");
     } catch (caught) {
       if (aliveRef.current && request === requestRef.current) setError(errorMessage(caught, tr("не удалось загрузить переписку")));
@@ -601,7 +749,6 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     setRevealed({});
     setRecordingNotice("");
     setError("");
-    shouldScrollRef.current = true;
     followsEndRef.current = true;
     host.api(`/api/messages/${chatId}`).then((data) => {
       if (alive && request === requestRef.current) setThread(data as ChatThread);
@@ -620,9 +767,7 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
   }, [chatId, host]);
 
   useLayoutEffect(() => {
-    if (!thread || !shouldScrollRef.current) return;
-    shouldScrollRef.current = false;
-    scrollToEnd();
+    if (thread && followsEndRef.current) scrollToEnd();
   }, [thread, chatId]);
 
   useEffect(() => () => {
@@ -715,7 +860,6 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
         setReplyTo(null);
         setDraft("");
       }
-      shouldScrollRef.current = true;
       await loadThread(true);
     } catch (caught) {
       host.toast(errorMessage(caught, editing ? tr("не удалось изменить сообщение") : tr("не удалось отправить сообщение")));
@@ -749,7 +893,6 @@ function ChatThread({ host, chatId, onUnmatchRequest }: { host: ChatHostBridge; 
     if (replyTo?.id) form.append("reply_to_id", String(replyTo.id));
     await host.api("/api/messages/voice", { method: "POST", body: form });
     setReplyTo(null);
-    shouldScrollRef.current = true;
     await loadThread(true);
   };
 

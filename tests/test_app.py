@@ -2011,6 +2011,25 @@ class WiringTest(unittest.TestCase):
         self.assertFalse(user["needs_city"])
         self.assertEqual(user["city"], "")
 
+    def test_only_the_recipient_gets_a_separate_match_notice(self):
+        first = self._register(email="match-initiator@wiring.test")
+        self._logout()
+        second = self._register(email="match-notice@wiring.test", name="Саша")
+        self.client.post("/api/swipe", json={"target_id": first["id"], "direction": "like"})
+        self._logout()
+        self._login("match-initiator@wiring.test")
+
+        for _ in range(2):
+            result = self.client.post("/api/swipe", json={"target_id": second["id"], "direction": "like"})
+            self.assertTrue(result.get_json()["matched"])
+        notices = self.client.get("/api/inbox").get_json()["notices"]
+        self.assertFalse(any(notice["kind"] == "match" for notice in notices))
+
+        self._logout()
+        self._login("match-notice@wiring.test")
+        notices = self.client.get("/api/inbox").get_json()["notices"]
+        self.assertEqual([notice["from_id"] for notice in notices if notice["kind"] == "match"], [first["id"]])
+
     def test_admin_stats_matches_and_chats(self):
         from admin import collect_stats
 
@@ -2658,6 +2677,16 @@ class WiringTest(unittest.TestCase):
             result = self.client.get("/api/places", query_string={"q": query, "country": "Бразилия"})
             self.assertEqual(result.status_code, 200)
             self.assertTrue(any(item["value"].startswith("São Paulo ·") and item["country"] == "Бразилия" for item in result.get_json()["places"]))
+        for query in ("Энгельс", "Engels"):
+            result = self.client.get("/api/places", query_string={"q": query, "country": "Россия"})
+            self.assertIn(
+                {"value": "Engels · Россия", "label": "Энгельс · Россия", "country": "Россия"},
+                result.get_json()["places"],
+            )
+        with patch("place_validation._ask_openai") as ai:
+            result = self.client.post("/api/places/resolve", json={"city": "Engels · Россия", "country": "Россия"})
+            self.assertEqual(result.get_json()["city"], "Engels · Россия")
+            ai.assert_not_called()
         from world_places import rows
         self.assertGreater(len(rows()), 200000)
         from cities import country_of_city

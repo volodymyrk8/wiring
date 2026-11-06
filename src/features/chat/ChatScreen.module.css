@@ -303,3 +303,69 @@
 .reaction:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .reaction:disabled { opacity: .5; cursor: default; }
 .reactionPicker { display: flex; flex-wrap: wrap; gap: 4px; flex-basis: 100%; padding: 4px 0; }
+
+.swipe {
+  position: relative;
+  max-width: 100%;
+  touch-action: pan-y;
+}
+.shift {
+  position: relative;
+  z-index: 1;
+  transition: transform 0.18s ease;
+}
+.dragging .shift,
+.dragging .replyGlyph { transition: none; }
+.replyGlyph {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lime) 28%, var(--bg-2));
+  color: var(--ink);
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.quickReply {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: -36px;
+  opacity: 0;
+  pointer-events: none;
+}
+.wrap:global(.mine) .quickReply { right: auto; left: -36px; }
+.swipe:hover .quickReply,
+.quickReply:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (pointer: coarse) {
+  .swipe { -webkit-user-select: none; user-select: none; }
+  .quickReply:not(:focus-visible) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+    opacity: 1;
+    pointer-events: none;
+  }
+}
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shift, .replyGlyph { transition: none; }
+}

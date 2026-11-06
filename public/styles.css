@@ -3290,7 +3290,7 @@ button.bubble-quote {
   line-height: 1.2;
   cursor: pointer;
 }
-.bubble-action:first-child {
+.bubble-action.is-primary {
   border-color: color-mix(in srgb, var(--lime) 55%, var(--line));
   color: var(--lime);
 }

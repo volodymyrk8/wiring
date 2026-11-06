@@ -51,6 +51,9 @@ export type SelectProps<T extends string = string> = {
   searchable?: boolean;
   searchPlaceholder?: string;
   onSearchChange?: (query: string) => void;
+  onOpenChange?: (open: boolean) => void;
+  inlineMenu?: boolean;
+  optionLimit?: number;
 };
 
 export function Select<T extends string = string>({
@@ -76,6 +79,9 @@ export function Select<T extends string = string>({
   searchable = false,
   searchPlaceholder = tr("Найти…"),
   onSearchChange,
+  onOpenChange,
+  inlineMenu = false,
+  optionLimit,
 }: SelectProps<T>) {
   const [internalValue, setInternalValue] = useState<T | undefined>(defaultValue ?? options[0]?.value);
   const [isOpen, setIsOpen] = useState(false);
@@ -91,28 +97,36 @@ export function Select<T extends string = string>({
   const selectedValue = isControlled ? controlledValue : internalValue;
   const selectedOption = options.find((o) => o.value === selectedValue);
 
+  const closeMenu = () => {
+    if (inlineMenu && menuRef.current?.contains(document.activeElement)) {
+      wrapRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus({ preventScroll: true });
+    }
+    setIsOpen(false);
+  };
   const layerRefs = useRef([wrapRef, menuRef]);
-  useDismissibleLayer(layerRefs.current, isOpen, () => setIsOpen(false));
+  useDismissibleLayer(layerRefs.current, isOpen, closeMenu, inlineMenu);
 
   useEffect(() => {
+    onOpenChange?.(isOpen);
     if (!isOpen) {
       setQuery("");
       onSearchChange?.("");
       return;
     }
-    if (!searchable) return;
-    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    if (!searchable || inlineMenu) return;
+    const frame = requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(frame);
-  }, [isOpen, searchable]);
+  }, [isOpen, searchable, inlineMenu]);
 
   const fold = (value: string) => value.toLocaleLowerCase(getLocale()).replaceAll("ё", "е");
   const needle = fold(query.trim());
-  const visibleOptions = searchable && needle
+  const matchingOptions = searchable && needle
     ? options.filter((option) => fold(`${option.label} ${option.searchText || ""}`).includes(needle))
     : options;
+  const visibleOptions = optionLimit === undefined ? matchingOptions : matchingOptions.slice(0, optionLimit);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || inlineMenu) return;
 
     const updatePlacement = () => {
       const wrap = wrapRef.current;
@@ -145,15 +159,16 @@ export function Select<T extends string = string>({
       });
     };
 
-    requestAnimationFrame(updatePlacement);
+    const frame = requestAnimationFrame(updatePlacement);
     window.addEventListener("resize", updatePlacement);
     window.addEventListener("scroll", updatePlacement, true);
 
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("resize", updatePlacement);
       window.removeEventListener("scroll", updatePlacement, true);
     };
-  }, [isOpen]);
+  }, [isOpen, inlineMenu]);
 
   const toggleOpen = (e: JSX.TargetedMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -172,7 +187,7 @@ export function Select<T extends string = string>({
       setInternalValue(option.value);
     }
     onChange?.(option.value);
-    setIsOpen(false);
+    closeMenu();
   };
 
   const isIconOnly = variant === "iconOnly";
@@ -183,6 +198,65 @@ export function Select<T extends string = string>({
   const errorId = id ? `${id}-error` : undefined;
   const hintId = id ? `${id}-hint` : undefined;
 
+  const menu = (
+    <div
+      ref={menuRef}
+      id={id ? `${id}-options` : undefined}
+      role="listbox"
+      tabIndex={-1}
+      style={inlineMenu ? undefined : { ...menuBox, maxHeight: `${menuMaxHeight}px`, visibility: menuBox.left == null ? "hidden" : "visible" }}
+      class={`${styles.menu}${inlineMenu ? ` ${styles.inlineMenu}` : ""}${placement === "up" ? ` ${styles.menuUp}` : ""}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
+    >
+      {searchable ? (
+        <div class={styles.searchRow}>
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+            autoComplete="off"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") event.preventDefault();
+            }}
+            onInput={(event) => { setQuery(event.currentTarget.value); onSearchChange?.(event.currentTarget.value); }}
+          />
+        </div>
+      ) : null}
+      {searchable && needle && !visibleOptions.length ? <p class={styles.empty}>{tr("Ничего не нашлось")}</p> : null}
+      {visibleOptions.map((option) => {
+        const isSelected = option.value === selectedValue;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="option"
+            aria-selected={isSelected}
+            disabled={option.disabled}
+            data-value={option.value}
+            data-theme={option.swatchTheme || option.value}
+            class={`${styles.option}${isSelected ? ` ${styles.selectedOption}` : ""}`}
+            onClick={handleSelect(option)}
+          >
+            {option.icon ? (
+              <span class={styles.optionIcon}>{option.icon}</span>
+            ) : option.swatchTheme ? (
+              <span class={styles.swatch} data-theme-set={option.swatchTheme} data-theme={option.swatchTheme} aria-hidden="true" />
+            ) : null}
+            <span class={styles.optionLabel}>{option.label}</span>
+            {isSelected && (
+              <span class={styles.check} aria-hidden="true">
+                <CheckIcon />
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div ref={wrapRef} class={`${styles.selectWrap}${hasFieldLabel ? ` ${styles.hasFieldLabel}` : ""}${hasError ? ` ${styles.hasError}` : ""}${className ? ` ${className}` : ""}`}>
       <Trigger
@@ -191,6 +265,7 @@ export function Select<T extends string = string>({
         class={`${isIconOnly ? styles.iconTrigger : styles.trigger}${isPill ? ` ${styles.pillTrigger}` : ""}${!showValue && !isIconOnly ? ` ${styles.compactTrigger}` : ""}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-controls={isOpen && id ? `${id}-options` : undefined}
         aria-label={ariaLabel || fieldLabel || title || selectedOption?.label || placeholder}
         aria-required={required}
         aria-invalid={hasError}
@@ -227,64 +302,7 @@ export function Select<T extends string = string>({
         <span id={hintId} class={styles.hintText}>{hint}</span>
       ) : null}
 
-      {isOpen && createPortal(
-        <div
-          ref={menuRef}
-          role="listbox"
-          tabIndex={-1}
-          style={{ ...menuBox, maxHeight: `${menuMaxHeight}px`, visibility: menuBox.left == null ? "hidden" : "visible" }}
-          class={`${styles.menu}${placement === "up" ? ` ${styles.menuUp}` : ""}${align === "left" ? ` ${styles.menuAlignLeft}` : ""}${menuClassName ? ` ${menuClassName}` : ""}`}
-        >
-          {searchable ? (
-            <div class={styles.searchRow}>
-              <input
-                ref={searchRef}
-                type="text"
-                value={query}
-                placeholder={searchPlaceholder}
-                aria-label={searchPlaceholder}
-                autoComplete="off"
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => {
-                  event.stopPropagation();
-                  if (event.key === "Enter") event.preventDefault();
-                }}
-                onInput={(event) => { setQuery(event.currentTarget.value); onSearchChange?.(event.currentTarget.value); }}
-              />
-            </div>
-          ) : null}
-          {searchable && needle && !visibleOptions.length ? <p class={styles.empty}>{tr("Ничего не нашлось")}</p> : null}
-          {visibleOptions.map((option) => {
-            const isSelected = option.value === selectedValue;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                disabled={option.disabled}
-                data-value={option.value}
-                data-theme={option.swatchTheme || option.value}
-                class={`${styles.option}${isSelected ? ` ${styles.selectedOption}` : ""}`}
-                onClick={handleSelect(option)}
-              >
-                {option.icon ? (
-                  <span class={styles.optionIcon}>{option.icon}</span>
-                ) : option.swatchTheme ? (
-                  <span class={styles.swatch} data-theme-set={option.swatchTheme} data-theme={option.swatchTheme} aria-hidden="true" />
-                ) : null}
-                <span class={styles.optionLabel}>{option.label}</span>
-                {isSelected && (
-                  <span class={styles.check} aria-hidden="true">
-                    <CheckIcon />
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>,
-        document.body,
-      )}
+      {isOpen && (inlineMenu ? menu : createPortal(menu, document.body))}
     </div>
   );
 }

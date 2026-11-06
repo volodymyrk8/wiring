@@ -61,8 +61,8 @@ function FilterPanel({ host, filters, onApply, onClear }: { host: LikesHostBridg
         <label>{tr("от")}<input type="number" min="18" max="99" value={draft.min_age} onInput={(event) => update("min_age", Number(event.currentTarget.value) || 18)} /></label>
         <label>{tr("до")}<input type="number" min="18" max="99" value={draft.max_age} onInput={(event) => update("max_age", Number(event.currentTarget.value) || 99)} /></label>
       </div>
-      <Select className={styles.cityField} label={tr("Страна")} id="likes-country" searchable searchPlaceholder={tr("Страна")} options={countryOptions} value={draft.country || ""} onChange={(value) => setDraft((current) => withCountry(current, value, places))} ariaLabel={tr("Страна в лайках")} />
-      <CitySelect api={host.api} places={places} country={draft.country} emptyLabel={tr("неважно")} className={styles.cityField} label={tr("Город")} id="likes-city" value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город")} />
+      <Select className={styles.cityField} label={tr("Страна")} id="likes-country" inlineMenu searchable searchPlaceholder={tr("Страна")} options={countryOptions} value={draft.country || ""} onChange={(value) => setDraft((current) => withCountry(current, value, places))} ariaLabel={tr("Страна в лайках")} />
+      <CitySelect api={host.api} places={places} country={draft.country} emptyLabel={tr("неважно")} className={styles.cityField} label={tr("Город")} id="likes-city" inlineMenu value={draft.city} onChange={(value) => update("city", value)} ariaLabel={tr("Город")} />
       <div class={styles.filterFooter}>
         <Button variant="ghost" slim onClick={onClear}>{tr("сбросить")}</Button>
         <Button variant="solid" slim onClick={() => onApply(draft)}>{tr("применить")}</Button>

@@ -47,6 +47,8 @@ export function createInboxController({
   translate: tr = source => source,
 }: InboxDeps) {
   const seenNotices = new Set<number | string>();
+  const pendingRead = new Set<number | string>();
+  let markingRead = false;
   let timer = 0;
 
   const noticeAction = (note: Notice) => async () => {
@@ -114,19 +116,25 @@ export function createInboxController({
     }
     syncChrome();
     const fresh = (data.notices || []).filter((note: Notice) => !seenNotices.has(note.id));
-    const shown: Array<number | string> = [];
     for (const note of fresh) {
+      if (!announce || seenNotices.has(note.id)) continue;
       seenNotices.add(note.id);
+      pendingRead.add(note.id);
       const inChat = state.view === "chat" && state.chatId === Number(note.from_id) && note.kind === "message";
-      if (inChat || !announce) continue;
-      const noticesOn = state.user?.notify_enabled !== false;
-      if (!noticesOn) continue;
+      if (inChat || state.user?.notify_enabled === false) continue;
       toast(note.body || tr("новое уведомление"), noticeAction(note));
       pingBrowser(note.body || tr("новое уведомление"));
-      shown.push(note.id);
     }
-    if (shown.length) {
-      api("/api/notices/read", { method: "POST", body: JSON.stringify({ ids: shown }) }).catch(() => {});
+    if (!markingRead && pendingRead.size) {
+      markingRead = true;
+      const ids = [...pendingRead];
+      void api("/api/notices/read", {
+        method: "POST", keepalive: true, body: JSON.stringify({ ids }),
+      }).then(() => {
+        ids.forEach((id) => pendingRead.delete(id));
+      }).catch(() => {
+        // Retry on the next poll without displaying the same notice again.
+      }).finally(() => { markingRead = false; });
     }
     if (announce && state.likesIn > prevLikes && state.view === "likes") {
       await loadLikes();
@@ -162,6 +170,8 @@ export function createInboxController({
   const stop = () => {
     clearInterval(timer);
     timer = 0;
+    seenNotices.clear();
+    pendingRead.clear();
     document.title = pageTitle;
   };
 

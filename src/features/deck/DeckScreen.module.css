@@ -112,7 +112,7 @@
   -webkit-line-clamp: 3;
 }
 
-.bio { display: -webkit-box; overflow: hidden; margin: 0 0 6px; color: var(--on-photo); font-size: 13px; line-height: 1.4; text-shadow: 0 1px 8px rgba(0,0,0,.7); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.bio { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; overflow: hidden; margin: 0 0 6px; color: var(--on-photo); font-size: 13px; line-height: 1.4; text-shadow: 0 1px 8px rgba(0,0,0,.7); -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .bioCompact { -webkit-line-clamp: 1; font-size: 12px; margin-bottom: 4px; }
 
 .jevMatch { margin: 0 0 6px; padding: 8px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.14); }

@@ -137,6 +137,15 @@
   overscroll-behavior: contain;
 }
 
+.menu.inlineMenu {
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin-top: 6px;
+  max-height: min(240px, 45dvh);
+  box-shadow: none;
+}
+
 .menuUp {
   top: auto;
   bottom: calc(100% + 6px);

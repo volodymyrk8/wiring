@@ -16,7 +16,7 @@ const user = {
   plus: true, needs_profile: false, needs_special_consent: false,
   jev_feed_unlocked: true, jev_feed_beta: true, jev_feed_enabled: true, jev_feed_available: true,
 };
-const person = { ...user, id: 2, name: 'Тестовый собеседник', neuro: ['asd', 'adhd'] };
+const person = { ...user, bio: 'Строка один\nСтрока два', communication: 'Привет\nКак дела?', id: 2, name: 'Тестовый собеседник', neuro: ['asd', 'adhd'] };
 const catalog = {
   places: [{ country: 'Сербия', cities: ['Белград'] }],
   neuro: [{ id: 'asd', label: 'РАС (ASD)' }, { id: 'adhd', label: 'СДВГ (ADHD)' }],
@@ -27,6 +27,8 @@ const calls = [];
 const heldMedia = new Map();
 let mediaRun = 0;
 let messageCount = 100;
+let sentText = '';
+let delaySendRefresh = false;
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/fixture/')) {
@@ -53,10 +55,18 @@ const server = createServer(async (req, res) => {
       ok: true, cards: [{ ...person, recommendation_reasons: [`Общие отметки о диагнозах: ${user.neuro.map(id => id === 'asd' ? 'РАС (ASD)' : 'СДВГ (ADHD)').join(', ')}`] }],
       has_more: false, generation: 0, recommendation_source: 'taste',
     };
-    else if (url.pathname === '/api/messages/2') {
+    else if (url.pathname === '/api/messages' && req.method === 'POST') {
+      sentText = JSON.parse(body).body;
+      delaySendRefresh = true;
+      data.id = ++messageCount;
+    } else if (url.pathname === '/api/messages/2') {
+      if (delaySendRefresh) {
+        delaySendRefresh = false;
+        await new Promise(resolve => setTimeout(resolve, 750));
+      }
       const run = mediaRun || ++mediaRun;
       data = { ok: true, peer: person, messages: Array.from({ length: messageCount }, (_, i) => ({
-        id: i + 1, from_id: 2, body: `Тестовое сообщение ${i + 1}`, created_at: 1720000000 + i,
+        id: i + 1, from_id: 2, body: (i === 101 && sentText) || `Тестовое сообщение ${i + 1}`, created_at: 1720000000 + i,
         // These photos are above the last bubble and decode after the old
         // 2.5s initial pin window. The fixed-size thread itself never resizes.
         ...(i === 98 ? { photo_url: `/fixture/late-a-${run}.svg` } : {}),
@@ -100,6 +110,8 @@ if (process.env.FIXTURE_ONLY === '1') {
 
     await page.goto(origin + '/for-you');
     await page.getByRole('region', { name: 'Почему может подойти' }).waitFor();
+    const previewBio = page.getByText('Строка один Строка два', { exact: true });
+    assert.equal(await previewBio.evaluate(el => getComputedStyle(el).whiteSpace), 'pre-wrap');
     assert.match(await page.getByRole('region', { name: 'Почему может подойти' }).innerText(), /РАС/);
     await page.locator('.tabbar a[data-nav=profile]').click();
     await page.getByRole('link', { name: 'Редактировать анкету', exact: true }).click();
@@ -146,7 +158,13 @@ if (process.env.FIXTURE_ONLY === '1') {
     assert.equal(await page.getByRole('dialog').count(), 0);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(origin + '/chats/2');
+    await page.goto(origin + '/p/2');
+    const prompt = page.getByText('Привет Как дела?', { exact: true });
+    assert.equal(await prompt.evaluate(el => getComputedStyle(el).whiteSpace), 'pre-wrap');
+    await page.goto(origin + '/chats');
+    await page.getByText('взаимно · начать разговор?', { exact: true }).waitFor();
+    const chatEntry = page.getByRole('link', { name: /Тестовый собеседник/ });
+    await chatEntry.click();
     await page.locator('[data-msg="100"]').waitFor();
     const thread = page.locator('.thread');
     const gap = () => thread.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop);
@@ -181,9 +199,18 @@ if (process.env.FIXTURE_ONLY === '1') {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(150);
     assert.ok(await gap() < 3, 'keyboard resize must pin a reader following the latest message');
+    await thread.evaluate(el => { el.scrollTop -= 700; });
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.thread');
+      return el.scrollHeight - el.clientHeight - el.scrollTop > 500;
+    });
+    await page.getByPlaceholder('написать сообщение').fill('Новое сообщение из истории');
+    await page.getByRole('button', { name: 'Отправить сообщение' }).click();
+    await page.getByText('Новое сообщение из истории', { exact: true }).waitFor();
+    assert.ok(await gap() < 3, 'sending from history returns to the newest message');
     await page.screenshot({ path: '/tmp/wiring-trello-bugs/chat-latest.png' });
     assert.deepEqual(errors, []);
-    console.log('Trello regressions passed: saved diagnoses refresh recommendations; crop buttons visible at 390x844, 320x480, 844x390; late chat media and keyboard resizing respect the reader.');
+    console.log('Trello regressions passed: saved diagnoses refresh recommendations; crop buttons visible at 390x844, 320x480, 844x390; line breaks, chat copy, late media, keyboard resizing and sending from history.');
   } finally {
     for (const resolve of heldMedia.values()) resolve();
     await browser?.close();

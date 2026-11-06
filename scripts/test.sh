@@ -26,6 +26,7 @@ if [[ -f package.json ]]; then
   npm run test:i18n
   npm run test:profile
   npm run test:deck
+  npm run test:chat-gesture
   npm run test:analytics
   npm run test:inbox
   npm run test:push

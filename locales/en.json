@@ -623,6 +623,7 @@
   "Нарва": "Narva",
   "Настоящее пользовательское соглашение (далее — соглашение) регулирует использование сервиса знакомств WIRING. Используя сервис, вы подтверждаете, что прочитали соглашение и": "These terms of use (the agreement) govern use of the WIRING dating service. By using the service, you confirm that you have read the agreement and",
   "Настройка": "Setup",
+  "Начать разговор?": "Start a conversation?",
   "Начни разговор": "Start a conversation",
   "Не видишь письмо? Проверь «Спам» и «Промоакции».": "Cannot find the email? Check Spam and Promotions.",
   "Не диагноз из справочника. Сильнее бьют звук, свет, чужое настроение. Легко перепутать с аутизмом — не всегда одно и то же.": "Not a clinical diagnosis. Sounds, light and other people's emotions may feel more intense. It can resemble autism, but is not always the same thing.",
@@ -999,6 +1000,7 @@
   "Словакия": "Slovakia",
   "Сломали расписание — сломали человека. Не про контроль партнёра, про нервную систему.": "A disrupted routine can be deeply unsettling. It is about the nervous system, not controlling a partner.",
   "Слушать голосовое": "Play voice message",
+  "Смахни вправо, чтобы ответить. Удерживай, чтобы изменить или удалить.": "Swipe right to reply. Hold to edit or delete.",
   "Сменить имя": "Change name",
   "Сменить имя можно {0}.": "You can change your name on {0}.",
   "Сменить имя?": "Change your name?",
@@ -1145,7 +1147,6 @@
   "Удалить сообщение?": "Delete this message?",
   "Удалить фото": "Delete photo",
   "Удалить фото?": "Delete this photo?",
-  "Удерживай, чтобы ответить или изменить сообщение": "Press and hold to reply or edit a message",
   "Ужгород": "Uzhgorod",
   "Уже есть аккаунт?": "Already have an account?",
   "Уже есть профиль?": "Already have a profile?",
@@ -1320,6 +1321,7 @@
   "ваш доступ к сервису ранее не прекращался за нарушение соглашения, если мы прямо не разрешили новую регистрацию.": "your access has not previously been ended for violating this agreement, unless we explicitly permitted a new registration.",
   "версия приложения устарела — обнови WIRING": "This app version is out of date. Please update WIRING.",
   "взаимная симпатия": "mutual like",
+  "взаимно · начать разговор?": "mutual like · start a conversation?",
   "взаимно · начни разговор": "mutual like · start a conversation",
   "взаимно с {0}": "You and {0} liked each other",
   "взаимно с {0}. Чат в разделе «Чаты».": "You and {0} liked each other. Find your conversation in Chats.",
@@ -2098,6 +2100,7 @@
   "Коморы": "Comoros",
   "Сент-Китс и Невис": "St. Kitts & Nevis",
   "КНДР": "North Korea",
+  "Энгельс · Россия": "Engels · Russia",
   "Южная Корея": "South Korea",
   "Кувейт": "Kuwait",
   "о-ва Кайман": "Cayman Islands",
@@ -2288,5 +2291,7 @@
   "Данные получают только те, кому они нужны для работы сервиса: хостинг и хранение файлов, доставка почты, а при вашем согласии — Google Analytics и Яндекс.Метрика. Запись экрана (вебвизор) не используется.": "Data is shared only with providers needed to operate the service: hosting, file storage and email delivery, and, with your consent, Google Analytics and Yandex Metrica. Session recording is not used.",
   "Показываем людей со всего WIRING. Если ты уже лайкаешь анкеты, подбор идёт по ним. Если лайков мало — по тому, что выбрано у тебя и зачем ты здесь. Человек не показывается, если такие люди тебе скрыты или он сам скрыл себя от людей с твоими особенностями. Под карточкой написано, что совпало. Чтобы расставить анкеты, мы отправляем только выбранные пункты, один ли город, близкий ли возраст и общую цель. Имя, фото, свои тексты и переписку не отправляем. Похожая анкета не значит, что человек тоже тебя выберет.": "We suggest people from across WIRING. If you have liked profiles, we use them to guide recommendations. With few likes, we use your selected traits and what you are looking for. Your visibility settings and other people's privacy choices still apply. Shared details appear below each card. To rank profiles, we send only selected tags, whether you share a city, age range and a shared goal. We do not send names, photos, free text or messages. Similar profiles do not guarantee mutual interest.",
   "своя проводка": "wired differently",
-  "Как поставить": "How to install"
+  "Как поставить": "How to install",
+  "Необязательно. AppMetrica (Яндекс) получает сведения об устройстве, сессиях, регистрации и отправке сообщений. Имя, почта, анкета и переписка не передаются. Геолокация и рекламные идентификаторы отключены. Отозвать согласие можно здесь или в разделе «Согласия».": "Optional. AppMetrica (Yandex) receives device, session, registration and message sending statistics. Names, emails, profiles and messages are not sent. Location and advertising identifiers are disabled. Withdraw consent here or under Consents.",
+  "Разрешить аналитику AppMetrica на этом устройстве": "Allow AppMetrica analytics on this device"
 }
