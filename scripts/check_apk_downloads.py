@@ -23,13 +23,14 @@ class AndroidLinks(HTMLParser):
 def check_download(url):
     if urlsplit(url).scheme not in ("http", "https"):
         raise ValueError("APK download must use HTTP(S)")
-    with urlopen(Request(url, method="HEAD"), timeout=30) as response:
+    headers = {"User-Agent": "WIRING-Deployment-Check/1.0"}
+    with urlopen(Request(url, method="HEAD", headers=headers), timeout=30) as response:
         mime = response.headers.get_content_type()
         if mime not in ("application/vnd.android.package-archive", "application/octet-stream"):
             raise ValueError(f"APK URL returned {mime}, not a binary download: {url}")
         if int(response.headers.get("Content-Length", "0")) <= 4:
             raise ValueError(f"APK download is empty: {url}")
-    with urlopen(Request(url, headers={"Range": "bytes=0-3"}), timeout=30) as response:
+    with urlopen(Request(url, headers={**headers, "Range": "bytes=0-3"}), timeout=30) as response:
         if response.read(4) != b"PK\x03\x04":
             raise ValueError(f"APK download has no ZIP header: {url}")
 
